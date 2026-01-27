@@ -7,10 +7,10 @@ use std::path::PathBuf;
 /// Application modes
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Mode {
-    Normal,  // Navigation mode
-    // Edit,    // Phase 2: Editing a cell
-    // Visual,  // Phase 4: Visual selection
-    // Command, // Phase 4: Command input
+    Normal, // Navigation mode
+            // Edit,    // Phase 2: Editing a cell
+            // Visual,  // Phase 4: Visual selection
+            // Command, // Phase 4: Command input
 }
 
 /// Main application state
@@ -44,7 +44,6 @@ pub struct App {
 
     /// Optional status message to display
     pub status_message: Option<String>,
-
     // Phase 2: Cell editing
     // pub edit_buffer: String,
 }
@@ -85,7 +84,8 @@ impl App {
             // Quit - vim-style (warns if unsaved in Phase 2)
             KeyCode::Char('q') if !self.show_cheatsheet => {
                 if self.csv_data.is_dirty {
-                    self.status_message = Some("Unsaved changes! Use :q! to force quit".to_string());
+                    self.status_message =
+                        Some("Unsaved changes! Use :q! to force quit".to_string());
                 } else {
                     self.should_quit = true;
                 }

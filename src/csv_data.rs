@@ -41,8 +41,8 @@ impl CsvData {
         // Read all rows (memory-bounded for MVP)
         let mut rows = Vec::new();
         for (line_num, result) in reader.records().enumerate() {
-            let record = result
-                .context(format!("Failed to parse CSV row at line {}", line_num + 2))?;
+            let record =
+                result.context(format!("Failed to parse CSV row at line {}", line_num + 2))?;
             let row: Vec<String> = record.iter().map(|s| s.to_string()).collect();
             rows.push(row);
         }
@@ -66,6 +66,7 @@ impl CsvData {
     }
 
     /// Get specific cell value (returns "" if out of bounds)
+    #[allow(dead_code)]
     pub fn get_cell(&self, row: usize, col: usize) -> &str {
         self.rows
             .get(row)

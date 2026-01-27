@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use app::App;
 use crossterm::event::{self, Event, KeyEventKind};
 use csv_data::CsvData;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 fn main() -> Result<()> {
@@ -16,10 +16,7 @@ fn main() -> Result<()> {
 
     // Scan directory for other CSV files
     let csv_files = scan_directory_for_csvs(&file_path)?;
-    let current_file_index = csv_files
-        .iter()
-        .position(|p| p == &file_path)
-        .unwrap_or(0);
+    let current_file_index = csv_files.iter().position(|p| p == &file_path).unwrap_or(0);
 
     // Load CSV data
     let csv_data = CsvData::from_file(&file_path)
@@ -60,7 +57,7 @@ fn parse_args(args: &[String]) -> Result<PathBuf> {
 }
 
 /// Scan directory for other CSV files
-fn scan_directory_for_csvs(file_path: &PathBuf) -> Result<Vec<PathBuf>> {
+fn scan_directory_for_csvs(file_path: &Path) -> Result<Vec<PathBuf>> {
     let dir = file_path
         .parent()
         .context("Failed to get parent directory")?;
@@ -87,7 +84,7 @@ fn scan_directory_for_csvs(file_path: &PathBuf) -> Result<Vec<PathBuf>> {
 
     // If no CSV files found (shouldn't happen), at least include the current file
     if csv_files.is_empty() {
-        csv_files.push(file_path.clone());
+        csv_files.push(file_path.to_path_buf());
     }
 
     Ok(csv_files)

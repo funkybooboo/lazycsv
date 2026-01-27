@@ -13,9 +13,9 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(0),      // Table area
-            Constraint::Length(3),   // Sheet switcher
-            Constraint::Length(3),   // Status bar
+            Constraint::Min(0),    // Table area
+            Constraint::Length(3), // Sheet switcher
+            Constraint::Length(3), // Status bar
         ])
         .split(frame.area());
 
@@ -56,7 +56,8 @@ fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     let mut col_letter_cells = vec![Cell::from("")]; // Empty cell for row numbers column
     for i in start_col..end_col {
         let letter = column_index_to_letter(i);
-        col_letter_cells.push(Cell::from(letter).style(Style::default().add_modifier(Modifier::DIM)));
+        col_letter_cells
+            .push(Cell::from(letter).style(Style::default().add_modifier(Modifier::DIM)));
     }
     let col_letters_row = Row::new(col_letter_cells).height(1);
 
@@ -64,7 +65,8 @@ fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     let mut header_cells = vec![Cell::from("#")]; // Row number column header
     for i in start_col..end_col {
         let header_text = csv.get_header(i);
-        header_cells.push(Cell::from(header_text).style(Style::default().add_modifier(Modifier::BOLD)));
+        header_cells
+            .push(Cell::from(header_text).style(Style::default().add_modifier(Modifier::BOLD)));
     }
     let header_row = Row::new(header_cells).height(1);
 
@@ -98,7 +100,10 @@ fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
 
     // Calculate column widths
     let mut widths = vec![Constraint::Length(5)]; // Row number column
-    let available_width = area.width.saturating_sub(5).saturating_sub(visible_col_count as u16 + 2);
+    let available_width = area
+        .width
+        .saturating_sub(5)
+        .saturating_sub(visible_col_count as u16 + 2);
     let col_width = if visible_col_count > 0 {
         available_width / visible_col_count as u16
     } else {
@@ -115,15 +120,11 @@ fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
 
     // Create table widget
     let table = Table::new(all_rows, widths)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(format!(
-                    " lazycsv: {}{} ",
-                    csv.filename,
-                    if csv.is_dirty { "*" } else { "" }
-                )),
-        )
+        .block(Block::default().borders(Borders::ALL).title(format!(
+            " lazycsv: {}{} ",
+            csv.filename,
+            if csv.is_dirty { "*" } else { "" }
+        )))
         .highlight_symbol("► ");
 
     // Render stateful widget
@@ -143,7 +144,11 @@ fn render_sheet_switcher(frame: &mut Frame, app: &App, area: Rect) {
     }
 
     let count_info = if app.csv_files.len() > 1 {
-        format!("Files ({}/{}): ", app.current_file_index + 1, app.csv_files.len())
+        format!(
+            "Files ({}/{}): ",
+            app.current_file_index + 1,
+            app.csv_files.len()
+        )
     } else {
         "File: ".to_string()
     };
@@ -253,11 +258,8 @@ fn render_cheatsheet(frame: &mut Frame) {
         )),
     ];
 
-    let help = Paragraph::new(help_text).block(
-        Block::default()
-            .borders(Borders::ALL)
-            .title(" Help "),
-    );
+    let help =
+        Paragraph::new(help_text).block(Block::default().borders(Borders::ALL).title(" Help "));
 
     // Clear background
     frame.render_widget(ratatui::widgets::Clear, area);

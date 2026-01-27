@@ -15,3 +15,6 @@ fuzzy-matcher = "0.3"
 opt-level = 3
 lto = true
 codegen-units = 1
+
+[dev-dependencies]
+tempfile = "3.10.1"
