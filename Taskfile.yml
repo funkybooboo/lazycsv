@@ -117,7 +117,8 @@ tasks:
         104,DataDrive LLC,Sarah Wilson,USA,555-0004
         105,CloudNet Systems,Tom Brown,Australia,555-0005
         EOF
-      - echo "Sample CSV files created: sample.csv, customers.csv"
+      - |
+        echo "Sample CSV files created: sample.csv, customers.csv"
 
   docs:
     desc: Open project documentation
