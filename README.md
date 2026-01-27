@@ -171,7 +171,7 @@ Contributions welcome! Please:
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+GPL License - see [LICENSE](LICENSE) file for details.
 
 ## Inspiration
 
@@ -187,3 +187,4 @@ Special thanks to:
 - [ratatui team](https://ratatui.rs/) for the excellent TUI framework
 - [BurntSushi](https://github.com/BurntSushi) for the CSV crate
 - The Rust community for making this possible
+
