@@ -1,0 +1,138 @@
+version: '3'
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  build:
+    desc: Build the project in debug mode
+    cmds:
+      - cargo build
+
+  build-release:
+    desc: Build the project in release mode (optimized)
+    cmds:
+      - cargo build --release
+
+  run:
+    desc: Run the application with sample.csv
+    cmds:
+      - cargo run -- sample.csv
+
+  run-release:
+    desc: Run the release build with sample.csv
+    cmds:
+      - cargo run --release -- sample.csv
+
+  run-customers:
+    desc: Run the application with customers.csv
+    cmds:
+      - cargo run -- customers.csv
+
+  test:
+    desc: Run all tests
+    cmds:
+      - cargo test
+
+  test-verbose:
+    desc: Run tests with verbose output
+    cmds:
+      - cargo test -- --nocapture
+
+  check:
+    desc: Check the project for errors without building
+    cmds:
+      - cargo check
+
+  clippy:
+    desc: Run clippy linter
+    cmds:
+      - cargo clippy -- -D warnings
+
+  fmt:
+    desc: Format code with rustfmt
+    cmds:
+      - cargo fmt
+
+  fmt-check:
+    desc: Check if code is formatted correctly
+    cmds:
+      - cargo fmt -- --check
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - cargo clean
+
+  install:
+    desc: Install lazycsv to ~/.cargo/bin
+    cmds:
+      - cargo install --path .
+
+  uninstall:
+    desc: Uninstall lazycsv from ~/.cargo/bin
+    cmds:
+      - cargo uninstall lazycsv
+
+  dev:
+    desc: Run in dev mode (rebuild on changes)
+    cmds:
+      - cargo watch -x 'run -- sample.csv'
+    preconditions:
+      - sh: command -v cargo-watch
+        msg: "cargo-watch not installed. Run: cargo install cargo-watch"
+
+  all:
+    desc: Run format, clippy, and test
+    cmds:
+      - task: fmt
+      - task: clippy
+      - task: test
+
+  sample:
+    desc: Create sample CSV files for testing
+    cmds:
+      - |
+        cat > sample.csv << 'EOF'
+        ID,Name,Email,Age,City,Score
+        1,Alice Johnson,alice@example.com,30,New York,95
+        2,Bob Smith,bob@example.com,25,Los Angeles,87
+        3,Charlie Brown,charlie@example.com,35,Chicago,92
+        4,Diana Prince,diana@example.com,28,Houston,88
+        5,Eve Davis,eve@example.com,32,Phoenix,91
+        6,Frank Miller,frank@example.com,29,Philadelphia,85
+        7,Grace Lee,grace@example.com,27,San Antonio,89
+        8,Henry Wilson,henry@example.com,31,San Diego,90
+        9,Iris Moore,iris@example.com,26,Dallas,86
+        10,Jack Taylor,jack@example.com,33,San Jose,93
+        EOF
+      - |
+        cat > customers.csv << 'EOF'
+        CustomerID,Company,Contact,Country,Phone
+        101,Acme Corp,John Doe,USA,555-0001
+        102,TechStart Inc,Jane Smith,Canada,555-0002
+        103,Global Solutions,Mike Johnson,UK,555-0003
+        104,DataDrive LLC,Sarah Wilson,USA,555-0004
+        105,CloudNet Systems,Tom Brown,Australia,555-0005
+        EOF
+      - echo "Sample CSV files created: sample.csv, customers.csv"
+
+  docs:
+    desc: Open project documentation
+    cmds:
+      - cargo doc --open
+
+  bench:
+    desc: Run benchmarks (if any)
+    cmds:
+      - cargo bench
+
+  ci:
+    desc: Run CI checks (format, clippy, test)
+    cmds:
+      - task: fmt-check
+      - task: clippy
+      - task: test
+      - task: build-release
