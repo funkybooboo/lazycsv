@@ -1,11 +1,17 @@
 version: '3'
 
+vars:
+  DEFAULT_CSV: sample.csv
+
 tasks:
   default:
     desc: Show available tasks
     cmds:
-      - task --list
+      - go-task --list
 
+  #----------------#
+  # Build Commands #
+  #----------------#
   build:
     desc: Build the project in debug mode
     cmds:
@@ -16,21 +22,30 @@ tasks:
     cmds:
       - cargo build --release
 
+  #----------------#
+  # Run Commands   #
+  #----------------#
   run:
-    desc: Run the application with sample.csv
+    desc: "Run the application with a given CSV file (default: {{.DEFAULT_CSV}})"
     cmds:
-      - cargo run -- sample.csv
+      - cargo run -- {{.file | default .DEFAULT_CSV}}
 
   run-release:
-    desc: Run the release build with sample.csv
+    desc: "Run the release build with a given CSV file (default: {{.DEFAULT_CSV}})"
     cmds:
-      - cargo run --release -- sample.csv
+      - cargo run --release -- {{.file | default .DEFAULT_CSV}}
 
-  run-customers:
-    desc: Run the application with customers.csv
+  dev:
+    desc: Run in dev mode (rebuild on changes)
     cmds:
-      - cargo run -- customers.csv
+      - cargo watch -x 'run -- {{.file | default .DEFAULT_CSV}}'
+    preconditions:
+      - sh: command -v cargo-watch
+        msg: "cargo-watch not installed. Run: cargo install cargo-watch"
 
+  #----------------#
+  # Test Commands  #
+  #----------------#
   test:
     desc: Run all tests
     cmds:
@@ -41,26 +56,43 @@ tasks:
     cmds:
       - cargo test -- --nocapture
 
+  bench:
+    desc: Run benchmarks (if any)
+    cmds:
+      - cargo bench
+
+  #------------------#
+  # Quality Checks   #
+  #------------------#
+  format:
+    desc: Format code with rustfmt
+    cmds:
+      - cargo fmt
+
+  format-check:
+    desc: Check if code is formatted correctly
+    cmds:
+      - cargo fmt -- --check
+
+  lint:
+    desc: Run clippy linter
+    cmds:
+      - cargo clippy -- -D warnings
+
   check:
     desc: Check the project for errors without building
     cmds:
       - cargo check
 
-  clippy:
-    desc: Run clippy linter
+  quality:
+    desc: Run all quality checks (format, lint)
     cmds:
-      - cargo clippy -- -D warnings
+      - go-task format
+      - go-task lint
 
-  fmt:
-    desc: Format code with rustfmt
-    cmds:
-      - cargo fmt
-
-  fmt-check:
-    desc: Check if code is formatted correctly
-    cmds:
-      - cargo fmt -- --check
-
+  #------------------#
+  # Project Commands #
+  #------------------#
   clean:
     desc: Clean build artifacts
     cmds:
@@ -76,20 +108,10 @@ tasks:
     cmds:
       - cargo uninstall lazycsv
 
-  dev:
-    desc: Run in dev mode (rebuild on changes)
+  docs:
+    desc: Open project documentation
     cmds:
-      - cargo watch -x 'run -- sample.csv'
-    preconditions:
-      - sh: command -v cargo-watch
-        msg: "cargo-watch not installed. Run: cargo install cargo-watch"
-
-  all:
-    desc: Run format, clippy, and test
-    cmds:
-      - task: fmt
-      - task: clippy
-      - task: test
+      - cargo doc --open
 
   sample:
     desc: Create sample CSV files for testing
@@ -120,20 +142,13 @@ tasks:
       - |
         echo "Sample CSV files created: sample.csv, customers.csv"
 
-  docs:
-    desc: Open project documentation
-    cmds:
-      - cargo doc --open
-
-  bench:
-    desc: Run benchmarks (if any)
-    cmds:
-      - cargo bench
-
+  #------------------#
+  # CI Commands      #
+  #------------------#
   ci:
-    desc: Run CI checks (format, clippy, test)
+    desc: Run CI checks (format-check, lint, test, build-release)
     cmds:
-      - task: fmt-check
-      - task: clippy
-      - task: test
-      - task: build-release
+      - go-task format-check
+      - go-task lint
+      - go-task test
+      - go-task build-release
