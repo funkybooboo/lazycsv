@@ -21,10 +21,8 @@ jobs:
           profile: minimal
           components: rustfmt
           override: true
-      - name: Install Task
-        run: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
       - name: Check formatting
-        run: got-task format-check
+        run: cargo fmt -- --check
 
   lint:
     name: Lint
@@ -37,8 +35,6 @@ jobs:
           profile: minimal
           components: clippy
           override: true
-      - name: Install Task
-        run: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -50,7 +46,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-lint-
       - name: Run linter
-        run: go-task lint
+        run: cargo clippy -- -D warnings
 
   test:
     name: Test
@@ -62,8 +58,6 @@ jobs:
           toolchain: stable
           profile: minimal
           override: true
-      - name: Install Task
-        run: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -75,7 +69,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-test-
       - name: Run tests
-        run: go-task test
+        run: cargo test
 
   build:
     name: Build
@@ -95,8 +89,6 @@ jobs:
           toolchain: ${{ matrix.rust }}
           profile: minimal
           override: true
-      - name: Install Task
-        run: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -108,5 +100,5 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-build-${{ matrix.rust }}-
       - name: Build
-        run: go-task build-release
+        run: cargo build --release
         continue-on-error: ${{ matrix.experimental || false }}
