@@ -31,9 +31,13 @@ fn test_complete_navigation_workflow() {
     assert_eq!(app.selected_row(), Some(2));
     assert_eq!(app.selected_col, 2);
 
+    // gg - Go to first row (multi-key command)
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-    app.handle_key(key_event(KeyCode::Char('0'))).unwrap();
+    app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
     assert_eq!(app.selected_row(), Some(0));
+
+    // 0 - Go to first column
+    app.handle_key(key_event(KeyCode::Char('0'))).unwrap();
     assert_eq!(app.selected_col, 0);
 }
 

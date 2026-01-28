@@ -3,9 +3,10 @@ mod navigation;
 
 use crate::csv_data::CsvData;
 use anyhow::{Context, Result};
-use crossterm::event::KeyEvent;
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::widgets::TableState;
 use std::path::PathBuf;
+use std::time::Instant;
 
 /// Application modes
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -14,6 +15,15 @@ pub enum Mode {
             // Edit,    // Phase 2: Editing a cell
             // Visual,  // Phase 4: Visual selection
             // Command, // Phase 4: Command input
+}
+
+/// Viewport centering mode for view commands (zt, zz, zb)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ViewportMode {
+    Auto,   // Auto-center when possible (default)
+    Top,    // Selected row at top (zt)
+    Center, // Selected row centered (zz)
+    Bottom, // Selected row at bottom (zb)
 }
 
 /// Main application state
@@ -47,6 +57,19 @@ pub struct App {
 
     /// Optional status message to display
     pub status_message: Option<String>,
+
+    // Multi-key command support
+    /// Pending key for multi-key commands (e.g., after 'g', waiting for second key)
+    pub pending_key: Option<KeyCode>,
+
+    /// Time when pending key was set (for timeout)
+    pub pending_key_time: Option<Instant>,
+
+    /// Count prefix for vim commands (e.g., "5" for 5j)
+    pub command_count: Option<String>,
+
+    /// Viewport centering mode (Auto, Top, Center, Bottom)
+    pub viewport_mode: ViewportMode,
     // Phase 2: Cell editing
     // pub edit_buffer: String,
 }
@@ -69,6 +92,10 @@ impl App {
             csv_files,
             current_file_index,
             status_message: None,
+            pending_key: None,
+            pending_key_time: None,
+            command_count: None,
+            viewport_mode: ViewportMode::Auto,
         }
     }
 

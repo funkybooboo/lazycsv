@@ -51,11 +51,17 @@ fn run(
 ) -> Result<()> {
     let mut app = App::new(csv_data, csv_files, current_file_index);
 
+    // Event-driven rendering: only redraw when state changes
+    let mut needs_redraw = true;
+
     loop {
-        // Draw UI
-        terminal
-            .draw(|frame| ui::render(frame, &mut app))
-            .context("Failed to render UI")?;
+        // Only render if state has changed
+        if needs_redraw {
+            terminal
+                .draw(|frame| ui::render(frame, &mut app))
+                .context("Failed to render UI")?;
+            needs_redraw = false;
+        }
 
         // Poll for events (100ms timeout)
         if event::poll(Duration::from_millis(100)).context("Failed to poll for events")? {
@@ -64,6 +70,9 @@ fn run(
                 if key.kind == KeyEventKind::Press {
                     // Handle key press - returns true if we need to reload file
                     let should_reload = app.handle_key(key)?;
+
+                    // State changed, need to redraw
+                    needs_redraw = true;
 
                     if should_reload {
                         // Reload CSV data from new file

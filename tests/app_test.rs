@@ -107,6 +107,8 @@ fn test_navigation_home_end() {
     app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
     assert_eq!(app.selected_row(), Some(2)); // Last row
 
+    // gg - Go to first row (multi-key command)
+    app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
     assert_eq!(app.selected_row(), Some(0)); // First row
 }

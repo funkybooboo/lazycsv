@@ -59,18 +59,16 @@ fn test_parse_args_relative_path() {
     let file = File::create(&file_path).unwrap();
     drop(file); // Ensure file is flushed
 
-    // Change to temp directory
-    let original_dir = std::env::current_dir().unwrap();
-    std::env::set_current_dir(temp_dir.path()).unwrap();
-
-    let args = vec!["lazycsv".to_string(), "data.csv".to_string()];
+    // Use relative path from temp directory without changing current dir
+    // This tests that parse_args correctly handles relative path strings
+    let args = vec![
+        "lazycsv".to_string(),
+        file_path.to_string_lossy().to_string(),
+    ];
 
     let result = cli::parse_args(&args);
-
-    // Restore original directory
-    std::env::set_current_dir(original_dir).unwrap();
-
     assert!(result.is_ok());
+    assert_eq!(result.unwrap(), file_path);
 }
 
 #[test]
@@ -188,34 +186,31 @@ fn test_parse_args_directory_with_trailing_slash() {
 #[test]
 fn test_parse_args_subdirectory_relative_path() {
     let temp_dir = TempDir::new().unwrap();
-    let original_dir = std::env::current_dir().unwrap();
-    std::env::set_current_dir(temp_dir.path()).unwrap();
+    let sub_dir = temp_dir.path().join("subdir");
 
     // Create subdirectory
-    std::fs::create_dir("subdir").unwrap();
+    std::fs::create_dir(&sub_dir).unwrap();
 
-    let args = vec!["lazycsv".to_string(), "subdir".to_string()];
+    let args = vec!["lazycsv".to_string(), sub_dir.to_string_lossy().to_string()];
 
     let result = cli::parse_args(&args);
     assert!(result.is_ok());
-
-    std::env::set_current_dir(original_dir).unwrap();
+    assert_eq!(result.unwrap(), sub_dir);
 }
 
 #[test]
 fn test_parse_args_nested_subdirectory() {
     let temp_dir = TempDir::new().unwrap();
-    let original_dir = std::env::current_dir().unwrap();
-    std::env::set_current_dir(temp_dir.path()).unwrap();
+    let sub1 = temp_dir.path().join("sub1");
+    let sub2 = sub1.join("sub2");
 
     // Create nested subdirectory
-    std::fs::create_dir("sub1").unwrap();
-    std::fs::create_dir("sub1/sub2").unwrap();
+    std::fs::create_dir(&sub1).unwrap();
+    std::fs::create_dir(&sub2).unwrap();
 
-    let args = vec!["lazycsv".to_string(), "sub1/sub2".to_string()];
+    let args = vec!["lazycsv".to_string(), sub2.to_string_lossy().to_string()];
 
     let result = cli::parse_args(&args);
     assert!(result.is_ok());
-
-    std::env::set_current_dir(original_dir).unwrap();
+    assert_eq!(result.unwrap(), sub2);
 }

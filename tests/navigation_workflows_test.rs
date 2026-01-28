@@ -55,7 +55,8 @@ fn test_navigate_to_all_four_corners() {
     assert_eq!(app.selected_row(), Some(99));
     assert_eq!(app.selected_col, 2);
 
-    // Navigate to top-right (0, 2)
+    // Navigate to top-right (0, 2) - using gg multi-key command
+    app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
     assert_eq!(app.selected_row(), Some(0));
     assert_eq!(app.selected_col, 2);

@@ -52,8 +52,54 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     }
     let header_row = Row::new(header_cells).height(1);
 
-    // Build data rows with row numbers
-    let rows = csv.rows.iter().enumerate().map(|(row_idx, row)| {
+    // Virtual scrolling: Calculate visible viewport to only process visible rows
+    let table_height = area
+        .height
+        .saturating_sub(4) // borders + column letters + header
+        .saturating_sub(6) // status bar + file switcher
+        as usize;
+
+    // Get current scroll position from table state
+    let selected_idx = app.table_state.selected().unwrap_or(0);
+
+    // Calculate scroll offset based on viewport mode (zt, zz, zb, or auto)
+    let scroll_offset = match app.viewport_mode {
+        crate::app::ViewportMode::Auto => {
+            // Auto-center: keep selected row centered when possible
+            if selected_idx < table_height / 2 {
+                0 // Near top, no scroll
+            } else {
+                (selected_idx - table_height / 2).min(csv.row_count().saturating_sub(table_height))
+            }
+        }
+        crate::app::ViewportMode::Top => {
+            // zt: selected row at top of screen
+            selected_idx.min(csv.row_count().saturating_sub(table_height))
+        }
+        crate::app::ViewportMode::Center => {
+            // zz: selected row at center of screen
+            if selected_idx < table_height / 2 {
+                0
+            } else {
+                (selected_idx - table_height / 2).min(csv.row_count().saturating_sub(table_height))
+            }
+        }
+        crate::app::ViewportMode::Bottom => {
+            // zb: selected row at bottom of screen
+            selected_idx.saturating_sub(table_height.saturating_sub(1))
+        }
+    };
+
+    // Only process visible rows (huge performance improvement for large files)
+    let end_row = (scroll_offset + table_height).min(csv.row_count());
+    let visible_rows = if scroll_offset < csv.row_count() {
+        &csv.rows[scroll_offset..end_row]
+    } else {
+        &[]
+    };
+
+    let rows = visible_rows.iter().enumerate().map(|(idx_in_window, row)| {
+        let row_idx = scroll_offset + idx_in_window; // Actual row index in dataset
         let mut cells = vec![Cell::from(format!("{}", row_idx + 1))]; // Row number
 
         for col_idx in start_col..end_col {
@@ -110,10 +156,17 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
         .highlight_symbol("► ");
 
     // Render stateful widget
-    // Offset by 2 to account for column letters and header rows
+    // With virtual scrolling, we need to adjust the selected position
+    // to be relative to the visible window, then offset by 2 for headers
     let mut adjusted_state = app.table_state.clone();
     if let Some(selected) = adjusted_state.selected() {
-        adjusted_state.select(Some(selected + 2));
+        // Calculate position within visible window
+        let position_in_window = if selected >= scroll_offset && selected < end_row {
+            selected - scroll_offset
+        } else {
+            0
+        };
+        adjusted_state.select(Some(position_in_window + 2)); // +2 for column letters and header
     }
 
     frame.render_stateful_widget(table, area, &mut adjusted_state);
