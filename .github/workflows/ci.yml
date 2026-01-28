@@ -24,7 +24,7 @@ jobs:
       - name: Install Task
         run: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
       - name: Check formatting
-        run: task format-check
+        run: got-task format-check
 
   lint:
     name: Lint
@@ -50,7 +50,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-lint-
       - name: Run linter
-        run: task lint
+        run: go-task lint
 
   test:
     name: Test
@@ -75,7 +75,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-test-
       - name: Run tests
-        run: task test
+        run: go-task test
 
   build:
     name: Build
@@ -108,5 +108,5 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-build-${{ matrix.rust }}-
       - name: Build
-        run: task build-release
+        run: go-task build-release
         continue-on-error: ${{ matrix.experimental || false }}
