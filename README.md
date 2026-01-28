@@ -5,19 +5,20 @@ A blazingly fast terminal UI for CSV files. Navigate huge datasets with vim keys
 Inspired by [lazygit](https://github.com/jesseduffield/lazygit), [lazydocker](https://github.com/jesseduffield/lazydocker), and [lazysql](https://github.com/jorgerojas26/lazysql).
 
 ```
-┌─ lazycsv: sales_data.csv ──────── Row 3/100 ─────┐
-│     │  A      │  B         │  C           │  D   │
-├─────┼─────────┼────────────┼──────────────┼──────┤
-│  #  │  ID     │  Date      │  Product     │  Qty │
-├─────┼─────────┼────────────┼──────────────┼──────┤
-│  1  │  001    │ 2024-01-15 │ Widget A     │  100 │
-│►2   │  002    │ 2024-01-16 │ [Gadget B]   │   50 │
-│  3  │  003    │ 2024-01-17 │ Doohickey... │   75 │
-├─────────────────────────────────────────────────┤
-│ Row 2/100 │ Col B: Date │ ? help │ q quit      │
-├─────────────────────────────────────────────────┤
-│ Files (1/2): ► sales.csv | customers.csv       │
-└─────────────────────────────────────────────────┘
+┌─ lazycsv: sales_data.csv ─────────────────────────┐
+│     │  A      │ ►B         │  C           │  D    │
+├─────┼─────────┼────────────┼──────────────┼───────┤
+│  #  │  ID     │  Date      │  Product     │  Qty  │
+├─────┼─────────┼────────────┼──────────────┼───────┤
+│  1  │  001    │ 2024-01-15 │ Widget A     │  100  │
+│►2   │  002    │ [2024...] │ Gadget B     │   50  │
+│  3  │  003    │ 2024-01-17 │ Doohickey... │   75  │
+├────────────────────────────────────────────────────┤
+│ [?] help │ [q] quit │ [ ] files │                 │
+│ Row 2/100 │ Col B: Date (2/4) │ Cell: "2024..." │
+├────────────────────────────────────────────────────┤
+│ Files (1/2): ► sales.csv | customers.csv         │
+└────────────────────────────────────────────────────┘
 ```
 
 ## Why LazyCSV?
@@ -39,7 +40,11 @@ cargo install --path .
 ## Quick Start
 
 ```bash
-lazycsv data.csv    # open a CSV file
+# Open current directory
+lazycsv
+
+# Or open specific file
+lazycsv data.csv
 
 # In the app:
 # hjkl or arrows  → navigate
@@ -97,7 +102,7 @@ cargo run -- sample.csv
 cargo test
 ```
 
-**Test Suite:** 99 comprehensive tests covering all Phase 1 features. See [tests/README.md](tests/README.md) for details.
+**Test Suite:** 133 comprehensive tests covering all Phase 1 features including directory handling. See [tests/README.md](tests/README.md) for details.
 
 See [docs/development.md](docs/development.md) for contributing guidelines.
 

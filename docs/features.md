@@ -16,14 +16,32 @@ LazyCSV is designed around these core principles:
 
 ### File Loading
 - ✅ Load CSV files from command line: `lazycsv file.csv`
-- ✅ Support absolute and relative paths
+- ✅ Load from directory: `lazycsv .` or `lazycsv /path/to/dir`
+- ✅ No arguments defaults to current directory: `lazycsv`
+- ✅ Support absolute and relative paths (files and directories)
+- ✅ Directory mode: loads first CSV file alphabetically
 - ✅ Handle UTF-8 encoding
 - ✅ Parse quoted fields and escaped commas
-- ✅ Error messages for invalid files
+- ✅ Error messages for invalid files or missing directories
 
 **Usage:**
 ```bash
+# Specific file
 lazycsv data.csv
+
+# Current directory (loads first CSV alphabetically)
+lazycsv
+lazycsv .
+
+# Parent directory
+lazycsv ..
+
+# Subdirectory
+lazycsv ./data
+lazycsv data/exports
+
+# Absolute directory path
+lazycsv /home/user/csvfiles
 ```
 
 ### Table Display
@@ -39,15 +57,17 @@ lazycsv data.csv
 **Visual Layout:**
 ```
 ┌─ lazycsv: data.csv ────────────────────┐
-│     │  A      │  B      │  C      │... │ ← Column letters
+│     │  A      │ ►B      │  C      │... │ ← Column letters (► shows selected)
 ├─────┼─────────┼─────────┼─────────┼────┤
 │  #  │  Name   │  Email  │  Age    │... │ ← Headers
 ├─────┼─────────┼─────────┼─────────┼────┤
 │  1  │  Alice  │  a@e... │  30     │... │
-│►2   │ [Bob]   │  b@e... │  25     │... │ ← Current cell
+│►2   │  Bob    │ [b@e...]│  25     │... │ ← Current cell (highlighted)
 │  3  │  Charlie│  c@e... │  35     │... │
 ├─────┴─────────┴─────────┴─────────┴────┤
-│ Row 2/100 │ Col 2/5 Email │ ? help    │ ← Status bar
+│ [?] help │ [q] quit │ [ ] files │      │ ← Status bar (left: controls,
+│ Row 2/100 │ Col B: Email (2/5) │       │           right: position)
+│ Cell: "bob@example.com"                │
 ├───────────────────────────────────────┤
 │ Files (1/2): ► data.csv | other.csv  │ ← File switcher
 └───────────────────────────────────────┘
@@ -77,15 +97,20 @@ All navigation is keyboard-driven with vim-inspired keys:
 LazyCSV treats CSV files in the same directory like "worksheets":
 
 - ✅ **Auto-discovery** - Scans directory for all .csv files on startup
+- ✅ **Works with files or directories** - Scans parent dir when given a file, or scans the directory when given a dir path
 - ✅ **Always-visible switcher** - Bottom panel shows all available files
 - ✅ **Quick switching** - Press `[` for previous, `]` for next file
-- ✅ **Current file indicator** - `►` shows active file
-- ✅ **File count** - Shows "Files (2/5)" - file 2 of 5 total
+- ✅ **Current file indicator** - `►` shows active file in top bar and file switcher
+- ✅ **File count** - Shows "Files (2/5): ► file1.csv | file2.csv | ..."
 
 **Usage:**
 ```bash
-# Open a CSV file - automatically finds other CSVs in same directory
+# Open a specific file - automatically finds other CSVs in same directory
 lazycsv sales.csv
+
+# Open a directory - loads first CSV alphabetically, finds all others
+lazycsv .
+lazycsv /path/to/csvfiles
 
 # Now in the app:
 # Press ] to switch to next file (customers.csv)
@@ -100,12 +125,22 @@ lazycsv sales.csv
 - ✅ **Close with `?` or `Esc`**
 
 ### Status Bar
-Always-visible status bar shows:
-- ✅ Current position: "Row 5/100"
-- ✅ Current column: "Col 2/5 Email" (includes column name)
-- ✅ Quick help: "[?] help"
-- ✅ Quit hint: "[q] quit"
-- ✅ File switching hint: "[/]] switch files" (when multiple files)
+Always-visible status bar with two sections:
+
+**Left side (controls):**
+- ✅ Quick help: `[?] help`
+- ✅ Quit hint: `[q] quit`
+- ✅ File switching hint: `[ ] files` (when multiple files)
+
+**Right side (position info):**
+- ✅ Current row: `Row 5/100`
+- ✅ Current column: `Col B: Email (2/5)` (letter, name, and position)
+- ✅ Current cell value: `Cell: "value"` (or `<empty>` for empty cells)
+
+**Format:**
+```
+[?] help │ [q] quit │ [ ] files │ Row 5/100 │ Col B: Email (2/5) │ Cell: "example"
+```
 
 ### File Information
 - ✅ Filename in title bar

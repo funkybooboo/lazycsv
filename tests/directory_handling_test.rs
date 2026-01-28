@@ -1,4 +1,5 @@
 use lazycsv::{cli, file_scanner, CsvData};
+use serial_test::serial;
 use std::fs::File;
 use std::io::Write as IoWrite;
 use tempfile::TempDir;
@@ -100,6 +101,7 @@ fn test_directory_empty() {
 }
 
 #[test]
+#[serial]
 fn test_current_directory_dot() {
     let temp_dir = TempDir::new().unwrap();
     let original_dir = std::env::current_dir().unwrap();
@@ -109,6 +111,7 @@ fn test_current_directory_dot() {
     let mut file = File::create("test.csv").unwrap();
     writeln!(file, "A,B,C").unwrap();
     writeln!(file, "1,2,3").unwrap();
+    drop(file); // Ensure file is flushed
 
     let args = vec!["lazycsv".to_string(), ".".to_string()];
 
@@ -124,6 +127,7 @@ fn test_current_directory_dot() {
 }
 
 #[test]
+#[serial]
 fn test_no_args_defaults_to_current_directory() {
     let temp_dir = TempDir::new().unwrap();
     let original_dir = std::env::current_dir().unwrap();
@@ -133,6 +137,7 @@ fn test_no_args_defaults_to_current_directory() {
     let mut file = File::create("data.csv").unwrap();
     writeln!(file, "Name").unwrap();
     writeln!(file, "Test").unwrap();
+    drop(file); // Ensure file is flushed
 
     let args = vec!["lazycsv".to_string()];
 
@@ -156,10 +161,7 @@ fn test_subdirectory_path() {
     writeln!(file, "X,Y").unwrap();
     writeln!(file, "1,2").unwrap();
 
-    let args = vec![
-        "lazycsv".to_string(),
-        sub_dir.to_string_lossy().to_string(),
-    ];
+    let args = vec!["lazycsv".to_string(), sub_dir.to_string_lossy().to_string()];
 
     let path = cli::parse_args(&args).unwrap();
     let csv_files = file_scanner::scan_directory(&path).unwrap();
@@ -260,12 +262,11 @@ fn test_directory_with_mixed_extensions() {
 
     // Should only include lowercase .csv files
     assert!(csv_files.len() >= 1);
-    assert!(csv_files
-        .iter()
-        .all(|p| p.extension().unwrap() == "csv"));
+    assert!(csv_files.iter().all(|p| p.extension().unwrap() == "csv"));
 }
 
 #[test]
+#[serial]
 fn test_parent_directory_double_dot() {
     let temp_dir = TempDir::new().unwrap();
     let sub_dir = temp_dir.path().join("subdir");

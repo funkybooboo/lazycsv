@@ -51,9 +51,7 @@ fn test_scan_directory_mixed_files() {
     let csv_files = result.unwrap();
     // Should only include CSV files
     assert_eq!(csv_files.len(), 2);
-    assert!(csv_files
-        .iter()
-        .all(|p| p.extension().unwrap() == "csv"));
+    assert!(csv_files.iter().all(|p| p.extension().unwrap() == "csv"));
 }
 
 #[test]
@@ -279,9 +277,7 @@ fn test_direct_scan_directory_mixed_files() {
 
     let csv_files = result.unwrap();
     assert_eq!(csv_files.len(), 2);
-    assert!(csv_files
-        .iter()
-        .all(|p| p.extension().unwrap() == "csv"));
+    assert!(csv_files.iter().all(|p| p.extension().unwrap() == "csv"));
 }
 
 #[test]
@@ -367,7 +363,9 @@ fn test_direct_scan_directory_case_sensitive_extension() {
 
     let csv_files = result.unwrap();
     // Only lowercase .csv should match
-    assert!(csv_files.iter().any(|p| p.file_name().unwrap() == "lowercase.csv"));
+    assert!(csv_files
+        .iter()
+        .any(|p| p.file_name().unwrap() == "lowercase.csv"));
 }
 
 #[test]

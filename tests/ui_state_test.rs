@@ -64,7 +64,11 @@ fn test_ui_renders_with_single_cell() -> io::Result<()> {
     })?;
 
     let buffer = terminal.backend().buffer();
-    let content = buffer.content.iter().map(|c| c.symbol()).collect::<String>();
+    let content = buffer
+        .content
+        .iter()
+        .map(|c| c.symbol())
+        .collect::<String>();
 
     assert!(content.contains("single.csv"));
 

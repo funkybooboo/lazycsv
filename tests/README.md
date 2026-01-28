@@ -4,9 +4,9 @@ Comprehensive testing for the LazyCSV TUI application.
 
 ## Test Statistics
 
-- **Total Tests:** 99
-- **Test Suites:** 10
-- **Coverage:** All Phase 1 features and workflows
+- **Total Tests:** 133
+- **Test Suites:** 11
+- **Coverage:** All Phase 1 features including directory handling and workflows
 - **Status:** ✅ All Passing
 
 ## Test Organization
@@ -18,10 +18,11 @@ Tests are organized by component and concern:
 ```
 tests/
 ├── app_test.rs                     # Application logic (16 tests)
-├── cli_test.rs                     # CLI parsing (8 tests)
+├── cli_test.rs                     # CLI parsing (16 tests)
 ├── csv_data_test.rs                # CSV data model (3 tests)
 ├── csv_edge_cases_test.rs          # CSV edge cases (17 tests)
-├── file_scanner_test.rs            # File discovery (12 tests)
+├── directory_handling_test.rs      # Directory scanning integration (13 tests)
+├── file_scanner_test.rs            # File discovery (25 tests)
 ├── integration_workflows_test.rs   # End-to-end workflows (13 tests)
 ├── navigation_workflows_test.rs    # Navigation patterns (10 tests)
 ├── ui_rendering_test.rs            # TUI rendering (6 tests)
@@ -53,22 +54,13 @@ Tests core application state and behavior:
 
 ### 2. CLI Tests (`cli_test.rs`)
 
-Tests command-line argument parsing:
+Tests command-line argument parsing - file and directory paths, error handling, various path formats.
 
-- ✅ No arguments (shows usage)
-- ✅ Valid file path
-- ✅ File not found error
-- ✅ Directory instead of file error
-- ✅ Relative paths
-- ✅ Absolute paths
-- ✅ Paths with spaces
-- ✅ Extra arguments handling
-
-**Error Cases Covered:**
-- Missing file
-- Invalid path
-- Directory path
-- All error messages are clear
+**Key Features:**
+- Supports both file and directory arguments
+- No args defaults to current directory
+- All path formats (relative, absolute, ., .., etc.)
+- Clear error messages
 
 ### 3. CSV Data Tests (`csv_data_test.rs`)
 
@@ -103,28 +95,26 @@ Tests challenging CSV scenarios:
 - Unicode/emoji → Full support
 - 10K rows → Fast loading
 
-### 5. File Scanner Tests (`file_scanner_test.rs`)
+### 5. Directory Handling Tests (`directory_handling_test.rs`)
 
-Tests directory CSV discovery:
+Integration tests for directory-based workflows - loading from directories, scanning, multi-file switching.
 
-- ✅ Single CSV file
-- ✅ Multiple CSVs (sorted alphabetically)
-- ✅ Mixed file types (filters non-CSV)
-- ✅ Subdirectories (ignores nested files)
-- ✅ Empty directory handling
-- ✅ Alphabetical sorting
-- ✅ Case sensitivity
-- ✅ Dots in filenames
-- ✅ Hidden files
-- ✅ Full path preservation
+**Key Scenarios:**
+- Open directory with no args or explicit path
+- Load first CSV alphabetically from directory
+- Handle empty directories and directories with no CSVs
+- Support various directory path formats
 
-**Behavior:**
+### 6. File Scanner Tests (`file_scanner_test.rs`)
+
+Tests directory CSV discovery - scanning, filtering, sorting, path handling.
+
+**Key Behaviors:**
 - Only scans immediate directory (not recursive)
 - Alphabetically sorts files
-- Returns full paths
-- Handles edge cases gracefully
+- Handles edge cases (hidden files, dots in names, etc.)
 
-### 6. Navigation Workflows (`navigation_workflows_test.rs`)
+### 7. Navigation Workflows (`navigation_workflows_test.rs`)
 
 Tests complex navigation patterns:
 
@@ -168,7 +158,7 @@ Tests end-to-end user scenarios:
 - File switching preserves app state
 - Rapid input is handled correctly
 
-### 8. UI Rendering Tests (`ui_rendering_test.rs`)
+### 9. UI Rendering Tests (`ui_rendering_test.rs`)
 
 Tests TUI output with TestBackend:
 
@@ -185,7 +175,7 @@ Tests TUI output with TestBackend:
 - Help overlay shows correctly
 - File switcher displays all files
 
-### 9. UI State Tests (`ui_state_test.rs`)
+### 10. UI State Tests (`ui_state_test.rs`)
 
 Tests UI with different data states:
 

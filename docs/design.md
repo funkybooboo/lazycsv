@@ -28,30 +28,33 @@ Complete UI/UX design specification for LazyCSV.
 ### Default View (Phase 1)
 
 ```
-┌─ lazycsv: sales_data.csv ──────────── Row 3/1,234 ───┐
-│     │  A          │  B         │  C           │  D    │ ← Column letters
+┌─ lazycsv: sales_data.csv ────────────────────────────┐
+│     │  A          │ ►B         │  C           │  D    │ ← Column letters (► shows selected)
 ├─────┼─────────────┼────────────┼──────────────┼───────┤
 │  #  │  ID         │  Date      │  Product     │  Qty  │ ← Headers
 ├─────┼─────────────┼────────────┼──────────────┼───────┤
 │  1  │  001        │ 2024-01-15 │ Widget A     │  100  │
 │  2  │  002        │ 2024-01-16 │ Gadget B     │   50  │
-│►3   │  003        │ 2024-01-17 │ [Doohickey...]│  75  │ ← Current
+│►3   │  003        │[2024-01-17]│ Doohickey C  │   75  │ ← Current cell
 │  4  │  004        │ 2024-01-18 │ Thingamajig  │  200  │
 │  5  │  005        │ 2024-01-19 │ Whatchama... │  125  │
 │ ... │                                                  │
 ├──────────────────────────────────────────────────────┤
-│ Row 3/1,234 │ Col C: Product │ ? help │ q quit      │ ← Status
+│ [?] help │ [q] quit │ [ ] files │                    │ ← Status (left: controls,
+│ Row 3/1,234 │ Col B: Date (2/4) │                    │           right: info)
+│ Cell: "2024-01-17"                                   │
 ├──────────────────────────────────────────────────────┤
-│ Files (1/2): ► sales_data.csv | customers.csv       │ ← Switcher
+│ Files (1/2): ► sales_data.csv | customers.csv       │ ← File switcher
 └──────────────────────────────────────────────────────┘
 ```
 
 **Legend:**
-- `►` - Current row indicator (always visible in left gutter)
-- `[text]` - Current cell (reversed video)
-- `...` - Truncated text (cell width limit)
+- `►` - Row indicator (left gutter) AND column indicator (top row)
+- `[text]` - Current cell (reversed video / highlighted)
+- `...` - Truncated text (cell width limit ~20 chars)
 - Column letters: A, B, C, D... (like Excel)
 - Row numbers: 1, 2, 3... (not 0-indexed for user)
+- Status bar shows current cell value on bottom line
 
 ### With Help Overlay (Press ?)
 

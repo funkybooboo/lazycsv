@@ -29,10 +29,7 @@ fn test_parse_args_with_valid_file() {
 
 #[test]
 fn test_parse_args_file_not_found() {
-    let args = vec![
-        "lazycsv".to_string(),
-        "/nonexistent/file.csv".to_string(),
-    ];
+    let args = vec!["lazycsv".to_string(), "/nonexistent/file.csv".to_string()];
 
     let result = cli::parse_args(&args);
     assert!(result.is_err());
@@ -146,10 +143,7 @@ fn test_parse_args_relative_directory() {
     let sub_dir = temp_dir.path().join("subdir");
     std::fs::create_dir(&sub_dir).unwrap();
 
-    let args = vec![
-        "lazycsv".to_string(),
-        sub_dir.to_string_lossy().to_string(),
-    ];
+    let args = vec!["lazycsv".to_string(), sub_dir.to_string_lossy().to_string()];
 
     let result = cli::parse_args(&args);
     assert!(result.is_ok());
@@ -172,10 +166,7 @@ fn test_parse_args_absolute_directory() {
 
 #[test]
 fn test_parse_args_nonexistent_directory() {
-    let args = vec![
-        "lazycsv".to_string(),
-        "/nonexistent/directory".to_string(),
-    ];
+    let args = vec!["lazycsv".to_string(), "/nonexistent/directory".to_string()];
 
     let result = cli::parse_args(&args);
     assert!(result.is_err());
