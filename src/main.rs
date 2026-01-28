@@ -1,22 +1,31 @@
-mod app;
-mod csv_data;
-mod ui;
-
 use anyhow::{Context, Result};
-use app::App;
 use crossterm::event::{self, Event, KeyEventKind};
-use csv_data::CsvData;
-use std::path::{Path, PathBuf};
+use lazycsv::{cli, file_scanner, ui, App, CsvData};
 use std::time::Duration;
 
 fn main() -> Result<()> {
-    // Parse CLI args
+    // Parse CLI args (returns file or directory path)
     let args: Vec<String> = std::env::args().collect();
-    let file_path = parse_args(&args)?;
+    let path = cli::parse_args(&args)?;
 
-    // Scan directory for other CSV files
-    let csv_files = scan_directory_for_csvs(&file_path)?;
-    let current_file_index = csv_files.iter().position(|p| p == &file_path).unwrap_or(0);
+    // Determine the CSV file to load and scan directory for others
+    let (file_path, csv_files, current_file_index) = if path.is_file() {
+        // User provided a specific CSV file
+        let csv_files = file_scanner::scan_directory_for_csvs(&path)?;
+        let current_file_index = csv_files.iter().position(|p| p == &path).unwrap_or(0);
+        (path, csv_files, current_file_index)
+    } else if path.is_dir() {
+        // User provided a directory - scan for CSV files
+        let csv_files = file_scanner::scan_directory(&path)?;
+        if csv_files.is_empty() {
+            anyhow::bail!("No CSV files found in directory: {}", path.display());
+        }
+        // Load first CSV file alphabetically
+        let file_path = csv_files[0].clone();
+        (file_path, csv_files, 0)
+    } else {
+        anyhow::bail!("Invalid path: {}", path.display());
+    };
 
     // Load CSV data
     let csv_data = CsvData::from_file(&file_path)
@@ -34,66 +43,10 @@ fn main() -> Result<()> {
     result
 }
 
-fn parse_args(args: &[String]) -> Result<PathBuf> {
-    if args.len() < 2 {
-        anyhow::bail!(
-            "Usage: lazycsv <file.csv>\n\n\
-             Example: lazycsv data.csv\n\n\
-             LazyCSV is a fast, ergonomic TUI for CSV files.\n\
-             Press ? in the app for keyboard shortcuts."
-        );
-    }
-
-    let path = PathBuf::from(&args[1]);
-    if !path.exists() {
-        anyhow::bail!("File not found: {}", path.display());
-    }
-
-    if !path.is_file() {
-        anyhow::bail!("Path is not a file: {}", path.display());
-    }
-
-    Ok(path)
-}
-
-/// Scan directory for other CSV files
-fn scan_directory_for_csvs(file_path: &Path) -> Result<Vec<PathBuf>> {
-    let dir = file_path
-        .parent()
-        .context("Failed to get parent directory")?;
-
-    let mut csv_files = Vec::new();
-
-    // Read directory entries
-    for entry in std::fs::read_dir(dir).context("Failed to read directory")? {
-        let entry = entry.context("Failed to read directory entry")?;
-        let path = entry.path();
-
-        // Check if it's a CSV file
-        if path.is_file() {
-            if let Some(ext) = path.extension() {
-                if ext.to_str() == Some("csv") {
-                    csv_files.push(path);
-                }
-            }
-        }
-    }
-
-    // Sort alphabetically
-    csv_files.sort();
-
-    // If no CSV files found (shouldn't happen), at least include the current file
-    if csv_files.is_empty() {
-        csv_files.push(file_path.to_path_buf());
-    }
-
-    Ok(csv_files)
-}
-
 fn run(
     terminal: &mut ratatui::Terminal<impl ratatui::backend::Backend>,
     csv_data: CsvData,
-    csv_files: Vec<PathBuf>,
+    csv_files: Vec<std::path::PathBuf>,
     current_file_index: usize,
 ) -> Result<()> {
     let mut app = App::new(csv_data, csv_files, current_file_index);

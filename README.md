@@ -89,13 +89,15 @@ See [plans/todo.md](plans/todo.md) for the full roadmap.
 ```bash
 # Using Task (recommended)
 task run        # run with sample.csv
-task test       # run tests
+task test       # run tests (99 tests)
 task all        # format, lint, test
 
 # Or with Cargo
 cargo run -- sample.csv
 cargo test
 ```
+
+**Test Suite:** 99 comprehensive tests covering all Phase 1 features. See [tests/README.md](tests/README.md) for details.
 
 See [docs/development.md](docs/development.md) for contributing guidelines.
 
@@ -106,9 +108,10 @@ See [docs/development.md](docs/development.md) for contributing guidelines.
 - ✅ Fast CSV viewer with vim navigation
 - ✅ Multi-file switching
 - ✅ Row/column numbers (A, B, C...)
+- ✅ Comprehensive test suite (99 tests)
 - 📋 Cell editing coming in Phase 2
 
-**Version:** 0.1.0 | **Code:** ~450 lines | **Performance:** 60 FPS on 10K+ rows
+**Version:** 0.1.0 | **Tests:** 99 passing | **Performance:** 60 FPS on 10K+ rows
 
 ## Philosophy
 

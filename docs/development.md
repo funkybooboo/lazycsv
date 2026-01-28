@@ -34,19 +34,43 @@ task test
 
 ```
 lazycsv/
-├── src/              - Rust source code
-│   ├── main.rs       - Entry point
-│   ├── app.rs        - Application state
-│   ├── csv_data.rs   - CSV data structures
-│   └── ui.rs         - UI rendering
+├── src/                    - Rust source code
+│   ├── main.rs             - Entry point & main loop
+│   ├── lib.rs              - Library exports
+│   ├── cli.rs              - CLI argument parsing
+│   ├── file_scanner.rs     - CSV file discovery
+│   ├── csv_data.rs         - CSV data model
+│   ├── app/                - Application logic
+│   │   ├── mod.rs          - App struct & state
+│   │   ├── input.rs        - Keyboard input handling
+│   │   └── navigation.rs   - Navigation methods
+│   └── ui/                 - User interface
+│       ├── mod.rs          - Main render function
+│       ├── table.rs        - Table rendering
+│       ├── status.rs       - Status bar & file switcher
+│       ├── help.rs         - Help overlay
+│       └── utils.rs        - Utility functions
 │
-├── docs/             - Documentation
-│   ├── README.md     - Docs index
-│   ├── features.md   - Feature specs
-│   ├── design.md     - UI/UX design
-│   ├── architecture.md - System architecture
-│   ├── keybindings.md - Keyboard shortcuts
-│   └── development.md - This file
+├── tests/                  - Test suite (99 tests)
+│   ├── README.md           - Test documentation
+│   ├── app_test.rs         - Application logic tests
+│   ├── cli_test.rs         - CLI parsing tests
+│   ├── csv_data_test.rs    - CSV loading tests
+│   ├── csv_edge_cases_test.rs - Edge case tests
+│   ├── file_scanner_test.rs - File discovery tests
+│   ├── integration_workflows_test.rs - End-to-end tests
+│   ├── navigation_workflows_test.rs - Navigation tests
+│   ├── ui_rendering_test.rs - TUI rendering tests
+│   ├── ui_state_test.rs    - UI state tests
+│   └── ui_test.rs          - UI utility tests
+│
+├── docs/                   - Documentation
+│   ├── README.md           - Docs index
+│   ├── features.md         - Feature specs
+│   ├── design.md           - UI/UX design
+│   ├── architecture.md     - System architecture
+│   ├── keybindings.md      - Keyboard shortcuts
+│   └── development.md      - This file
 │
 ├── plans/            - Planning documents
 │   ├── README.md     - Plans index
