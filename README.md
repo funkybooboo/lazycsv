@@ -23,7 +23,7 @@ Inspired by [lazygit](https://github.com/jesseduffield/lazygit), [lazydocker](ht
 
 ## Why LazyCSV?
 
-- ⚡ **Fast** - 10K+ rows at 60 FPS
+- ⚡ **Fast** - 100K+ rows at 60 FPS
 - ⌨️ **Vim keys** - hjkl your way through data
 - 📁 **Multi-file** - switch between CSVs like Excel sheets (press `[` `]`)
 - 🎯 **Simple** - no config needed, just works
@@ -32,7 +32,7 @@ Inspired by [lazygit](https://github.com/jesseduffield/lazygit), [lazydocker](ht
 ## Install
 
 ```bash
-git clone https://github.com/yourusername/lazycsv.git
+git clone https://github.com/funkybooboo/lazycsv.git
 cd lazycsv
 cargo install --path .
 ```
@@ -116,7 +116,7 @@ See [docs/development.md](docs/development.md) for contributing guidelines.
 - ✅ Comprehensive test suite (99 tests)
 - 📋 Cell editing coming in Phase 2
 
-**Version:** 0.1.0 | **Tests:** 99 passing | **Performance:** 60 FPS on 10K+ rows
+**Version:** 0.1.0 | **Tests:** 99 passing | **Performance:** 60 FPS on 100K+ rows
 
 ## Philosophy
 
