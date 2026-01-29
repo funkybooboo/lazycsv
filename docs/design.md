@@ -64,8 +64,7 @@ Complete UI/UX design specification for LazyCSV.
 ├─────┼────────┼────────║ Navigation   │ Editing  ║────┤
 │  #  │  ID    │  Date  ║  hjkl/arrows │ i Edit   ║    │
 ├─────┼────────┼────────║  gg/G First/ │ Esc Cncl ║────┤
-│  1  │  001   │  2024..║  w/b Next/pr │ ^S  Save ║    │
-│►2   │  002   │  2024..║  0/$ First/l │          ║    │
+│  3  │  003   │  2024..║  0/$ First/l │          ║    │
 │  3  │  003   │  2024..║  PageUp/Down │ Rows/Col ║    │
 │  4  │  004   │  2024..║              │ o Add ro ║    │
 │ ... │                 ║ File Switch  │ O Add ro ║    │

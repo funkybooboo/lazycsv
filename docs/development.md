@@ -14,7 +14,7 @@ Guide for contributing to LazyCSV.
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/lazycsv.git
+git clone https://github.com/funkybooboo/lazycsv.git
 cd lazycsv
 
 # Build
@@ -51,7 +51,7 @@ lazycsv/
 │       ├── help.rs         - Help overlay
 │       └── utils.rs        - Utility functions
 │
-├── tests/                  - Test suite (99 tests)
+├── tests/                  - Test suite
 │   ├── README.md           - Test documentation
 │   ├── app_test.rs         - Application logic tests
 │   ├── cli_test.rs         - CLI parsing tests
@@ -517,8 +517,8 @@ reset
 - [Design](design.md) - UI/UX design
 
 ### Community
-- **Issues**: https://github.com/yourusername/lazycsv/issues
-- **Discussions**: https://github.com/yourusername/lazycsv/discussions
+- **Issues**: https://github.com/funkybooboo/lazycsv/issues
+- **Discussions**: https://github.com/funkybooboo/lazycsv/discussions
 - **Discord**: (future)
 
 ### Questions

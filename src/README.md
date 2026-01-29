@@ -6,100 +6,112 @@ This directory contains the Rust source code for LazyCSV.
 
 ```
 src/
-├── main.rs       - Entry point and event loop
-├── app.rs        - Application state and keyboard handling
-├── csv_data.rs   - CSV data structures and file I/O
-└── ui.rs         - UI rendering with ratatui
+├── main.rs         - Entry point & TUI lifecycle
+├── lib.rs          - Main library crate
+├── cli.rs          - CLI argument parsing
+├── file_scanner.rs - Scans for CSV files
+├── csv_data.rs     - CSV data loading and storage
+│
+├── app/
+│   ├── mod.rs      - Core application state (`App` struct)
+│   ├── input.rs    - Keyboard input handling
+│   └── navigation.rs - Vim-style navigation logic
+│
+└── ui/
+    ├── mod.rs      - Main UI rendering entrypoint
+    ├── table.rs    - CSV table rendering (with virtual scrolling)
+    ├── status.rs   - Status bar and file switcher UI
+    ├── help.rs     - Help/cheatsheet overlay
+    └── utils.rs    - UI helper functions
 ```
 
 ## Modules
 
 ### `main.rs`
-**Purpose**: Entry point, CLI argument parsing, terminal lifecycle
-
-**Key Functions:**
-- `main()` - Entry point, initializes terminal and runs app
-- `parse_args()` - Parse and validate CLI arguments
-- `scan_directory_for_csvs()` - Find other CSV files in same directory
-- `run()` - Main event loop
+**Purpose**: Entry point, TUI initialization, and main event loop.
 
 **Responsibilities:**
-- Parse CLI arguments
-- Initialize terminal with ratatui
-- Load initial CSV file
-- Run event loop (draw → poll → handle → repeat)
-- Ensure terminal cleanup on exit
+- Initialize the terminal and `ratatui` backend.
+- Parse CLI arguments using the `cli` module.
+- Scan for CSV files using the `file_scanner` module.
+- Create the main `App` state.
+- Run the main event loop, handling events and drawing the UI.
+- Ensure proper terminal cleanup on exit.
+
+### `cli.rs`
+**Purpose**: Handles command-line argument parsing.
+
+**Responsibilities:**
+- Defines the CLI arguments using `clap`.
+- Parses the arguments provided when the application is started.
+- Determines the initial file or directory to open.
+
+### `file_scanner.rs`
+**Purpose**: Finds CSV files in a given directory.
+
+**Responsibilities:**
+- Scans a directory for files with `.csv` or `.CSV` extensions.
+- Ignores subdirectories.
+- Sorts the found files alphabetically.
 
 ### `csv_data.rs`
-**Purpose**: CSV data structures and file I/O
+**Purpose**: Manages loading, storing, and accessing CSV data.
 
 **Key Structures:**
-- `CsvData` - Holds parsed CSV data (headers, rows, filename, dirty flag)
-
-**Key Methods:**
-- `from_file()` - Load CSV from file path
-- `row_count()` / `column_count()` - Get dimensions
-- `get_cell()` / `get_header()` - Access data
-- Phase 2: `set_cell()`, `save_to_file()`
-- Phase 3: `add_row()`, `delete_row()`, `add_column()`, `delete_column()`
+- `CsvData` - Holds the file path, headers, and all rows of a CSV file.
 
 **Responsibilities:**
-- Load and parse CSV files with `csv` crate
-- Store data in memory (Vec<Vec<String>>)
-- Provide safe access to cells and headers
-- Handle errors with anyhow::Context
+- Loads a CSV file from a given path using the `csv` crate.
+- Stores the entire dataset in memory as a `Vec<Vec<String>>`.
+- Provides safe methods to access headers and cell data.
+- Tracks whether the data has been modified (the `is_dirty` flag).
 
-### `app.rs`
-**Purpose**: Application state and keyboard event handling
+### `app/` Module
+**Purpose**: Manages the application's state and logic.
 
-**Key Structures:**
-- `Mode` - Application mode (Normal, Edit, Visual, Command)
-- `App` - Main application state
+#### `app/mod.rs`
+**Purpose**: Defines the core application state.
+- **`App` struct**: The single source of truth for the application's state. It holds the CSV data, selection state, scroll offsets, current mode, file list, and more.
+- **`Mode` enum**: Defines the different application modes (e.g., `Normal`).
 
-**Key Fields:**
-- `csv_data` - Loaded CSV data
-- `table_state` - Current table selection (row)
-- `selected_col` - Current column
-- `horizontal_offset` - Horizontal scroll position
-- `show_cheatsheet` - Help overlay visibility
-- `csv_files` - List of CSV files in directory
-- `current_file_index` - Active file index
+#### `app/input.rs`
+**Purpose**: Handles all keyboard input.
+- It receives key events and translates them into actions.
+- It manages multi-key command sequences (e.g., `gg`, `zz`) with timeouts.
+- It handles numeric prefixes for commands (e.g., `5j`).
+- It dispatches to the `navigation` module for movement commands.
 
-**Key Methods:**
-- `new()` - Create app with initial state
-- `handle_key()` - Dispatch keyboard events by mode
-- `handle_normal_mode()` - Handle navigation and commands
-- `handle_navigation()` - Move cursor, scroll, jump
-- `reload_current_file()` - Load different CSV file
+#### `app/navigation.rs`
+**Purpose**: Implements all vim-style navigation logic.
+- It contains functions for moving the cursor (`move_up_by`, `move_down_by`, etc.).
+- It handles jumping to specific lines (`goto_line`, `goto_first_row`).
+- It manages the viewport and scrolling.
 
-**Responsibilities:**
-- Track all mutable application state
-- Handle keyboard input
-- Implement navigation logic
-- Manage file switching
-- Phase 2: Edit mode, undo/redo
+### `ui/` Module
+**Purpose**: Handles all UI rendering using `ratatui`.
 
-### `ui.rs`
-**Purpose**: UI rendering with ratatui
+#### `ui/mod.rs`
+**Purpose**: The main entrypoint for rendering.
+- The `render` function sets up the main layout and calls the other UI modules to draw their respective components.
 
-**Key Functions:**
-- `render()` - Main render function (called each frame)
-- `render_table()` - Draw CSV table with row/column numbers
-- `render_status_bar()` - Draw status bar at bottom
-- `render_sheet_switcher()` - Draw file list at bottom
-- `render_cheatsheet()` - Draw help overlay when active
+#### `ui/table.rs`
+**Purpose**: Renders the main CSV data table.
+- It displays the data in a grid with row numbers and column letters.
+- **Virtual Scrolling**: For performance, it only renders the rows and columns that are currently visible in the viewport.
+- It highlights the selected row and cell.
 
-**Helper Functions:**
-- `centered_rect()` - Calculate centered area for overlays
-- `column_index_to_letter()` - Convert 0→A, 1→B, 26→AA, etc.
+#### `ui/status.rs`
+**Purpose**: Renders the UI components at the bottom of the screen.
+- `render_status_bar`: Draws the status bar, which shows information about the current selection, file, and any status messages.
+- `render_sheet_switcher`: Draws the list of open CSV files, allowing the user to see which files are open and which is active.
 
-**Responsibilities:**
-- Render all UI elements using ratatui widgets
-- Apply styling (bold, dim, reversed)
-- Handle text truncation (max 20 chars)
-- Display row numbers and column letters
-- Show current cell highlight
-- Layout panels (table, status, switcher)
+#### `ui/help.rs`
+**Purpose**: Renders the help/cheatsheet overlay.
+- It displays a centered popup with a list of keybindings.
+
+#### `ui/utils.rs`
+**Purpose**: Contains helper functions for the UI module.
+- `column_index_to_letter`: Converts a column index (0, 1, 2...) to its spreadsheet-style letter representation (A, B, C...).
 
 ## Code Style
 
@@ -130,9 +142,13 @@ task test-verbose  # With output
 ```
 
 ### Test Coverage
-- `csv_data.rs`: Tests for loading, cell access, edge cases
-- `ui.rs`: Tests for column letter conversion
-- More tests needed (contributions welcome!)
+The project has a comprehensive test suite with 133 tests.
+- **Unit Tests**: Found alongside the code in each module.
+- **Integration Tests**: Located in the `tests/` directory, covering workflows, UI rendering, and edge cases.
+- `cli_test.rs`: Tests command-line argument parsing.
+- `csv_data_test.rs` & `csv_edge_cases_test.rs`: Test CSV loading and data handling.
+- `app_test.rs` & `navigation_workflows_test.rs`: Test application logic and user workflows.
+- `ui_rendering_test.rs` & `ui_state_test.rs`: Test UI components and state changes.
 
 ## Dependencies
 
@@ -160,26 +176,15 @@ Target performance (Phase 1):
 - Render frame: < 16ms (60 FPS) ✅
 - Navigation: < 10ms response ✅
 
-## Future Modules
+## Future Development
 
-As the project grows, we may add:
+The following are key areas for future development:
 
-### Phase 2+
-- `edit.rs` - Edit mode logic
-- `undo.rs` - Undo/redo system
-
-### Phase 3+
-- `operations.rs` - Row/column operations
-- `clipboard.rs` - Copy/paste logic
-
-### Phase 4+
-- `search.rs` - Fuzzy search implementation
-- `filter.rs` - Row filtering
-- `sort.rs` - Column sorting
-
-### Phase 5+
-- `excel.rs` - Excel file support with calamine
-- `worksheet.rs` - Unified CSV/Excel abstraction
+- **True Lazy Loading**: The highest priority is to re-engineer `csv_data.rs` to not load the entire file into memory. This will likely involve using a streaming parser and an indexing mechanism to fetch rows on demand, fulfilling the "lazy" promise.
+- **Cell Editing**: Implementing `edit.rs` and the `Edit` mode in `app/mod.rs` to allow users to modify cell content and save changes back to the file. This will also require an undo/redo system (`undo.rs`).
+- **Row/Column Operations**: Adding functionality to add, delete, and reorder rows and columns.
+- **Search and Filter**: Implementing fuzzy search (`search.rs`), column sorting, and row filtering.
+- **Excel Support**: Adding support for reading `.xlsx` files, likely using a crate like `calamine`.
 
 ## Contributing
 

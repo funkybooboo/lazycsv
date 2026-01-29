@@ -69,16 +69,13 @@ This plan includes:
 **Phase 1 (MVP): ✅ Complete**
 
 Implemented:
-- CSV loading and display
+- Fast in-memory CSV loading and display
 - Vim-style navigation (hjkl, gg, G, etc.)
-- Row numbers and column letters (A, B, C...)
-- Multi-file navigation ([/] keys)
-- Always-visible file switcher
-- Help overlay (? key)
-- Status bar with context
-- Horizontal scrolling
+- Multi-file switching with `[` and `]`
+- Comprehensive test suite (133 tests)
 
 Next up:
+- True lazy-loading for large files
 - Phase 2: Cell editing, saving, undo/redo
 
 ### Tracking Progress
@@ -107,6 +104,7 @@ task run
 Key decisions documented in this directory:
 
 ### Phase 1 Decisions
+- ✅ **Load all data into memory** - For simplicity in the MVP, the entire CSV is loaded into RAM. True lazy-loading is a top priority for a future phase.
 - ✅ **No colors** - Monochrome design for now
 - ✅ **Row/column numbers** - Excel-style (A, B, C... and 1, 2, 3...)
 - ✅ **File switcher at bottom** - Always visible, doesn't block data

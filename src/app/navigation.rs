@@ -31,16 +31,6 @@ pub fn handle_navigation(app: &mut App, code: KeyCode) -> Result<()> {
             move_right_by(app, count);
         }
 
-        // Word forward (with count: 3w moves right 3 columns)
-        KeyCode::Char('w') => {
-            move_right_by(app, count);
-        }
-
-        // Word backward (with count: 3b moves left 3 columns)
-        KeyCode::Char('b') => {
-            move_left_by(app, count);
-        }
-
         // First column
         KeyCode::Char('0') => {
             app.selected_col = 0;

@@ -8,17 +8,17 @@ LazyCSV follows a clean, modular architecture:
 
 ```
 ┌─────────────┐
-│   main.rs   │  Entry point, CLI, terminal lifecycle
+│   main.rs   │  Entry point, TUI lifecycle
 └──────┬──────┘
        │
        ▼
 ┌─────────────┐
-│   app.rs    │  Application state, keyboard handling
+│  app module │  Application state, input, navigation
 └──────┬──────┘
        │
-       ├───────► csv_data.rs   (CSV data structures)
+       ├───────► csv_data.rs (Data loading/storage)
        │
-       └───────► ui.rs          (Rendering with ratatui)
+       └───────► ui module   (Rendering with ratatui)
 ```
 
 ## Core Components
@@ -61,27 +61,27 @@ loop {
 - 100ms poll timeout (responsive but not CPU-intensive)
 - Returns `Result<()>` for error propagation
 
-### 2. Application State (`app.rs`)
+### 2. Application State (`app/` module)
 
-**Responsibility**: Manage all mutable application state
+**Responsibility**: Manage all mutable application state and handle user input.
+
+The `app` module is split into three parts:
+- **`mod.rs`**: Defines the central `App` struct, which is the single source of truth for all application state.
+- **`input.rs`**: Handles all keyboard input, mapping keypresses to actions and managing multi-key sequences.
+- **`navigation.rs`**: Contains the logic for all vim-style navigation, updating the `App` state based on user commands.
 
 ```rust
+// In app/mod.rs
 pub struct App {
     // Data
-    csv_data: CsvData,              // Loaded CSV
-    csv_files: Vec<PathBuf>,        // Available files
-    current_file_index: usize,      // Active file
+    csv_data: CsvData,
+    csv_files: Vec<PathBuf>,
+    current_file_index: usize,
 
     // UI State
-    table_state: TableState,        // Row selection (from ratatui)
-    selected_col: usize,            // Column selection
-    horizontal_offset: usize,       // Scroll position
-    show_cheatsheet: bool,          // Help visibility
-    mode: Mode,                     // Current mode
-
-    // Feedback
-    status_message: Option<String>, // Temp status message
-    should_quit: bool,              // Exit flag
+    table_state: TableState,
+    selected_col: usize,
+    // ... and so on
 }
 ```
 
@@ -145,10 +145,9 @@ CsvData::from_file(path) -> Result<CsvData>
 ```
 
 **Trade-offs:**
-- ✅ Simple: Easy to understand and debug
-- ✅ Fast: O(1) random access
-- ❌ Memory: Not suitable for massive files (100K+ rows)
-- ❌ Types: No numeric operations (yet)
+- ✅ **Simple & Fast**: The in-memory model is simple to implement and provides very fast O(1) access for navigation.
+- ❌ **High Memory Usage**: This approach is not "lazy" and is unsuitable for CSV files that are too large to fit into RAM.
+- **Future Work**: A top priority is to refactor this to a true lazy-loading model that reads from disk on demand.
 
 **Future Optimizations** (if needed):
 - Virtual scrolling (load only visible rows)
@@ -156,28 +155,24 @@ CsvData::from_file(path) -> Result<CsvData>
 - Chunked loading
 - Type inference for columns
 
-### 4. UI Rendering (`ui.rs`)
+### 4. UI Rendering (`ui/` module)
 
-**Responsibility**: Render all UI elements with ratatui
+**Responsibility**: Render all UI elements with `ratatui`.
+
+The `ui` module is composed of several files:
+- **`mod.rs`**: The main `render` function that sets up the layout and calls the other rendering modules.
+- **`table.rs`**: Renders the main data table, including the virtual scrolling logic.
+- **`status.rs`**: Renders the status bar and the file switcher.
+- **`help.rs`**: Renders the help overlay.
+- **`utils.rs`**: Contains utility functions for the UI, like `column_index_to_letter`.
 
 ```rust
+// In ui/mod.rs
 pub fn render(frame: &mut Frame, app: &mut App) {
-    // Layout
-    let chunks = Layout::vertical([
-        Min(0),         // Table
-        Length(3),      // File switcher
-        Length(3),      // Status bar
-    ]).split(frame.area());
-
-    // Render components
-    render_table(frame, app, chunks[0]);
-    render_sheet_switcher(frame, app, chunks[1]);
-    render_status_bar(frame, app, chunks[2]);
-
-    // Conditional overlays
-    if app.show_cheatsheet {
-        render_cheatsheet(frame);
-    }
+    // ... setup layout ...
+    table::render_table(frame, app, ...);
+    status::render_status_bar(frame, app, ...);
+    // ...
 }
 ```
 
@@ -282,11 +277,11 @@ ui::render() draws new file
 
 ```
 main.rs
-  ├─ uses: app, csv_data, ui
+  ├─ uses: app, csv_data, ui, cli, file_scanner
   ├─ depends on: crossterm, ratatui, anyhow
   └─ exports: none (binary crate)
 
-app.rs
+app/
   ├─ uses: csv_data
   ├─ depends on: crossterm, ratatui, anyhow
   └─ exports: App, Mode
@@ -296,7 +291,7 @@ csv_data.rs
   ├─ depends on: csv, anyhow
   └─ exports: CsvData
 
-ui.rs
+ui/
   ├─ uses: app
   ├─ depends on: ratatui
   └─ exports: render()
@@ -307,10 +302,10 @@ ui.rs
          main.rs
         /   |   \
        /    |    \
-   app.rs  ui.rs  csv_data.rs
-      |      |
-      |      |
-   csv_data.rs
+   app/    ui/   csv_data.rs
+      \    /
+       \  /
+      csv_data.rs
 ```
 
 **Key Observation**:

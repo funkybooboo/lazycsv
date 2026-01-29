@@ -31,8 +31,6 @@ The current mode is always shown in the title bar:
 | `j` or `↓` | Move down (next row) |
 | `k` or `↑` | Move up (previous row) |
 | `l` or `→` | Move right (next column) |
-| `w` | Next column (word forward) |
-| `b` | Previous column (word backward) |
 | `0` | First column |
 | `$` | Last column |
 | `gg` or `Home` | First row |
@@ -43,7 +41,6 @@ The current mode is always shown in the title bar:
 **Tips:**
 - Vim users: Use `hjkl` for faster navigation (home row)
 - Others: Arrow keys work just as well
-- `w`/`b` are same as `l`/`h` for now (column = "word")
 
 ### File Navigation
 
@@ -282,9 +279,9 @@ Print-friendly summary:
 ║ Navigation     │ Editing (Phase 2) │ Files           ║
 ║  hjkl/arrows   │  i/Enter  Edit    │  [/]   Switch   ║
 ║  gg/G First/La │  Esc      Cancel  │  ?     Help     ║
-║  w/b  Next/Pre │  ^S       Save    │  q     Quit     ║
-║  0/$  First/La │  u        Undo    │                 ║
-║  PageUp/Down   │  ^R       Redo    │                 ║
+║  0/$  First/La │  ^S       Save    │  q     Quit     ║
+║  PageUp/Down   │  u        Undo    │                 ║
+║                │  ^R       Redo    │                 ║
 ╠═══════════════════════════════════════════════════════╣
 ║ Rows (Phase 3) │ Columns (Phase 3) │ Search (Phase 4)║
 ║  o    Add belo │  ^A      Add col  │  /     Search   ║
@@ -300,7 +297,7 @@ Print-friendly summary:
 If you're a vim user, these will feel natural:
 
 ### Direct Mappings (Same as Vim)
-- Movement: `hjkl`, `gg`, `G`, `w`, `b`, `0`, `$`
+- Movement: `hjkl`, `gg`, `G`, `0`, `$`
 - Operators: `dd`, `yy`, `p`, `P`, `u`, `Ctrl+R`
 - Visual: `v`, `V`
 - Search: `/`, `n`, `N`, `*`

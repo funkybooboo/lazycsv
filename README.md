@@ -29,6 +29,8 @@ Inspired by [lazygit](https://github.com/jesseduffield/lazygit), [lazydocker](ht
 - 🎯 **Simple** - no config needed, just works
 - 🎨 **Clean** - minimalist design, zero clutter
 
+**Note:** The "lazy" in LazyCSV is currently aspirational. The app loads the entire CSV file into memory. True lazy-loading for large files is a top priority for future versions!
+
 ## Install
 
 ```bash
@@ -65,7 +67,7 @@ That's it! Press `?` in the app for full keybindings.
 | `?` | Show help |
 | `q` | Quit |
 
-**Vim users:** All your favorite motions work (`w`, `b`, `0`, `$`, etc.)
+**Vim users:** All your favorite motions work (`0`, `$`, etc.)
 
 ## Innovation: Multi-File Navigation
 
@@ -73,10 +75,11 @@ LazyCSV treats CSV files in the same directory like Excel sheets. Open one file,
 
 ## Coming Soon
 
+- 💾 **True lazy-loading** for huge files
 - ✏️ Cell editing & saving
 - ➕ Add/delete rows and columns
-- 🔍 Fuzzy search
-- 📊 Sort & filter
+- 🔍 Fuzzy search & filtering
+- 📊 Column sorting
 - 📑 Excel file support
 
 See [plans/todo.md](plans/todo.md) for the full roadmap.
@@ -94,7 +97,7 @@ See [plans/todo.md](plans/todo.md) for the full roadmap.
 ```bash
 # Using Task (recommended)
 task run        # run with sample.csv
-task test       # run tests (99 tests)
+task test       # run tests (133 tests)
 task all        # format, lint, test
 
 # Or with Cargo
@@ -113,7 +116,7 @@ See [docs/development.md](docs/development.md) for contributing guidelines.
 - ✅ Fast CSV viewer with vim navigation
 - ✅ Multi-file switching
 - ✅ Row/column numbers (A, B, C...)
-- ✅ Comprehensive test suite (99 tests)
+- ✅ Comprehensive test suite (133 tests)
 - 📋 Cell editing coming in Phase 2
 
 **Version:** 0.1.0 | **Tests:** 99 passing | **Performance:** 60 FPS on 100K+ rows

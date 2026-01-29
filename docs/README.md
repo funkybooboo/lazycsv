@@ -28,38 +28,22 @@ Welcome to the LazyCSV documentation! This directory contains comprehensive docu
 ## Project Status
 
 ### Phase 1: Core Viewing (MVP) ✅ Complete
-- CSV loading and display
+- Fast CSV loading and display (in-memory)
 - Vim-style navigation
 - Multi-file switching
-- Help overlay
-- Row/column numbers
+- Comprehensive test suite (133 tests)
 
-### Phase 2: Cell Editing 📋 Planned
-- In-place editing
-- Save changes
-- Undo/redo
-- Dirty state tracking
-
-### Phase 3: Row/Column Operations 📋 Planned
-- Add/delete rows and columns
-- Copy/paste operations
-- Visual selection mode
-
-### Phase 4: Advanced Features 📋 Planned
-- Fuzzy search (rows, columns, cell data)
-- Column sorting
-- Row filtering
-- Statistics
-
-### Phase 5: Multi-File/Sheet Navigation 📋 Planned
-- Excel file support
-- Multi-sheet navigation
-- Unified file/sheet switcher
+### Future Development
+- **True Lazy Loading**: Stream data from disk instead of loading all at once.
+- **Cell Editing**: In-place editing, saving, and undo/redo.
+- **Row/Column Operations**: Add, delete, and copy/paste rows and columns.
+- **Search and Filter**: Fuzzy search, column sorting, and row filtering.
+- **Excel Support**: Read `.xlsx` files.
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/lazycsv/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/lazycsv/discussions)
+- **Issues**: [GitHub Issues](https://github.com/funkybooboo/lazycsv/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/funkybooboo/lazycsv/discussions)
 - **Contributing**: See [development.md](development.md)
 
 ## License

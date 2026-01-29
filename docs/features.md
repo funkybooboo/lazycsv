@@ -81,8 +81,6 @@ All navigation is keyboard-driven with vim-inspired keys:
 - ✅ `j` / `↓` - Move down (next row)
 - ✅ `k` / `↑` - Move up (previous row)
 - ✅ `l` / `→` - Move right (next column)
-- ✅ `w` - Next column (word forward)
-- ✅ `b` - Previous column (word backward)
 
 **Jumps:**
 - ✅ `gg` / `Home` - Jump to first row
@@ -307,7 +305,7 @@ LazyCSV is designed for speed:
 
 ### Current (Phase 1):
 - **Read-only** - No editing yet (Phase 2)
-- **Memory-bounded** - Loads entire file into memory (good for < 100K rows)
+- **Memory-bounded**: The entire file is loaded into memory. This is fast for small to medium files (up to 100K rows), but makes it unsuitable for very large datasets that don't fit in RAM. True lazy-loading is a top priority for future development.
 - **~10 columns visible** - Horizontal scroll for more
 - **20 char cell limit** - Longer text truncated with `...`
 - **Monochrome** - No colors (design decision)

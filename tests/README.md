@@ -39,7 +39,6 @@ Tests core application state and behavior:
 - ✅ App initialization
 - ✅ Navigation (up/down/left/right)
 - ✅ Vim keybindings (hjkl, gg, G, 0, $)
-- ✅ Word navigation (w, b)
 - ✅ Help toggle
 - ✅ Quit functionality
 - ✅ File switching ([ and ])
@@ -122,7 +121,6 @@ Tests complex navigation patterns:
 - ✅ Page navigation (20 rows at a time)
 - ✅ Horizontal scrolling (wide CSVs)
 - ✅ Vim-style hjkl navigation
-- ✅ Word navigation (w/b)
 - ✅ Boundary testing
 - ✅ Mixed navigation keys
 - ✅ Traversing entire dataset
@@ -247,7 +245,7 @@ task test-verbose      # Run with full output
 
 **Phase 1 MVP (100% Coverage):**
 - ✅ CSV loading and parsing
-- ✅ Vim navigation (hjkl, gg, G, w, b, 0, $)
+- ✅ Vim navigation (hjkl, gg, G, 0, $)
 - ✅ Arrow key navigation
 - ✅ Page up/down
 - ✅ Multi-file switching ([, ])
@@ -395,5 +393,5 @@ When adding features:
 ---
 
 **Test Coverage:** Phase 1 Complete ✅
-**Status:** All 99 tests passing 🎉
+**Status:** All 133 tests passing 🎉
 **Quality:** Production-ready
