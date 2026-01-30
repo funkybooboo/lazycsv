@@ -8,7 +8,7 @@ fn test_single_row_csv() {
     writeln!(file, "Name,Age,City").unwrap();
     writeln!(file, "Alice,30,NYC").unwrap();
 
-    let csv_data = CsvData::from_file(file.path()).unwrap();
+    let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
     assert_eq!(csv_data.row_count(), 1);
     assert_eq!(csv_data.column_count(), 3);
@@ -22,7 +22,7 @@ fn test_single_column_csv() {
     writeln!(file, "Alice").unwrap();
     writeln!(file, "Bob").unwrap();
 
-    let csv_data = CsvData::from_file(file.path()).unwrap();
+    let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
     assert_eq!(csv_data.row_count(), 2);
     assert_eq!(csv_data.column_count(), 1);
@@ -36,7 +36,7 @@ fn test_csv_with_empty_cells() {
     writeln!(file, "1,,3").unwrap();
     writeln!(file, ",2,").unwrap();
 
-    let csv_data = CsvData::from_file(file.path()).unwrap();
+    let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
     assert_eq!(csv_data.row_count(), 2);
     assert_eq!(csv_data.get_cell(0, 0), "1");
@@ -54,7 +54,7 @@ fn test_csv_with_quoted_fields() {
     writeln!(file, "Alice,\"Hello, World\"").unwrap();
     writeln!(file, "Bob,\"Line1\nLine2\"").unwrap();
 
-    let csv_data = CsvData::from_file(file.path()).unwrap();
+    let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
     assert_eq!(csv_data.row_count(), 2);
     assert_eq!(csv_data.get_cell(0, 0), "Alice");
@@ -68,7 +68,7 @@ fn test_csv_with_escaped_quotes() {
     writeln!(file, "Text").unwrap();
     writeln!(file, "\"She said \"\"hello\"\"\"").unwrap();
 
-    let csv_data = CsvData::from_file(file.path()).unwrap();
+    let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
     assert_eq!(csv_data.row_count(), 1);
     assert_eq!(csv_data.get_cell(0, 0), "She said \"hello\"");
@@ -80,7 +80,7 @@ fn test_csv_with_whitespace() {
     writeln!(file, "A,B,C").unwrap();
     writeln!(file, "  1  ,  2  ,  3  ").unwrap();
 
-    let csv_data = CsvData::from_file(file.path()).unwrap();
+    let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
     // CSV parser should preserve whitespace
     assert_eq!(csv_data.get_cell(0, 0), "  1  ");
@@ -94,7 +94,7 @@ fn test_csv_with_special_characters() {
     writeln!(file, "★,😀").unwrap();
     writeln!(file, "€,日本").unwrap();
 
-    let csv_data = CsvData::from_file(file.path()).unwrap();
+    let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
     assert_eq!(csv_data.row_count(), 2);
     assert_eq!(csv_data.get_cell(0, 0), "★");
@@ -110,7 +110,7 @@ fn test_csv_with_long_text() {
     let long_text = "a".repeat(1000);
     writeln!(file, "{}", long_text).unwrap();
 
-    let csv_data = CsvData::from_file(file.path()).unwrap();
+    let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
     assert_eq!(csv_data.row_count(), 1);
     assert_eq!(csv_data.get_cell(0, 0).len(), 1000);
@@ -123,7 +123,7 @@ fn test_csv_with_numbers() {
     writeln!(file, "123,456.789,1.23e10").unwrap();
     writeln!(file, "-999,0.001,-5e-3").unwrap();
 
-    let csv_data = CsvData::from_file(file.path()).unwrap();
+    let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
     assert_eq!(csv_data.row_count(), 2);
     // Numbers are stored as strings
@@ -140,7 +140,7 @@ fn test_csv_with_mixed_row_lengths() {
     writeln!(file, "4,5").unwrap(); // Missing last column
 
     // CSV parser is strict - should fail with inconsistent field count
-    let result = CsvData::from_file(file.path());
+    let result = CsvData::from_file(file.path(), None, false, None);
     assert!(result.is_err());
 }
 
@@ -152,7 +152,7 @@ fn test_large_csv() {
         writeln!(file, "{},{},{}", i, i * 2, i * 3).unwrap();
     }
 
-    let csv_data = CsvData::from_file(file.path()).unwrap();
+    let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
     assert_eq!(csv_data.row_count(), 10000);
     assert_eq!(csv_data.get_cell(0, 0), "0");
@@ -168,7 +168,7 @@ fn test_wide_csv() {
     let row: Vec<String> = (0..100).map(|i| format!("val{}", i)).collect();
     writeln!(file, "{}", row.join(",")).unwrap();
 
-    let csv_data = CsvData::from_file(file.path()).unwrap();
+    let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
     assert_eq!(csv_data.column_count(), 100);
     assert_eq!(csv_data.row_count(), 1);
@@ -184,7 +184,7 @@ fn test_csv_with_blank_lines_ignored() {
     writeln!(file, "").unwrap(); // Blank line
     writeln!(file, "3,4").unwrap();
 
-    let csv_data = CsvData::from_file(file.path()).unwrap();
+    let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
     // CSV parser should handle blank lines appropriately
     // Standard CSV parsers may include or exclude them
@@ -197,7 +197,7 @@ fn test_filename_extraction() {
     writeln!(file, "A").unwrap();
     writeln!(file, "1").unwrap();
 
-    let csv_data = CsvData::from_file(file.path()).unwrap();
+    let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
     // Should extract filename from path
     assert!(!csv_data.filename.is_empty());
@@ -209,7 +209,7 @@ fn test_csv_with_commas_in_quotes() {
     writeln!(file, "Name,Address").unwrap();
     writeln!(file, "Alice,\"123 Main St, Apt 4, City\"").unwrap();
 
-    let csv_data = CsvData::from_file(file.path()).unwrap();
+    let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
     assert_eq!(csv_data.row_count(), 1);
     assert_eq!(csv_data.get_cell(0, 1), "123 Main St, Apt 4, City");
@@ -221,7 +221,7 @@ fn test_csv_dirty_flag_initial_state() {
     writeln!(file, "A").unwrap();
     writeln!(file, "1").unwrap();
 
-    let csv_data = CsvData::from_file(file.path()).unwrap();
+    let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
     assert!(!csv_data.is_dirty);
 }
@@ -232,7 +232,7 @@ fn test_header_and_cell_access_consistency() {
     writeln!(file, "Name,Age,City").unwrap();
     writeln!(file, "Alice,30,NYC").unwrap();
 
-    let csv_data = CsvData::from_file(file.path()).unwrap();
+    let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
     for col in 0..csv_data.column_count() {
         // Should be able to access both header and cells for all columns

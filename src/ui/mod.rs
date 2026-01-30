@@ -31,7 +31,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     status::render_status_bar(frame, app, chunks[2]);
 
     // Render help overlay if active
-    if app.show_cheatsheet {
+    if app.ui.show_cheatsheet {
         help::render_cheatsheet(frame);
     }
 }

@@ -13,7 +13,7 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
 
     // Calculate visible columns (max 10)
     let max_visible_cols = 10;
-    let start_col = app.horizontal_offset;
+    let start_col = app.ui.horizontal_offset;
     let end_col = (start_col + max_visible_cols).min(csv.column_count());
     let visible_col_count = end_col - start_col;
 
@@ -29,12 +29,12 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     let mut col_letter_cells = vec![Cell::from("")]; // Empty cell for row numbers column
     for i in start_col..end_col {
         let letter = column_index_to_letter(i);
-        let display = if i == app.selected_col {
+        let display = if i == app.ui.selected_col {
             format!("►{}", letter) // Show indicator on selected column
         } else {
             format!(" {}", letter) // Space for alignment
         };
-        let style = if i == app.selected_col {
+        let style = if i == app.ui.selected_col {
             Style::default().add_modifier(Modifier::BOLD)
         } else {
             Style::default().add_modifier(Modifier::DIM)
@@ -60,10 +60,10 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
         as usize;
 
     // Get current scroll position from table state
-    let selected_idx = app.table_state.selected().unwrap_or(0);
+    let selected_idx = app.ui.table_state.selected().unwrap_or(0);
 
     // Calculate scroll offset based on viewport mode (zt, zz, zb, or auto)
-    let scroll_offset = match app.viewport_mode {
+    let scroll_offset = match app.ui.viewport_mode {
         crate::app::ViewportMode::Auto => {
             // Auto-center: keep selected row centered when possible
             if selected_idx < table_height / 2 {
@@ -114,7 +114,7 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
             };
 
             // Highlight current cell
-            let style = if Some(row_idx) == app.selected_row() && col_idx == app.selected_col {
+            let style = if Some(row_idx) == app.selected_row() && col_idx == app.ui.selected_col {
                 Style::default().add_modifier(Modifier::REVERSED)
             } else {
                 Style::default()
@@ -158,7 +158,7 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     // Render stateful widget
     // With virtual scrolling, we need to adjust the selected position
     // to be relative to the visible window, then offset by 2 for headers
-    let mut adjusted_state = app.table_state.clone();
+    let mut adjusted_state = app.ui.table_state.clone();
     if let Some(selected) = adjusted_state.selected() {
         // Calculate position within visible window
         let position_in_window = if selected >= scroll_offset && selected < end_row {

@@ -26,22 +26,36 @@ pub enum ViewportMode {
     Bottom, // Selected row at bottom (zb)
 }
 
+/// Holds state for the UI
+#[derive(Debug)]
+pub struct UiState {
+    pub table_state: TableState,
+    pub selected_col: usize,
+    pub horizontal_offset: usize,
+    pub show_cheatsheet: bool,
+    pub viewport_mode: ViewportMode,
+}
+
+impl Default for UiState {
+    fn default() -> Self {
+        Self {
+            table_state: TableState::default(),
+            selected_col: 0,
+            horizontal_offset: 0,
+            show_cheatsheet: false,
+            viewport_mode: ViewportMode::Auto,
+        }
+    }
+}
+
 /// Main application state
+#[derive(Debug)]
 pub struct App {
     /// Loaded CSV data
     pub csv_data: CsvData,
 
-    /// Current table selection state (tracks selected row)
-    pub table_state: TableState,
-
-    /// Currently selected column
-    pub selected_col: usize,
-
-    /// Horizontal scroll offset (for wide tables)
-    pub horizontal_offset: usize,
-
-    /// Whether to show help overlay
-    pub show_cheatsheet: bool,
+    /// UI-related state
+    pub ui: UiState,
 
     /// Flag to quit application
     pub should_quit: bool,
@@ -68,25 +82,75 @@ pub struct App {
     /// Count prefix for vim commands (e.g., "5" for 5j)
     pub command_count: Option<String>,
 
-    /// Viewport centering mode (Auto, Top, Center, Bottom)
-    pub viewport_mode: ViewportMode,
+    /// Delimiter used for CSV parsing
+    pub delimiter: Option<u8>,
+
+    /// Whether CSV was parsed without headers
+    pub no_headers: bool,
+
+    /// The character encoding used for file loading
+    pub encoding: Option<String>,
     // Phase 2: Cell editing
     // pub edit_buffer: String,
 }
 
 impl App {
-    /// Create new App from loaded CSV data and file list
-    pub fn new(csv_data: CsvData, csv_files: Vec<PathBuf>, current_file_index: usize) -> Self {
-        let mut table_state = TableState::default();
-        // Select first row by default
-        table_state.select(Some(0));
+    /// Create a new `App` instance from CLI arguments.
+    /// This function handles file scanning, initial data loading, and App creation.
+    pub fn from_cli(cli_args: crate::cli::CliArgs) -> Result<Self> {
+        let path = cli_args.path.unwrap();
+
+        // Determine the CSV file to load and scan directory for others
+        let (file_path, csv_files, current_file_index) = if path.is_file() {
+            let csv_files = crate::file_scanner::scan_directory_for_csvs(&path)?;
+            let current_file_index = csv_files.iter().position(|p| p == &path).unwrap_or(0);
+            (path, csv_files, current_file_index)
+        } else if path.is_dir() {
+            let csv_files = crate::file_scanner::scan_directory(&path)?;
+            if csv_files.is_empty() {
+                anyhow::bail!("No CSV files found in directory: {}", path.display());
+            }
+            let file_path = csv_files[0].clone();
+            (file_path, csv_files, 0)
+        } else {
+            anyhow::bail!("Invalid path: {}", path.display());
+        };
+
+        // Load CSV data
+        let csv_data = crate::csv_data::CsvData::from_file(
+            &file_path,
+            cli_args.delimiter,
+            cli_args.no_headers,
+            cli_args.encoding.clone(),
+        )
+        .context(format!("Failed to load CSV file: {}", file_path.display()))?;
+
+        // Create and return the App
+        Ok(Self::new(
+            csv_data,
+            csv_files,
+            current_file_index,
+            cli_args.delimiter,
+            cli_args.no_headers,
+            cli_args.encoding,
+        ))
+    }
+
+    /// Create new App from loaded CSV data, file list, and CLI parsing options
+    pub fn new(
+        csv_data: CsvData,
+        csv_files: Vec<PathBuf>,
+        current_file_index: usize,
+        delimiter: Option<u8>,
+        no_headers: bool,
+        encoding: Option<String>,
+    ) -> Self {
+        let mut ui_state = UiState::default();
+        ui_state.table_state.select(Some(0));
 
         Self {
             csv_data,
-            table_state,
-            selected_col: 0,
-            horizontal_offset: 0,
-            show_cheatsheet: false,
+            ui: ui_state,
             should_quit: false,
             mode: Mode::Normal,
             csv_files,
@@ -95,7 +159,9 @@ impl App {
             pending_key: None,
             pending_key_time: None,
             command_count: None,
-            viewport_mode: ViewportMode::Auto,
+            delimiter,
+            no_headers,
+            encoding,
         }
     }
 
@@ -106,7 +172,7 @@ impl App {
 
     /// Get current selected row index (for status display)
     pub fn selected_row(&self) -> Option<usize> {
-        self.table_state.selected()
+        self.ui.table_state.selected()
     }
 
     /// Get current file path
@@ -117,13 +183,17 @@ impl App {
     /// Reload CSV data from current file
     pub fn reload_current_file(&mut self) -> Result<()> {
         let file_path = self.current_file().clone();
-        self.csv_data = CsvData::from_file(&file_path)
-            .context(format!("Failed to reload file: {}", file_path.display()))?;
+        self.csv_data = CsvData::from_file(
+            &file_path,
+            self.delimiter,
+            self.no_headers,
+            self.encoding.clone(),
+        )
+        .context(format!("Failed to reload file: {}", file_path.display()))?;
 
-        // Reset cursor to first row
-        self.table_state.select(Some(0));
-        self.selected_col = 0;
-        self.horizontal_offset = 0;
+        // Reset UI state
+        self.ui = UiState::default();
+        self.ui.table_state.select(Some(0));
 
         Ok(())
     }

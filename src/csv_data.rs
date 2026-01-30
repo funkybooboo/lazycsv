@@ -1,7 +1,11 @@
 use anyhow::{Context, Result};
+use encoding_rs::Encoding;
+use std::fs;
 use std::path::Path;
+use csv;
 
 /// Holds parsed CSV data in memory
+#[derive(Debug)]
 pub struct CsvData {
     /// Column headers (first row)
     pub headers: Vec<String>,
@@ -17,35 +21,24 @@ pub struct CsvData {
 }
 
 impl CsvData {
-    /// Load CSV from file path
-    pub fn from_file(path: &Path) -> Result<Self> {
+    /// Load CSV from file path with optional delimiter, header, and encoding settings.
+    pub fn from_file(
+        path: &Path,
+        delimiter: Option<u8>,
+        no_headers: bool,
+        encoding_label: Option<String>,
+    ) -> Result<Self> {
         let filename = path
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("unknown")
             .to_string();
 
-        let mut reader = csv::ReaderBuilder::new()
-            .has_headers(true)
-            .from_path(path)
-            .context(format!("Failed to open CSV file: {}", path.display()))?;
+        let file_bytes =
+            fs::read(path).context(format!("Failed to read file: {}", path.display()))?;
 
-        // Extract headers
-        let headers = reader
-            .headers()
-            .context("Failed to read CSV headers - file may be empty or malformed")?
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
-
-        // Read all rows (memory-bounded for MVP)
-        let mut rows = Vec::new();
-        for (line_num, result) in reader.records().enumerate() {
-            let record =
-                result.context(format!("Failed to parse CSV row at line {}", line_num + 2))?;
-            let row: Vec<String> = record.iter().map(|s| s.to_string()).collect();
-            rows.push(row);
-        }
+        let decoded_content = Self::decode_file_bytes(&file_bytes, encoding_label)?;
+        let (headers, rows) = Self::parse_csv_content(&decoded_content, delimiter, no_headers)?;
 
         Ok(CsvData {
             headers,
@@ -53,6 +46,58 @@ impl CsvData {
             filename,
             is_dirty: false,
         })
+    }
+
+    /// Decodes file bytes into a UTF-8 string using the specified encoding.
+    fn decode_file_bytes(
+        file_bytes: &[u8],
+        encoding_label: Option<String>,
+    ) -> Result<String> {
+        if let Some(label) = &encoding_label {
+            let encoding = Encoding::for_label(label.as_bytes())
+                .ok_or_else(|| anyhow::anyhow!("Unsupported encoding: {}", label))?;
+            let (decoded_content, ..) = encoding.decode(file_bytes);
+            Ok(decoded_content.into_owned())
+        } else {
+            let (decoded_content, ..) = encoding_rs::UTF_8.decode_with_bom_removal(file_bytes);
+            Ok(decoded_content.into_owned())
+        }
+    }
+
+    /// Parses CSV content from a string.
+    fn parse_csv_content(
+        content: &str,
+        delimiter: Option<u8>,
+        no_headers: bool,
+    ) -> Result<(Vec<String>, Vec<Vec<String>>)> {
+        let mut builder = csv::ReaderBuilder::new();
+        builder.has_headers(!no_headers);
+        if let Some(d) = delimiter {
+            builder.delimiter(d);
+        }
+
+        let mut reader = builder.from_reader(content.as_bytes());
+        let headers_from_csv = reader.headers()?.clone();
+
+        let mut rows: Vec<Vec<String>> = Vec::new();
+        for result in reader.records() {
+            let record = result?;
+            rows.push(record.iter().map(String::from).collect());
+        }
+
+        let final_headers = if no_headers {
+            rows.get(0)
+                .map(|first_row| {
+                    (1..=first_row.len())
+                        .map(|i| format!("Column {}", i))
+                        .collect()
+                })
+                .unwrap_or_else(Vec::new)
+        } else {
+            headers_from_csv.iter().map(String::from).collect()
+        };
+
+        Ok((final_headers, rows))
     }
 
     /// Get total row count (excluding headers)

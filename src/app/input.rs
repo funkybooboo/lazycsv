@@ -32,7 +32,7 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<bool> {
 
     // Handle numeric prefixes (5, 10, 25, etc.) - only when help is closed
     // Special case: '0' alone means "go to first column", not start of count
-    if !app.show_cheatsheet {
+    if !app.ui.show_cheatsheet {
         if let KeyCode::Char(c) = key.code {
             if c.is_numeric() {
                 // If '0' is pressed without existing count, treat it as "first column" command
@@ -47,7 +47,7 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<bool> {
 
     match key.code {
         // Quit - vim-style (warns if unsaved in Phase 2)
-        KeyCode::Char('q') if !app.show_cheatsheet => {
+        KeyCode::Char('q') if !app.ui.show_cheatsheet => {
             if app.csv_data.is_dirty {
                 app.status_message = Some("Unsaved changes! Use :q! to force quit".to_string());
             } else {
@@ -57,12 +57,12 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<bool> {
 
         // Toggle help/cheatsheet
         KeyCode::Char('?') => {
-            app.show_cheatsheet = !app.show_cheatsheet;
+            app.ui.show_cheatsheet = !app.ui.show_cheatsheet;
         }
 
         // Close help overlay
-        KeyCode::Esc if app.show_cheatsheet => {
-            app.show_cheatsheet = false;
+        KeyCode::Esc if app.ui.show_cheatsheet => {
+            app.ui.show_cheatsheet = false;
         }
 
         // Clear pending command on Esc
@@ -73,7 +73,7 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<bool> {
         }
 
         // File switching - Previous file
-        KeyCode::Char('[') if !app.show_cheatsheet && app.csv_files.len() > 1 => {
+        KeyCode::Char('[') if !app.ui.show_cheatsheet && app.csv_files.len() > 1 => {
             app.current_file_index = if app.current_file_index == 0 {
                 app.csv_files.len() - 1
             } else {
@@ -83,26 +83,26 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<bool> {
         }
 
         // File switching - Next file
-        KeyCode::Char(']') if !app.show_cheatsheet && app.csv_files.len() > 1 => {
+        KeyCode::Char(']') if !app.ui.show_cheatsheet && app.csv_files.len() > 1 => {
             app.current_file_index = (app.current_file_index + 1) % app.csv_files.len();
             return Ok(true); // Signal to reload file
         }
 
         // Start multi-key sequences (only when help is closed)
-        KeyCode::Char('g') if !app.show_cheatsheet => {
+        KeyCode::Char('g') if !app.ui.show_cheatsheet => {
             app.pending_key = Some(KeyCode::Char('g'));
             app.pending_key_time = Some(std::time::Instant::now());
             return Ok(false);
         }
 
-        KeyCode::Char('z') if !app.show_cheatsheet => {
+        KeyCode::Char('z') if !app.ui.show_cheatsheet => {
             app.pending_key = Some(KeyCode::Char('z'));
             app.pending_key_time = Some(std::time::Instant::now());
             return Ok(false);
         }
 
         // Navigation (only when help is closed)
-        _ if !app.show_cheatsheet => navigation::handle_navigation(app, key.code)?,
+        _ if !app.ui.show_cheatsheet => navigation::handle_navigation(app, key.code)?,
 
         _ => {}
     }
@@ -124,19 +124,19 @@ fn handle_multi_key_command(app: &mut App, first: KeyCode, second: KeyCode) -> R
 
         // zt - Top of screen
         (KeyCode::Char('z'), KeyCode::Char('t')) => {
-            app.viewport_mode = ViewportMode::Top;
+            app.ui.viewport_mode = ViewportMode::Top;
             app.status_message = Some("View: top".to_string());
         }
 
         // zz - Center of screen
         (KeyCode::Char('z'), KeyCode::Char('z')) => {
-            app.viewport_mode = ViewportMode::Center;
+            app.ui.viewport_mode = ViewportMode::Center;
             app.status_message = Some("View: center".to_string());
         }
 
         // zb - Bottom of screen
         (KeyCode::Char('z'), KeyCode::Char('b')) => {
-            app.viewport_mode = ViewportMode::Bottom;
+            app.ui.viewport_mode = ViewportMode::Bottom;
             app.status_message = Some("View: bottom".to_string());
         }
 

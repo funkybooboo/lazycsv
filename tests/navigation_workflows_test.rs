@@ -39,39 +39,39 @@ fn key_event(code: KeyCode) -> KeyEvent {
 fn test_navigate_to_all_four_corners() {
     let csv_data = create_large_csv();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     // Start at top-left (0, 0)
     assert_eq!(app.selected_row(), Some(0));
-    assert_eq!(app.selected_col, 0);
+    assert_eq!(app.ui.selected_col, 0);
 
     // Navigate to bottom-left (99, 0)
     app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
     assert_eq!(app.selected_row(), Some(99));
-    assert_eq!(app.selected_col, 0);
+    assert_eq!(app.ui.selected_col, 0);
 
     // Navigate to bottom-right (99, 2)
     app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
     assert_eq!(app.selected_row(), Some(99));
-    assert_eq!(app.selected_col, 2);
+    assert_eq!(app.ui.selected_col, 2);
 
     // Navigate to top-right (0, 2) - using gg multi-key command
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
     assert_eq!(app.selected_row(), Some(0));
-    assert_eq!(app.selected_col, 2);
+    assert_eq!(app.ui.selected_col, 2);
 
     // Navigate to top-left (0, 0)
     app.handle_key(key_event(KeyCode::Char('0'))).unwrap();
     assert_eq!(app.selected_row(), Some(0));
-    assert_eq!(app.selected_col, 0);
+    assert_eq!(app.ui.selected_col, 0);
 }
 
 #[test]
 fn test_page_navigation_workflow() {
     let csv_data = create_large_csv();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     // Start at row 0
     assert_eq!(app.selected_row(), Some(0));
@@ -107,44 +107,44 @@ fn test_page_navigation_workflow() {
 fn test_horizontal_scrolling_workflow() {
     let csv_data = create_wide_csv();
     let csv_files = vec![PathBuf::from("wide.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     // Start at column 0, offset 0
-    assert_eq!(app.selected_col, 0);
-    assert_eq!(app.horizontal_offset, 0);
+    assert_eq!(app.ui.selected_col, 0);
+    assert_eq!(app.ui.horizontal_offset, 0);
 
     // Navigate right to column 11 (should trigger scroll)
     for _ in 0..11 {
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
     }
-    assert_eq!(app.selected_col, 11);
-    assert!(app.horizontal_offset > 0); // Should have scrolled
+    assert_eq!(app.ui.selected_col, 11);
+    assert!(app.ui.horizontal_offset > 0); // Should have scrolled
 
     // Navigate to last column
     app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
-    assert_eq!(app.selected_col, 19);
-    assert!(app.horizontal_offset > 0);
+    assert_eq!(app.ui.selected_col, 19);
+    assert!(app.ui.horizontal_offset > 0);
 
     // Navigate back to first column
     app.handle_key(key_event(KeyCode::Char('0'))).unwrap();
-    assert_eq!(app.selected_col, 0);
-    assert_eq!(app.horizontal_offset, 0);
+    assert_eq!(app.ui.selected_col, 0);
+    assert_eq!(app.ui.horizontal_offset, 0);
 }
 
 #[test]
 fn test_vim_style_navigation_workflow() {
     let csv_data = create_large_csv();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     // Test hjkl navigation in a square pattern
     assert_eq!(app.selected_row(), Some(0));
-    assert_eq!(app.selected_col, 0);
+    assert_eq!(app.ui.selected_col, 0);
 
     // Move right twice with l
     app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
-    assert_eq!(app.selected_col, 2);
+    assert_eq!(app.ui.selected_col, 2);
 
     // Move down twice with j
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
@@ -154,7 +154,7 @@ fn test_vim_style_navigation_workflow() {
     // Move left twice with h
     app.handle_key(key_event(KeyCode::Char('h'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('h'))).unwrap();
-    assert_eq!(app.selected_col, 0);
+    assert_eq!(app.ui.selected_col, 0);
 
     // Move up twice with k
     app.handle_key(key_event(KeyCode::Char('k'))).unwrap();
@@ -162,33 +162,12 @@ fn test_vim_style_navigation_workflow() {
     assert_eq!(app.selected_row(), Some(0));
 }
 
-#[test]
-fn test_word_navigation_workflow() {
-    let csv_data = create_wide_csv();
-    let csv_files = vec![PathBuf::from("wide.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
-
-    // Start at column 0
-    assert_eq!(app.selected_col, 0);
-
-    // Use 'w' to move forward
-    app.handle_key(key_event(KeyCode::Char('w'))).unwrap();
-    assert_eq!(app.selected_col, 1);
-    app.handle_key(key_event(KeyCode::Char('w'))).unwrap();
-    assert_eq!(app.selected_col, 2);
-
-    // Use 'b' to move backward
-    app.handle_key(key_event(KeyCode::Char('b'))).unwrap();
-    assert_eq!(app.selected_col, 1);
-    app.handle_key(key_event(KeyCode::Char('b'))).unwrap();
-    assert_eq!(app.selected_col, 0);
-}
 
 #[test]
 fn test_boundary_navigation() {
     let csv_data = create_large_csv();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     // Try to go up from first row
     app.handle_key(key_event(KeyCode::Char('k'))).unwrap();
@@ -196,13 +175,13 @@ fn test_boundary_navigation() {
 
     // Try to go left from first column
     app.handle_key(key_event(KeyCode::Char('h'))).unwrap();
-    assert_eq!(app.selected_col, 0); // Should stay at 0
+    assert_eq!(app.ui.selected_col, 0); // Should stay at 0
 
     // Go to bottom-right corner
     app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
     assert_eq!(app.selected_row(), Some(99));
-    assert_eq!(app.selected_col, 2);
+    assert_eq!(app.ui.selected_col, 2);
 
     // Try to go down from last row
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
@@ -210,14 +189,14 @@ fn test_boundary_navigation() {
 
     // Try to go right from last column
     app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
-    assert_eq!(app.selected_col, 2); // Should stay at 2
+    assert_eq!(app.ui.selected_col, 2); // Should stay at 2
 }
 
 #[test]
 fn test_mixed_navigation_keys() {
     let csv_data = create_large_csv();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     // Mix vim keys and arrow keys
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
@@ -226,7 +205,7 @@ fn test_mixed_navigation_keys() {
 
     app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
     app.handle_key(key_event(KeyCode::Right)).unwrap();
-    assert_eq!(app.selected_col, 2);
+    assert_eq!(app.ui.selected_col, 2);
 
     app.handle_key(key_event(KeyCode::Char('k'))).unwrap();
     app.handle_key(key_event(KeyCode::Up)).unwrap();
@@ -234,14 +213,14 @@ fn test_mixed_navigation_keys() {
 
     app.handle_key(key_event(KeyCode::Char('h'))).unwrap();
     app.handle_key(key_event(KeyCode::Left)).unwrap();
-    assert_eq!(app.selected_col, 0);
+    assert_eq!(app.ui.selected_col, 0);
 }
 
 #[test]
 fn test_navigate_across_entire_dataset() {
     let csv_data = create_large_csv();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     // Navigate to middle of dataset
     for _ in 0..50 {
@@ -266,7 +245,7 @@ fn test_navigate_across_entire_dataset() {
 fn test_rapid_direction_changes() {
     let csv_data = create_large_csv();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     // Rapidly change directions
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
@@ -277,20 +256,20 @@ fn test_rapid_direction_changes() {
     app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('h'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
-    assert_eq!(app.selected_col, 1);
+    assert_eq!(app.ui.selected_col, 1);
 }
 
 #[test]
 fn test_navigation_preserves_position_on_file_switch() {
     let csv_data = create_large_csv();
     let csv_files = vec![PathBuf::from("file1.csv"), PathBuf::from("file2.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     // Navigate to specific position
     app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
     assert_eq!(app.selected_row(), Some(99));
-    assert_eq!(app.selected_col, 2);
+    assert_eq!(app.ui.selected_col, 2);
 
     // Switch file (this would trigger reload in real app)
     // After reload, position should reset

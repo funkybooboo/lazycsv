@@ -33,7 +33,7 @@ fn create_test_csv() -> CsvData {
 fn test_ui_renders_table() -> io::Result<()> {
     let csv_data = create_test_csv();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend)?;
@@ -74,10 +74,10 @@ fn test_ui_renders_table() -> io::Result<()> {
 fn test_ui_renders_help_overlay() -> io::Result<()> {
     let csv_data = create_test_csv();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     // Show help
-    app.show_cheatsheet = true;
+    app.ui.show_cheatsheet = true;
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend)?;
@@ -110,7 +110,7 @@ fn test_ui_renders_multi_file_switcher() -> io::Result<()> {
         PathBuf::from("file2.csv"),
         PathBuf::from("file3.csv"),
     ];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend)?;
@@ -139,7 +139,7 @@ fn test_ui_renders_multi_file_switcher() -> io::Result<()> {
 fn test_ui_shows_status_bar() -> io::Result<()> {
     let csv_data = create_test_csv();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend)?;
@@ -168,7 +168,7 @@ fn test_ui_shows_status_bar() -> io::Result<()> {
 fn test_ui_column_letters_displayed() -> io::Result<()> {
     let csv_data = create_test_csv();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend)?;
@@ -199,7 +199,7 @@ fn test_ui_shows_dirty_indicator() -> io::Result<()> {
     let mut csv_data = create_test_csv();
     csv_data.is_dirty = true;
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend)?;

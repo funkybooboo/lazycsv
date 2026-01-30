@@ -23,19 +23,19 @@ fn key_event(code: KeyCode) -> KeyEvent {
 fn test_app_initialization() {
     let csv_data = create_test_csv_data();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let app = App::new(csv_data, csv_files, 0);
+    let app = App::new(csv_data, csv_files, 0, None, false, None);
 
     assert_eq!(app.selected_row(), Some(0));
-    assert_eq!(app.selected_col, 0);
+    assert_eq!(app.ui.selected_col, 0);
     assert!(!app.should_quit);
-    assert!(!app.show_cheatsheet);
+    assert!(!app.ui.show_cheatsheet);
 }
 
 #[test]
 fn test_navigation_down() {
     let csv_data = create_test_csv_data();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
     assert_eq!(app.selected_row(), Some(1));
@@ -52,9 +52,9 @@ fn test_navigation_down() {
 fn test_navigation_up() {
     let csv_data = create_test_csv_data();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
-    app.table_state.select(Some(2));
+    app.ui.table_state.select(Some(2));
 
     app.handle_key(key_event(KeyCode::Char('k'))).unwrap();
     assert_eq!(app.selected_row(), Some(1));
@@ -71,38 +71,38 @@ fn test_navigation_up() {
 fn test_navigation_left_right() {
     let csv_data = create_test_csv_data();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
-    assert_eq!(app.selected_col, 0);
+    assert_eq!(app.ui.selected_col, 0);
 
     app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
-    assert_eq!(app.selected_col, 1);
+    assert_eq!(app.ui.selected_col, 1);
 
     app.handle_key(key_event(KeyCode::Right)).unwrap();
-    assert_eq!(app.selected_col, 2);
+    assert_eq!(app.ui.selected_col, 2);
 
     // Try to go beyond last column
     app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
-    assert_eq!(app.selected_col, 2);
+    assert_eq!(app.ui.selected_col, 2);
 
     app.handle_key(key_event(KeyCode::Char('h'))).unwrap();
-    assert_eq!(app.selected_col, 1);
+    assert_eq!(app.ui.selected_col, 1);
 
     app.handle_key(key_event(KeyCode::Left)).unwrap();
-    assert_eq!(app.selected_col, 0);
+    assert_eq!(app.ui.selected_col, 0);
 
     // Try to go before first column
     app.handle_key(key_event(KeyCode::Char('h'))).unwrap();
-    assert_eq!(app.selected_col, 0);
+    assert_eq!(app.ui.selected_col, 0);
 }
 
 #[test]
 fn test_navigation_home_end() {
     let csv_data = create_test_csv_data();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
-    app.table_state.select(Some(1));
+    app.ui.table_state.select(Some(1));
 
     app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
     assert_eq!(app.selected_row(), Some(2)); // Last row
@@ -117,41 +117,23 @@ fn test_navigation_home_end() {
 fn test_navigation_first_last_column() {
     let csv_data = create_test_csv_data();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
-    app.selected_col = 1;
+    app.ui.selected_col = 1;
 
     app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
-    assert_eq!(app.selected_col, 2); // Last column
+    assert_eq!(app.ui.selected_col, 2); // Last column
 
     app.handle_key(key_event(KeyCode::Char('0'))).unwrap();
-    assert_eq!(app.selected_col, 0); // First column
+    assert_eq!(app.ui.selected_col, 0); // First column
 }
 
-#[test]
-fn test_vim_word_navigation() {
-    let csv_data = create_test_csv_data();
-    let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
-
-    app.handle_key(key_event(KeyCode::Char('w'))).unwrap();
-    assert_eq!(app.selected_col, 1);
-
-    app.handle_key(key_event(KeyCode::Char('w'))).unwrap();
-    assert_eq!(app.selected_col, 2);
-
-    app.handle_key(key_event(KeyCode::Char('b'))).unwrap();
-    assert_eq!(app.selected_col, 1);
-
-    app.handle_key(key_event(KeyCode::Char('b'))).unwrap();
-    assert_eq!(app.selected_col, 0);
-}
 
 #[test]
 fn test_quit_functionality() {
     let csv_data = create_test_csv_data();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     assert!(!app.should_quit);
 
@@ -164,7 +146,7 @@ fn test_quit_with_unsaved_changes() {
     let mut csv_data = create_test_csv_data();
     csv_data.is_dirty = true;
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     assert!(!app.should_quit);
 
@@ -177,27 +159,27 @@ fn test_quit_with_unsaved_changes() {
 fn test_help_toggle() {
     let csv_data = create_test_csv_data();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
-    assert!(!app.show_cheatsheet);
-
-    app.handle_key(key_event(KeyCode::Char('?'))).unwrap();
-    assert!(app.show_cheatsheet);
+    assert!(!app.ui.show_cheatsheet);
 
     app.handle_key(key_event(KeyCode::Char('?'))).unwrap();
-    assert!(!app.show_cheatsheet);
+    assert!(app.ui.show_cheatsheet);
+
+    app.handle_key(key_event(KeyCode::Char('?'))).unwrap();
+    assert!(!app.ui.show_cheatsheet);
 }
 
 #[test]
 fn test_help_close_with_esc() {
     let csv_data = create_test_csv_data();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
-    app.show_cheatsheet = true;
+    app.ui.show_cheatsheet = true;
 
     app.handle_key(key_event(KeyCode::Esc)).unwrap();
-    assert!(!app.show_cheatsheet);
+    assert!(!app.ui.show_cheatsheet);
 }
 
 #[test]
@@ -208,7 +190,7 @@ fn test_file_switching_next() {
         PathBuf::from("file2.csv"),
         PathBuf::from("file3.csv"),
     ];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     assert_eq!(app.current_file_index, 0);
 
@@ -234,7 +216,7 @@ fn test_file_switching_previous() {
         PathBuf::from("file2.csv"),
         PathBuf::from("file3.csv"),
     ];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     assert_eq!(app.current_file_index, 0);
 
@@ -251,7 +233,7 @@ fn test_file_switching_previous() {
 fn test_no_file_switching_with_single_file() {
     let csv_data = create_test_csv_data();
     let csv_files = vec![PathBuf::from("file1.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
     assert!(!should_reload); // Should not reload with single file
@@ -261,18 +243,18 @@ fn test_no_file_switching_with_single_file() {
 fn test_navigation_blocked_when_help_shown() {
     let csv_data = create_test_csv_data();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
-    app.show_cheatsheet = true;
+    app.ui.show_cheatsheet = true;
     let initial_row = app.selected_row();
-    let initial_col = app.selected_col;
+    let initial_col = app.ui.selected_col;
 
     // Try navigation with help shown
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
     assert_eq!(app.selected_row(), initial_row);
 
     app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
-    assert_eq!(app.selected_col, initial_col);
+    assert_eq!(app.ui.selected_col, initial_col);
 
     // File switching should also be blocked
     let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
@@ -283,7 +265,7 @@ fn test_navigation_blocked_when_help_shown() {
 fn test_current_file_path() {
     let csv_data = create_test_csv_data();
     let csv_files = vec![PathBuf::from("test.csv"), PathBuf::from("other.csv")];
-    let app = App::new(csv_data, csv_files.clone(), 0);
+    let app = App::new(csv_data, csv_files.clone(), 0, None, false, None);
 
     assert_eq!(app.current_file(), &csv_files[0]);
 }

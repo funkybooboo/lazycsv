@@ -23,13 +23,13 @@ fn create_test_csv() -> CsvData {
 fn test_complete_navigation_workflow() {
     let csv_data = create_test_csv();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     // User workflow: Navigate to bottom-right, then back to top-left
     app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
     assert_eq!(app.selected_row(), Some(2));
-    assert_eq!(app.selected_col, 2);
+    assert_eq!(app.ui.selected_col, 2);
 
     // gg - Go to first row (multi-key command)
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
@@ -38,18 +38,18 @@ fn test_complete_navigation_workflow() {
 
     // 0 - Go to first column
     app.handle_key(key_event(KeyCode::Char('0'))).unwrap();
-    assert_eq!(app.selected_col, 0);
+    assert_eq!(app.ui.selected_col, 0);
 }
 
 #[test]
 fn test_help_workflow() {
     let csv_data = create_test_csv();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     // Open help
     app.handle_key(key_event(KeyCode::Char('?'))).unwrap();
-    assert!(app.show_cheatsheet);
+    assert!(app.ui.show_cheatsheet);
 
     // Try to navigate (should be blocked)
     let initial_row = app.selected_row();
@@ -58,7 +58,7 @@ fn test_help_workflow() {
 
     // Close help with Esc
     app.handle_key(key_event(KeyCode::Esc)).unwrap();
-    assert!(!app.show_cheatsheet);
+    assert!(!app.ui.show_cheatsheet);
 
     // Navigation should work again
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
@@ -69,7 +69,7 @@ fn test_help_workflow() {
 fn test_quit_workflow_clean_state() {
     let csv_data = create_test_csv();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     assert!(!app.should_quit);
 
@@ -82,7 +82,7 @@ fn test_quit_workflow_dirty_state() {
     let mut csv_data = create_test_csv();
     csv_data.is_dirty = true;
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     assert!(!app.should_quit);
 
@@ -100,7 +100,7 @@ fn test_file_switching_workflow() {
         PathBuf::from("file2.csv"),
         PathBuf::from("file3.csv"),
     ];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     // Start at file 0
     assert_eq!(app.current_file_index, 0);
@@ -129,11 +129,11 @@ fn test_file_switching_workflow() {
 fn test_help_and_quit_workflow() {
     let csv_data = create_test_csv();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     // Open help
     app.handle_key(key_event(KeyCode::Char('?'))).unwrap();
-    assert!(app.show_cheatsheet);
+    assert!(app.ui.show_cheatsheet);
 
     // Try to quit while help is open (should not work)
     app.handle_key(key_event(KeyCode::Char('q'))).unwrap();
@@ -141,7 +141,7 @@ fn test_help_and_quit_workflow() {
 
     // Close help
     app.handle_key(key_event(KeyCode::Char('?'))).unwrap();
-    assert!(!app.show_cheatsheet);
+    assert!(!app.ui.show_cheatsheet);
 
     // Now quit should work
     app.handle_key(key_event(KeyCode::Char('q'))).unwrap();
@@ -152,13 +152,13 @@ fn test_help_and_quit_workflow() {
 fn test_navigate_then_switch_file_workflow() {
     let csv_data = create_test_csv();
     let csv_files = vec![PathBuf::from("file1.csv"), PathBuf::from("file2.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     // Navigate to a specific position
     app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
     assert_eq!(app.selected_row(), Some(2));
-    assert_eq!(app.selected_col, 2);
+    assert_eq!(app.ui.selected_col, 2);
 
     // Switch file
     let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
@@ -170,7 +170,7 @@ fn test_navigate_then_switch_file_workflow() {
 fn test_rapid_key_sequence_workflow() {
     let csv_data = create_test_csv();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     // Simulate rapid user input
     for _ in 0..10 {
@@ -180,14 +180,14 @@ fn test_rapid_key_sequence_workflow() {
 
     // Should end at maximum position
     assert_eq!(app.selected_row(), Some(2));
-    assert_eq!(app.selected_col, 2);
+    assert_eq!(app.ui.selected_col, 2);
 }
 
 #[test]
 fn test_zigzag_navigation_workflow() {
     let csv_data = create_test_csv();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     // Zigzag pattern: down-right, down-right, down-right
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
@@ -196,20 +196,20 @@ fn test_zigzag_navigation_workflow() {
     app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
 
     assert_eq!(app.selected_row(), Some(2));
-    assert_eq!(app.selected_col, 2);
+    assert_eq!(app.ui.selected_col, 2);
 }
 
 #[test]
 fn test_help_toggle_multiple_times() {
     let csv_data = create_test_csv();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     for _ in 0..5 {
         app.handle_key(key_event(KeyCode::Char('?'))).unwrap();
-        assert!(app.show_cheatsheet);
+        assert!(app.ui.show_cheatsheet);
         app.handle_key(key_event(KeyCode::Char('?'))).unwrap();
-        assert!(!app.show_cheatsheet);
+        assert!(!app.ui.show_cheatsheet);
     }
 }
 
@@ -217,7 +217,7 @@ fn test_help_toggle_multiple_times() {
 fn test_boundary_navigation_workflow() {
     let csv_data = create_test_csv();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     // Try to go beyond boundaries multiple times
     for _ in 0..10 {
@@ -225,7 +225,7 @@ fn test_boundary_navigation_workflow() {
         app.handle_key(key_event(KeyCode::Char('h'))).unwrap();
     }
     assert_eq!(app.selected_row(), Some(0));
-    assert_eq!(app.selected_col, 0);
+    assert_eq!(app.ui.selected_col, 0);
 
     // Go to opposite corner
     app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
@@ -237,7 +237,7 @@ fn test_boundary_navigation_workflow() {
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
     }
     assert_eq!(app.selected_row(), Some(2));
-    assert_eq!(app.selected_col, 2);
+    assert_eq!(app.ui.selected_col, 2);
 }
 
 #[test]
@@ -248,7 +248,7 @@ fn test_current_file_tracking() {
         PathBuf::from("file2.csv"),
         PathBuf::from("file3.csv"),
     ];
-    let mut app = App::new(csv_data, csv_files.clone(), 1);
+    let mut app = App::new(csv_data, csv_files.clone(), 1, None, false, None);
 
     // Should start at file index 1
     assert_eq!(app.current_file(), &csv_files[1]);
@@ -264,7 +264,7 @@ fn test_current_file_tracking() {
 fn test_status_message_lifecycle() {
     let csv_data = create_test_csv();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     // Initially no status message
     assert!(app.status_message.is_none());

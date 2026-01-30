@@ -56,13 +56,13 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
 
     let selected_row = app.selected_row().map(|i| i + 1).unwrap_or(0);
     let total_rows = app.csv_data.row_count();
-    let col_letter = column_index_to_letter(app.selected_col);
-    let col_name = app.csv_data.get_header(app.selected_col);
+    let col_letter = column_index_to_letter(app.ui.selected_col);
+    let col_name = app.csv_data.get_header(app.ui.selected_col);
     let total_cols = app.csv_data.column_count();
 
     // Get current cell value
     let cell_value = if let Some(row_idx) = app.selected_row() {
-        let value = app.csv_data.get_cell(row_idx, app.selected_col);
+        let value = app.csv_data.get_cell(row_idx, app.ui.selected_col);
         if value.is_empty() {
             "<empty>".to_string()
         } else if value.len() > 30 {
@@ -92,7 +92,7 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             total_rows,
             col_letter,
             col_name,
-            app.selected_col + 1,
+            app.ui.selected_col + 1,
             total_cols,
             cell_value
         );

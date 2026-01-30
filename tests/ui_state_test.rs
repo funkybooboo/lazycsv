@@ -37,7 +37,7 @@ fn create_single_cell_csv() -> CsvData {
 fn test_ui_renders_with_empty_data() -> io::Result<()> {
     let csv_data = create_empty_csv();
     let csv_files = vec![PathBuf::from("empty.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend)?;
@@ -54,7 +54,7 @@ fn test_ui_renders_with_empty_data() -> io::Result<()> {
 fn test_ui_renders_with_single_cell() -> io::Result<()> {
     let csv_data = create_single_cell_csv();
     let csv_files = vec![PathBuf::from("single.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend)?;
@@ -79,7 +79,7 @@ fn test_ui_renders_with_single_cell() -> io::Result<()> {
 fn test_ui_renders_with_small_terminal() -> io::Result<()> {
     let csv_data = create_small_csv();
     let csv_files = vec![PathBuf::from("small.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     // Very small terminal
     let backend = TestBackend::new(20, 10);
@@ -97,7 +97,7 @@ fn test_ui_renders_with_small_terminal() -> io::Result<()> {
 fn test_ui_renders_with_large_terminal() -> io::Result<()> {
     let csv_data = create_small_csv();
     let csv_files = vec![PathBuf::from("small.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     // Large terminal
     let backend = TestBackend::new(200, 100);
@@ -114,7 +114,7 @@ fn test_ui_renders_with_large_terminal() -> io::Result<()> {
 fn test_ui_state_after_navigation() -> io::Result<()> {
     let csv_data = create_small_csv();
     let csv_files = vec![PathBuf::from("small.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend)?;
@@ -142,7 +142,7 @@ fn test_ui_state_after_navigation() -> io::Result<()> {
 fn test_ui_state_transitions_help_toggle() -> io::Result<()> {
     let csv_data = create_small_csv();
     let csv_files = vec![PathBuf::from("small.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend)?;
@@ -154,7 +154,7 @@ fn test_ui_state_transitions_help_toggle() -> io::Result<()> {
     let buffer1 = terminal.backend().buffer().clone();
 
     // Toggle help on
-    app.show_cheatsheet = true;
+    app.ui.show_cheatsheet = true;
     terminal.draw(|frame| {
         lazycsv::ui::render(frame, &mut app);
     })?;
@@ -164,7 +164,7 @@ fn test_ui_state_transitions_help_toggle() -> io::Result<()> {
     assert_ne!(buffer1.content, buffer2.content);
 
     // Toggle help off
-    app.show_cheatsheet = false;
+    app.ui.show_cheatsheet = false;
     terminal.draw(|frame| {
         lazycsv::ui::render(frame, &mut app);
     })?;
@@ -180,7 +180,7 @@ fn test_ui_state_transitions_help_toggle() -> io::Result<()> {
 fn test_ui_status_bar_updates() -> io::Result<()> {
     let csv_data = create_small_csv();
     let csv_files = vec![PathBuf::from("small.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend)?;
@@ -221,7 +221,7 @@ fn test_ui_status_bar_updates() -> io::Result<()> {
 fn test_ui_file_switcher_single_file() -> io::Result<()> {
     let csv_data = create_small_csv();
     let csv_files = vec![PathBuf::from("only.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend)?;
@@ -252,7 +252,7 @@ fn test_ui_file_switcher_multiple_files() -> io::Result<()> {
         PathBuf::from("second.csv"),
         PathBuf::from("third.csv"),
     ];
-    let mut app = App::new(csv_data, csv_files, 1); // Start at second file
+    let mut app = App::new(csv_data, csv_files, 1, None, false, None); // Start at second file
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend)?;
@@ -280,7 +280,7 @@ fn test_ui_dirty_indicator() -> io::Result<()> {
     let mut csv_data = create_small_csv();
     csv_data.is_dirty = false;
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend)?;
@@ -310,7 +310,7 @@ fn test_ui_dirty_indicator() -> io::Result<()> {
 fn test_ui_column_letters() -> io::Result<()> {
     let csv_data = create_small_csv();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend)?;
@@ -338,7 +338,7 @@ fn test_ui_column_letters() -> io::Result<()> {
 fn test_ui_row_numbers() -> io::Result<()> {
     let csv_data = create_small_csv();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend)?;
@@ -366,7 +366,7 @@ fn test_ui_row_numbers() -> io::Result<()> {
 fn test_ui_responsive_to_selection() -> io::Result<()> {
     let csv_data = create_small_csv();
     let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0);
+    let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend)?;
@@ -378,7 +378,7 @@ fn test_ui_responsive_to_selection() -> io::Result<()> {
     let buffer1 = terminal.backend().buffer().clone();
 
     // Change selection
-    app.table_state.select(Some(1));
+    app.ui.table_state.select(Some(1));
     terminal.draw(|frame| {
         lazycsv::ui::render(frame, &mut app);
     })?;
