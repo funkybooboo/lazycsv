@@ -34,7 +34,26 @@ A phased checklist for building the LazyCSV TUI. Check off items as they're comp
 
 ---
 
-## Phase 1.5: UI/UX Enhancements & Large File Support 🚀
+## Phase 1.5: Type System & State Refactoring 🧠
+
+*This phase focuses on improving code clarity, safety, and maintainability by introducing a richer type system and refactoring state management.*
+
+### Command & Action Abstraction
+- [ ] **Introduce `UserAction` Enum:** Create a comprehensive `UserAction` enum to represent all possible actions a user can take (e.g., `Navigate(Direction)`, `GoTo(Location)`, `ToggleHelp`, `Quit`).
+- [ ] **Refactor Input Handling:** Modify `app/input.rs` to act as a parser that translates raw `KeyEvent`s into `UserAction`s. The main app logic will then dispatch based on the `UserAction`.
+- [ ] **Define Helper Enums:** Create smaller, focused enums like `Direction`, `Location`, and `FileDirection` to be used within `UserAction`.
+
+### Newtype Wrappers for Indices
+- [ ] **Introduce `RowIndex` and `ColIndex`:** Create newtype wrappers around `usize` (e.g., `struct RowIndex(pub usize);`) for row and column indices.
+- [ ] **Update Function Signatures:** Refactor functions throughout the codebase (`get_cell`, navigation functions, etc.) to use these newtypes, preventing accidental swapping of row and column values.
+
+### State Management Refinement
+- [ ] **`UiState` Refactoring:** Confirm that all UI-related state is cleanly separated into the `UiState` struct.
+- [ ] **`InputState`:** Consider creating an `InputState` struct to hold `pending_key`, `pending_key_time`, and `command_count`.
+
+---
+
+## Phase 1.6: UI/UX Enhancements & Large File Support 🚀
 
 *This phase addresses new requirements for better usability and performance with large datasets.*
 
@@ -54,6 +73,10 @@ A phased checklist for building the LazyCSV TUI. Check off items as they're comp
     - [ ] `G` jumps to last row.
     - [ ] `15G` jumps to row 15.
     - [ ] Buffer number keys before `G`, matching vim's behavior exactly.
+- [ ] **Command-line Jumps:** Implement Vim-style command-line navigation.
+    - [ ] `:15` jumps to row 15.
+    - [ ] `:B` jumps to column 'B'.
+    - [ ] `:BC` jumps to column 55.
 - [ ] **Column Jumping:** Implement `g<letter(s)>` key sequence for column navigation:
     - [ ] `ga` or `gA` jumps to column A (first column).
     - [ ] `gB` jumps to column B (second column).
@@ -115,25 +138,6 @@ A phased checklist for building the LazyCSV TUI. Check off items as they're comp
     - [ ] Single invalid keys in Normal mode should be ignored silently to avoid noise (vim-style).
 - [ ] **General Polish:**
     - [x] Remove the `w` and `b` key handling from the codebase and `docs/keybindings.md`.
-
----
-
-## Phase 1.8: Type System & State Refactoring 🧠
-
-*This phase focuses on improving code clarity, safety, and maintainability by introducing a richer type system and refactoring state management.*
-
-### Command & Action Abstraction
-- [ ] **Introduce `UserAction` Enum:** Create a comprehensive `UserAction` enum to represent all possible actions a user can take (e.g., `Navigate(Direction)`, `GoTo(Location)`, `ToggleHelp`, `Quit`).
-- [ ] **Refactor Input Handling:** Modify `app/input.rs` to act as a parser that translates raw `KeyEvent`s into `UserAction`s. The main app logic will then dispatch based on the `UserAction`.
-- [ ] **Define Helper Enums:** Create smaller, focused enums like `Direction`, `Location`, and `FileDirection` to be used within `UserAction`.
-
-### Newtype Wrappers for Indices
-- [ ] **Introduce `RowIndex` and `ColIndex`:** Create newtype wrappers around `usize` (e.g., `struct RowIndex(pub usize);`) for row and column indices.
-- [ ] **Update Function Signatures:** Refactor functions throughout the codebase (`get_cell`, navigation functions, etc.) to use these newtypes, preventing accidental swapping of row and column values.
-
-### State Management Refinement
-- [ ] **`UiState` Refactoring:** Confirm that all UI-related state is cleanly separated into the `UiState` struct.
-- [ ] **`InputState`:** Consider creating an `InputState` struct to hold `pending_key`, `pending_key_time`, and `command_count`.
 
 ---
 
