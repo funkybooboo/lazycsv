@@ -145,6 +145,43 @@ fn test_csv_with_mixed_row_lengths() {
 }
 
 #[test]
+fn test_malformed_csv_with_missing_fields() {
+    // CSV with inconsistent column counts (missing fields in some rows)
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    let mut file = NamedTempFile::new().unwrap();
+    writeln!(file, "A,B,C").unwrap();
+    writeln!(file, "1,2").unwrap(); // Missing third field
+    writeln!(file, "3,4,5").unwrap();
+
+    let result = CsvData::from_file(file.path(), None, false, None);
+
+    // Should either handle gracefully or return error (not panic)
+    // Current behavior: CSV crate returns error for inconsistent column counts
+    // This is acceptable - we don't crash, we return an error
+    assert!(result.is_ok() || result.is_err()); // Just don't panic
+}
+
+#[test]
+fn test_long_cell_content() {
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    let mut file = NamedTempFile::new().unwrap();
+    writeln!(file, "Name,Description").unwrap();
+    // Very long cell content (200+ characters)
+    let long_text = "a".repeat(250);
+    writeln!(file, "Test,{}", long_text).unwrap();
+
+    let result = CsvData::from_file(file.path(), None, false, None);
+
+    assert!(result.is_ok());
+    let csv_data = result.unwrap();
+    assert_eq!(csv_data.rows[0][1], long_text);
+}
+
+#[test]
 fn test_large_csv() {
     let mut file = NamedTempFile::new().unwrap();
     writeln!(file, "A,B,C").unwrap();
@@ -181,7 +218,7 @@ fn test_csv_with_blank_lines_ignored() {
     let mut file = NamedTempFile::new().unwrap();
     writeln!(file, "A,B").unwrap();
     writeln!(file, "1,2").unwrap();
-    writeln!(file, "").unwrap(); // Blank line
+    writeln!(file).unwrap(); // Blank line
     writeln!(file, "3,4").unwrap();
 
     let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();

@@ -115,7 +115,7 @@ pub struct CsvData {
     headers: Vec<String>,      // Column names
     rows: Vec<Vec<String>>,    // All data rows
     filename: String,          // Original filename
-    is_dirty: bool,            // Unsaved changes (Phase 2)
+    is_dirty: bool,            // Unsaved changes (v0.4.0+)
 }
 ```
 
@@ -135,7 +135,7 @@ CsvData::from_file(path) -> Result<CsvData>
 .get_cell(row, col) -> &str       // Safe, returns "" if out of bounds
 .get_header(col) -> &str
 
-// Future (Phase 2+)
+// Future (v0.4.0+)
 .set_cell(row, col, value)
 .save_to_file(path) -> Result<()>
 .add_row(at: usize)
@@ -353,8 +353,8 @@ anyhow displays: "Failed to load file.csv: No such file or directory"
 | Load file | O(n) | n = total cells |
 | Navigate | O(1) | Just update index |
 | Render | O(v) | v = visible cells (~200) |
-| Search (Phase 4) | O(n) | Full table scan |
-| Sort (Phase 4) | O(n log n) | Standard sort |
+| Search (v1.1.0) | O(n) | Full table scan |
+| Sort (v1.2.0) | O(n log n) | Standard sort |
 
 ### Space Complexity
 
@@ -366,7 +366,7 @@ anyhow displays: "Failed to load file.csv: No such file or directory"
 
 ### Performance Targets
 
-✅ Achieved in Phase 1:
+✅ Achieved in v0.1.0:
 - File loading: < 100ms for 10K rows
 - Frame rendering: < 16ms (60 FPS)
 - Navigation: < 10ms response
@@ -396,7 +396,7 @@ Potential uses:
 - Background file loading (large files)
 - Async search (massive datasets)
 - Real-time file watching
-- Parallel sort (Phase 4)
+- Parallel sort (v1.2.0)
 
 ## Testing Strategy
 
@@ -432,64 +432,161 @@ fn test_load_and_navigate() {
 - Test help overlay
 - Test edge cases (empty file, single row, single column)
 
-## Future Architecture (Phases 2-5)
+## Future Architecture (v0.2.0 - v1.6.2)
 
-### Phase 2: Edit Mode
+### Version 0.2.0: Type System & State Refactoring
 ```rust
-// New modules
-mod undo;     // Undo/redo system
+// New types for safety
+pub enum UserAction {
+    Navigate(Direction),
+    Edit(CellPosition),
+    ToggleHelp,
+    Quit,
+    // ... etc
+}
 
-// Enhanced structures
+pub struct RowIndex(pub usize);
+pub struct ColIndex(pub usize);
+
+pub struct InputState {
+    pending_key: Option<KeyCode>,
+    pending_key_time: Option<Instant>,
+    command_count: Option<String>,
+}
+```
+
+### Version 0.4.0: Quick Edit Mode
+```rust
+// Enhanced Mode enum
 pub enum Mode {
     Normal,
-    Edit { buffer: String, original: String },  // Track edits
+    Insert { buffer: String, cursor: usize },
 }
 
-pub struct UndoStack {
-    history: Vec<Command>,
-    current: usize,
+// App additions
+pub struct App {
+    edit_buffer: String,
+    cursor_position: usize,
 }
 ```
 
-### Phase 3: Operations
+### Version 0.5.0: Vim Magnifier
 ```rust
-// New modules
-mod operations;   // Row/column operations
-mod clipboard;    // Copy/paste
+// New mode for power editing
+pub enum Mode {
+    Normal,
+    Insert { ... },
+    Magnifier { vim_buffer: VimBuffer },  // Embedded vim editor
+}
 
-// Command pattern
-trait Command {
-    fn execute(&mut self, data: &mut CsvData);
-    fn undo(&mut self, data: &mut CsvData);
+// Potential integration with ratatui-vim or custom implementation
+pub struct VimBuffer {
+    content: String,
+    vim_state: VimState,  // Normal/Insert mode within magnifier
 }
 ```
 
-### Phase 4: Search & Filter
+### Version 0.6.0: Persistence & Guards
+```rust
+// Commands
+pub enum Command {
+    Save,
+    Quit { force: bool },
+    SaveAndQuit,
+}
+
+// Dirty tracking (already in CsvData)
+pub struct CsvData {
+    is_dirty: bool,
+    // ...
+}
+```
+
+### Version 0.7.0-0.9.0: Row, Column, Header Operations
+```rust
+// Command pattern for undo/redo
+trait Operation {
+    fn execute(&mut self, data: &mut CsvData) -> Result<()>;
+    fn undo(&mut self, data: &mut CsvData) -> Result<()>;
+}
+
+pub enum OperationType {
+    EditCell { row: RowIndex, col: ColIndex, old: String, new: String },
+    AddRow { at: RowIndex },
+    DeleteRow { at: RowIndex, data: Vec<String> },
+    AddColumn { at: ColIndex, header: String },
+    DeleteColumn { at: ColIndex, header: String, data: Vec<String> },
+    EditHeader { col: ColIndex, old: String, new: String },
+    ToggleHeaders { had_headers: bool },
+}
+```
+
+### Version 1.0.0-1.0.1: Command History & Marks
+```rust
+pub struct CommandHistory {
+    operations: Vec<Box<dyn Operation>>,
+    current: usize,  // Position in history
+    max_size: usize, // 100 operations
+}
+
+impl CommandHistory {
+    fn push(&mut self, op: Box<dyn Operation>);
+    fn undo(&mut self, data: &mut CsvData) -> Option<String>; // Returns description
+    fn redo(&mut self, data: &mut CsvData) -> Option<String>;
+}
+```
+
+### Version 1.1.0-1.1.1: Search & Visual
 ```rust
 // New modules
 mod search;   // Fuzzy search with fuzzy-matcher
-mod filter;   // Row filtering
-mod sort;     // Column sorting
 
-// Search state
 pub struct SearchState {
     query: String,
     matches: Vec<Match>,
     current: usize,
 }
+
+pub struct VisualSelection {
+    start: CellPosition,
+    end: CellPosition,
+    mode: VisualMode,  // Cell or Line
+}
 ```
 
-### Phase 5: Excel Support
+### Version 1.2.0-1.2.1: Sorting & Filtering
 ```rust
-// New modules
-mod excel;      // Excel file support with calamine
-mod worksheet;  // Unified CSV/Excel abstraction
+mod filter;
+mod sort;
 
-// Worksheet abstraction
-pub enum Worksheet {
-    Csv(PathBuf),
-    Excel(PathBuf, String),  // file + sheet name
+pub struct Filter {
+    column: ColIndex,
+    operator: FilterOperator,
+    value: String,
 }
+
+pub enum FilterOperator {
+    Equals,
+    NotEquals,
+    GreaterThan,
+    LessThan,
+    Contains,
+    StartsWith,
+    EndsWith,
+}
+```
+
+### Version 1.4.1: Session Persistence
+```rust
+pub struct SessionState {
+    cursor_position: CellPosition,
+    scroll_offset: (usize, usize),
+    sort_order: Option<(ColIndex, SortDirection)>,
+    filters: Vec<Filter>,
+    frozen_columns: usize,
+}
+
+// Saved to ~/.cache/lazycsv/<file_hash>.session
 ```
 
 ## Code Quality Standards

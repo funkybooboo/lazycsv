@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
+use csv;
 use encoding_rs::Encoding;
 use std::fs;
 use std::path::Path;
-use csv;
 
 /// Holds parsed CSV data in memory
 #[derive(Debug)]
@@ -49,10 +49,7 @@ impl CsvData {
     }
 
     /// Decodes file bytes into a UTF-8 string using the specified encoding.
-    fn decode_file_bytes(
-        file_bytes: &[u8],
-        encoding_label: Option<String>,
-    ) -> Result<String> {
+    fn decode_file_bytes(file_bytes: &[u8], encoding_label: Option<String>) -> Result<String> {
         if let Some(label) = &encoding_label {
             let encoding = Encoding::for_label(label.as_bytes())
                 .ok_or_else(|| anyhow::anyhow!("Unsupported encoding: {}", label))?;
@@ -86,13 +83,13 @@ impl CsvData {
         }
 
         let final_headers = if no_headers {
-            rows.get(0)
+            rows.first()
                 .map(|first_row| {
                     (1..=first_row.len())
                         .map(|i| format!("Column {}", i))
                         .collect()
                 })
-                .unwrap_or_else(Vec::new)
+                .unwrap_or_default()
         } else {
             headers_from_csv.iter().map(String::from).collect()
         };
@@ -125,11 +122,11 @@ impl CsvData {
         self.headers.get(col).map(|s| s.as_str()).unwrap_or("")
     }
 
-    // Phase 2: Cell editing methods (to be implemented)
+    // v0.4.0-v0.6.0: Cell editing methods (to be implemented)
     // pub fn set_cell(&mut self, row: usize, col: usize, value: String)
     // pub fn save_to_file(&self, path: &Path) -> Result<()>
 
-    // Phase 3: Row/column operations (to be implemented)
+    // v0.7.0-v0.8.0: Row/column operations (to be implemented)
     // pub fn add_row(&mut self, at: usize)
     // pub fn delete_row(&mut self, at: usize)
     // pub fn add_column(&mut self, at: usize, header: String)

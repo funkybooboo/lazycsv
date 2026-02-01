@@ -7,12 +7,12 @@ This directory contains planning documents, design specifications, and developme
 ### `todo.md`
 **Comprehensive development checklist** with checkboxes for tracking progress.
 
-Organized by phase:
-- ✅ Phase 1: Core Viewing (MVP) - Complete!
-- 📋 Phase 2: Cell Editing
-- 📋 Phase 3: Row/Column Operations
-- 📋 Phase 4: Advanced Features (Fuzzy Search, Sort, Filter)
-- 📋 Phase 5: Multi-File/Sheet Navigation & Excel Support
+Organized by version:
+- ✅ v0.1.0: Foundation (MVP) - Complete!
+- 📋 v0.4.0-v0.6.0: Cell Editing & Persistence
+- 📋 v0.7.0-v0.8.0: Row/Column Operations
+- 📋 v1.1.0-v1.2.0: Advanced Features (Search, Sort, Filter)
+- 📋 v1.3.0: Multi-File Navigation
 
 **How to use:**
 - Check off items as you complete them
@@ -66,7 +66,7 @@ This plan includes:
 
 ### Current Status
 
-**Phase 1 (MVP): ✅ Complete**
+**v0.1.0 (MVP): ✅ Complete**
 
 Implemented:
 - Fast in-memory CSV loading and display
@@ -76,7 +76,7 @@ Implemented:
 
 Next up:
 - True lazy-loading for large files
-- Phase 2: Cell editing, saving, undo/redo
+- v0.4.0-v1.0.0: Cell editing, saving, undo/redo
 
 ### Tracking Progress
 
@@ -103,8 +103,8 @@ task run
 
 Key decisions documented in this directory:
 
-### Phase 1 Decisions
-- ✅ **Load all data into memory** - For simplicity in the MVP, the entire CSV is loaded into RAM. True lazy-loading is a top priority for a future phase.
+### v0.1.0 Decisions
+- ✅ **Load all data into memory** - For simplicity in the MVP, the entire CSV is loaded into RAM. This is now a permanent design decision for performance.
 - ✅ **No colors** - Monochrome design for now
 - ✅ **Row/column numbers** - Excel-style (A, B, C... and 1, 2, 3...)
 - ✅ **File switcher at bottom** - Always visible, doesn't block data
@@ -113,20 +113,20 @@ Key decisions documented in this directory:
 - ✅ **~10 columns visible** - Horizontal scroll for wide tables
 - ✅ **Truncate at 20 chars** - Longer text shows with ...
 
-### Phase 2 Decisions (Planned)
+### v0.4.0-v0.6.0 Decisions (Planned)
 - 📋 **Select-all in edit** - Most edits replace, not append
 - 📋 **No delete confirmation** - Undo provides safety
 - 📋 **Vim-style quit** - q warns, :q! forces
 - 📋 **Atomic save** - Write to temp, rename on success
 
-### Phase 4 Decisions (Planned)
+### v1.1.0-v1.2.0 Decisions (Planned)
 - 📋 **Fuzzy search** - Not just substring, score-based
 - 📋 **In-place sort** - Actually reorder data (undoable)
 - 📋 **Case-insensitive search** - More useful for data
 
 ## Future Planning
 
-### Phase 6+ Ideas
+### v1.4.0+ Ideas
 - Configuration file (`~/.config/lazycsv/config.toml`)
 - Custom keybindings
 - Optional color themes

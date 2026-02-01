@@ -1,7 +1,7 @@
+use clap::Parser;
 use lazycsv::{cli::CliArgs, App};
 use std::fs::write;
 use tempfile::TempDir;
-use clap::Parser;
 
 #[test]
 fn test_delimiter_integration() {
@@ -10,7 +10,7 @@ fn test_delimiter_integration() {
     write(&file_path, "a;b;c\n1;2;3").unwrap();
 
     let args =
-        CliArgs::try_parse_from(&["lazycsv", file_path.to_str().unwrap(), "--delimiter", ";"])
+        CliArgs::try_parse_from(["lazycsv", file_path.to_str().unwrap(), "--delimiter", ";"])
             .unwrap();
 
     let app = App::from_cli(args).unwrap();
@@ -26,8 +26,8 @@ fn test_no_headers_integration() {
     let file_path = temp_dir.path().join("test.csv");
     write(&file_path, "a,b,c\n1,2,3").unwrap();
 
-    let args = CliArgs::try_parse_from(&["lazycsv", file_path.to_str().unwrap(), "--no-headers"])
-        .unwrap();
+    let args =
+        CliArgs::try_parse_from(["lazycsv", file_path.to_str().unwrap(), "--no-headers"]).unwrap();
 
     let app = App::from_cli(args).unwrap();
 
@@ -47,7 +47,7 @@ fn test_default_csv_loading_integration() {
     let file_path = temp_dir.path().join("test.csv");
     write(&file_path, "header1,header2\nval1,val2").unwrap();
 
-    let args = CliArgs::try_parse_from(&["lazycsv", file_path.to_str().unwrap()]).unwrap();
+    let args = CliArgs::try_parse_from(["lazycsv", file_path.to_str().unwrap()]).unwrap();
     let app = App::from_cli(args).unwrap();
 
     assert_eq!(app.csv_data.headers, vec!["header1", "header2"]);
@@ -64,7 +64,7 @@ fn test_directory_path_integration() {
     let _other_file = temp_dir.path().join("b_test.csv");
     write(_other_file, "h3,h4\n3,4").unwrap();
 
-    let args = CliArgs::try_parse_from(&["lazycsv", temp_dir.path().to_str().unwrap()]).unwrap();
+    let args = CliArgs::try_parse_from(["lazycsv", temp_dir.path().to_str().unwrap()]).unwrap();
     let app = App::from_cli(args).unwrap();
 
     assert_eq!(app.csv_data.headers, vec!["h1", "h2"]);
@@ -82,9 +82,13 @@ fn test_encoding_integration() {
     let (encoded_bytes, ..) = UTF_16LE.encode("h1,h2\nval1,val2");
     write(&file_path, encoded_bytes).unwrap();
 
-    let args =
-        CliArgs::try_parse_from(&["lazycsv", file_path.to_str().unwrap(), "--encoding", "utf-16le"])
-            .unwrap();
+    let args = CliArgs::try_parse_from([
+        "lazycsv",
+        file_path.to_str().unwrap(),
+        "--encoding",
+        "utf-16le",
+    ])
+    .unwrap();
 
     let app = App::from_cli(args).unwrap();
 
@@ -106,7 +110,10 @@ fn test_invalid_encoding_integration() {
         Some("invalid-encoding".to_string()),
     );
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Unsupported encoding"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Unsupported encoding"));
 }
 
 #[test]
@@ -115,7 +122,7 @@ fn test_delimiter_and_no_headers_integration() {
     let file_path = temp_dir.path().join("test.csv");
     write(&file_path, "a;b\n1;2").unwrap();
 
-    let args = CliArgs::try_parse_from(&[
+    let args = CliArgs::try_parse_from([
         "lazycsv",
         file_path.to_str().unwrap(),
         "--delimiter",

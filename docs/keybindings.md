@@ -8,22 +8,27 @@ Press `?` in the app to see the built-in cheatsheet.
 
 LazyCSV keybindings follow vim conventions:
 
-- **Mnemonic**: Keys chosen for easy memory (o=add, d=delete, y=yank/copy)
-- **Modal**: Different modes (Normal, Edit, Visual, Command)
+- **Mnemonic**: Keys chosen for easy memory (o=add, d=delete, y=yank/copy, m=magnify)
+- **Modal**: Different modes (Normal, Insert, Magnifier, Visual, Command)
 - **Efficient**: Common actions are single keystrokes
 - **Consistent**: Same patterns across operations
+- **Vim-First**: Every action accessible via vim-style keys
 
-## Mode Indicator
+## Mode Indicators
 
-The current mode is always shown in the title bar:
-- `lazycsv: file.csv` - Normal mode
-- `lazycsv: file.csv [EDIT]` - Edit mode
-- `lazycsv: file.csv [VISUAL]` - Visual mode
-- `lazycsv: file.csv [COMMAND]` - Command mode
+The current mode is always shown in the status bar:
+- `-- NORMAL --` - Navigation mode
+- `-- INSERT --` - Quick cell editing
+- `-- MAGNIFIER --` - Vim editor for power editing
+- `-- HEADER EDIT --` - Editing column headers
+- `-- VISUAL --` - Selection mode
+- `-- COMMAND --` - Command input mode
 
-## Phase 1: Navigation (Current)
+---
 
-### Cursor Movement
+## v0.1.0 - Foundation (Current)
+
+### Basic Navigation
 
 | Key | Action |
 |-----|--------|
@@ -31,16 +36,10 @@ The current mode is always shown in the title bar:
 | `j` or `↓` | Move down (next row) |
 | `k` or `↑` | Move up (previous row) |
 | `l` or `→` | Move right (next column) |
-| `0` | First column |
-| `$` | Last column |
-| `gg` or `Home` | First row |
-| `G` or `End` | Last row |
-| `PageUp` | Page up (~20 rows) |
-| `PageDown` | Page down (~20 rows) |
-
-**Tips:**
-- Vim users: Use `hjkl` for faster navigation (home row)
-- Others: Arrow keys work just as well
+| `Enter` | Move down one row (vim-style) |
+| `w` | Jump to next non-empty cell in row |
+| `b` | Jump to previous non-empty cell in row |
+| `e` | Jump to last non-empty cell in row |
 
 ### File Navigation
 
@@ -49,133 +48,305 @@ The current mode is always shown in the title bar:
 | `[` | Previous CSV file in directory |
 | `]` | Next CSV file in directory |
 
-**How it works:**
-- LazyCSV scans the directory on startup
-- All CSV files are available to switch between
-- File list shown at bottom with `►` indicator
-- Like Excel sheets, but for CSV files!
-
-### Help & Information
+### Help & System
 
 | Key | Action |
 |-----|--------|
 | `?` | Toggle help/cheatsheet |
-| `Esc` | Close help (when help is open) |
+| `Esc` | Close help / Cancel current operation |
+| `q` | Quit |
 
-### Quit
+---
 
-| Key | Action |
-|-----|--------|
-| `q` | Quit (warns if unsaved changes in Phase 2) |
+## v0.2.0 - Type Safety Refactor
 
-## Phase 2: Cell Editing (Planned)
+*Internal improvements - no new user-facing keybindings*
 
-### Entering Edit Mode
+---
 
-| Key | Action |
-|-----|--------|
-| `i` | Enter edit mode at current cell |
-| `Enter` | Enter edit mode at current cell |
+## v0.3.0 - Advanced Navigation
 
-**Behavior:**
-- All text is selected by default (ready to replace)
-- Type to replace entire value
-- Press `End` to move to end if you want to append
-
-### While in Edit Mode
+### Enhanced Movement
 
 | Key | Action |
 |-----|--------|
-| Type characters | Edit cell value |
+| `gg` | Jump to first row |
+| `G` | Jump to last row |
+| `<number>G` | Jump to specific row (e.g., `15G`) |
+| `0` | Jump to first column |
+| `$` | Jump to last column |
+| `PageUp` | Page up (~20 rows) |
+| `PageDown` | Page down (~20 rows) |
+
+### Column Jumping
+
+| Key | Action |
+|-----|--------|
+| `ga` or `gA` | Jump to column A (first column) |
+| `gB` | Jump to column B |
+| `gBC` | Jump to column 55 (Excel-style letters) |
+
+**Column Letter System:** A=1, B=2, ..., Z=26, AA=27, AB=28, etc.
+
+### Count Prefixes
+
+| Pattern | Action |
+|---------|--------|
+| `5j` | Move down 5 rows |
+| `3h` | Move left 3 columns |
+| `10l` | Move right 10 columns |
+
+### Command-Line Jumps
+
+| Command | Action |
+|---------|--------|
+| `:15` | Jump to row 15 |
+| `:B` | Jump to column B |
+| `:BC` | Jump to column 55 |
+
+---
+
+## v0.4.0 - Quick Editing
+
+### Entering Insert Mode
+
+| Key | Action |
+|-----|--------|
+| `i` | Enter Insert mode at current position |
+| `a` | Enter Insert mode with cursor after current position |
+| `A` | Enter Insert mode at end of cell content |
+| `I` | Enter Insert mode at beginning of cell content |
+| `gi` | Go to last edited cell and enter Insert mode |
+
+### In Insert Mode
+
+| Key | Action |
+|-----|--------|
+| Type characters | Insert text at cursor |
 | `Backspace` | Delete character before cursor |
 | `Delete` | Delete character at cursor |
 | `←` `→` | Move cursor within cell |
 | `Home` | Move to start of cell |
 | `End` | Move to end of cell |
-| `Enter` | Save changes and exit edit mode |
-| `Esc` | Cancel changes and exit edit mode |
-| `Ctrl+C` | Cancel changes (alternative) |
+| `Ctrl+h` | Backspace (vim-style) |
+| `Ctrl+w` | Delete word before cursor |
+| `Ctrl+u` | Delete to start of line |
+| `Enter` | Save changes and exit to Normal mode |
+| `Esc` | Cancel changes and exit to Normal mode |
 
-### Saving
+---
+
+## v0.5.0 - Vim Magnifier
+
+### Opening Magnifier
 
 | Key | Action |
 |-----|--------|
+| `Enter` | Open Magnifier for current cell |
+
+### In Magnifier Mode (Full Vim)
+
+The Magnifier embeds a complete vim-like editor:
+
+**Normal Mode Commands:**
+- `i`, `a`, `A`, `I` - Enter Insert mode
+- `o`, `O` - Open new line
+- `dd` - Delete line
+- `yy` - Yank (copy) line
+- `p`, `P` - Paste
+- `hjkl` - Navigate
+- `w`, `b` - Word navigation
+- `0`, `$` - Line start/end
+- `gg`, `G` - File start/end
+
+**Commands:**
+| Command | Action |
+|---------|--------|
+| `:w` | Save to memory (not to file yet) |
+| `:q` | Close magnifier, discard changes |
+| `:wq` or `ZZ` | Save to memory and close |
+| `:q!` | Force close without saving |
+
+**Cell Navigation:**
+| Key | Action |
+|-----|--------|
+| `Ctrl+h` | Move to cell left (prompts to save if dirty) |
+| `Ctrl+j` | Move to cell below (prompts to save if dirty) |
+| `Ctrl+k` | Move to cell above (prompts to save if dirty) |
+| `Ctrl+l` | Move to cell right (prompts to save if dirty) |
+
+---
+
+## v0.6.0 - Save/Quit Guards
+
+### Saving
+
+| Key/Command | Action |
+|-------------|--------|
 | `Ctrl+S` | Save file |
-| `:w` | Save file (command mode) |
+| `:w` | Save file |
 | `:wq` | Save and quit |
+| `:x` | Save and quit (alias) |
+
+### Quitting
+
+| Command | Action |
+|---------|--------|
+| `:q` | Quit (fails if unsaved changes) |
+| `:q!` | Force quit (discard all changes) |
+
+---
+
+## v0.7.0 - Row Operations
+
+### Add/Delete Rows
+
+| Key | Action |
+|-----|--------|
+| `o` | Add row below, enter Insert mode for first cell |
+| `O` | Add row above, enter Insert mode for first cell |
+| `dd` | Delete current row |
+| `<number>dd` | Delete N rows (e.g., `3dd`) |
+| `<number>o` | Add N rows (e.g., `2o`) |
+
+### Copy/Paste Rows
+
+| Key | Action |
+|-----|--------|
+| `yy` | Copy (yank) current row |
+| `<number>yy` | Copy N rows (e.g., `5yy`) |
+| `p` | Paste row below current |
+| `P` | Paste row above current |
+
+**Notes:**
+- New rows are empty (blank cells)
+- No confirmation for delete (use `u` to undo if mistake)
+- Clipboard persists (can paste multiple times)
+
+---
+
+## v0.8.0 - Column Operations
+
+### Column Operators (Vim-Style)
+
+| Key | Action |
+|-----|--------|
+| `dc` | Delete current column |
+| `yc` | Yank (copy) current column |
+| `pc` | Paste column after current |
+| `Pc` | Paste column before current |
+| `o` | In header row: add column after, enter HeaderEdit mode |
+| `O` | In header row: add column before, enter HeaderEdit mode |
+
+**Notes:**
+- Column operators work like vim: `d` for delete, `y` for yank, `p` for paste
+- `c` suffix targets the column (like `w` targets a word in vim)
+- After adding column with `o`/`O`, automatically enter HeaderEdit mode
+- No confirmation needed (use `u` to undo)
+- All cells in new column start empty
+
+---
+
+## v0.9.0 - Header Management
+
+### Header Editing
+
+| Key/Command | Action |
+|-------------|--------|
+| `gh` | Enter HeaderEdit mode for current column header |
+| `:rename <name>` | Rename current column header |
+
+### In HeaderEdit Mode
+
+| Key | Action |
+|-----|--------|
+| Type characters | Edit header name |
+| `Backspace` | Delete character before cursor |
+| `Delete` | Delete character at cursor |
+| `←` `→` | Move cursor |
+| `Home` | Move to start |
+| `End` | Move to end |
+| `Enter` | Save header change, return to Normal |
+| `Esc` | Cancel changes, return to Normal |
+
+### Header Row Toggle
+
+| Command | Action |
+|---------|--------|
+| `:headers` | Toggle header row on/off |
+
+**Toggle On:** Promotes first data row to headers
+**Toggle Off:** Demotes headers to first data row
+
+---
+
+## v1.0.0 - Undo/Redo & Power Commands
 
 ### Undo/Redo
 
 | Key | Action |
 |-----|--------|
 | `u` | Undo last operation |
-| `Ctrl+R` | Redo |
+| `Ctrl+r` | Redo |
+
+### Vim Power Features
+
+| Key | Action |
+|-----|--------|
+| `.` | Repeat last edit (dot command) |
 
 **What can be undone:**
-- Cell edits
+- Cell edits (quick and magnifier)
 - Row operations (add, delete, paste)
-- Column operations (add, delete)
+- Column operations (delete, yank, paste)
+- Header edits and renames
+- Header row toggle
 - Sort operations
 - Up to 100 operations
 
-## Phase 3: Row & Column Operations (Planned)
+---
 
-### Row Operations
+## v1.1.0 - Marks System
 
-| Key | Action |
-|-----|--------|
-| `o` | Add row below current |
-| `O` | Add row above current |
-| `dd` | Delete current row |
-| `5dd` | Delete 5 rows |
-| `yy` | Copy (yank) current row |
-| `5yy` | Copy 5 rows |
-| `p` | Paste row below current |
-| `P` | Paste row above current |
-
-**Notes:**
-- New rows are empty (blank cells)
-- No confirmation for delete (use undo if mistake)
-- Clipboard persists (can paste multiple times)
-
-### Column Operations
+### Setting & Jumping to Marks
 
 | Key | Action |
 |-----|--------|
-| `Ctrl+A` | Add column after current |
-| `Ctrl+Shift+A` | Add column before current |
-| `D` | Delete current column |
+| `m[a-z]` | Set mark at current cell (e.g., `ma` sets mark 'a) |
+| `'[a-z]` | Jump to mark (beginning of cell) |
+| `` `[a-z] `` | Jump to mark (exact position) |
+| `''` or `` `` `` | Jump back to previous position |
+| `'.` | Jump to last edited cell |
 
-**Notes:**
-- Prompted for column header name when adding
-- No confirmation for delete (use undo if mistake)
+**Examples:**
+```
+ma          # Set mark 'a at current cell
+gg → 0      # Jump to A1
+...         # Do some work
+'a          # Jump back to mark 'a
+```
 
-### Visual Selection
+---
 
-| Key | Action |
-|-----|--------|
-| `v` | Enter visual mode (cell selection) |
-| `V` | Enter visual line mode (row selection) |
-| `hjkl` | Extend selection |
-| `d` | Delete selected rows |
-| `y` | Copy selected rows |
-| `Esc` | Exit visual mode |
-
-## Phase 4: Advanced Features (Planned)
+## v1.2.0 - Search & Visual
 
 ### Fuzzy Search
 
 | Key | Action |
 |-----|--------|
 | `/` | Open fuzzy finder |
-| Type | Search query (finds rows, columns, cell data) |
+| `*` | Search for current cell value |
+
+**In Search Mode:**
+| Key | Action |
+|-----|--------|
+| Type | Enter search query |
 | `j` or `↓` | Next result |
 | `k` or `↑` | Previous result |
 | `Enter` | Jump to selected result |
 | `Esc` | Cancel search |
-| `*` | Search for current cell value |
 
-**After jumping:**
+**After Jumping:**
 | Key | Action |
 |-----|--------|
 | `n` | Next match |
@@ -187,77 +358,126 @@ The current mode is always shown in the title bar:
 - **Column names**: "Email" or "eml" → Email column
 - **Cell data**: "widget" → cells containing "widget"
 
-### Sorting
+### Visual Selection
 
 | Key | Action |
 |-----|--------|
+| `v` | Enter Visual mode (cell selection) |
+| `V` | Enter Visual Line mode (row selection) |
+| `Ctrl+v` | Enter Visual Block mode (rectangle selection) |
+| `d` | Delete selection |
+| `y` | Yank (copy) selection |
+| `o` | Move cursor to other end of selection |
+| `Esc` | Exit Visual mode |
+
+**In Visual Mode:**
+- `hjkl` extends selection
+- `o` jumps cursor to opposite corner of selection
+- Visual indicators (`══`) show selected rows
+- Block mode allows selecting rectangular regions
+
+---
+
+## v1.2.0 - Sorting & Filtering
+
+### Sorting
+
+| Key/Command | Action |
+|-------------|--------|
 | `s` | Sort by current column (toggle asc/desc) |
-| `:sort` | Sort ascending (command) |
-| `:sort!` | Sort descending (command) |
+| `:sort` | Sort ascending |
+| `:sort!` | Sort descending |
 
 **Notes:**
-- In-place sort (actually reorders rows)
 - Smart: numeric sort for numbers, text sort for strings
-- Indicator in header shows ↑ or ↓
+- Header shows ↑ or ↓ indicator
 - Undoable
 
 ### Filtering
 
 | Command | Action |
 |---------|--------|
-| `:filter Age>30` | Filter rows where Age > 30 |
-| `:filter Name contains "John"` | Filter rows where Name contains John |
+| `:filter <expr>` | Filter rows (e.g., `:filter Age>30`) |
 | `:nofilter` or `:nof` | Clear all filters |
 
-**Filter operators:**
-- `=` - Equals
-- `!=` - Not equals
-- `>`, `<`, `>=`, `<=` - Comparisons (numeric)
-- `contains` - Contains substring
-- `starts` - Starts with
-- `ends` - Ends with
+**Filter Operators:**
+| Operator | Meaning | Example |
+|----------|---------|---------|
+| `=` | Equals | `:filter Status=active` |
+| `!=` | Not equals | `:filter Type!=deleted` |
+| `>` | Greater than | `:filter Age>30` |
+| `<` | Less than | `:filter Score<100` |
+| `>=` | Greater or equal | `:filter Price>=10` |
+| `<=` | Less or equal | `:filter Qty<=50` |
+| `contains` | Contains substring | `:filter Name contains "John"` |
+| `starts` | Starts with | `:filter Email starts "admin"` |
+| `ends` | Ends with | `:filter File ends ".csv"` |
 
-### Statistics
+---
+
+## v1.3.0 - Multi-File Guards
+
+| Key | Action |
+|-----|--------|
+| `[` | Previous file (blocks if unsaved changes) |
+| `]` | Next file (blocks if unsaved changes) |
+
+**Error:** "No write since last change" if trying to switch with dirty file
+
+---
+
+## v1.4.0 - Command Ranges
+
+### Range Operations
+
+| Command | Action |
+|---------|--------|
+| `:1,10d` | Delete rows 1-10 |
+| `:1,10y` | Yank (copy) rows 1-10 |
+| `:%d` | Delete all data rows |
+| `:%y` | Yank all rows |
+| `:'a,'bd` | Delete from mark 'a to mark 'b |
+| `:'a,$y` | Yank from mark 'a to last row |
+
+**Range Syntax:**
+- `<number>` - Specific row (e.g., `5` means row 5)
+- `.` - Current row
+- `$` - Last row
+- `%` - All rows (1,$)
+- `'a` - Mark 'a
+
+---
+
+## v1.5.0 - Advanced Viewing
+
+### Column Management
+
+| Command | Action |
+|---------|--------|
+| `:freeze` | Freeze current column and all to its left |
+| `:autowidth` | Auto-size current column to fit content |
+
+| Key | Action |
+|-----|--------|
+| `Ctrl+Left` | Decrease column width |
+| `Ctrl+Right` | Increase column width |
+
+### Statistics & Plotting
 
 | Command | Action |
 |---------|--------|
 | `:stats` | Show statistics for current column |
+| `:plot` | Show text-based plot for numeric column |
 
-## Phase 5: Excel Support (Planned)
-
-Same keybindings work for Excel files!
-
-| Key | Action |
-|-----|--------|
-| `[` | Previous sheet in workbook |
-| `]` | Next sheet in workbook |
-
-**Usage:**
-```bash
-lazycsv workbook.xlsx    # Opens Excel file
-# Press ] to switch to next sheet
-# Press [ to go back to previous sheet
-```
-
-## Command Mode
-
-Press `:` to enter command mode.
-
-### Available Commands
+### Data Transformation
 
 | Command | Action |
 |---------|--------|
-| `:q` | Quit (warns if unsaved) |
-| `:q!` | Force quit (no save) |
-| `:w` | Save file |
-| `:wq` or `:x` | Save and quit |
-| `:w newfile.csv` | Save as newfile.csv |
-| `:sort` | Sort by current column (asc) |
-| `:sort!` | Sort by current column (desc) |
-| `:filter <expr>` | Filter rows |
-| `:nofilter` | Clear filter |
-| `:stats` | Show column statistics |
-| `:help` or `:h` | Show help |
+| `:s/pattern/replacement/g` | Regex search and replace |
+| `:transpose` | Toggle transposed view (rows↔columns) |
+| `:sort <col1>,<col2>` | Multi-column sort |
+
+---
 
 ## Global Keys
 
@@ -268,6 +488,8 @@ These work in (almost) all modes:
 | `Ctrl+C` | Cancel/escape current operation |
 | `Ctrl+L` | Redraw screen |
 
+---
+
 ## Quick Reference Card
 
 Print-friendly summary:
@@ -276,76 +498,194 @@ Print-friendly summary:
 ╔═══════════════════════════════════════════════════════╗
 ║              LAZYCSV QUICK REFERENCE                  ║
 ╠═══════════════════════════════════════════════════════╣
-║ Navigation     │ Editing (Phase 2) │ Files           ║
-║  hjkl/arrows   │  i/Enter  Edit    │  [/]   Switch   ║
-║  gg/G First/La │  Esc      Cancel  │  ?     Help     ║
-║  0/$  First/La │  ^S       Save    │  q     Quit     ║
-║  PageUp/Down   │  u        Undo    │                 ║
-║                │  ^R       Redo    │                 ║
+║ NAVIGATION     │ EDITING          │ FILES             ║
+║  hjkl/arrows   │  i    Quick edit │  [/]   Switch     ║
+║  gg/G First/La │  Enter Magnifier │  ?     Help       ║
+║  0/$  Col 1/End│  Esc  Cancel     │  q     Quit       ║
+║  w/b/e Words   │  gi   Last+Edit  │                   ║
+║  gA/gBC Coljmp │  .    Repeat     │                   ║
+║  :15/:B  Jump  │  ^S   Save file  │                   ║
 ╠═══════════════════════════════════════════════════════╣
-║ Rows (Phase 3) │ Columns (Phase 3) │ Search (Phase 4)║
-║  o    Add belo │  ^A      Add col  │  /     Search   ║
-║  O    Add abov │  D       Del col  │  n/N   Next/Pre ║
-║  dd   Delete   │  v       Visual   │  s     Sort     ║
-║  yy   Copy     │  d       Del sel  │  *     Find     ║
-║  p    Paste    │  y       Copy sel │                 ║
+║ ROWS           │ COLUMNS          │ HEADER            ║
+║  o/O  Add      │  o/O  Add col    │  gh     Edit hdr  ║
+║  dd   Delete   │  dc   Delete     │  :ren   Rename    ║
+║  yy   Copy     │  yc   Copy       │  :headers Toggle  ║
+║  p/P  Paste    │  pc/Pc Paste     │                   ║
+╠═══════════════════════════════════════════════════════╣
+║ SEARCH         │ SORT/FILTER      │ SYSTEM            ║
+║  /     Search  │  s      Sort     │  u      Undo      ║
+║  *     Find    │  :sort  Sort cmd │  ^r     Redo      ║
+║  n/N   Next    │  :filt  Filter   │  :w     Save      ║
+║  v/V/^v Visual │  :nof   Clear    │  :q!    Force q   ║
+╠═══════════════════════════════════════════════════════╣
+║ MARKS          │ RANGES           │                   ║
+║  ma    Set     │  :1,10d Delete   │                   ║
+║  'a     Jump   │  :%y   Yank all  │                   ║
+║  `.     Last   │  :'a,'bd Range   │                   ║
 ╚═══════════════════════════════════════════════════════╝
 ```
 
-## Vim Users
+---
 
-If you're a vim user, these will feel natural:
+## Vim User Guide
 
 ### Direct Mappings (Same as Vim)
-- Movement: `hjkl`, `gg`, `G`, `0`, `$`
-- Operators: `dd`, `yy`, `p`, `P`, `u`, `Ctrl+R`
-- Visual: `v`, `V`
-- Search: `/`, `n`, `N`, `*`
-- Commands: `:w`, `:q`, `:wq`, `:q!`
 
-### Adapted (Similar Concept)
-- `o`/`O` - Add row (vs. open line) - same mnemonic
-- `i` - Edit cell (vs. insert mode) - same mnemonic
-- `D` - Delete column (vs. delete to end of line)
-- `s` - Sort column (vs. substitute) - different
+**Movement:**
+- `hjkl` - Basic navigation
+- `gg`, `G` - First/last row
+- `0`, `$` - First/last column
+- `w`, `b`, `e` - Word motion (next/prev/last non-empty cell)
 
-### Different
-- `[`/`]` - File/sheet navigation (vs. jump to section)
-- `?` - Help (vs. search backward) - help takes precedence
-- `Ctrl+A` - Add column (vs. increment number)
+**Operators:**
+- `dd` - Delete row
+- `yy` - Yank (copy) row
+- `dc` - Delete column
+- `yc` - Yank column
+- `p`, `P` - Paste
+- `pc`, `Pc` - Paste column
+- `u` - Undo
+- `Ctrl+r` - Redo
+- `.` - Repeat last edit
+
+**Visual:**
+- `v`, `V` - Visual mode
+- `Ctrl+v` - Visual block mode
+
+**Marks:**
+- `m[a-z]` - Set mark
+- `'[a-z]` - Jump to mark
+- `''` - Jump back
+- `'.` - Jump to last edit
+
+**Search:**
+- `/` - Search
+- `n`, `N` - Next/previous match
+- `*` - Search for word under cursor
+
+**Commands:**
+- `:w` - Write (save)
+- `:q` - Quit
+- `:wq` - Write and quit
+- `:q!` - Force quit
+- `:1,10d` - Delete range
+- `:%y` - Yank all
+
+### Adapted Mappings (Similar Concept)
+
+| Key | LazyCSV | Vim | Mnemonic |
+|-----|---------|-----|----------|
+| `o`/`O` | Add row/col | Open line | o = open/add |
+| `i` | Edit cell | Insert mode | i = insert |
+| `Enter` | Magnifier | - | Enter = enter cell |
+| `dc`/`yc` | Delete/yank col | dw/yw (word) | c = column |
+| `gh` | Edit header | - | g = go, h = header |
+| `gi` | Go to last edit | gi | g = go, i = insert |
+| `s` | Sort | Substitute | s = sort |
+| `m` | Set mark | m | m = mark |
+
+### Different from Vim
+
+| Key | LazyCSV | Vim |
+|-----|---------|-----|
+| `[`/`]` | Switch files | Jump to previous/next section |
+| `?` | Help | Search backward |
+| `Enter` | Magnifier / Down | - |
+| `w`/`b`/`e` | Next/prev/last cell | Next/prev/end of word |
+| `o`/`O` | Add row/col | Open line |
+| `dc`/`yc` | Column delete/yank | Delete/yank word |
+
+---
 
 ## Tips & Tricks
 
-### Fast Navigation
+### Lightning Fast Navigation
+
 ```
-gg → 0        # Jump to cell A1 (top-left)
-G → $         # Jump to last cell (bottom-right)
-5G            # Jump to row 5
+gg → 0              # Jump to cell A1 (top-left)
+G → $               # Jump to last cell (bottom-right)
+15G                 # Jump to row 15
+gBC                 # Jump to column 55
+:25 → Enter         # Jump to row 25
+:C → Enter          # Jump to column C
 ```
 
-### Efficient Editing (Phase 2+)
+### Efficient Editing Workflows
+
+**Quick Edit & Power Edit:**
 ```
-i → type → Enter       # Quick replace
-yy → jjj → p          # Copy row, move down 3, paste
-dd → p                # Cut and paste row
+i → type → Enter    # Quick replace cell value
+Enter → edit → :wq  # Full vim magnifier editing
+gi → type → Enter   # Jump to last edit, edit, save
+.                   # Repeat last edit (dot command!)
+```
+
+**Row Manipulation:**
+```
+yy → jjj → p        # Copy row, move down 3, paste
+5dd → p             # Delete 5 rows, paste them elsewhere
+o → type → Enter    # Add row and enter data
+```
+
+**Column Operations:**
+```
+gA → dc             # Jump to column A, delete it
+yc → 5l → pc        # Copy column, move right 5, paste column
+gD → yc → gA → Pc   # Copy column D, paste before column A
+o → Name → Enter    # Add column in header, name it
+```
+
+**Marks & Navigation:**
+```
+ma                  # Set mark 'a at current cell
+gg → 0              # Jump to A1
+...                 # Do some work
+'a                  # Jump back to mark 'a
+`.                  # Jump to last edited cell
+```
+
+**Word Motion (Sparse Data):**
+```
+w → w → w           # Jump to next non-empty cells
+b → b               # Jump to previous non-empty cell
+e                   # Jump to last non-empty cell
+```
+
+**Visual Block (Rectangle Selection):**
+```
+Ctrl+v → jj → l → y # Select 3 rows x 2 cols, yank
+5j → p              # Move down 5, paste block
+```
+
+**Command Ranges:**
+```
+:1,10d              # Delete rows 1-10
+:%y                 # Yank all rows
+:'a,'bd             # Delete from mark 'a to 'b
+:10,20y → 25 → p    # Copy rows 10-20, jump to row 25, paste
+```
+
+### Search Workflows
+
+```
+/email → Enter      # Find "email" in columns/cells
+*                   # Search for value in current cell
+n → n → n           # Jump through matches
+:s/widget/gadget/g  # Replace all "widget" with "gadget"
 ```
 
 ### Multi-File Workflow
+
 ```
-] → ] → [             # Next, next, back one
-# Or: Keep pressing ] to cycle through all files
+] → ] → [           # Next, next, back one
+] → :w → ]          # Save, then switch
 ```
 
-### Search Power (Phase 4)
-```
-/email → Enter        # Find "Email" column
-*                     # Find current cell value
-n → n → n            # Jump through matches
-```
+---
 
-## Customization (Phase 6+)
+## Customization (v1.4.0+)
 
-Future: Custom keybindings via config file:
+Custom keybindings via config file:
 
 ```toml
 # ~/.config/lazycsv/config.toml
@@ -353,16 +693,45 @@ Future: Custom keybindings via config file:
 quit = "q"
 save = "<C-s>"
 help = "?"
-# ... customize any key
+
+[theme]
+header = "cyan"
+selected_cell = "blue"
+status_bar = "blue"
 ```
 
-Key notation:
+**Key notation:**
 - `<C-x>` = Ctrl+X
 - `<S-x>` = Shift+X
 - `<M-x>` = Alt+X (Meta)
 - `<Enter>` = Enter
 - `<Esc>` = Escape
-- `<Tab>` = Tab
+- `<Space>` = Space
+
+---
+
+## Version Roadmap
+
+| Version | Features Added |
+|---------|----------------|
+| v0.1.0 | Foundation - viewing, basic navigation |
+| v0.2.0 | Type safety refactor (internal) |
+| v0.3.0 | Advanced navigation (gg, G, counts, column jumps) |
+| v0.4.0 | Quick editing (Insert mode) |
+| v0.5.0 | Vim magnifier (power editing) |
+| v0.6.0 | Save/quit guards |
+| v0.7.0 | Row operations |
+| v0.8.0 | Column operations |
+| v0.9.0 | Header management |
+| v1.0.0 | Undo/redo system |
+| v1.1.0 | Search & visual selection |
+| v1.2.0 | Sorting & filtering |
+| v1.3.0 | Multi-file guards |
+| v1.4.0 | Advanced viewing (freeze, themes) |
+| v1.5.0 | Data analysis (stats, plotting) |
+| v1.6.0 | Final polish |
+
+---
 
 ## Getting Help
 

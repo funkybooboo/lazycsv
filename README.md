@@ -23,13 +23,13 @@ Inspired by [lazygit](https://github.com/jesseduffield/lazygit), [lazydocker](ht
 
 ## Why LazyCSV?
 
-- ⚡ **Fast** - 100K+ rows at 60 FPS
-- ⌨️ **Vim keys** - hjkl your way through data
+- ⚡ **Fast** - 100K+ rows at 60 FPS (in-memory)
+- ⌨️ **Vim keys** - hjkl your way through data, full vim emulation in magnifier
 - 📁 **Multi-file** - switch between CSVs like Excel sheets (press `[` `]`)
 - 🎯 **Simple** - no config needed, just works
 - 🎨 **Clean** - minimalist design, zero clutter
 
-**Note:** The "lazy" in LazyCSV is currently aspirational. The app loads the entire CSV file into memory. True lazy-loading for large files is a top priority for future versions!
+**Note:** LazyCSV loads the entire CSV file into memory for maximum performance. This design choice prioritizes speed and simplicity over handling files larger than available RAM.
 
 ## Install
 
@@ -48,9 +48,13 @@ lazycsv
 # Or open specific file
 lazycsv data.csv
 
+# With options
+lazycsv data.csv --delimiter ';' --no-headers
+
 # In the app:
 # hjkl or arrows  → navigate
 # [ or ]          → switch between CSV files
+# gg or G         → jump to top/bottom
 # ?               → show help
 # q               → quit
 ```
@@ -67,27 +71,43 @@ That's it! Press `?` in the app for full keybindings.
 | `?` | Show help |
 | `q` | Quit |
 
-**Vim users:** All your favorite motions work (`0`, `$`, etc.)
+**Vim users:** All your favorite motions work (`0`, `$`, `15G`, `gBC`, etc.)
 
 ## Innovation: Multi-File Navigation
 
 LazyCSV treats CSV files in the same directory like Excel sheets. Open one file, instantly switch between all of them with `[` and `]` keys. No more `cd` and reopening!
 
-## Coming Soon
+## Roadmap to v1.0
 
-- 💾 **True lazy-loading** for huge files
-- ✏️ Cell editing & saving
-- ➕ Add/delete rows and columns
-- 🔍 Fuzzy search & filtering
-- 📊 Column sorting
-- 📑 Excel file support
+| Version | Features |
+|---------|----------|
+| **v0.1.0** | ✅ Foundation - viewing, navigation, multi-file |
+| **v0.2.0** | Type safety refactor (internal) |
+| **v0.3.0** | Advanced navigation - `gg`, `G`, counts, column jumps |
+| **v0.4.0** | Quick editing - Insert mode for fast cell edits |
+| **v0.5.0** | **Vim magnifier** - full vim editor embedded in TUI |
+| **v0.6.0** | Save/quit guards - `:w`, `:q`, dirty tracking |
+| **v0.7.0** | Row operations - `o`, `O`, `dd`, `yy`, `p` |
+| **v0.8.0** | Column operations - `:addcol`, `:delcol` |
+| **v0.9.0** | Header management - `gh` to edit headers |
+| **v1.0.0** | Undo/redo system - `u`, `Ctrl+r` |
 
-See [plans/todo.md](plans/todo.md) for the full roadmap.
+### Post-v1.0 Features
+
+| Version | Features |
+|---------|----------|
+| v1.1.0 | Search & visual selection - `/`, `v`, `V` |
+| v1.2.0 | Sorting & filtering - `s`, `:filter` |
+| v1.3.0 | Multi-file guards with dirty tracking |
+| v1.4.0 | Advanced viewing - column freezing, themes |
+| v1.5.0 | Data analysis - stats, plotting, regex replace |
+| v1.6.0 | Final polish - comprehensive tests, docs |
+
+See [plans/todo.md](plans/todo.md) for the complete detailed roadmap.
 
 ## Documentation
 
-- **[Features](docs/features.md)** - What it can do (and will do)
-- **[Keybindings](docs/keybindings.md)** - Every keyboard shortcut
+- **[Keybindings](docs/keybindings.md)** - Every keyboard shortcut by version
 - **[Design](docs/design.md)** - How it looks and feels
 - **[Architecture](docs/architecture.md)** - How it works
 - **[Development](docs/development.md)** - How to contribute
@@ -97,7 +117,7 @@ See [plans/todo.md](plans/todo.md) for the full roadmap.
 ```bash
 # Using Task (recommended)
 task run        # run with sample.csv
-task test       # run tests (133 tests)
+task test       # run tests
 task all        # format, lint, test
 
 # Or with Cargo
@@ -105,29 +125,29 @@ cargo run -- sample.csv
 cargo test
 ```
 
-**Test Suite:** 133 comprehensive tests covering all Phase 1 features including directory handling. See [tests/README.md](tests/README.md) for details.
-
 See [docs/development.md](docs/development.md) for contributing guidelines.
 
 ## Status
 
-🎉 **Phase 1 MVP Complete!** LazyCSV is ready to use for viewing CSV files.
+🎉 **v0.1.0 Complete!** LazyCSV is ready to use for viewing CSV files.
 
 - ✅ Fast CSV viewer with vim navigation
-- ✅ Multi-file switching
-- ✅ Row/column numbers (A, B, C...)
-- ✅ Comprehensive test suite (133 tests)
-- 📋 Cell editing coming in Phase 2
+- ✅ Multi-file switching with `[` `]`
+- ✅ Row/column numbering (A, B, C...)
+- ✅ Comprehensive test suite
+- 📋 Cell editing coming in v0.4.0
+- 🎯 Target: v1.0.0 with full editing, undo, rows/columns
 
-**Version:** 0.1.0 | **Tests:** 99 passing | **Performance:** 60 FPS on 100K+ rows
+**Current:** v0.1.0 | **Performance:** 60 FPS on 100K+ rows | **Architecture:** In-memory
 
 ## Philosophy
 
 LazyCSV follows the "lazy tools" design:
 1. **Keyboard first** - mouse optional
-2. **Fast** - instant response
+2. **Fast** - instant response, in-memory for speed
 3. **Simple** - no configuration required
-4. **Powerful** - vim-style efficiency
+4. **Powerful** - vim-style efficiency with full vim emulation
+5. **Vim-first** - if it works in vim, it should work here
 
 ## License
 

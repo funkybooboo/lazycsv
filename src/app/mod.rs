@@ -12,9 +12,9 @@ use std::time::Instant;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Mode {
     Normal, // Navigation mode
-            // Edit,    // Phase 2: Editing a cell
-            // Visual,  // Phase 4: Visual selection
-            // Command, // Phase 4: Command input
+            // Edit,    // v0.4.0: Quick cell editing
+            // Visual,  // v1.1.0: Visual selection mode
+            // Command, // v1.1.0: Command input mode
 }
 
 /// Viewport centering mode for view commands (zt, zz, zb)
@@ -90,7 +90,7 @@ pub struct App {
 
     /// The character encoding used for file loading
     pub encoding: Option<String>,
-    // Phase 2: Cell editing
+    // v0.4.0: Cell editing fields (to be implemented)
     // pub edit_buffer: String,
 }
 
@@ -98,7 +98,7 @@ impl App {
     /// Create a new `App` instance from CLI arguments.
     /// This function handles file scanning, initial data loading, and App creation.
     pub fn from_cli(cli_args: crate::cli::CliArgs) -> Result<Self> {
-        let path = cli_args.path.unwrap();
+        let path = cli_args.path.context("No path provided")?;
 
         // Determine the CSV file to load and scan directory for others
         let (file_path, csv_files, current_file_index) = if path.is_file() {

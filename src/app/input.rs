@@ -10,7 +10,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Result<bool> {
     // Returns true if we need to reload a different file
     match app.mode {
         Mode::Normal => handle_normal_mode(app, key),
-        // Phase 2: Mode::Edit => handle_edit_mode(app, key),
+        // v0.4.0: Mode::Edit => handle_edit_mode(app, key),
     }
 }
 

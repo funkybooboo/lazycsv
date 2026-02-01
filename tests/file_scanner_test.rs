@@ -123,7 +123,7 @@ fn test_scan_directory_case_sensitivity() {
 
     let csv_files = result.unwrap();
     // Both should be included (case-sensitive filesystems)
-    assert!(csv_files.len() >= 1);
+    assert!(!csv_files.is_empty());
 }
 
 #[test]
@@ -152,7 +152,7 @@ fn test_scan_directory_uppercase_extension() {
 
     let csv_files = result.unwrap();
     // Depends on case-sensitive extension matching
-    assert!(csv_files.len() >= 1);
+    assert!(!csv_files.is_empty());
 }
 
 #[test]
@@ -192,7 +192,7 @@ fn test_scan_directory_hidden_files() {
 
     let csv_files = result.unwrap();
     // Hidden files should still be included
-    assert!(csv_files.len() >= 1);
+    assert!(!csv_files.is_empty());
 }
 
 #[test]
@@ -349,7 +349,7 @@ fn test_direct_scan_directory_with_hidden_files() {
 
     let csv_files = result.unwrap();
     // Both visible and hidden CSV files should be included
-    assert!(csv_files.len() >= 1);
+    assert!(!csv_files.is_empty());
 }
 
 #[test]
@@ -400,4 +400,17 @@ fn test_direct_scan_directory_preserves_full_path() {
     // Should return full paths, not just filenames
     assert!(csv_files[0].is_absolute() || csv_files[0].to_string_lossy().contains('/'));
     assert!(csv_files[0].starts_with(temp_dir.path()));
+}
+
+#[test]
+fn test_scan_empty_directory_no_csvs() {
+    // Create temp directory with no CSV files
+    let temp_dir = TempDir::new().unwrap();
+
+    // Scan should return empty vector (no crash)
+    let result = file_scanner::scan_directory(temp_dir.path());
+
+    assert!(result.is_ok());
+    let csv_files = result.unwrap();
+    assert!(csv_files.is_empty());
 }

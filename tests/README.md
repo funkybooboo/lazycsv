@@ -6,7 +6,7 @@ Comprehensive testing for the LazyCSV TUI application.
 
 - **Total Tests:** 133
 - **Test Suites:** 11
-- **Coverage:** All Phase 1 features including directory handling and workflows
+- **Coverage:** All v0.1.0 features including directory handling and workflows
 - **Status:** ✅ All Passing
 
 ## Test Organization
@@ -243,7 +243,7 @@ task test-verbose      # Run with full output
 
 ### Features Covered
 
-**Phase 1 MVP (100% Coverage):**
+**v0.1.0 MVP (100% Coverage):**
 - ✅ CSV loading and parsing
 - ✅ Vim navigation (hjkl, gg, G, 0, $)
 - ✅ Arrow key navigation
@@ -288,7 +288,7 @@ task test-verbose      # Run with full output
 
 - **Reliability:** All tests pass consistently
 - **Speed:** Full suite runs in <1 second
-- **Coverage:** Every Phase 1 feature is tested
+- **Coverage:** Every v0.1.0 feature is tested
 - **Maintainability:** Tests are organized by concern
 - **Readability:** Clear test names and comments
 
@@ -334,18 +334,18 @@ See `.github/workflows/ci.yml` for configuration.
 
 ## Future Testing
 
-### Phase 2 (Cell Editing)
+### v0.4.0-v0.6.0 (Cell Editing & Persistence)
 - Edit mode tests
 - Cell modification tests
 - Save functionality tests
 - Undo/redo tests
 
-### Phase 3 (Row/Column Operations)
+### v0.7.0-v0.8.0 (Row/Column Operations)
 - Row add/delete tests
 - Column add/delete tests
 - Copy/paste tests
 
-### Phase 4 (Search & Filter)
+### v1.1.0-v1.2.0 (Search & Filter)
 - Fuzzy search tests
 - Sort tests
 - Filter tests
@@ -392,6 +392,6 @@ When adding features:
 
 ---
 
-**Test Coverage:** Phase 1 Complete ✅
+**Test Coverage:** v0.1.0 Complete ✅
 **Status:** All 133 tests passing 🎉
 **Quality:** Production-ready

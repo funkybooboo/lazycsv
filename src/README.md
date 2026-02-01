@@ -125,7 +125,7 @@ src/
 ### Error Handling
 - Use `?` operator for propagation
 - Add context with `.context("description")`
-- User-facing errors go to status bar (Phase 2)
+- User-facing errors go to status bar (v0.6.0)
 - Never unwrap() in production code
 
 ### Module Organization
@@ -159,7 +159,7 @@ See [Cargo.toml](../Cargo.toml) for full list.
 - `crossterm 0.29` - Terminal control
 - `csv 1.3` - CSV parsing
 - `anyhow 1.0` - Error handling
-- `fuzzy-matcher 0.3` - Fuzzy search (Phase 4)
+- `fuzzy-matcher 0.3` - Fuzzy search (v1.1.0)
 
 ## Building
 
@@ -171,7 +171,7 @@ task check           # Check without building
 
 ## Performance
 
-Target performance (Phase 1):
+Target performance (v0.1.0):
 - Load 10K rows: < 100ms ✅
 - Render frame: < 16ms (60 FPS) ✅
 - Navigation: < 10ms response ✅

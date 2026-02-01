@@ -27,18 +27,22 @@ Welcome to the LazyCSV documentation! This directory contains comprehensive docu
 
 ## Project Status
 
-### Phase 1: Core Viewing (MVP) ✅ Complete
+### v0.1.0 - Foundation ✅ Complete
 - Fast CSV loading and display (in-memory)
 - Vim-style navigation
 - Multi-file switching
-- Comprehensive test suite (133 tests)
+- Comprehensive test suite
 
-### Future Development
-- **True Lazy Loading**: Stream data from disk instead of loading all at once.
-- **Cell Editing**: In-place editing, saving, and undo/redo.
-- **Row/Column Operations**: Add, delete, and copy/paste rows and columns.
-- **Search and Filter**: Fuzzy search, column sorting, and row filtering.
-- **Excel Support**: Read `.xlsx` files.
+### Roadmap to v1.0
+- **v0.2.0** - Type safety refactor
+- **v0.3.0** - Advanced navigation (gg, G, counts, column jumps)
+- **v0.4.0** - Quick editing (Insert mode)
+- **v0.5.0** - **Vim magnifier** (full vim editor embedded)
+- **v0.6.0** - Save/quit guards
+- **v0.7.0** - Row operations (o, O, dd, yy, p)
+- **v0.8.0** - Column operations (:addcol, :delcol)
+- **v0.9.0** - Header management (gh to edit headers)
+- **v1.0.0** - Undo/redo system (u, Ctrl+r)
 
 ## Support
 

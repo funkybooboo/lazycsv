@@ -12,7 +12,7 @@ LazyCSV is designed around these core principles:
 4. **Simple** - Clean, minimal interface
 5. **Powerful** - Complex operations with simple keystrokes
 
-## Current Features (Phase 1 - MVP)
+## Current Features (v0.1.0 - MVP)
 
 ### File Loading
 - ✅ Load CSV files from command line: `lazycsv file.csv`
@@ -142,12 +142,12 @@ Always-visible status bar with two sections:
 
 ### File Information
 - ✅ Filename in title bar
-- ✅ Dirty indicator `*` when unsaved (Phase 2)
+- ✅ Dirty indicator `*` when unsaved (v0.6.0)
 - ✅ Row count and column count in status
 
 ## Planned Features
 
-### Phase 2: Cell Editing
+### v0.4.0-v0.6.0: Cell Editing & Persistence
 
 **Edit Mode:**
 - 📋 Press `i` or `Enter` to edit current cell
@@ -178,7 +178,7 @@ Always-visible status bar with two sections:
 - 📋 Works for cell edits, row/column ops, sorts
 - 📋 Shows what was undone: "Undo: Edit cell A5"
 
-### Phase 3: Row & Column Operations
+### v0.7.0-v0.8.0: Row & Column Operations
 
 **Row Operations:**
 - 📋 `o` - Add row below current (empty cells)
@@ -199,7 +199,7 @@ Always-visible status bar with two sections:
 - New rows have empty strings for all cells
 - Clipboard persists across operations (can paste multiple times)
 
-### Phase 4: Advanced Features
+### v1.0.0-v1.3.0: Advanced Features
 
 **Fuzzy Search:**
 - 📋 Press `/` to open fuzzy finder overlay
@@ -255,38 +255,19 @@ Always-visible status bar with two sections:
 - 📋 Display in overlay panel
 - 📋 Close with `Esc`
 
-### Phase 5: Multi-File/Sheet Navigation
+### v1.3.0: Multi-File Guards
 
 **CSV Multi-File:**
-- 📋 Already implemented in Phase 1! ✅
-- 📋 Scan directory on startup
-- 📋 Switch with `[` and `]`
-- 📋 Always-visible file list at bottom
+- ✅ Already implemented in v0.1.0!
+- ✅ Scan directory on startup
+- ✅ Switch with `[` and `]`
+- ✅ Always-visible file list at bottom
 
-**Excel Support:**
-- 📋 Detect file type: `.xlsx`, `.xls`, `.xlsm`
-- 📋 Load Excel files with calamine crate
-- 📋 Extract all sheet names
-- 📋 Load first/active sheet by default
-- 📋 Convert Excel data types:
-  - Numbers → formatted strings
-  - Dates → ISO 8601 format
-  - Formulas → evaluated values (or formula text)
-  - Boolean → "TRUE"/"FALSE"
-- 📋 Handle merged cells (take first value)
-
-**Multi-Sheet Navigation:**
-- 📋 Show sheet list at bottom (same as file list)
-- 📋 Title shows "Sheets" instead of "Files"
-- 📋 Current sheet with `►` indicator
-- 📋 Press `[`/`]` to switch sheets
-- 📋 Show count: "Sheets (2/5)"
-- 📋 Consistent UX with CSV multi-file
-
-**Saving:**
-- 📋 Save as CSV (convert from Excel)
-- 📋 Warning when converting (potential data loss)
-- 📋 Future: Save back to Excel (preserve other sheets)
+**Unsaved Changes Protection:**
+- 📋 `[` / `]` blocked if current file has unsaved changes
+- 📋 Status error: "No write since last change"
+- 📋 Force switch with `:next!` / `:prev!` (future)
+- 📋 Prevents accidental data loss when switching files
 
 ## Performance Requirements
 
@@ -297,14 +278,14 @@ LazyCSV is designed for speed:
 | File loading | < 100ms for 10K rows | ✅ Achieved |
 | Render frame | < 16ms (60 FPS) | ✅ Achieved |
 | Navigation | < 10ms response | ✅ Achieved |
-| Search | < 200ms for 10K rows | 📋 Phase 4 |
-| Sort | < 500ms for 10K rows | 📋 Phase 4 |
-| Save | < 200ms for 10K rows | 📋 Phase 2 |
+| Search | < 200ms for 10K rows | 📋 v1.1.0 |
+| Sort | < 500ms for 10K rows | 📋 v1.2.0 |
+| Save | < 200ms for 10K rows | 📋 v0.6.0 |
 
 ## Constraints & Limitations
 
-### Current (Phase 1):
-- **Read-only** - No editing yet (Phase 2)
+### Current (v0.1.0):
+- **Read-only** - No editing yet (v0.4.0)
 - **Memory-bounded**: The entire file is loaded into memory. This is fast for small to medium files (up to 100K rows), but makes it unsuitable for very large datasets that don't fit in RAM. True lazy-loading is a top priority for future development.
 - **~10 columns visible** - Horizontal scroll for more
 - **20 char cell limit** - Longer text truncated with `...`
@@ -345,7 +326,7 @@ LazyCSV is designed for speed:
 - Cleaner, more professional look
 - Works on all terminals
 - Less visual noise
-- May add as option in Phase 6
+- May add as option in v1.4.0
 
 ### Why Multi-File for CSV?
 - Provides consistent UX with Excel multi-sheet
@@ -387,9 +368,8 @@ LazyCSV is designed for speed:
 | Keyboard-first | ✅ | ❌ | ✅ | ✅ |
 | Vim navigation | ✅ | ❌ | Partial | ✅ |
 | Fast (10K+ rows) | ✅ | ❌ | ✅ | ✅ |
-| In-place editing | Phase 2 | ✅ | ❌ | ✅ |
+| In-place editing | v0.4.0 | ✅ | ❌ | ✅ |
 | Multi-file nav | ✅ | ❌ | ❌ | ❌ |
-| Excel support | Phase 5 | ✅ | ❌ | ✅ |
 | Clean UI | ✅ | ❌ | ✅ | ❌ |
 | Built-in help | ✅ | ✅ | ❌ | ✅ |
 
@@ -401,7 +381,7 @@ LazyCSV is designed for speed:
 
 ## Future Ideas
 
-### Phase 6+: Advanced Features
+### v1.4.0+: Advanced Features
 - Configuration file (`~/.config/lazycsv/config.toml`)
 - Custom keybindings
 - Theme support (colors as option)

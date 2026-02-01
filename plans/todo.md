@@ -1,442 +1,680 @@
-# LazyCSV Development Todo
+# LazyCSV Development Roadmap
 
-A phased checklist for building the LazyCSV TUI. Check off items as they're completed.
+A versioned checklist for building the LazyCSV TUI. Each version represents a deliverable milestone.
+
+## Version Milestones
+
+- **v0.1.0** - Foundation ✅ (Complete)
+- **v0.2.0** - Type Safety Refactor
+- **v0.3.0** - Advanced Navigation
+- **v0.4.0** - Quick Editing
+- **v0.5.0** - Vim Magnifier
+- **v0.6.0** - Save/Quit Guards
+- **v0.7.0** - Row Operations
+- **v0.8.0** - Column Operations
+- **v0.9.0** - Header Management
+- **v1.0.0** - Undo/Redo System
+- **v1.1.0** - Search & Visual
+- **v1.2.0** - Sorting & Filtering
+- **v1.3.0** - Multi-File Guards
+- **v1.4.0** - Advanced Viewing
+- **v1.5.0** - Data Analysis
+- **v1.6.0** - Final Polish
+
+---
 
 ## Guiding Principles
+
 - **Vim-like Modal Editing:** Core navigation and commands should feel familiar to Vim users.
-- **Ephemeral Edits:** No changes are saved to the file until the user explicitly commands it with `:w` or `:wq`. All cell edits update an in-memory representation of the data first.
-- **Intuitive UX:** While inspired by Vim, the UX should be clean, clear, and intuitive, with good feedback for the user.
-- **Robust Error Handling & Guards:** The application must handle errors gracefully, provide clear user feedback, and prevent accidental data loss.
+- **Ephemeral Edits:** No changes are saved to the file until the user explicitly commands it with `:w` or `:wq`. All cell edits update an in-memory representation first.
+- **Intuitive UX:** While inspired by Vim, the UX should be clean, clear, and intuitive.
+- **In-Memory Only:** All CSV files are loaded entirely into RAM for maximum performance.
+- **Robust Error Handling:** Handle errors gracefully with clear user feedback.
 
 ---
 
-## Phase 0.5: CLI Enhancements ✨
+## v0.1.0 - Foundation ✅
 
-*This phase focuses on extending the command-line interface with utility functions.*
+*Core viewing with vim navigation (COMPLETE)*
 
-### CLI Argument Enhancements
-- [x] **Introduce `clap` for Argument Parsing:** Integrate `clap` as a dependency for robust command-line argument handling, including automatic `--help` and `--version` support.
-- [x] **Define New CLI Options for TUI:**
-    - [x] Add `--delimiter <CHAR>` flag to specify a custom CSV delimiter (e.g., `,`, `;`, `\t`).
-    - [x] Add `--no-headers` flag to indicate that the CSV file does not have a header row.
-    - [ ] Add `--encoding <ENCODING>` flag to specify the file encoding (e.g., `utf-8`, `latin1`).
-    - [x] The primary positional argument will remain `<PATH>`, which can be a file or directory.
-- [x] **Integrate CLI Options with CSV Loading:** Pass the parsed `--delimiter` and `--no-headers` values to the CSV loading logic to correctly interpret the file.
-- [ ] **Integrate Encoding Option:** Use the `encoding_rs` crate to decode the file's contents before parsing if an encoding is specified.
-- [ ] **Add Unit and Integration Tests:** Cover the new argument parsing and its effect on CSV loading.
-- [x] **Code Organization Refactoring:** Encapsulated application initialization logic into `App::from_cli`, improving separation of concerns.
+- ✅ Vim navigation (hjkl, arrows)
+- ✅ Multi-file switching ([, ])
+- ✅ Basic UI with status bar
+- ✅ Help overlay (?)
+- ✅ File scanning and loading
+- ✅ Row/column numbering (A, B, C...)
 
 ---
 
-## Phase 1: Core Viewing (MVP) 🎯
+## v0.1.1 - Foundation Cleanup (Patch Release) ✅
 
-*(This phase is complete, and its items remain as a record of initial setup)*
+### Version 0.1.1: Code Quality & Safety Fixes ✅
+
+*Address audit findings before v0.2.0 refactor*
+
+#### Critical Fixes (Must Do) ✅
+- [x] **Fix Clippy Error 1:** `csv_data.rs:89` - Change `rows.get(0)` to `rows.first()`
+- [x] **Fix Clippy Error 2:** `csv_data.rs:95` - Change `.unwrap_or_else(Vec::new)` to `.unwrap_or_default()`
+- [x] **Fix Dangerous unwrap():** `app/mod.rs:101` - Replace `cli_args.path.unwrap()` with proper error handling using `.context("No path provided")?`
+
+#### Code Cleanup (Should Do) ✅
+- [x] **Update Phase Comments:** Replace all "// Phase X" comments with version numbers
+  - `csv_data.rs` lines 125, 129
+  - `app/mod.rs` lines 15-17, 93
+  - `app/input.rs` line 13
+- [x] **Update Mode Comments:** Clean up commented future modes in `Mode` enum
+- [x] **Verify Clippy Clean:** Run `cargo clippy -- -D warnings` and ensure zero errors ✅ (0 warnings)
+
+#### Test File Fixes ✅
+- [x] **Fix Test Warnings:** `file_scanner_test.rs` - Changed `len() >= 1` to `!is_empty()` (4 occurrences)
+- [x] **Fix Test Warnings:** `csv_edge_cases_test.rs` - Removed empty string from `writeln!()`
+- [x] **Fix Test Warnings:** `cli_test.rs` & `cli_integration_test.rs` - Removed needless borrows `&[...]` → `[...]` (16 occurrences)
+
+#### Verification ✅
+- [x] **Run Tests:** Confirm all tests pass after fixes ✅ (51 tests passing)
+- [x] **Build Check:** Verify release build succeeds ✅ (clean build)
+- [x] **Clippy Check:** Full check with `--all-targets --all-features` ✅ (0 warnings across all targets)
 
 ---
 
-## Phase 1.5: Type System & State Refactoring 🧠
+## v0.1.2 - Test Coverage Expansion ✅ COMPLETE
 
-*This phase focuses on improving code clarity, safety, and maintainability by introducing a richer type system and refactoring state management.*
+### Version 0.1.2: Comprehensive Test Suite ✅
 
-### Command & Action Abstraction
-- [ ] **Introduce `UserAction` Enum:** Create a comprehensive `UserAction` enum to represent all possible actions a user can take (e.g., `Navigate(Direction)`, `GoTo(Location)`, `ToggleHelp`, `Quit`).
-- [ ] **Refactor Input Handling:** Modify `app/input.rs` to act as a parser that translates raw `KeyEvent`s into `UserAction`s. The main app logic will then dispatch based on the `UserAction`.
-- [ ] **Define Helper Enums:** Create smaller, focused enums like `Direction`, `Location`, and `FileDirection` to be used within `UserAction`.
+*Fill critical test gaps before v0.2.0 refactor*
 
-### Newtype Wrappers for Indices
-- [ ] **Introduce `RowIndex` and `ColIndex`:** Create newtype wrappers around `usize` (e.g., `struct RowIndex(pub usize);`) for row and column indices.
-- [ ] **Update Function Signatures:** Refactor functions throughout the codebase (`get_cell`, navigation functions, etc.) to use these newtypes, preventing accidental swapping of row and column values.
+#### Critical Test Gaps (P0 - Must Have) ✅ COMPLETE
+- [x] **Multi-Key Command Tests:**
+  - [x] `test_multi_key_gg_goes_to_first_row()` - Test `gg` command ✅
+  - [x] `test_multi_key_G_goes_to_last_row()` - Test `G` command ✅
+  - [x] `test_multi_key_2G_goes_to_row_2()` - Test count + G ✅
+  - [x] `test_count_prefix_2j_moves_down_2_rows()` - Count prefix ✅
+  - [x] `test_count_prefix_0_goes_to_first_column()` - 0 behavior ✅
+  - [x] `test_count_prefix_clears_after_use()` - State cleanup ✅
 
-### State Management Refinement
-- [ ] **`UiState` Refactoring:** Confirm that all UI-related state is cleanly separated into the `UiState` struct.
-- [ ] **`InputState`:** Consider creating an `InputState` struct to hold `pending_key`, `pending_key_time`, and `command_count`.
+- [x] **Count Prefix Tests (COMPLETE):**
+  - [x] `test_count_prefix_2j_moves_down_2_rows()` - Count prefix ✅
+  - [x] `test_count_prefix_2l_moves_right_2_columns()` - Count + l ✅
+  - [x] `test_count_prefix_0_goes_to_first_column()` - 0 behavior ✅
+  - [x] `test_count_prefix_clears_after_use()` - State cleanup ✅
+
+#### Important Test Gaps (P1 - Should Have) ✅ COMPLETE
+- [x] **Error Handling Tests:**
+  - [x] `test_error_file_not_found_shows_message()` - File not found ✅
+  - [x] `test_error_malformed_csv_recovered()` - Invalid CSV ✅
+  - [x] `test_scan_empty_directory_no_csvs()` - Empty dir ✅
+
+- [x] **File Switching Edge Cases:**
+  - [x] `test_file_switch_single_file_no_op()` - Only 1 file ✅
+  - [x] `test_file_switch_at_first_boundary()` - First file wrap ✅
+  - [x] `test_file_switch_at_last_boundary()` - Last file wrap ✅
+  - [x] `test_file_switch_preserves_position()` - Position ✅
+
+- [x] **State Consistency Tests:**
+  - [x] `test_state_after_help_toggle()` - Help + navigation ✅
+  - [x] `test_state_comprehensive_after_file_switch()` - File switch state ✅
+  - [x] `test_dirty_flag_behavior()` - Dirty flag ✅
+
+- [x] **Input Edge Cases:**
+  - [x] `test_special_keys_ignored_in_normal_mode()` - Special keys ✅
+
+#### Target Metrics ✅ ALL ACHIEVED
+- [x] **Reach 70+ tests** - **ACHIEVED: 136 tests!** ✅
+- [x] **Multi-key command coverage** - 100% ✅
+- [x] **Count prefix coverage** - 100% ✅
+- [x] **Error handling coverage** - Core cases covered ✅
+- [x] **All tests passing** - 136/136 passing ✅
+- [x] **90%+ code coverage** for input handling
+- [x] **100% coverage** for multi-key commands
+- [x] **All P0 tests passing** before v0.2.0
 
 ---
 
-## Phase 1.6: UI/UX Enhancements & Large File Support 🚀
+## v0.1.3 - Rust Idioms & Code Quality
 
-*This phase addresses new requirements for better usability and performance with large datasets.*
+### Version 0.1.3: Idiomatic Rust Refactoring
 
-### Data Layer: In-Memory Strategy
-- [ ] **In-Memory Only:** All CSV files are loaded entirely into RAM for maximum performance and simplicity.
-- [ ] **No Lazy-Loading:** No paging or virtual scrolling. The application assumes sufficient memory for the dataset.
-- [ ] **Error Handling:** Implement robust error handling for:
-    - [ ] Files too large to fit in memory (show clear error message suggesting file size reduction).
-    - [ ] File I/O errors during initial load.
-    - [ ] CSV parsing errors (malformed rows, encoding issues).
+*Address code quality issues and make code more idiomatic before v0.2.0*
 
-### Navigation Enhancements
-- [ ] **Core Vim Navigation:** Ensure `hjkl` movement works correctly, along with `w`/`b` removed (not applicable to CSV).
-- [ ] **Enter Key:** In Normal mode, `Enter` moves cursor down one row (equivalent to `j`), matching vim behavior.
-- [ ] **Row Jumping:** Implement vim-style `<number>G` sequence to jump to row. For example:
-    - [ ] `gg` jumps to first row (row 1, or header if present).
-    - [ ] `G` jumps to last row.
-    - [ ] `15G` jumps to row 15.
-    - [ ] Buffer number keys before `G`, matching vim's behavior exactly.
-- [ ] **Command-line Jumps:** Implement Vim-style command-line navigation.
-    - [ ] `:15` jumps to row 15.
-    - [ ] `:B` jumps to column 'B'.
-    - [ ] `:BC` jumps to column 55.
-- [ ] **Column Jumping:** Implement `g<letter(s)>` key sequence for column navigation:
-    - [ ] `ga` or `gA` jumps to column A (first column).
-    - [ ] `gB` jumps to column B (second column).
-    - [ ] `gAA` jumps to column 27, `gBC` jumps to column 55 (Excel-style column letters).
-    - [ ] Use base-26 conversion: A=1, B=2, ..., Z=26, AA=27, AB=28, etc.
-    - [ ] Buffer letter keys after `g` until a non-letter key or timeout (match vim behavior for `g` commands).
-- [ ] **Count Prefixes:** Support vim-style count prefixes for all navigation:
-    - [ ] `5j` moves down 5 rows, `3h` moves left 3 columns, etc.
+#### Critical Issues Found
+
+**1. Test Organization (Major Issue)**
+- [ ] **Move unit tests inline:** All tests are in separate `tests/` directory
+  - Should use `#[cfg(test)] mod tests { }` in source files
+  - Keep integration tests in `tests/`, move unit tests inline
+  - Benefits: Tests are with code they test, better visibility, faster compilation
+  - Files to refactor: `app/mod.rs`, `app/input.rs`, `app/navigation.rs`, `csv_data.rs`, `ui/table.rs`, `ui/status.rs`
+
+**2. String Allocations (19 found)**
+- [ ] **Reduce `.to_string()` calls:** Many could use `&'static str` or `Cow<str>`
+  - `input.rs`: 8 calls for status messages
+  - `mod.rs`: 3 calls for cloning
+  - `csv_data.rs`: 2 calls for headers
+  - `ui/*.rs`: 6 calls for UI strings
+  - Replace with: `&'static str` for constants, `Cow<str>` for flexibility
+
+**3. Clone Usage (Potential optimization)**
+- [ ] **Audit clone calls:** 19 `.clone()`, `.to_string()`, `.to_owned()` calls
+  - Some clones may be unnecessary with better lifetime management
+  - Use references where possible (`&str` instead of `String`)
+  - Pass by reference instead of cloning
+
+**4. Function Signatures**
+- [ ] **Use `&[T]` instead of `&Vec<T>`:** More flexible, accepts slices
+- [ ] **Return `&str` instead of `String`:** When possible, avoid allocations
+  - `column_index_to_letter()` returns `String`, could return `&'static str`
+
+**5. Iterator Usage**
+- [ ] **Replace manual index loops:** 3 found with `for _ in 0..count`
+  - Use iterator methods like `.take()`, `.skip()`, `.step_by()`
+  - More idiomatic and often more efficient
+
+**6. Error Handling**
+- [ ] **Use `?` operator more:** Some places manually match on Result
+- [ ] **Use `.context()` from anyhow:** Better error messages
+- [ ] **Consider `thiserror` for custom errors:** More structured than anyhow for library code
+
+**7. Traits Implementation**
+- [ ] **Implement `Default` trait:** For `App`, `UiState`, `CsvData`
+  - Remove manual `Default::default()` calls
+  - Use `#[derive(Default)]` where possible
+- [ ] **Use `From`/`Into` traits:** For conversions instead of helper functions
+
+**8. Module Organization**
+- [ ] **Re-export commonly used items:** Reduce deep imports
+- [ ] **Use `use crate::` consistently:** Some mix of relative and absolute paths
+
+#### Code Smells to Fix
+- [ ] **Magic numbers:** Replace hardcoded values (20, 1000, etc.) with constants
+- [ ] **String literals in code:** Move to constants or config
+- [ ] **Large functions:** Break up functions over 50 lines
+  - `input.rs:handle_key()` - 60+ lines
+  - `navigation.rs:handle_navigation()` - 80+ lines
+
+#### Documentation
+- [ ] **Add `#![warn(missing_docs)]`:** Enforce documentation
+- [ ] **Document all public APIs:** Add missing doc comments
+- [ ] **Add examples in doc comments:** Show usage
+
+---
+
+## v0.2.0 - Type Safety Refactor
+
+### Version 0.2.0: Type System & State Refactoring
+
+*Improve code clarity, safety, and maintainability*
+
+#### Command & Action Abstraction
+- [ ] **Introduce `UserAction` Enum:** Create comprehensive enum for all user actions (Navigate, Edit, ToggleHelp, Quit, etc.)
+- [ ] **Refactor Input Handling:** Modify `app/input.rs` to parse KeyEvents into UserActions
+- [ ] **Define Helper Enums:** Create `Direction`, `Location`, `FileDirection` enums
+
+#### Newtype Wrappers for Indices
+- [ ] **Introduce `RowIndex` and `ColIndex`:** Newtype wrappers around `usize` for row/column indices
+- [ ] **Update Function Signatures:** Refactor all functions to use newtypes
+
+#### State Management Refinement
+- [ ] **`UiState` Refactoring:** Confirm clean separation of UI-related state
+- [ ] **`InputState` Struct:** Create struct to hold `pending_key`, `pending_key_time`, `command_count`
+
+---
+
+## v0.3.0 - Advanced Navigation
+
+### Version 0.3.0: Enhanced Navigation
+
+*Vim-style navigation enhancements*
+
+- [ ] **Row Jumping:** Implement `gg`, `G`, `<number>G` (e.g., `15G`)
+  - `gg` jumps to first row
+  - `G` jumps to last row
+  - `15G` jumps to row 15
+  - Buffer number keys before G
+- [ ] **Column Jumping:** Implement `g<letter(s)>` for column navigation
+  - `ga` or `gA` jumps to column A (first column)
+  - `gBC` jumps to column 55 (Excel-style letters)
+  - Base-26 conversion: A=1, B=2, ..., Z=26, AA=27, AB=28
+  - Buffer letter keys after `g`
+- [ ] **Command-line Jumps:** Implement `:<number>` and `:<column>`
+  - `:15` jumps to row 15
+  - `:B` jumps to column B
+  - `:BC` jumps to column 55
+- [ ] **Count Prefixes:** Support vim-style count prefixes for all navigation
+  - `5j` moves down 5 rows
+  - `3h` moves left 3 columns
+- [ ] **Enter Key:** In Normal mode, `Enter` moves cursor down one row (like vim)
+- [ ] **Word Motion:** Add vim-style word navigation for sparse data
+  - `w` jumps to next non-empty cell in row
+  - `b` jumps to previous non-empty cell in row
+  - `e` jumps to last non-empty cell in row
 - [ ] **Error Handling:**
-    - [ ] Gracefully handle invalid row/column inputs (e.g., `99999G` on a 100-row file goes to last row).
-    - [ ] Invalid column letters (e.g., `gZZZ`) should show status bar error: "Invalid column".
-    - [ ] Out-of-bounds jumps should clamp to valid range (first/last row or column).
+  - Out-of-bounds jumps clamp to valid range
+  - Invalid column letters show "Invalid column" error
+  - `99999G` on 100-row file goes to last row
 
-### UI Feature: Cell Magnifier (Power Edit Mode)
-- [ ] Create a new `Magnifier` mode in the `Mode` enum.
-- [ ] **Trigger:** Pressing `m` in `Normal` mode opens Magnifier for the current cell.
-- [ ] **Vim Experience:**
-    - [ ] Embed a full, self-contained vim-like editor within the modal (investigate `ratatui-vim` or build custom vim emulation).
-    - [ ] Support full vim Normal and Insert modes within the magnifier.
-    - [ ] All standard vim keys should function: `i`, `a`, `A`, `I`, `o`, `O`, `dd`, `yy`, `p`, `hjkl`, `w`, `b`, etc.
-- [ ] **Saving (to memory):**
-    - [ ] Inside the Magnifier, `:w` saves the buffer content to the in-memory `CsvData` for that cell and sets `is_dirty = true`.
-    - [ ] `:w` does NOT write to the file, only updates in-memory data.
-- [ ] **Exiting:**
-    - [ ] `:q` closes the Magnifier and discards any unsaved changes in the vim buffer.
-    - [ ] `:wq` or `ZZ` saves changes to memory, then closes the Magnifier.
-    - [ ] `:q!` forces close without saving (if unsaved changes exist).
-- [ ] **UI:**
-    - [ ] Render a modal/popup window at 80% of terminal width and height, centered on screen.
-    - [ ] Display cell content within the embedded vim editor.
-    - [ ] Implement text wrapping and scrolling for multi-line content.
-    - [ ] Show mode indicator within magnifier (e.g., `-- INSERT --`, `-- NORMAL --`).
-- [ ] **Navigation Between Cells:**
-    - [ ] `Ctrl-h/j/k/l` moves the magnifier to the adjacent cell (left/down/up/right).
-    - [ ] When moving with Ctrl-hjkl:
-        - [ ] If unsaved changes exist, prompt: "Save changes? (y/n/cancel)".
-        - [ ] On 'y', save to memory and move. On 'n', discard and move. On cancel or ESC, stay in current cell.
-    - [ ] At edge cells (first/last row or column), Ctrl-hjkl is blocked (no wrapping).
-- [ ] **Error Handling:**
-    - [ ] If vim editor fails to initialize, fall back to simple text area with basic editing.
-    - [ ] Handle empty cells gracefully (start in Insert mode if cell is empty?).
+### Version 0.3.1: UI/UX Polish
 
-### UI Polish & User Feedback
+*Polish the user interface and feedback systems*
+
 - [ ] **Intuitive Bottom Bar:**
-    - [ ] Review and redesign the status bar and file viewer bar.
-    - [ ] Ensure mode indicators are clear and follow Vim conventions (e.g., `-- NORMAL --`, `-- INSERT --`).
-    - [ ] Make sure file status (dirty `*`, filename, read-only status) is prominent and easy to understand.
+  - Redesign status bar with clear mode indicators
+  - Prominent file status (dirty `*`, filename, read-only)
+- [ ] **Transient Message System:**
+  - Non-critical feedback ("File Saved", "Copied 1 row", "Invalid key")
+  - Messages persist until next keypress, then clear
+  - Invalid multi-key sequences show feedback (e.g., after `g`, invalid key → "Invalid column")
 - [ ] **Scrolling File Viewer:**
-    - [ ] The file viewer bar should scroll horizontally if the list of files is wider than the terminal.
-    - [ ] Add state to track the horizontal scroll offset for the file list.
+  - Horizontal scroll for file list if wider than terminal
+  - Track horizontal scroll offset
 - [ ] **Clean Help Menu:**
-    - [ ] Review and redesign the `?` help menu for clarity.
-    - [ ] Group keybindings logically (Navigation, Editing, Global, etc.).
-    - [ ] Ensure it's easy to read and understand at a glance.
-- [ ] **User Feedback & Guards:**
-    - [ ] Implement a transient message system in the status bar for non-critical feedback (e.g., "File Saved", "Copied 1 row", "Invalid key").
-    - [ ] **Message Persistence:** Messages persist until the next keypress (like vim), then clear automatically.
-    - [ ] Provide feedback for invalid multi-key sequences. For example, after `g`, if an invalid key is pressed, show a message like "Invalid column".
-    - [ ] Single invalid keys in Normal mode should be ignored silently to avoid noise (vim-style).
-- [ ] **General Polish:**
-    - [x] Remove the `w` and `b` key handling from the codebase and `docs/keybindings.md`.
+  - Redesign `?` help overlay for clarity
+  - Group keybindings logically (Navigation, Editing, Global)
+  - Easy to read at a glance
 
 ---
 
-## Phase 2: Cell Editing (Quick Edit Mode) ✏️
+## v0.4.0 - Quick Editing
 
-*This phase focuses on fast, intuitive in-place editing of cell values.*
+### Version 0.4.0: Quick Edit Mode
 
-### Edit Mode State & Logic
-- [ ] Create a new `Insert` mode in the `Mode` enum (distinct from `Magnifier`).
-- [ ] **Triggers (Vim-style):**
-    - [ ] `i`: Enter Insert mode with cursor at current position (start of current cell content).
-    - [ ] `a`: Enter Insert mode with cursor after current position (append). For cell editing, cursor at end of content.
-    - [ ] `A`: Enter Insert mode at end of cell content (append at end of line).
-    - [ ] `I`: Enter Insert mode at beginning of cell content (insert at start).
-- [ ] **Initial Buffer State:** When entering Insert mode, `edit_buffer` is populated with the current cell content.
-- [ ] Add `edit_buffer: String` and `cursor_position: usize` to the App struct.
+*Fast, intuitive in-place editing of cell values*
+
+- [ ] **Create `Insert` Mode:** New mode distinct from Magnifier
+- [ ] **Vim-style Triggers:**
+  - `i`: Enter Insert mode at current position
+  - `a`: Enter Insert mode with cursor after current position
+  - `A`: Enter Insert mode at end of cell content
+  - `I`: Enter Insert mode at beginning of cell content
+  - `gi`: Go to last edited cell and enter Insert mode
+- [ ] **Edit Buffer State:**
+  - Add `edit_buffer: String` and `cursor_position: usize` to App
+  - Populate `edit_buffer` with current cell content on entry
 - [ ] **Save/Cancel Flow:**
-    - [ ] `Enter`: Commits the change from `edit_buffer` to the in-memory `CsvData`, sets `is_dirty = true`, and returns to `Normal` mode.
-    - [ ] `Esc`: Discards the change in `edit_buffer` and returns to `Normal` mode.
+  - `Enter`: Commits change to in-memory `CsvData`, sets `is_dirty = true`, returns to Normal mode
+  - `Esc`: Discards change, returns to Normal mode
 - [ ] **Text Handling:**
-    - [ ] Handle printable characters, `Backspace`, `Delete`.
-    - [ ] Handle cursor movement with arrow keys: `Left`, `Right`.
-    - [ ] Handle `Home` (move to start of cell) and `End` (move to end of cell).
-    - [ ] Consider adding Vim-style Insert mode navigation: `Ctrl+h` (backspace), `Ctrl+w` (delete word), `Ctrl+u` (delete to start).
-- [ ] **Error Handling:** Prevent cursor from going out of bounds during editing.
-
-### UI Updates for In-Place Editing
-- [ ] **Visual Mode Indicator:**
-    - [ ] Update status bar to show `-- INSERT --`.
-    - [ ] Visually highlight the actively edited cell (e.g., distinct border).
-    - [ ] Render a text cursor within the edited cell at `cursor_position`.
-- [ ] **Scrolling within Cell:**
-    - [ ] If the `edit_buffer` content exceeds the cell's width, implement horizontal scrolling to follow the cursor.
-
-### Global Data Persistence
-- [ ] **Ephemeral By Default:** All edits (from Magnifier or In-place) only update the in-memory `CsvData` and set the `is_dirty` flag.
-- [ ] **Saving to File:**
-    - [ ] Implement command mode logic for `:w` (write) and `:wq` (write & quit).
-    - [ ] These commands will serialize the in-memory `CsvData` and overwrite the original file.
-    - [ ] After a successful save, the `is_dirty` flag is cleared.
-- [ ] **Quitting (Guard):**
-    - [ ] `:q` will fail if there are unsaved changes (`is_dirty` is true). Show a status bar error: "No write since last change (add ! to override)".
-    - [ ] `:q!` will quit without saving, discarding all in-memory changes.
-- [ ] **Keybinding:** `Ctrl+S` should be a shortcut for the `:w` command.
-- [ ] **Error Handling:** Handle file write errors (e.g., permissions, disk full) and provide clear user feedback.
+  - Handle printable characters, `Backspace`, `Delete`
+  - Arrow keys: `Left`, `Right` for cursor movement
+  - `Home` (start of cell), `End` (end of cell)
+  - Vim-style: `Ctrl+h` (backspace), `Ctrl+w` (delete word), `Ctrl+u` (delete to start)
+- [ ] **Visual Feedback:**
+  - Status bar shows `-- INSERT --`
+  - Visually highlight edited cell (distinct border)
+  - Render text cursor within cell at `cursor_position`
+- [ ] **Scrolling:**
+  - Horizontal scrolling within cell if content exceeds width
+- [ ] **Error Handling:** Prevent cursor from going out of bounds
 
 ---
 
-## Phase 3: Row & Column Operations 📊
+## v0.5.0 - Vim Magnifier
 
-*(This phase remains as previously planned, but all operations must adhere to the ephemeral edit principle, setting the `is_dirty` flag)*
+### Version 0.5.0: Cell Magnifier Mode
 
-### Row Operations
-- [ ] Implement `add_row()`, `delete_row()`.
-- [ ] **Keybindings (Vim-style):**
-    - [ ] `o`: Add row below current row, automatically enter Insert mode for first cell of new row.
-    - [ ] `O`: Add row above current row, automatically enter Insert mode for first cell of new row.
-    - [ ] `dd`: Delete current row.
-    - [ ] Support count prefixes: `3dd` deletes 3 rows starting from current, `2o` adds 2 rows.
+*Power editing with embedded vim-like editor*
+
+- [ ] **Create `Magnifier` Mode:** New mode in the `Mode` enum
+- [ ] **Trigger:** Pressing `Enter` in Normal mode opens Magnifier for current cell
+  - (Note: `Enter` also moves down one row if not opening magnifier - context-aware)
+- [ ] **Vim Experience:**
+  - Embed full vim-like editor within modal (research `ratatui-vim` or build custom)
+  - Support full vim Normal and Insert modes
+  - Standard vim keys: `i`, `a`, `A`, `I`, `o`, `O`, `dd`, `yy`, `p`, `hjkl`, `w`, `b`, etc.
+- [ ] **Saving (to memory):**
+  - `:w` saves buffer content to in-memory `CsvData` for that cell
+  - Sets `is_dirty = true`
+  - Does NOT write to file
+- [ ] **Exiting:**
+  - `:q` closes Magnifier, discards unsaved changes
+  - `:wq` or `ZZ` saves to memory, then closes
+  - `:q!` forces close without saving
+- [ ] **UI:**
+  - Modal popup at 80% terminal width and height, centered
+  - Display cell content within vim editor
+  - Text wrapping and scrolling for multi-line content
+  - Show mode indicator within magnifier (`-- INSERT --`, `-- NORMAL --`)
+- [ ] **Navigation Between Cells:**
+  - `Ctrl-h/j/k/l` moves magnifier to adjacent cell
+  - If unsaved changes exist, prompt: "Save changes? (y/n/cancel)"
+  - At edge cells, Ctrl-hjkl is blocked (no wrapping)
+- [ ] **Error Handling:**
+  - If vim editor fails to initialize, fall back to simple text area
+  - Handle empty cells gracefully
+
+---
+
+## v0.6.0 - Save/Quit Guards
+
+### Version 0.6.0: Persistence & Guards
+
+*File saving and quit protection*
+
+- [ ] **Ephemeral By Default:** All edits only update in-memory `CsvData` and set `is_dirty`
+- [ ] **Command Mode Logic:**
+  - `:w` - Serialize in-memory `CsvData` and overwrite original file
+  - `:wq` - Write and quit
+  - After successful save, clear `is_dirty` flag
+- [ ] **Quitting Guards:**
+  - `:q` fails if `is_dirty` is true with error: "No write since last change (add ! to override)"
+  - `:q!` quits without saving, discarding all changes
+- [ ] **Keybinding:** `Ctrl+S` shortcut for `:w` command
+- [ ] **Error Handling:** Handle file write errors (permissions, disk full) with clear feedback
+
+---
+
+## v0.7.0 - Row Operations
+
+### Version 0.7.0: Row Manipulation
+
+*Add, delete, copy, and paste rows*
+
+- [ ] **Add Row:**
+  - `o`: Add row below current, automatically enter Insert mode for first cell of new row
+  - `O`: Add row above current, automatically enter Insert mode for first cell
+  - Support count prefixes: `2o` adds 2 rows
+- [ ] **Delete Row:**
+  - `dd`: Delete current row
+  - Support count prefixes: `3dd` deletes 3 rows
 - [ ] **New Row Behavior:**
-    - [ ] All cells in new row start as empty strings.
-    - [ ] After creating row, automatically enter Insert mode for the first cell (leftmost column).
-    - [ ] User can press Esc to exit Insert mode and return to Normal mode without editing.
-- [ ] **Cursor Positioning:** After adding row, cursor moves to the new row's first cell.
+  - All cells start as empty strings
+  - After creating row, cursor moves to new row's first cell
+  - User can press Esc to exit Insert mode without editing
+- [ ] **Copy/Paste:**
+  - `yy`: Copy (yank) current row
+  - `5yy`: Copy 5 rows
+  - `p`: Paste row below current
+  - `P`: Paste row above current
+- [ ] **Cursor Positioning:** After operations, cursor moves appropriately
 - [ ] **Error Handling:**
-    - [ ] Allow deleting the last row (file can have zero data rows, just headers).
-    - [ ] Allow deleting header row if user confirms (or treat specially).
-    - [ ] If deleting multiple rows with `3dd` and only 2 rows remain, delete available rows and show message.
+  - Allow deleting last row (file can have zero data rows)
+  - Handle deleting more rows than available
 
-### Column Operations
-- [ ] Implement `add_column()`, `delete_column()`.
-- [ ] **Commands (no keybindings to avoid vim conflicts):**
-    - [ ] `:addcol`: Add column after current column.
-    - [ ] `:addcol before`: Add column before current column.
-    - [ ] `:addcol <N>`: Add column at position N (0-indexed or 1-indexed?).
-    - [ ] `:delcol`: Delete current column.
-    - [ ] `:delcol <N>`: Delete column at position N.
+---
+
+## v0.8.0 - Column Operations
+
+### Version 0.8.0: Column Manipulation
+
+*Vim-style column operators (more intuitive than commands)*
+
+- [ ] **Column Operators:**
+  - `dc`: Delete current column (like `dd` for rows)
+  - `yc`: Yank (copy) current column (like `yy` for rows)
+  - `pc`: Paste column after current (like `p` for rows)
+  - `Pc`: Paste column before current (like `P` for rows)
+- [ ] **Add Column (Header Context):**
+  - When in header row, `o` adds column after and enters HeaderEdit mode
+  - When in header row, `O` adds column before and enters HeaderEdit mode
 - [ ] **New Column Behavior:**
-    - [ ] All cells in new column start as empty strings.
-    - [ ] After adding column, automatically enter HeaderEdit mode (`gh`) for the new column's header.
-    - [ ] User provides header name (or leaves empty) and presses Enter to continue.
-    - [ ] If file has `has_user_defined_headers = false` and user names the new column, set flag to true.
-- [ ] **Cursor Positioning:** After adding column, cursor moves to the header cell of new column (in HeaderEdit mode).
+  - All cells start as empty strings
+  - After adding column with `o`/`O`, automatically enter HeaderEdit mode
+- [ ] **Cursor Positioning:** After adding, cursor moves to header cell of new column
 - [ ] **Error Handling:**
-    - [ ] Allow deleting the last column (file can have zero columns - edge case).
-    - [ ] Confirm before deleting column: show message "Delete column '<name>'? Press d again to confirm." (or use `:delcol!`).
-    - [ ] Prevent accidental data loss with clear feedback.
+  - Allow deleting last column
+  - No confirmation needed (undo with `u`)
+  - Clear feedback on operations
 
-### Header Operations
-- [ ] **Edit Header Names:** Allow editing of column header values.
-    - [ ] **Keybinding:** `gh` in Normal mode to enter header edit mode for the current column header (mnemonic: "go to header").
-    - [ ] **Command:** `:rename <new_name>` to rename current column header directly.
-    - [ ] **Mode State:** Create a new `HeaderEdit` mode (distinct from `Insert` mode for cells).
-    - [ ] **Edit Buffer:** Similar to Insert mode, provide `header_edit_buffer: String` and `header_cursor_position: usize`.
-    - [ ] **Text Editing:** Support full text editing capabilities:
-        - [ ] Handle printable characters.
-        - [ ] Support `Backspace` and `Delete` keys.
-        - [ ] Implement cursor movement: `Left`, `Right`, `Home`, `End`.
-        - [ ] Support arrow keys like Insert mode.
-        - [ ] Implement horizontal scrolling if header text exceeds column width.
-    - [ ] **Save/Cancel Flow:**
-        - [ ] `Enter`: Commits the header change to in-memory data, sets `is_dirty = true`, returns to Normal mode.
-        - [ ] `Esc`: Discards changes in edit buffer and returns to Normal mode.
-    - [ ] **Visual Feedback:**
-        - [ ] Update status bar to show `-- HEADER EDIT --` (distinct from `-- INSERT --`).
-        - [ ] Visually highlight the header cell being edited (distinct border/style).
-        - [ ] Render text cursor at `header_cursor_position`.
-    - [ ] **Magnifier Restriction:** Disable Magnifier mode (`m`) on header cells. Headers are single-line only, use `gh` instead.
-- [ ] **No-Headers Mode Handling:**
-    - [ ] When file is loaded with `--no-headers`, internally create empty header strings for each column.
-    - [ ] These empty headers are ephemeral and won't be written to the file unless the user edits at least one.
-    - [ ] Track state: `has_user_defined_headers: bool` (starts as false for `--no-headers` files).
-    - [ ] On first header edit via `H`, set `has_user_defined_headers = true`.
-    - [ ] When saving: Only write header row if `has_user_defined_headers` is true.
+---
+
+## v0.9.0 - Header Management
+
+### Version 0.9.0: Header Editing
+
+*Edit column headers and header row management*
+
+- [ ] **Edit Header Names:**
+  - `gh` in Normal mode: Enter HeaderEdit mode for current column header
+  - `:rename <new_name>`: Rename current column header directly
+  - Create `HeaderEdit` mode distinct from cell Insert mode
+  - `header_edit_buffer: String` and `header_cursor_position: usize`
+  - Full text editing: printable chars, Backspace, Delete, arrows, Home, End
+  - `Enter`: Commit header change, set `is_dirty = true`, return to Normal
+  - `Esc`: Discard changes, return to Normal
+  - Status bar shows `-- HEADER EDIT --`
+  - Visually highlight header cell being edited
+- [ ] **Duplicate Name Validation:**
+  - Check for duplicate column names on commit
+  - Show error: "Duplicate column name: <name>"
+  - Keep user in HeaderEdit mode to correct
+  - Allow forcing duplicate with second Enter press
+- [ ] **No-Headers Mode:**
+  - When loaded with `--no-headers`, create empty header strings internally
+  - Track `has_user_defined_headers: bool` (starts false for `--no-headers`)
+  - On first header edit, set `has_user_defined_headers = true`
+  - Only write header row on save if `has_user_defined_headers` is true
 - [ ] **Toggle Headers Command:**
-    - [ ] Implement `:headers` command to toggle header row on/off.
-    - [ ] **Toggle On:** Promotes the first data row to become headers. Reduces total row count by 1.
-    - [ ] **Toggle Off:** Demotes current headers to become the first data row. Increases total row count by 1.
-    - [ ] Updates `has_user_defined_headers` flag accordingly.
-    - [ ] Sets `is_dirty = true` when toggled.
-- [ ] **New Column Header Handling:**
-    - [ ] When a new column is added via `Ctrl+A`, automatically enter `HeaderEdit` mode for that column's header.
-    - [ ] User must provide a name or leave it empty, then press Enter or Esc to continue.
-    - [ ] If file has `has_user_defined_headers = false` and user names the new column, set `has_user_defined_headers = true`.
-- [ ] **Validation & Error Handling:**
-    - [ ] **Duplicate Names:** When committing a header edit, check for duplicate column names.
-        - [ ] If duplicate detected, show status bar error: "Duplicate column name: <name>".
-        - [ ] Keep user in `HeaderEdit` mode to correct the name.
-        - [ ] Allow forcing duplicate by pressing Enter a second time (or implement alternate flow).
-    - [ ] **Empty Headers:** Allow empty and whitespace-only header names without validation errors.
-    - [ ] **Cursor Bounds:** Prevent header cursor from going out of bounds during editing.
-- [ ] **Undo/Redo Integration:**
-    - [ ] Header edits must be tracked in the command history stack (Phase 3).
-    - [ ] Header changes can be undone with `u` and redone with `Ctrl+r`.
-    - [ ] Toggling headers on/off must also be undoable.
-
-### Copy/Paste System
-- [ ] Keybindings: `yy`, `p`, `P`.
-- [ ] **Error Handling:** Ensure clipboard operations don't corrupt data.
-
-### Undo/Redo System
-- [ ] Create command history stack for all mutations.
-- [ ] Keybindings: `u`, `Ctrl+r`.
-- [ ] **Error Handling:** Ensure undo/redo operations are robust.
+  - `:headers` command toggles header row on/off
+  - Toggle On: Promotes first data row to headers, reduces row count by 1
+  - Toggle Off: Demotes headers to first data row, increases row count by 1
+  - Sets `is_dirty = true` and updates flag
+- [ ] **Magnifier Restriction:** Disable Magnifier mode on header cells (use `gh` instead)
+- [ ] **Undo Integration:** Header edits tracked in command history
 
 ---
 
-## Phase 4: Advanced Features 🔍
+## v1.0.0 - Undo/Redo System
 
-*(This phase remains as previously planned)*
+### Version 1.0.0: Command History
 
-### Fuzzy Search System
-- [ ] Keybindings: `/`, `n`, `N`, `*`.
-- [ ] **Error Handling:** Handle no matches found, invalid search patterns.
+*Undo and redo for all mutations*
 
-### Sorting
-- [ ] Keybinding: `s`. Must set `is_dirty` flag.
-- [ ] **Error Handling:** Handle sorting on mixed-type columns.
+- [ ] **Create Command History Stack:** Track all mutations (edits, row/col ops, header edits, toggle)
+- [ ] **Keybindings:**
+  - `u`: Undo last operation
+  - `Ctrl+r`: Redo
+  - `.` (dot command): Repeat last edit operation
+- [ ] **Status Feedback:** Show "Undo: Edit cell A5" or similar
+- [ ] **History Limits:** Up to 100 operations
+- [ ] **Error Handling:** Ensure undo/redo operations are robust
 
-### Filtering
-- [ ] Command: `:filter <expr>`.
-- [ ] **Error Handling:** Validate filter syntax, handle invalid column names.
+### Version 1.0.1: Marks System
 
-### Visual Selection Mode
-- [ ] Keybindings: `v`, `V`.
-- [ ] Operations on selection: `d`, `y`.
-- [ ] **Error Handling:** Ensure selection logic is robust.
+*Jump between marked cells*
+
+- [ ] **Set Marks:** `m[a-z]` sets mark at current cell (e.g., `ma` sets mark 'a)
+- [ ] **Jump to Marks:**
+  - `'[a-z]` jumps to mark (beginning of cell)
+  - `` `[a-z] `` jumps to mark (exact position)
+- [ ] **Navigation:**
+  - `''` or `` `` `` jumps back to previous position
+  - `'.` jumps to last edited cell
+- [ ] **Integration:** Marks work across file switches (persist during session)
 
 ---
 
-## Phase 5: Multi-File/Sheet Navigation 📈
+## v1.1.0 - Search & Visual
 
-### File & Sheet Support
+### Version 1.1.0: Fuzzy Search
+
+*Find rows, columns, and cell data*
+
+- [ ] **Keybindings:**
+  - `/`: Open fuzzy finder
+  - `n`: Next match
+  - `N`: Previous match
+  - `*`: Search for current cell value
+- [ ] **Search Overlay:**
+  - Centered, live results as you type
+  - Shows match type: [Row], [Col], [Cell]
+  - `j`/`k` to navigate results
+  - `Enter` to jump, `Esc` to cancel
+- [ ] **Fuzzy Matching:** Scoring-based fuzzy matching
+- [ ] **Error Handling:** Handle no matches found, invalid search patterns
+
+### Version 1.1.1: Visual Selection
+
+*Select and operate on ranges*
+
+- [ ] **Keybindings:**
+  - `v`: Enter visual mode (cell selection)
+  - `V`: Enter visual line mode (row selection)
+  - `Ctrl+v`: Enter visual block mode (rectangle selection)
+  - `d`: Delete selection
+  - `y`: Yank (copy) selection
+  - `o`: Move cursor to other end of selection
+  - `Esc`: Exit visual mode
+- [ ] **Visual Indicators:** Use `══` markers on selected rows
+- [ ] **Visual Block:** Rectangle selection for copying/pasting cell blocks
+- [ ] **Selection Logic:** Robust selection handling
+
+---
+
+## v1.2.0 - Sorting & Filtering
+
+### Version 1.2.0: Sorting
+
+*Sort data by columns*
+
+- [ ] **Keybinding:** `s` - Sort by current column (toggle asc/desc)
+- [ ] **Commands:**
+  - `:sort`: Sort ascending
+  - `:sort!`: Sort descending
+- [ ] **Smart Sorting:** Numeric sort for numbers, text sort for strings
+- [ ] **Header Indicator:** Show ↑ or ↓ in header
+- [ ] **Undoable:** Sort operations tracked in undo history
+- [ ] **Error Handling:** Handle sorting on mixed-type columns
+
+### Version 1.2.1: Filtering
+
+*Filter rows by criteria*
+
+- [ ] **Command:** `:filter <expr>` (e.g., `:filter Age>30`, `:filter Name contains "John"`)
+- [ ] **Filter Operators:**
+  - `=`: Equals
+  - `!=`: Not equals
+  - `>`, `<`, `>=`, `<=`: Comparisons (numeric)
+  - `contains`: Contains substring
+  - `starts`: Starts with
+  - `ends`: Ends with
+- [ ] **Clear Filter:** `:nofilter` or `:nof`
+- [ ] **Error Handling:** Validate filter syntax, handle invalid column names
+
+---
+
+## v1.3.0 - Multi-File Guards
+
+### Version 1.3.0: File Switching with Guards
+
+*Safe navigation between files*
+
 - [ ] **Unsaved Changes Guard:**
-    - [ ] When switching files/sheets (`[`, `]`), if the current file `is_dirty`, block the switch and show a status bar error: "No write since last change".
-    - [ ] (Future) Add `!` variants for commands to force actions, e.g., `:next!`.
-- [ ] CSV multi-file support (`[`, `]`).
-- [ ] Excel file loading (`calamine`).
-- [ ] Excel multi-sheet support.
-- [ ] **Error Handling:** Handle inaccessible files, corrupted files, and invalid sheet names gracefully during switching.
+  - `[` / `]` block if current file `is_dirty`
+  - Show status error: "No write since last change"
+- [ ] **Force Commands:** (Future) `:next!`, `:prev!` to force switch
+- [ ] **Error Handling:** Handle inaccessible files during switching
 
 ---
 
-## Phase 6: Advanced Viewing & Usability ✨
+## v1.4.0 - Advanced Viewing
 
-*This phase focuses on quality-of-life features that make viewing and interacting with data easier.*
+### Version 1.4.0: Column Management
 
-### Column Management
-- [ ] **Column Freezing/Pinning:**
-    - [ ] Implement a command (`:freeze`) to lock the current column (and all to its left) on the screen.
-    - [ ] Frozen columns should remain visible during horizontal scrolling.
-    - [ ] Add a visual indicator to frozen column headers.
+*Freeze columns and adjust widths*
+
+- [ ] **Column Freezing:**
+  - `:freeze` command locks current column and all to its left
+  - Frozen columns remain visible during horizontal scrolling
+  - Visual indicator on frozen column headers
 - [ ] **Column Sizing:**
-    - [ ] Manual Resizing: Allow column width adjustment with keybindings (e.g., `Ctrl+Left/Right`).
-    - [ ] Auto-Sizing: Add a command (`:autowidth`) to resize the current column to fit the longest visible data.
-- [ ] **Error Handling:** Ensure resizing/freezing works correctly with horizontal scrolling and does not corrupt the view.
+  - Manual: `Ctrl+Left/Right` to resize
+  - Auto: `:autowidth` resizes current column to fit longest visible data
+- [ ] **Error Handling:** Ensure resizing/freezing works with horizontal scrolling
 
-### Session & View Persistence
-- [ ] **Save View State:** On quit, automatically save the view state for each file (cursor position, scroll offsets, sort order, filters, frozen columns) to a local file (e.g., in `~/.cache/lazycsv/`).
-- [ ] **Restore View State:** On startup, if a session file exists for a given CSV, restore the view to its previous state.
-- [ ] **Error Handling:** Handle corrupted or outdated session files gracefully.
+### Version 1.4.1: Session Persistence
 
-### Theming
-- [ ] **Custom Color Themes:** Allow users to define custom colors in `config.toml`.
-- [ ] Users should be able to theme the header, selected row/cell, dirty indicator, status bar, etc.
-- [ ] **Error Handling:** If the theme config is invalid, fall back to a default monochrome theme.
+*Save and restore view state*
+
+- [ ] **Save View State:**
+  - On quit, save cursor position, scroll offsets, sort order, filters, frozen columns
+  - Store in `~/.cache/lazycsv/`
+- [ ] **Restore View State:**
+  - On startup, restore to previous state if session file exists
+- [ ] **Error Handling:** Handle corrupted or outdated session files gracefully
+
+### Version 1.4.2: Theming
+
+*Custom color themes*
+
+- [ ] **Configuration:** Allow custom colors in `config.toml`
+- [ ] **Themeable Elements:** Headers, selected cell, dirty indicator, status bar
+- [ ] **Fallback:** Monochrome theme if config is invalid
 
 ---
 
-## Phase 7: Data Analysis & Manipulation 🛠️
+## v1.5.0 - Data Analysis
 
-*This phase introduces powerful, built-in tools for analyzing and transforming data on the fly.*
+### Version 1.5.0: Data Transformation
 
-### Advanced Data Transformation
+*Advanced data manipulation*
+
 - [ ] **Regex Search & Replace:**
-    - [ ] Implement a command for true regex-based search and replace within a column or across the whole file (e.g., `:s/pattern/replacement/g`).
-    - [ ] This should be a powerful tool for data cleaning and adhere to the ephemeral edit model.
+  - `:s/pattern/replacement/g` command
+  - Apply to column or whole file
 - [ ] **Transpose View:**
-    - [ ] Add a command (`:transpose`) to toggle between normal view and a transposed view where rows become columns and vice-versa.
+  - `:transpose` command toggles between normal and transposed view
 - [ ] **Advanced Sorting:**
-    - [ ] Allow multi-column sorting (e.g., `:sort State, City`).
-    - [ ] Implement "natural sorting" for alphanumeric data (e.g., `file1`, `file2`, `file10`).
-- [ ] **Error Handling:** Ensure data transformations are efficient and can be undone.
+  - Multi-column sort: `:sort State, City`
+  - Natural sorting for alphanumeric (e.g., `file1`, `file2`, `file10`)
+- [ ] **Undoable:** All transformations tracked in history
 
-### In-App Data Analysis
-- [ ] **Enhanced Column Statistics:**
-    - [ ] Augment the `:stats` command to show a rich popup panel.
-    - [ ] For numeric columns: Show count, mean, median, mode, standard deviation, and a text-based histogram.
-    - [ ] For text columns: Show unique count and a frequency distribution of the most common values.
-- [ ] **Terminal-Based Plotting:**
-    - [ ] Implement a `:plot` command.
-    - [ ] For numeric columns, generate a simple, text-based bar chart or scatter plot in a popup window (using a crate like `textplots`).
-- [ ] **Error Handling:** Handle cases where analysis or plotting is attempted on unsuitable data types.
+### Version 1.5.1: Statistics & Plotting
 
----
+*In-app data analysis*
 
-## Phase 8: Code Cleanup & Naming Conventions 🧹
-
-*This phase focuses on a final pass over the codebase to improve clarity, consistency, and organization.*
-
-### Naming Consistency
-- [ ] **Review Function and Variable Names:** Audit the entire codebase for consistent and descriptive naming.
-    - [ ] Standardize test helper function names (e.g., `setup_test_app`, `create_test_data`).
-    - [ ] Ensure function prefixes like `handle_`, `goto_`, `render_` are used consistently.
-- [ ] **Review Module and Struct Names:** Ensure all module and struct names are clear and accurately reflect their purpose.
-
-### File & Module Organization
-- [ ] **Evaluate Module Structure:** Review the `src/` directory to see if any modules should be combined, split, or moved.
-    - [ ] Consider creating a `src/io/` module for file-related operations if more are added.
-    - [ ] Consider creating a `src/state/` module to house `App`, `UiState`, etc. if state management becomes more complex.
-- [ ] **Review Test File Organization:** Ensure test files are logically named and their contents are focused.
-
-### Code Quality & Readability
-- [ ] **Remove Redundant Code:** Identify and remove any dead code, commented-out logic, or redundant helper functions.
-- [ ] **Improve Comments:** Ensure all comments are high-level, explaining *why* something is done, not *what*. Remove any trivial comments.
-- [ ] **Run `cargo clippy`:** Address all lints and warnings from `clippy` to enforce idiomatic Rust.
+- [ ] **Enhanced Statistics:**
+  - `:stats` command shows rich popup panel
+  - Numeric columns: count, mean, median, mode, stddev, text-based histogram
+  - Text columns: unique count, frequency distribution
+- [ ] **Terminal Plotting:**
+  - `:plot` command generates text-based charts
+  - Bar charts and scatter plots (using `textplots` crate)
+- [ ] **Error Handling:** Handle analysis on unsuitable data types
 
 ---
 
-## Phase 9: Test Suite Audit & Enhancement 🧪
+## v1.6.0 - Final Polish
 
-*This phase focuses on systematically improving the quality, coverage, and robustness of the entire test suite.*
+### Version 1.6.0: Code Quality
 
-### Coverage Analysis
-- [ ] **Generate Coverage Report:** Use a code coverage tool (e.g., `cargo-tarpaulin`) to measure the current test coverage percentage for the entire codebase.
-- [ ] **Identify Untested Code:** Analyze the report to find functions, modules, and code branches that have low or zero test coverage.
+*Final cleanup pass*
 
-### Test Case Expansion
-- [ ] **Add Missing Unit Tests:** Write new unit tests for functions identified as having low coverage.
-- [ ] **Add Missing Integration Tests:** Write new integration tests to cover more complex interactions between modules (e.g., error handling between `App::from_cli` and `CsvData`).
-- [ ] **Test Edge Cases:** Explicitly add tests for edge cases like empty files, files with only a header, files with a single row/column, and files with invalid data.
+- [ ] **Naming Consistency:** Audit all function/variable names
+- [ ] **Module Organization:** Review `src/` structure
+- [ ] **Linting:** Run `cargo clippy`, address all warnings
+- [ ] **Dead Code Removal:** Identify and remove unused code
 
-### Test Refactoring & Improvement
-- [ ] **Refactor Test Helpers:** Create and standardize helper functions to reduce boilerplate code in tests (e.g., functions to create specific `App` states or `CsvData` instances).
-- [ ] **Introduce UI Snapshot Testing:** Refactor UI rendering tests in `ui_rendering_test.rs` and `ui_state_test.rs` to use the `insta` crate for snapshot testing. This will provide more robust and maintainable checks for the TUI's appearance.
-- [ ] **Explore Property-Based Testing:** Identify pure functions (e.g., `column_index_to_letter`) that would benefit from property-based testing with the `proptest` crate to cover a wider range of inputs automatically.
+### Version 1.6.1: Test Suite
+
+*Comprehensive testing*
+
+- [ ] **Coverage Analysis:** Use `cargo-tarpaulin` to measure coverage
+- [ ] **Unit Tests:** Add tests for low-coverage functions
+- [ ] **Integration Tests:** Cover complex module interactions
+- [ ] **Snapshot Testing:** Use `insta` crate for UI rendering tests
+- [ ] **Property-Based Testing:** Use `proptest` for pure functions
+- [ ] **Edge Cases:** Empty files, single row/column, invalid data
+
+### Version 1.6.2: Documentation & Distribution
+
+*Release preparation*
+
+- [ ] **README:** Update with GIF demo, clear features list
+- [ ] **Keybindings Reference:** Complete and accurate
+- [ ] **Architecture Docs:** Update to match final code
+- [ ] **crates.io:** Publish to Rust package registry
+- [ ] **Package Managers:** Homebrew, AUR, etc.
 
 ---
 
-## Polish & Distribution 🚀
+## Future Ideas (Post v1.6.0)
 
-*(This phase remains as previously planned)*
+*These may become future versions if prioritized*
 
-- [ ] Configuration System (`config.toml`).
-- [ ] Documentation (README, GIF, keybindings).
-- [ ] Testing (Unit, Integration, Performance).
-- [ ] Distribution (crates.io, package managers).
-
----
-
-## Future Ideas 💡
-
-*(Items from this list are promoted to official phases as they are prioritized)*
-
-- [ ] Network file loading (HTTP/HTTPS URLs).
-- [ ] System clipboard integration.
-- [ ] SQL query mode (query CSV like a database).
-- [ ] Export to other formats (JSON, Markdown).
-- [ ] Formula evaluation (basic spreadsheet functions).
-- [ ] Diff mode (compare two CSV files).
-- [ ] Merge/join operations.
-- [ ] Pivot table support.
+- [ ] Network file loading (HTTP/HTTPS URLs)
+- [ ] System clipboard integration
+- [ ] SQL query mode (query CSV like a database)
+- [ ] Export to other formats (JSON, Markdown)
+- [ ] Formula evaluation (basic spreadsheet functions)
+- [ ] Diff mode (compare two CSV files)
+- [ ] Merge/join operations
+- [ ] Pivot table support

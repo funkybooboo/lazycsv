@@ -25,7 +25,7 @@ Complete UI/UX design specification for LazyCSV.
 
 ## Screen Layouts
 
-### Default View (Phase 1)
+### Default View (v0.1.0)
 
 ```
 ┌─ lazycsv: sales_data.csv ────────────────────────────┐
@@ -84,7 +84,7 @@ Complete UI/UX design specification for LazyCSV.
 - Dimmed background (table still visible)
 - Close with `?` or `Esc`
 
-### Edit Mode (Phase 2)
+### Edit Mode (v0.4.0)
 
 ```
 ┌─ lazycsv: sales_data.csv [EDIT] * ────────────────────┐
@@ -112,7 +112,7 @@ Complete UI/UX design specification for LazyCSV.
 - Status bar shows edit instructions
 - All text selected by default (type to replace)
 
-### Visual Selection Mode (Phase 4)
+### Visual Selection Mode (v1.1.0)
 
 ```
 ┌─ lazycsv: sales_data.csv [VISUAL] ─ 3 rows selected ─┐
@@ -139,7 +139,7 @@ Complete UI/UX design specification for LazyCSV.
 - Row count in status: "3 rows selected"
 - Available operations in status
 
-### Fuzzy Search Overlay (Phase 4)
+### Fuzzy Search Overlay (v1.1.0)
 
 ```
 ┌─ lazycsv: sales_data.csv ────────────────────────────┐
@@ -202,7 +202,7 @@ Using only terminal defaults and text attributes:
 - Faster rendering
 - Accessibility (no color-blind issues)
 
-**Future: Optional Color Theme (Phase 6)**
+**Future: Optional Color Theme (v1.4.0)**
 
 If colors are added as an option:
 - **Headers**: Cyan + Bold
@@ -258,7 +258,7 @@ If colors are added as an option:
 7. Message: "Loaded: customers.csv" in status bar
 ```
 
-### Edit Mode Flow (Phase 2)
+### Edit Mode Flow (v0.4.0)
 ```
 1. Navigate to cell
 2. Press i or Enter
@@ -272,7 +272,7 @@ If colors are added as an option:
 8. Show feedback: Cell updated, * in title
 ```
 
-### Row Operations (Phase 3)
+### Row Operations (v0.7.0)
 ```
 Add row below (o):
   1. Navigate to row
@@ -291,7 +291,7 @@ Delete row (dd):
   6. * dirty indicator appears
 ```
 
-### Copy/Paste (Phase 3)
+### Copy/Paste (v0.7.0)
 ```
 1. Navigate to row
 2. Press yy (yank)
@@ -303,7 +303,7 @@ Delete row (dd):
 8. Can paste multiple times
 ```
 
-### Undo (Phase 2)
+### Undo (v1.0.0)
 ```
 1. Perform operation (edit, delete, sort, etc.)
 2. Press u
@@ -413,7 +413,7 @@ LazyCSV prioritizes instant response over smooth animation:
 └──────────────────────────────────────────┘
 ```
 
-### Unsaved Changes Warning (Phase 2)
+### Unsaved Changes Warning (v0.6.0)
 ```
 ┌──────────────────────────────────────────┐
 │          ⚠ Unsaved Changes               │
@@ -444,7 +444,7 @@ Multiple files:
 Edit mode:
   EDIT: "Widget A" │ Enter save │ Esc cancel
 
-After save (Phase 2):
+After save (v0.6.0):
   ✓ Saved successfully │ Row 10/100 │ Col 2/5
 
 After operation:
@@ -494,7 +494,7 @@ LazyCSV's design draws from:
 
 ## Future Design Considerations
 
-### Phase 6+
+### v1.4.0+
 - Optional color themes (configurable)
 - Mouse support (optional, keyboard still primary)
 - Column width adjustment (drag or command)
