@@ -82,7 +82,7 @@ LazyCSV treats CSV files in the same directory like Excel sheets. Open one file,
 | Version | Features |
 |---------|----------|
 | **v0.1.0** | ✅ Foundation - viewing, navigation, multi-file |
-| **v0.2.0** | Type safety refactor (internal) |
+| **v0.2.0** | 🔄 Type safety refactor (Phase 1 ✅, internal improvements) |
 | **v0.3.0** | Advanced navigation - `gg`, `G`, counts, column jumps |
 | **v0.4.0** | Quick editing - Insert mode for fast cell edits |
 | **v0.5.0** | **Vim magnifier** - full vim editor embedded in TUI |
@@ -130,15 +130,18 @@ See [docs/development.md](docs/development.md) for contributing guidelines.
 ## Status
 
 🎉 **v0.1.0 Complete!** LazyCSV is ready to use for viewing CSV files.
+🚀 **v0.2.0 Phase 1 Complete!** Type-safe architecture with strong compile-time guarantees.
 
 - ✅ Fast CSV viewer with vim navigation
 - ✅ Multi-file switching with `[` `]`
 - ✅ Row/column numbering (A, B, C...)
-- ✅ Comprehensive test suite
+- ✅ **NEW:** Type-safe position indices (RowIndex, ColIndex)
+- ✅ **NEW:** Semantic action types (InputResult, UserAction)
+- ✅ Comprehensive test suite (219 tests passing)
 - 📋 Cell editing coming in v0.4.0
 - 🎯 Target: v1.0.0 with full editing, undo, rows/columns
 
-**Current:** v0.1.0 | **Performance:** 60 FPS on 100K+ rows | **Architecture:** In-memory
+**Current:** v0.2.0 (Phase 1) | **Performance:** 60 FPS on 100K+ rows | **Architecture:** In-memory with type safety
 
 ## Philosophy
 

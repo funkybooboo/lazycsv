@@ -1,3 +1,4 @@
+use crate::domain::position::{ColIndex, RowIndex};
 use anyhow::{Context, Result};
 use csv;
 use encoding_rs::Encoding;
@@ -109,17 +110,20 @@ impl CsvData {
 
     /// Get specific cell value (returns "" if out of bounds)
     #[allow(dead_code)]
-    pub fn get_cell(&self, row: usize, col: usize) -> &str {
+    pub fn get_cell(&self, row: RowIndex, col: ColIndex) -> &str {
         self.rows
-            .get(row)
-            .and_then(|r| r.get(col))
+            .get(row.get())
+            .and_then(|r| r.get(col.get()))
             .map(|s| s.as_str())
             .unwrap_or("")
     }
 
     /// Get column header by index (returns "" if out of bounds)
-    pub fn get_header(&self, col: usize) -> &str {
-        self.headers.get(col).map(|s| s.as_str()).unwrap_or("")
+    pub fn get_header(&self, col: ColIndex) -> &str {
+        self.headers
+            .get(col.get())
+            .map(|s| s.as_str())
+            .unwrap_or("")
     }
 
     // v0.4.0-v0.6.0: Cell editing methods (to be implemented)
@@ -136,6 +140,7 @@ impl CsvData {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::position::{ColIndex, RowIndex};
     use std::io::Write;
     use tempfile::NamedTempFile;
 
@@ -150,9 +155,12 @@ mod tests {
 
         assert_eq!(csv_data.column_count(), 3);
         assert_eq!(csv_data.row_count(), 2);
-        assert_eq!(csv_data.get_header(0), "Name");
-        assert_eq!(csv_data.get_cell(0, 0), "Alice");
-        assert_eq!(csv_data.get_cell(1, 1), "25");
+        assert_eq!(csv_data.get_header(ColIndex::new(0)), "Name");
+        assert_eq!(
+            csv_data.get_cell(RowIndex::new(0), ColIndex::new(0)),
+            "Alice"
+        );
+        assert_eq!(csv_data.get_cell(RowIndex::new(1), ColIndex::new(1)), "25");
     }
 
     #[test]
@@ -174,8 +182,8 @@ mod tests {
 
         let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
-        assert_eq!(csv_data.get_cell(10, 0), ""); // Row out of bounds
-        assert_eq!(csv_data.get_cell(0, 10), ""); // Column out of bounds
+        assert_eq!(csv_data.get_cell(RowIndex::new(10), ColIndex::new(0)), ""); // Row out of bounds
+        assert_eq!(csv_data.get_cell(RowIndex::new(0), ColIndex::new(10)), ""); // Column out of bounds
     }
 
     #[test]
@@ -208,7 +216,10 @@ mod tests {
 
         assert_eq!(csv_data.row_count(), 1);
         assert_eq!(csv_data.column_count(), 3);
-        assert_eq!(csv_data.get_cell(0, 0), "Alice");
+        assert_eq!(
+            csv_data.get_cell(RowIndex::new(0), ColIndex::new(0)),
+            "Alice"
+        );
     }
 
     #[test]
@@ -222,7 +233,7 @@ mod tests {
 
         assert_eq!(csv_data.row_count(), 2);
         assert_eq!(csv_data.column_count(), 1);
-        assert_eq!(csv_data.get_header(0), "Name");
+        assert_eq!(csv_data.get_header(ColIndex::new(0)), "Name");
     }
 
     #[test]
@@ -235,12 +246,12 @@ mod tests {
         let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 2);
-        assert_eq!(csv_data.get_cell(0, 0), "1");
-        assert_eq!(csv_data.get_cell(0, 1), "");
-        assert_eq!(csv_data.get_cell(0, 2), "3");
-        assert_eq!(csv_data.get_cell(1, 0), "");
-        assert_eq!(csv_data.get_cell(1, 1), "2");
-        assert_eq!(csv_data.get_cell(1, 2), "");
+        assert_eq!(csv_data.get_cell(RowIndex::new(0), ColIndex::new(0)), "1");
+        assert_eq!(csv_data.get_cell(RowIndex::new(0), ColIndex::new(1)), "");
+        assert_eq!(csv_data.get_cell(RowIndex::new(0), ColIndex::new(2)), "3");
+        assert_eq!(csv_data.get_cell(RowIndex::new(1), ColIndex::new(0)), "");
+        assert_eq!(csv_data.get_cell(RowIndex::new(1), ColIndex::new(1)), "2");
+        assert_eq!(csv_data.get_cell(RowIndex::new(1), ColIndex::new(2)), "");
     }
 
     #[test]
@@ -253,9 +264,18 @@ mod tests {
         let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 2);
-        assert_eq!(csv_data.get_cell(0, 0), "Alice");
-        assert_eq!(csv_data.get_cell(0, 1), "Hello, World");
-        assert_eq!(csv_data.get_cell(1, 1), "Line1\nLine2");
+        assert_eq!(
+            csv_data.get_cell(RowIndex::new(0), ColIndex::new(0)),
+            "Alice"
+        );
+        assert_eq!(
+            csv_data.get_cell(RowIndex::new(0), ColIndex::new(1)),
+            "Hello, World"
+        );
+        assert_eq!(
+            csv_data.get_cell(RowIndex::new(1), ColIndex::new(1)),
+            "Line1\nLine2"
+        );
     }
 
     #[test]
@@ -267,7 +287,10 @@ mod tests {
         let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 1);
-        assert_eq!(csv_data.get_cell(0, 0), "She said \"hello\"");
+        assert_eq!(
+            csv_data.get_cell(RowIndex::new(0), ColIndex::new(0)),
+            "She said \"hello\""
+        );
     }
 
     #[test]
@@ -279,8 +302,14 @@ mod tests {
         let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
         // CSV parser should preserve whitespace
-        assert_eq!(csv_data.get_cell(0, 0), "  1  ");
-        assert_eq!(csv_data.get_cell(0, 1), "  2  ");
+        assert_eq!(
+            csv_data.get_cell(RowIndex::new(0), ColIndex::new(0)),
+            "  1  "
+        );
+        assert_eq!(
+            csv_data.get_cell(RowIndex::new(0), ColIndex::new(1)),
+            "  2  "
+        );
     }
 
     #[test]
@@ -293,10 +322,13 @@ mod tests {
         let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 2);
-        assert_eq!(csv_data.get_cell(0, 0), "★");
-        assert_eq!(csv_data.get_cell(0, 1), "😀");
-        assert_eq!(csv_data.get_cell(1, 0), "€");
-        assert_eq!(csv_data.get_cell(1, 1), "日本");
+        assert_eq!(csv_data.get_cell(RowIndex::new(0), ColIndex::new(0)), "★");
+        assert_eq!(csv_data.get_cell(RowIndex::new(0), ColIndex::new(1)), "😀");
+        assert_eq!(csv_data.get_cell(RowIndex::new(1), ColIndex::new(0)), "€");
+        assert_eq!(
+            csv_data.get_cell(RowIndex::new(1), ColIndex::new(1)),
+            "日本"
+        );
     }
 
     #[test]
@@ -309,7 +341,10 @@ mod tests {
         let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 1);
-        assert_eq!(csv_data.get_cell(0, 0).len(), 1000);
+        assert_eq!(
+            csv_data.get_cell(RowIndex::new(0), ColIndex::new(0)).len(),
+            1000
+        );
     }
 
     #[test]
@@ -323,9 +358,15 @@ mod tests {
 
         assert_eq!(csv_data.row_count(), 2);
         // Numbers are stored as strings
-        assert_eq!(csv_data.get_cell(0, 0), "123");
-        assert_eq!(csv_data.get_cell(0, 1), "456.789");
-        assert_eq!(csv_data.get_cell(0, 2), "1.23e10");
+        assert_eq!(csv_data.get_cell(RowIndex::new(0), ColIndex::new(0)), "123");
+        assert_eq!(
+            csv_data.get_cell(RowIndex::new(0), ColIndex::new(1)),
+            "456.789"
+        );
+        assert_eq!(
+            csv_data.get_cell(RowIndex::new(0), ColIndex::new(2)),
+            "1.23e10"
+        );
     }
 
     #[test]
@@ -388,9 +429,15 @@ mod tests {
         let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 10000);
-        assert_eq!(csv_data.get_cell(0, 0), "0");
-        assert_eq!(csv_data.get_cell(9999, 0), "9999");
-        assert_eq!(csv_data.get_cell(9999, 2), "29997");
+        assert_eq!(csv_data.get_cell(RowIndex::new(0), ColIndex::new(0)), "0");
+        assert_eq!(
+            csv_data.get_cell(RowIndex::new(9999), ColIndex::new(0)),
+            "9999"
+        );
+        assert_eq!(
+            csv_data.get_cell(RowIndex::new(9999), ColIndex::new(2)),
+            "29997"
+        );
     }
 
     #[test]
@@ -405,8 +452,8 @@ mod tests {
 
         assert_eq!(csv_data.column_count(), 100);
         assert_eq!(csv_data.row_count(), 1);
-        assert_eq!(csv_data.get_header(0), "Col0");
-        assert_eq!(csv_data.get_header(99), "Col99");
+        assert_eq!(csv_data.get_header(ColIndex::new(0)), "Col0");
+        assert_eq!(csv_data.get_header(ColIndex::new(99)), "Col99");
     }
 
     #[test]
@@ -445,7 +492,10 @@ mod tests {
         let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 1);
-        assert_eq!(csv_data.get_cell(0, 1), "123 Main St, Apt 4, City");
+        assert_eq!(
+            csv_data.get_cell(RowIndex::new(0), ColIndex::new(1)),
+            "123 Main St, Apt 4, City"
+        );
     }
 
     #[test]
@@ -469,8 +519,8 @@ mod tests {
 
         for col in 0..csv_data.column_count() {
             // Should be able to access both header and cells for all columns
-            let header = csv_data.get_header(col);
-            let cell = csv_data.get_cell(0, col);
+            let header = csv_data.get_header(ColIndex::new(col));
+            let cell = csv_data.get_cell(RowIndex::new(0), ColIndex::new(col));
             assert!(!header.is_empty() || col >= 3);
             assert!(!cell.is_empty() || col >= 3);
         }
@@ -488,9 +538,9 @@ mod tests {
 
         assert_eq!(csv_data.column_count(), 3);
         assert_eq!(csv_data.row_count(), 0);
-        assert_eq!(csv_data.get_header(0), "Name");
-        assert_eq!(csv_data.get_header(1), "Age");
-        assert_eq!(csv_data.get_header(2), "City");
+        assert_eq!(csv_data.get_header(ColIndex::new(0)), "Name");
+        assert_eq!(csv_data.get_header(ColIndex::new(1)), "Age");
+        assert_eq!(csv_data.get_header(ColIndex::new(2)), "City");
     }
 
     #[test]
@@ -506,8 +556,11 @@ mod tests {
         let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 2);
-        assert_eq!(csv_data.get_cell(0, 0), "Alice");
-        assert_eq!(csv_data.get_cell(1, 0), "Bob");
+        assert_eq!(
+            csv_data.get_cell(RowIndex::new(0), ColIndex::new(0)),
+            "Alice"
+        );
+        assert_eq!(csv_data.get_cell(RowIndex::new(1), ColIndex::new(0)), "Bob");
     }
 
     #[test]
@@ -535,8 +588,11 @@ mod tests {
 
         assert_eq!(csv_data.column_count(), 3);
         assert_eq!(csv_data.row_count(), 1);
-        assert_eq!(csv_data.get_cell(0, 0), "Alice");
-        assert_eq!(csv_data.get_cell(0, 1), "30");
+        assert_eq!(
+            csv_data.get_cell(RowIndex::new(0), ColIndex::new(0)),
+            "Alice"
+        );
+        assert_eq!(csv_data.get_cell(RowIndex::new(0), ColIndex::new(1)), "30");
     }
 
     #[test]
@@ -548,7 +604,10 @@ mod tests {
         let csv_data = CsvData::from_file(file.path(), Some(b';'), false, None).unwrap();
 
         assert_eq!(csv_data.column_count(), 3);
-        assert_eq!(csv_data.get_cell(0, 0), "Alice");
+        assert_eq!(
+            csv_data.get_cell(RowIndex::new(0), ColIndex::new(0)),
+            "Alice"
+        );
     }
 
     #[test]
@@ -560,7 +619,10 @@ mod tests {
         let csv_data = CsvData::from_file(file.path(), Some(b'|'), false, None).unwrap();
 
         assert_eq!(csv_data.column_count(), 3);
-        assert_eq!(csv_data.get_cell(0, 0), "Alice");
+        assert_eq!(
+            csv_data.get_cell(RowIndex::new(0), ColIndex::new(0)),
+            "Alice"
+        );
     }
 
     #[test]
@@ -588,7 +650,10 @@ mod tests {
         let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 1);
-        assert_eq!(csv_data.get_cell(0, 1).len(), 100_000);
+        assert_eq!(
+            csv_data.get_cell(RowIndex::new(0), ColIndex::new(1)).len(),
+            100_000
+        );
     }
 
     #[test]
@@ -606,8 +671,14 @@ mod tests {
         let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.column_count(), 100);
-        assert_eq!(csv_data.get_cell(0, 0), "val0");
-        assert_eq!(csv_data.get_cell(0, 99), "val99");
+        assert_eq!(
+            csv_data.get_cell(RowIndex::new(0), ColIndex::new(0)),
+            "val0"
+        );
+        assert_eq!(
+            csv_data.get_cell(RowIndex::new(0), ColIndex::new(99)),
+            "val99"
+        );
     }
 
     #[test]
@@ -625,7 +696,7 @@ mod tests {
         let csv_data = CsvData::from_file(&file_path, None, false, None).unwrap();
 
         // BOM should be stripped, headers should be clean
-        assert_eq!(csv_data.get_header(0), "Name");
+        assert_eq!(csv_data.get_header(ColIndex::new(0)), "Name");
         assert_eq!(csv_data.row_count(), 1);
     }
 
@@ -695,7 +766,10 @@ mod tests {
         assert!(result.is_ok());
         if let Ok(csv_data) = result {
             assert_eq!(csv_data.row_count(), 1);
-            assert_eq!(csv_data.get_cell(0, 1).len(), 1_000_000);
+            assert_eq!(
+                csv_data.get_cell(RowIndex::new(0), ColIndex::new(1)).len(),
+                1_000_000
+            );
         }
     }
 

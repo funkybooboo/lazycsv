@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use crossterm::event::{self, Event, KeyEventKind};
-use lazycsv::{cli, ui, App};
+use lazycsv::{cli, ui, App, InputResult};
 use std::time::Duration;
 
 fn main() -> Result<()> {
@@ -40,16 +40,24 @@ fn run(
             if let Event::Key(key) = event::read().context("Failed to read event")? {
                 // Only process KeyPress events (ignore KeyRelease)
                 if key.kind == KeyEventKind::Press {
-                    // Handle key press - returns true if we need to reload file
-                    let should_reload = app.handle_key(key)?;
+                    // Handle key press
+                    let result = app.handle_key(key)?;
 
                     // State changed, need to redraw
                     needs_redraw = true;
 
-                    if should_reload {
-                        // Reload CSV data from new file
-                        app.reload_current_file()
-                            .context("Failed to reload CSV file")?;
+                    match result {
+                        InputResult::ReloadFile => {
+                            // Reload CSV data from new file
+                            app.reload_current_file()
+                                .context("Failed to reload CSV file")?;
+                        }
+                        InputResult::Quit => {
+                            app.should_quit = true;
+                        }
+                        InputResult::Continue => {
+                            // Normal operation, continue
+                        }
                     }
                 }
             }

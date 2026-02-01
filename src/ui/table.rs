@@ -1,4 +1,5 @@
 use super::{utils::column_index_to_letter, MAX_CELL_WIDTH, MAX_VISIBLE_COLS};
+use crate::domain::position::ColIndex;
 use crate::App;
 use ratatui::{
     layout::{Constraint, Rect},
@@ -29,12 +30,13 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     let mut col_letter_cells = vec![Cell::from("")]; // Empty cell for row numbers column
     for i in start_col..end_col {
         let letter = column_index_to_letter(i);
-        let display = if i == app.ui.selected_col {
+        let col_idx = ColIndex::new(i);
+        let display = if col_idx == app.ui.selected_col {
             format!("►{}", letter) // Show indicator on selected column
         } else {
             format!(" {}", letter) // Space for alignment
         };
-        let style = if i == app.ui.selected_col {
+        let style = if col_idx == app.ui.selected_col {
             Style::default().add_modifier(Modifier::BOLD)
         } else {
             Style::default().add_modifier(Modifier::DIM)
@@ -46,7 +48,7 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     // Build header row with column names
     let mut header_cells = vec![Cell::from("#")]; // Row number column header
     for i in start_col..end_col {
-        let header_text = csv.get_header(i);
+        let header_text = csv.get_header(ColIndex::new(i));
         header_cells
             .push(Cell::from(header_text).style(Style::default().add_modifier(Modifier::BOLD)));
     }
@@ -113,7 +115,12 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
             };
 
             // Highlight current cell
-            let style = if Some(row_idx) == app.selected_row() && col_idx == app.ui.selected_col {
+            let style = if app
+                .selected_row()
+                .map(|r| r.get() == row_idx)
+                .unwrap_or(false)
+                && ColIndex::new(col_idx) == app.ui.selected_col
+            {
                 Style::default().add_modifier(Modifier::REVERSED)
             } else {
                 Style::default()

@@ -1,5 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use lazycsv::{App, CsvData};
+use lazycsv::{App, ColIndex, CsvData, InputResult, RowIndex};
 use std::path::PathBuf;
 
 fn key_event(code: KeyCode) -> KeyEvent {
@@ -28,17 +28,17 @@ fn test_complete_navigation_workflow() {
     // User workflow: Navigate to bottom-right, then back to top-left
     app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
-    assert_eq!(app.selected_row(), Some(2));
-    assert_eq!(app.ui.selected_col, 2);
+    assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
+    assert_eq!(app.ui.selected_col, ColIndex::new(2));
 
     // gg - Go to first row (multi-key command)
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-    assert_eq!(app.selected_row(), Some(0));
+    assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 
     // 0 - Go to first column
     app.handle_key(key_event(KeyCode::Char('0'))).unwrap();
-    assert_eq!(app.ui.selected_col, 0);
+    assert_eq!(app.ui.selected_col, ColIndex::new(0));
 }
 
 #[test]
@@ -107,21 +107,21 @@ fn test_file_switching_workflow() {
 
     // Switch forward through all files
     let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-    assert!(should_reload);
+    assert_eq!(should_reload, InputResult::ReloadFile);
     assert_eq!(app.current_file_index, 1);
 
     let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-    assert!(should_reload);
+    assert_eq!(should_reload, InputResult::ReloadFile);
     assert_eq!(app.current_file_index, 2);
 
     // Wrap around to first file
     let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-    assert!(should_reload);
+    assert_eq!(should_reload, InputResult::ReloadFile);
     assert_eq!(app.current_file_index, 0);
 
     // Switch backward
     let should_reload = app.handle_key(key_event(KeyCode::Char('['))).unwrap();
-    assert!(should_reload);
+    assert_eq!(should_reload, InputResult::ReloadFile);
     assert_eq!(app.current_file_index, 2);
 }
 
@@ -157,12 +157,12 @@ fn test_navigate_then_switch_file_workflow() {
     // Navigate to a specific position
     app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
-    assert_eq!(app.selected_row(), Some(2));
-    assert_eq!(app.ui.selected_col, 2);
+    assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
+    assert_eq!(app.ui.selected_col, ColIndex::new(2));
 
     // Switch file
     let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-    assert!(should_reload);
+    assert_eq!(should_reload, InputResult::ReloadFile);
     assert_eq!(app.current_file_index, 1);
 }
 
@@ -179,8 +179,8 @@ fn test_rapid_key_sequence_workflow() {
     }
 
     // Should end at maximum position
-    assert_eq!(app.selected_row(), Some(2));
-    assert_eq!(app.ui.selected_col, 2);
+    assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
+    assert_eq!(app.ui.selected_col, ColIndex::new(2));
 }
 
 #[test]
@@ -195,8 +195,8 @@ fn test_zigzag_navigation_workflow() {
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
 
-    assert_eq!(app.selected_row(), Some(2));
-    assert_eq!(app.ui.selected_col, 2);
+    assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
+    assert_eq!(app.ui.selected_col, ColIndex::new(2));
 }
 
 #[test]
@@ -224,8 +224,8 @@ fn test_boundary_navigation_workflow() {
         app.handle_key(key_event(KeyCode::Char('k'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('h'))).unwrap();
     }
-    assert_eq!(app.selected_row(), Some(0));
-    assert_eq!(app.ui.selected_col, 0);
+    assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
+    assert_eq!(app.ui.selected_col, ColIndex::new(0));
 
     // Go to opposite corner
     app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
@@ -236,8 +236,8 @@ fn test_boundary_navigation_workflow() {
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
     }
-    assert_eq!(app.selected_row(), Some(2));
-    assert_eq!(app.ui.selected_col, 2);
+    assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
+    assert_eq!(app.ui.selected_col, ColIndex::new(2));
 }
 
 #[test]
@@ -294,12 +294,12 @@ fn test_complete_user_session_workflow() {
     // 2. Go to specific location with gg
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-    assert_eq!(app.selected_row(), Some(0));
+    assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 
     // 3. Use count prefix
     app.handle_key(key_event(KeyCode::Char('2'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-    assert_eq!(app.selected_row(), Some(2));
+    assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
 
     // 4. Navigate to end
     app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
@@ -429,7 +429,7 @@ fn test_error_recovery_from_invalid_sequence() {
 
     // Next command should work normally
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-    assert_eq!(app.selected_row(), Some(1));
+    assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
 }
 
 #[test]

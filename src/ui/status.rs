@@ -55,9 +55,12 @@ pub fn render_sheet_switcher(frame: &mut Frame, app: &App, area: Rect) {
 pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     use crate::ui::utils::column_index_to_letter;
 
-    let selected_row = app.selected_row().map(|i| i + 1).unwrap_or(0);
+    let selected_row = app
+        .selected_row()
+        .map(|r| r.to_line_number().get())
+        .unwrap_or(0);
     let total_rows = app.csv_data.row_count();
-    let col_letter = column_index_to_letter(app.ui.selected_col);
+    let col_letter = column_index_to_letter(app.ui.selected_col.get());
     let col_name = app.csv_data.get_header(app.ui.selected_col);
     let total_cols = app.csv_data.column_count();
 
@@ -77,7 +80,7 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
 
     let status_text = if let Some(ref msg) = app.status_message {
         // Show status message if present
-        format!(" {} ", msg)
+        format!(" {} ", msg.as_str())
     } else {
         // Build left side: help, quit, files
         let left_side = if app.csv_files.len() > 1 {
@@ -93,7 +96,7 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             total_rows,
             col_letter,
             col_name,
-            app.ui.selected_col + 1,
+            app.ui.selected_col.to_column_number().get(),
             total_cols,
             cell_value
         );

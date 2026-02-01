@@ -39,15 +39,22 @@ lazycsv/
 │   ├── lib.rs              - Library exports
 │   ├── cli.rs              - CLI argument parsing
 │   ├── file_scanner.rs     - CSV file discovery
-│   ├── csv_data.rs         - CSV data model
+│   ├── csv_data.rs         - CSV data model (type-safe v0.2.0)
+│   ├── domain/             - Domain types (NEW in v0.2.0)
+│   │   ├── mod.rs          - Module exports
+│   │   └── position.rs     - RowIndex, ColIndex, Position types
+│   ├── input/              - Input actions (NEW in v0.2.0)
+│   │   ├── mod.rs          - Module exports
+│   │   └── actions.rs      - UserAction, InputResult enums
 │   ├── app/                - Application logic
-│   │   ├── mod.rs          - App struct & state
+│   │   ├── mod.rs          - App struct & state (type-safe v0.2.0)
 │   │   ├── input.rs        - Keyboard input handling
-│   │   └── navigation.rs   - Navigation methods
+│   │   ├── navigation.rs   - Navigation methods (type-safe v0.2.0)
+│   │   └── constants.rs    - App constants & messages
 │   └── ui/                 - User interface
 │       ├── mod.rs          - Main render function
-│       ├── table.rs        - Table rendering
-│       ├── status.rs       - Status bar & file switcher
+│       ├── table.rs        - Table rendering (type-safe v0.2.0)
+│       ├── status.rs       - Status bar & file switcher (type-safe v0.2.0)
 │       ├── help.rs         - Help overlay
 │       └── utils.rs        - Utility functions
 │
@@ -256,6 +263,7 @@ Write tests for new functionality:
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::position::{RowIndex, ColIndex};
 
     #[test]
     fn test_cell_access() {
@@ -266,8 +274,9 @@ mod tests {
             is_dirty: false,
         };
 
-        assert_eq!(data.get_cell(0, 0), "Alice");
-        assert_eq!(data.get_cell(0, 1), ""); // Out of bounds
+        // v0.2.0: Type-safe access with RowIndex and ColIndex
+        assert_eq!(data.get_cell(RowIndex::new(0), ColIndex::new(0)), "Alice");
+        assert_eq!(data.get_cell(RowIndex::new(0), ColIndex::new(1)), ""); // Out of bounds
     }
 }
 ```

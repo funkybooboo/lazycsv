@@ -63,22 +63,247 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 
 ## v0.2.0 - Type Safety Refactor
 
-### Version 0.2.0: Type System & State Refactoring
+### Version 0.2.0: Type System & Architecture Refactoring
 
-*Improve code clarity, safety, and maintainability*
+*Comprehensive refactoring to improve type safety, code organization, naming, and separation of concerns*
 
-#### Command & Action Abstraction
-- [ ] **Introduce `UserAction` Enum:** Create comprehensive enum for all user actions (Navigate, Edit, ToggleHelp, Quit, etc.)
-- [ ] **Refactor Input Handling:** Modify `app/input.rs` to parse KeyEvents into UserActions
-- [ ] **Define Helper Enums:** Create `Direction`, `Location`, `FileDirection` enums
+---
 
-#### Newtype Wrappers for Indices
-- [ ] **Introduce `RowIndex` and `ColIndex`:** Newtype wrappers around `usize` for row/column indices
-- [ ] **Update Function Signatures:** Refactor all functions to use newtypes
+#### Phase 1: Type Safety Foundation ✅ COMPLETED
 
-#### State Management Refinement
-- [ ] **`UiState` Refactoring:** Confirm clean separation of UI-related state
-- [ ] **`InputState` Struct:** Create struct to hold `pending_key`, `pending_key_time`, `command_count`
+**1.1 Position Types (Newtype Pattern)** ✅
+- [x] Create `src/domain/position.rs` module
+- [x] Define `RowIndex(usize)` newtype with:
+  - [x] `new()`, `get()`, `saturating_add()`, `saturating_sub()` methods
+  - [x] `From<usize>` and `Into<usize>` implementations
+  - [x] Proper `Debug`, `Clone`, `Copy`, `PartialEq` derives
+- [x] Define `ColIndex(usize)` newtype with similar API
+- [x] Define `Position { row: RowIndex, col: ColIndex }` struct
+- [x] Update all `usize` row/column parameters to use `RowIndex`/`ColIndex`
+- [x] Update `UiState::selected_col` from `usize` to `ColIndex`
+- [x] Update `CsvData::get_cell()` to take `(RowIndex, ColIndex)`
+- [x] Update `App::selected_row()` to return `Option<RowIndex>`
+
+**1.2 Action Abstraction Layer** ✅
+- [x] Create `src/input/actions.rs` module
+- [x] Define `UserAction` enum with Navigate, ViewportControl, ToggleHelp, Quit, SwitchFile
+- [x] Define `NavigateAction` enum (Up, Down, Left, Right, FirstRow, LastRow, etc.)
+- [x] Define `ViewportAction` enum (Top, Center, Bottom, Auto)
+- [x] Define `FileDirection` enum (Next, Previous)
+- [x] Replace `handle_key() -> Result<bool>` with `handle_key() -> Result<InputResult>`
+- [x] Define `InputResult` enum (Continue, ReloadFile, Quit)
+- [x] Update input.rs to use new action types
+
+**1.3 Remove Primitive Obsession** ✅
+- [x] Replace `command_count: Option<String>` with `Option<NonZeroUsize>`
+- [x] Create `PendingCommand` enum instead of `Option<KeyCode>`
+- [x] Create `StatusMessage` newtype instead of `Cow<'static, str>`
+
+**Phase 1 Results:**
+- ✅ All 219 tests passing
+- ✅ Zero compilation warnings
+- ✅ Type safety for row/column positions prevents entire class of bugs
+- ✅ Semantic action types improve code clarity
+- ✅ ~600 lines of type-safe code added
+
+---
+
+#### Phase 2: Separation of Concerns
+
+**2.1 Extract InputState**
+- [ ] Create `src/input/state.rs`
+- [ ] Define `InputState` struct:
+  ```rust
+  pub struct InputState {
+      pending_command: Option<PendingCommand>,
+      command_count: Option<NonZeroUsize>,
+      pending_command_time: Option<Instant>,
+  }
+  ```
+- [ ] Move `pending_key`, `pending_key_time`, `command_count` from `App` to `InputState`
+- [ ] Add `input_state: InputState` field to `App`
+- [ ] Update all references to use `app.input_state.*`
+
+**2.2 Extract Session Management**
+- [ ] Create `src/session/mod.rs` module
+- [ ] Define `Session` struct:
+  ```rust
+  pub struct Session {
+      files: Vec<PathBuf>,
+      current_file_index: usize,
+      config: FileConfig,
+  }
+  ```
+- [ ] Define `FileConfig` struct for `delimiter`, `no_headers`, `encoding`
+- [ ] Move file-related fields from `App` to `Session`
+- [ ] Add `session: Session` field to `App`
+- [ ] Implement `Session::next_file()`, `Session::prev_file()` methods
+
+**2.3 Reorganize State in App**
+- [ ] Slim down `App` struct to core responsibilities:
+  ```rust
+  pub struct App {
+      document: CsvData,        // Renamed from csv_data
+      view_state: ViewState,    // Renamed from ui
+      mode: Mode,
+      session: Session,
+      input_state: InputState,
+      status_message: Option<StatusMessage>,
+  }
+  ```
+- [ ] Move `UiState` from `src/app/mod.rs` to `src/ui/view_state.rs`
+- [ ] Rename `UiState` to `ViewState` for clarity
+
+**2.4 Domain Layer Creation**
+- [ ] Create `src/domain/` directory
+- [ ] Move or create domain types:
+  - [ ] `position.rs` - RowIndex, ColIndex, Position
+  - [ ] `viewport.rs` - Viewport calculations and logic
+  - [ ] `document.rs` - Consider extracting CSV operations from CsvData
+- [ ] Keep `csv_data.rs` focused on I/O and parsing only
+
+---
+
+#### Phase 3: Better Naming & Consistency
+
+**3.1 Struct/Field Naming**
+- [ ] Rename `csv_data` → `document` throughout
+- [ ] Rename `ui` → `view_state` throughout
+- [ ] Rename `show_cheatsheet` → `help_overlay_visible`
+- [ ] Rename `selected_col` → `selected_column` (match `column_count()`)
+- [ ] Rename `horizontal_offset` → `column_scroll_offset`
+- [ ] Rename `current_file_index` → `active_file_index`
+
+**3.2 Function Naming**
+- [ ] Rename `selected_row()` → `get_selected_row()`
+- [ ] Rename `current_file()` → `get_current_file()`
+- [ ] Rename `column_index_to_letter()` → `column_to_excel_letter()`
+- [ ] Make navigation functions consistent: `move_*`, `goto_*`, `jump_to_*`
+
+**3.3 Module Naming**
+- [ ] Rename `file_scanner.rs` → `file_discovery.rs` (more accurate)
+- [ ] Consider `app/constants.rs` → `app/messages.rs` (more specific)
+
+**3.4 Terminology Consistency**
+- [ ] Standardize on "help overlay" (not "cheatsheet" or "help")
+- [ ] Standardize on "file switcher" (not "sheet switcher")
+- [ ] Standardize on row index variables: always `row_idx` (never `i`, `row`, `r`)
+- [ ] Standardize on column index variables: always `col_idx` (never `i`, `col`, `c`)
+
+---
+
+#### Phase 4: Code Organization & Structure
+
+**4.1 Directory Restructuring**
+- [ ] Create new module structure:
+  ```
+  src/
+    app/           # Application coordinator (keep minimal)
+    domain/        # Domain types (Position, Viewport, etc.)
+    input/         # Input handling (actions, state, handlers)
+    navigation/    # Navigation commands (extracted from app)
+    session/       # Multi-file session management
+    ui/            # UI rendering (table, status, help, view_state)
+    file_system/   # File operations (rename from file_scanner)
+    csv/           # CSV data operations (move csv_data.rs here)
+  ```
+- [ ] Move `app/navigation.rs` → `navigation/commands.rs`
+- [ ] Move `app/input.rs` → `input/handler.rs`
+- [ ] Create `input/actions.rs` for action enums
+- [ ] Create `input/state.rs` for InputState
+
+**4.2 Module Boundaries**
+- [ ] Define clear public APIs for each module
+- [ ] Ensure `App` only depends on public APIs, not internal details
+- [ ] Move `MAX_VISIBLE_COLS` from `ui/mod.rs` to `ui/constants.rs`
+- [ ] Move `MAX_CELL_WIDTH` to `ui/constants.rs`
+- [ ] Create `navigation/constants.rs` for `PAGE_SIZE`
+
+**4.3 Constants Organization**
+- [ ] Create `src/config.rs` for configurable values:
+  - [ ] `DEFAULT_MAX_VISIBLE_COLS = 10`
+  - [ ] `DEFAULT_CELL_WIDTH = 20`
+  - [ ] `DEFAULT_PAGE_SIZE = 20`
+  - [ ] `MULTI_KEY_TIMEOUT_MS = 1000`
+- [ ] Move all message strings to `app/messages.rs`
+- [ ] Ensure all constants have clear documentation explaining their purpose
+
+---
+
+#### Phase 5: Clean Code Improvements
+
+**5.1 Extract Long Functions**
+- [ ] Decompose `render_table()` (172 lines):
+  - [ ] Extract `calculate_visible_columns()`
+  - [ ] Extract `calculate_scroll_offset()`
+  - [ ] Extract `build_column_header_row()`
+  - [ ] Extract `build_data_rows()`
+- [ ] Decompose `handle_normal_mode()` (111 lines):
+  - [ ] Extract multi-key command parsing
+  - [ ] Extract count prefix handling
+  - [ ] Use action dispatch pattern
+
+**5.2 Remove Magic Numbers**
+- [ ] Document or extract all magic numbers to constants
+- [ ] Replace `4` (borders + headers) with named constant
+- [ ] Replace `6` (status + switcher) with named constant
+- [ ] Replace `5` (row number width) with named constant
+- [ ] Replace `3` (truncation suffix) with named constant
+- [ ] Replace `27` and `30` (cell value display) with named constants
+
+**5.3 Improve Error Handling**
+- [ ] Add context to all `anyhow::Context` calls
+- [ ] Create custom error types for domain operations
+- [ ] Define `CsvError`, `NavigationError`, `InputError` types
+- [ ] Replace generic `Result<()>` with specific error types
+
+**5.4 Remove Dead Code**
+- [ ] Remove all commented-out "future" code (v0.4.0, etc.)
+- [ ] Remove unused constants from `app/constants.rs`
+- [ ] Audit all `#[allow(dead_code)]` attributes
+
+**5.5 Improve Code Clarity**
+- [ ] Add doc comments to all public types and functions
+- [ ] Add module-level documentation explaining purpose
+- [ ] Replace unclear variable names (`i`, `idx`, `s`) with descriptive names
+- [ ] Extract complex boolean expressions to named variables
+
+---
+
+#### Phase 6: Testing & Validation
+
+**6.1 Update Tests**
+- [ ] Update all tests to use new type-safe APIs
+- [ ] Fix tests to use `RowIndex`/`ColIndex` constructors
+- [ ] Update tests to use new action-based API
+- [ ] Ensure all 100+ tests still pass
+
+**6.2 Add New Tests**
+- [ ] Test `RowIndex`/`ColIndex` type safety (can't mix them)
+- [ ] Test `UserAction` parsing and dispatch
+- [ ] Test `InputState` multi-key command timeout
+- [ ] Test `Session` file switching logic
+
+**6.3 Integration Testing**
+- [ ] Verify UI renders correctly with new types
+- [ ] Verify navigation works with new action system
+- [ ] Verify file switching works with Session
+- [ ] Run full test suite: `cargo test`
+- [ ] Run with sample files to ensure no regressions
+
+---
+
+#### Success Criteria
+
+- [ ] **Zero raw `usize` for positions** in public APIs (all wrapped in RowIndex/ColIndex)
+- [ ] **All user input becomes UserAction** before state changes
+- [ ] **App struct has ≤ 6 fields** (document, view_state, mode, session, input_state, status_message)
+- [ ] **Clear module boundaries** - each module has single responsibility
+- [ ] **No magic numbers** - all explained with constants or comments
+- [ ] **No function > 80 lines** (decomposed for clarity)
+- [ ] **Consistent naming** - no mixed terminology
+- [ ] **All tests pass** - 100+ tests validate refactoring
+- [ ] **No performance regression** - still 60 FPS on 100K rows
 
 ---
 

@@ -33,8 +33,14 @@ Welcome to the LazyCSV documentation! This directory contains comprehensive docu
 - Multi-file switching
 - Comprehensive test suite
 
+### v0.2.0 - Type Safety Refactor 🔄 Phase 1 Complete
+- ✅ **Phase 1**: Type-safe position types (RowIndex, ColIndex)
+- ✅ **Phase 1**: Semantic action enums (UserAction, InputResult)
+- ✅ **Phase 1**: Improved primitive types (NonZeroUsize, StatusMessage)
+- 🔄 **Phase 2-6**: State separation, naming, organization (TODO)
+
 ### Roadmap to v1.0
-- **v0.2.0** - Type safety refactor
+- **v0.2.0** - Type safety refactor (Phase 1 ✅, Phases 2-6 in progress)
 - **v0.3.0** - Advanced navigation (gg, G, counts, column jumps)
 - **v0.4.0** - Quick editing (Insert mode)
 - **v0.5.0** - **Vim magnifier** (full vim editor embedded)

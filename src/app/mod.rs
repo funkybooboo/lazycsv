@@ -1,11 +1,13 @@
 mod input;
 mod navigation;
 
+use crate::domain::position::{ColIndex, RowIndex};
+use crate::input::{InputResult, PendingCommand, StatusMessage};
 use crate::CsvData;
 use anyhow::{Context, Result};
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyEvent;
 use ratatui::widgets::TableState;
-use std::borrow::Cow;
+use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -31,7 +33,7 @@ pub enum ViewportMode {
 #[derive(Debug)]
 pub struct UiState {
     pub table_state: TableState,
-    pub selected_col: usize,
+    pub selected_col: ColIndex,
     pub horizontal_offset: usize,
     pub show_cheatsheet: bool,
     pub viewport_mode: ViewportMode,
@@ -41,7 +43,7 @@ impl Default for UiState {
     fn default() -> Self {
         Self {
             table_state: TableState::default(),
-            selected_col: 0,
+            selected_col: ColIndex::new(0),
             horizontal_offset: 0,
             show_cheatsheet: false,
             viewport_mode: ViewportMode::Auto,
@@ -71,17 +73,17 @@ pub struct App {
     pub current_file_index: usize,
 
     /// Optional status message to display
-    pub status_message: Option<Cow<'static, str>>,
+    pub status_message: Option<StatusMessage>,
 
     // Multi-key command support
-    /// Pending key for multi-key commands (e.g., after 'g', waiting for second key)
-    pub pending_key: Option<KeyCode>,
+    /// Pending multi-key command (e.g., waiting for second key after 'g' or 'z')
+    pub pending_key: Option<PendingCommand>,
 
     /// Time when pending key was set (for timeout)
     pub pending_key_time: Option<Instant>,
 
-    /// Count prefix for vim commands (e.g., "5" for 5j)
-    pub command_count: Option<String>,
+    /// Count prefix for vim commands (e.g., 5 for "5j")
+    pub command_count: Option<NonZeroUsize>,
 
     /// Delimiter used for CSV parsing
     pub delimiter: Option<u8>,
@@ -167,13 +169,13 @@ impl App {
     }
 
     /// Handle keyboard input events
-    pub fn handle_key(&mut self, key: KeyEvent) -> Result<bool> {
+    pub fn handle_key(&mut self, key: KeyEvent) -> Result<InputResult> {
         input::handle_key(self, key)
     }
 
     /// Get current selected row index (for status display)
-    pub fn selected_row(&self) -> Option<usize> {
-        self.ui.table_state.selected()
+    pub fn selected_row(&self) -> Option<RowIndex> {
+        self.ui.table_state.selected().map(RowIndex::new)
     }
 
     /// Get current file path
@@ -203,6 +205,8 @@ impl App {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::position::{ColIndex, RowIndex};
+    use crate::input::{InputResult, PendingCommand};
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     use std::path::PathBuf;
 
@@ -229,8 +233,8 @@ mod tests {
         let csv_files = vec![PathBuf::from("test.csv")];
         let app = App::new(csv_data, csv_files, 0, None, false, None);
 
-        assert_eq!(app.selected_row(), Some(0));
-        assert_eq!(app.ui.selected_col, 0);
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
+        assert_eq!(app.ui.selected_col, ColIndex::new(0));
         assert!(!app.should_quit);
         assert!(!app.ui.show_cheatsheet);
     }
@@ -242,14 +246,14 @@ mod tests {
         let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-        assert_eq!(app.selected_row(), Some(1));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
 
         app.handle_key(key_event(KeyCode::Down)).unwrap();
-        assert_eq!(app.selected_row(), Some(2));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
 
         // Try to go beyond last row - should stay at last row
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-        assert_eq!(app.selected_row(), Some(2));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
     }
 
     #[test]
@@ -261,14 +265,14 @@ mod tests {
         app.ui.table_state.select(Some(2));
 
         app.handle_key(key_event(KeyCode::Char('k'))).unwrap();
-        assert_eq!(app.selected_row(), Some(1));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
 
         app.handle_key(key_event(KeyCode::Up)).unwrap();
-        assert_eq!(app.selected_row(), Some(0));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 
         // Try to go before first row - should stay at first row
         app.handle_key(key_event(KeyCode::Char('k'))).unwrap();
-        assert_eq!(app.selected_row(), Some(0));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
     }
 
     #[test]
@@ -277,27 +281,27 @@ mod tests {
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
-        assert_eq!(app.ui.selected_col, 0);
+        assert_eq!(app.ui.selected_col, ColIndex::new(0));
 
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
-        assert_eq!(app.ui.selected_col, 1);
+        assert_eq!(app.ui.selected_col, ColIndex::new(1));
 
         app.handle_key(key_event(KeyCode::Right)).unwrap();
-        assert_eq!(app.ui.selected_col, 2);
+        assert_eq!(app.ui.selected_col, ColIndex::new(2));
 
         // Try to go beyond last column
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
-        assert_eq!(app.ui.selected_col, 2);
+        assert_eq!(app.ui.selected_col, ColIndex::new(2));
 
         app.handle_key(key_event(KeyCode::Char('h'))).unwrap();
-        assert_eq!(app.ui.selected_col, 1);
+        assert_eq!(app.ui.selected_col, ColIndex::new(1));
 
         app.handle_key(key_event(KeyCode::Left)).unwrap();
-        assert_eq!(app.ui.selected_col, 0);
+        assert_eq!(app.ui.selected_col, ColIndex::new(0));
 
         // Try to go before first column
         app.handle_key(key_event(KeyCode::Char('h'))).unwrap();
-        assert_eq!(app.ui.selected_col, 0);
+        assert_eq!(app.ui.selected_col, ColIndex::new(0));
     }
 
     #[test]
@@ -309,12 +313,12 @@ mod tests {
         app.ui.table_state.select(Some(1));
 
         app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
-        assert_eq!(app.selected_row(), Some(2)); // Last row
+        assert_eq!(app.selected_row(), Some(RowIndex::new(2))); // Last row
 
         // gg - Go to first row (multi-key command)
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-        assert_eq!(app.selected_row(), Some(0)); // First row
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0))); // First row
     }
 
     #[test]
@@ -323,13 +327,13 @@ mod tests {
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
-        app.ui.selected_col = 1;
+        app.ui.selected_col = ColIndex::new(1);
 
         app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
-        assert_eq!(app.ui.selected_col, 2); // Last column
+        assert_eq!(app.ui.selected_col, ColIndex::new(2)); // Last column
 
         app.handle_key(key_event(KeyCode::Char('0'))).unwrap();
-        assert_eq!(app.ui.selected_col, 0); // First column
+        assert_eq!(app.ui.selected_col, ColIndex::new(0)); // First column
     }
 
     #[test]
@@ -398,16 +402,16 @@ mod tests {
         assert_eq!(app.current_file_index, 0);
 
         let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-        assert!(should_reload);
+        assert_eq!(should_reload, InputResult::ReloadFile);
         assert_eq!(app.current_file_index, 1);
 
         let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-        assert!(should_reload);
+        assert_eq!(should_reload, InputResult::ReloadFile);
         assert_eq!(app.current_file_index, 2);
 
         // Wrap around to first file
         let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-        assert!(should_reload);
+        assert_eq!(should_reload, InputResult::ReloadFile);
         assert_eq!(app.current_file_index, 0);
     }
 
@@ -424,11 +428,11 @@ mod tests {
         assert_eq!(app.current_file_index, 0);
 
         let should_reload = app.handle_key(key_event(KeyCode::Char('['))).unwrap();
-        assert!(should_reload);
+        assert_eq!(should_reload, InputResult::ReloadFile);
         assert_eq!(app.current_file_index, 2); // Wrap to last file
 
         let should_reload = app.handle_key(key_event(KeyCode::Char('['))).unwrap();
-        assert!(should_reload);
+        assert_eq!(should_reload, InputResult::ReloadFile);
         assert_eq!(app.current_file_index, 1);
     }
 
@@ -439,7 +443,7 @@ mod tests {
         let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
         let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-        assert!(!should_reload); // Should not reload with single file
+        assert_eq!(should_reload, InputResult::Continue); // Should not reload with single file
     }
 
     #[test]
@@ -461,7 +465,7 @@ mod tests {
 
         // File switching should also be blocked
         let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-        assert!(!should_reload);
+        assert_eq!(should_reload, InputResult::Continue);
     }
 
     #[test]
@@ -485,14 +489,14 @@ mod tests {
         // Move to last row first
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-        assert_eq!(app.selected_row(), Some(2));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
 
         // Execute gg command: press 'g' then 'g'
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
 
         // Should be at first row (row 0)
-        assert_eq!(app.selected_row(), Some(0));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
     }
 
     #[test]
@@ -502,13 +506,13 @@ mod tests {
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
-        assert_eq!(app.selected_row(), Some(0));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 
         // Press G to go to last row
         app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
 
         // Should be at last row (row 2)
-        assert_eq!(app.selected_row(), Some(2));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
     }
 
     #[test]
@@ -518,7 +522,7 @@ mod tests {
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
-        assert_eq!(app.selected_row(), Some(0));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 
         // Press '2' to start count prefix
         app.handle_key(key_event(KeyCode::Char('2'))).unwrap();
@@ -529,7 +533,7 @@ mod tests {
         // Actually with 3 rows (0, 1, 2), 2G should go to row index 1 (the second row)
         // Let me check what the expected behavior is...
         // G with count goes to that line number (1-indexed), so 2G = row index 1
-        assert_eq!(app.selected_row(), Some(1));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
     }
 
     // ========== v0.1.2: Count Prefix Tests ==========
@@ -541,7 +545,7 @@ mod tests {
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
-        assert_eq!(app.selected_row(), Some(0));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 
         // Press '2' to set count prefix
         app.handle_key(key_event(KeyCode::Char('2'))).unwrap();
@@ -549,7 +553,7 @@ mod tests {
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
 
         // Should be at row 2 (moved down 2 rows from row 0)
-        assert_eq!(app.selected_row(), Some(2));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
     }
 
     #[test]
@@ -562,13 +566,13 @@ mod tests {
         // Move to last column (column 2, index 2)
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
-        assert_eq!(app.ui.selected_col, 2);
+        assert_eq!(app.ui.selected_col, ColIndex::new(2));
 
         // Press '0' alone (no existing count) - should go to first column
         app.handle_key(key_event(KeyCode::Char('0'))).unwrap();
 
         // Should be at column 0 (not treated as start of count)
-        assert_eq!(app.ui.selected_col, 0);
+        assert_eq!(app.ui.selected_col, ColIndex::new(0));
     }
 
     #[test]
@@ -582,21 +586,21 @@ mod tests {
         app.handle_key(key_event(KeyCode::Char('2'))).unwrap();
         // Use it with 'j' to move down 2 rows
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-        assert_eq!(app.selected_row(), Some(2));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
 
         // Now press 'j' again without count - should only move 1 row
         // But we're at last row, so we stay at row 2
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-        assert_eq!(app.selected_row(), Some(2)); // Stays at last row
+        assert_eq!(app.selected_row(), Some(RowIndex::new(2))); // Stays at last row
 
         // Move back to row 0
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-        assert_eq!(app.selected_row(), Some(0));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 
         // Press 'j' without count - should move only 1 row (count was cleared)
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-        assert_eq!(app.selected_row(), Some(1)); // Only moved 1 row, not 2
+        assert_eq!(app.selected_row(), Some(RowIndex::new(1))); // Only moved 1 row, not 2
     }
 
     // ========== v0.1.2: Error Handling Tests ==========
@@ -631,7 +635,7 @@ mod tests {
         let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
 
         // Should not reload (no other files), index should stay the same
-        assert!(!should_reload);
+        assert_eq!(should_reload, InputResult::Continue);
         assert_eq!(app.current_file_index, initial_index);
     }
 
@@ -677,7 +681,10 @@ mod tests {
 
         // Now navigation should work
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-        assert_eq!(app.selected_row(), Some(initial_row.unwrap() + 1));
+        assert_eq!(
+            app.selected_row(),
+            Some(initial_row.unwrap().saturating_add(1))
+        );
     }
 
     #[test]
@@ -687,7 +694,7 @@ mod tests {
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
-        assert_eq!(app.ui.selected_col, 0);
+        assert_eq!(app.ui.selected_col, ColIndex::new(0));
 
         // Press '2' to set count prefix
         app.handle_key(key_event(KeyCode::Char('2'))).unwrap();
@@ -695,7 +702,7 @@ mod tests {
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
 
         // Should be at column 2 (moved right 2 columns from column 0)
-        assert_eq!(app.ui.selected_col, 2);
+        assert_eq!(app.ui.selected_col, ColIndex::new(2));
     }
 
     #[test]
@@ -715,7 +722,7 @@ mod tests {
         let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
 
         // Should reload and wrap to first file
-        assert!(should_reload);
+        assert_eq!(should_reload, InputResult::ReloadFile);
         assert_eq!(app.current_file_index, 0);
     }
 
@@ -734,7 +741,7 @@ mod tests {
 
         // Switch file
         let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-        assert!(should_reload);
+        assert_eq!(should_reload, InputResult::ReloadFile);
 
         // Verify file index changed
         assert_eq!(app.current_file_index, 1);
@@ -800,14 +807,14 @@ mod tests {
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
-        assert_eq!(app.selected_row(), Some(0));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 
         // Press '3' then 'G' to go to row 3 (1-indexed, so row index 2)
         app.handle_key(key_event(KeyCode::Char('3'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
 
         // Should be at row index 2 (3rd row)
-        assert_eq!(app.selected_row(), Some(2));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
     }
 
     #[test]
@@ -841,8 +848,8 @@ mod tests {
         app.handle_key(key_event(KeyCode::Char('k'))).unwrap(); // Up to row 1
 
         // Should be at row 1, col 0
-        assert_eq!(app.selected_row(), Some(1));
-        assert_eq!(app.ui.selected_col, 0);
+        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
+        assert_eq!(app.ui.selected_col, ColIndex::new(0));
     }
 
     #[test]
@@ -852,13 +859,13 @@ mod tests {
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
-        assert_eq!(app.ui.selected_col, 0);
+        assert_eq!(app.ui.selected_col, ColIndex::new(0));
 
         // Press '$' to go to last column
         app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
 
         // Should be at last column (column 2)
-        assert_eq!(app.ui.selected_col, 2);
+        assert_eq!(app.ui.selected_col, ColIndex::new(2));
     }
 
     #[test]
@@ -871,13 +878,13 @@ mod tests {
         // Move to last column
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
-        assert_eq!(app.ui.selected_col, 2);
+        assert_eq!(app.ui.selected_col, ColIndex::new(2));
 
         // Press '0' to go to first column
         app.handle_key(key_event(KeyCode::Char('0'))).unwrap();
 
         // Should be at first column (column 0)
-        assert_eq!(app.ui.selected_col, 0);
+        assert_eq!(app.ui.selected_col, ColIndex::new(0));
     }
 
     #[test]
@@ -907,12 +914,12 @@ mod tests {
         for _ in 0..5 {
             app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
         }
-        assert_eq!(app.selected_row(), Some(5));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(5)));
 
         // Page up should move up (typically ~20 rows, but we only have 10)
         app.handle_key(key_event(KeyCode::PageUp)).unwrap();
         // Should be at row 0 or higher
-        assert!(app.selected_row().unwrap() <= 5);
+        assert!(app.selected_row().unwrap().get() <= 5);
 
         // Page down should move down
         app.handle_key(key_event(KeyCode::PageDown)).unwrap();
@@ -928,7 +935,7 @@ mod tests {
 
         // Move to middle column
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
-        assert_eq!(app.ui.selected_col, 1);
+        assert_eq!(app.ui.selected_col, ColIndex::new(1));
 
         // Home and End keys should work without crashing
         app.handle_key(key_event(KeyCode::Home)).unwrap();
@@ -945,15 +952,15 @@ mod tests {
 
         // Try to go left from first column (should stay)
         app.handle_key(key_event(KeyCode::Char('h'))).unwrap();
-        assert_eq!(app.ui.selected_col, 0);
+        assert_eq!(app.ui.selected_col, ColIndex::new(0));
 
         // Go to last column
         app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
-        assert_eq!(app.ui.selected_col, 2);
+        assert_eq!(app.ui.selected_col, ColIndex::new(2));
 
         // Try to go right from last column (should stay)
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
-        assert_eq!(app.ui.selected_col, 2);
+        assert_eq!(app.ui.selected_col, ColIndex::new(2));
     }
 
     #[test]
@@ -969,8 +976,8 @@ mod tests {
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
 
-        assert_eq!(app.selected_row(), Some(2));
-        assert_eq!(app.ui.selected_col, 2);
+        assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
+        assert_eq!(app.ui.selected_col, ColIndex::new(2));
 
         // Note: In real app, file switch would reload and reset position
         // This test verifies current behavior
@@ -993,7 +1000,7 @@ mod tests {
         let should_reload = app.handle_key(key_event(KeyCode::Char('['))).unwrap();
 
         // Should reload and wrap to last file
-        assert!(should_reload);
+        assert_eq!(should_reload, InputResult::ReloadFile);
         assert_eq!(app.current_file_index, 2);
     }
 
@@ -1016,7 +1023,7 @@ mod tests {
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
 
         // Should be at row 0 (the only row)
-        assert_eq!(app.selected_row(), Some(0));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
     }
 
     #[test]
@@ -1034,7 +1041,7 @@ mod tests {
         app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
 
         // Should be at row 0 (the only row)
-        assert_eq!(app.selected_row(), Some(0));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
     }
 
     #[test]
@@ -1051,7 +1058,7 @@ mod tests {
         app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
 
         // Should clamp to last row (row 2)
-        assert_eq!(app.selected_row(), Some(2));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
     }
 
     #[test]
@@ -1067,7 +1074,7 @@ mod tests {
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
 
         // Should clamp to last column (column 2)
-        assert_eq!(app.ui.selected_col, 2);
+        assert_eq!(app.ui.selected_col, ColIndex::new(2));
     }
 
     #[test]
@@ -1081,13 +1088,13 @@ mod tests {
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
-        assert_eq!(app.ui.selected_col, 0);
+        assert_eq!(app.ui.selected_col, ColIndex::new(0));
 
         // Execute $ (go to last column)
         app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
 
         // Should stay at column 0 (only column)
-        assert_eq!(app.ui.selected_col, 0);
+        assert_eq!(app.ui.selected_col, ColIndex::new(0));
     }
 
     #[test]
@@ -1096,13 +1103,13 @@ mod tests {
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
-        assert_eq!(app.ui.selected_col, 0);
+        assert_eq!(app.ui.selected_col, ColIndex::new(0));
 
         // Execute 0 (go to first column)
         app.handle_key(key_event(KeyCode::Char('0'))).unwrap();
 
         // Should stay at column 0
-        assert_eq!(app.ui.selected_col, 0);
+        assert_eq!(app.ui.selected_col, ColIndex::new(0));
     }
 
     #[test]
@@ -1113,13 +1120,13 @@ mod tests {
 
         // Move to last row
         app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
-        assert_eq!(app.selected_row(), Some(2));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
 
         // Try to move down from last row
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
 
         // Should stay at last row
-        assert_eq!(app.selected_row(), Some(2));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
     }
 
     #[test]
@@ -1129,13 +1136,13 @@ mod tests {
         let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
         // Should start at row 0
-        assert_eq!(app.selected_row(), Some(0));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 
         // Try to move up from first row
         app.handle_key(key_event(KeyCode::Char('k'))).unwrap();
 
         // Should stay at row 0
-        assert_eq!(app.selected_row(), Some(0));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
     }
 
     #[test]
@@ -1144,13 +1151,13 @@ mod tests {
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
-        assert_eq!(app.ui.selected_col, 0);
+        assert_eq!(app.ui.selected_col, ColIndex::new(0));
 
         // Try to move left from first column
         app.handle_key(key_event(KeyCode::Char('h'))).unwrap();
 
         // Should stay at column 0
-        assert_eq!(app.ui.selected_col, 0);
+        assert_eq!(app.ui.selected_col, ColIndex::new(0));
     }
 
     #[test]
@@ -1161,13 +1168,13 @@ mod tests {
 
         // Move to last column
         app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
-        assert_eq!(app.ui.selected_col, 2);
+        assert_eq!(app.ui.selected_col, ColIndex::new(2));
 
         // Try to move right from last column
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
 
         // Should stay at column 2
-        assert_eq!(app.ui.selected_col, 2);
+        assert_eq!(app.ui.selected_col, ColIndex::new(2));
     }
 
     #[test]
@@ -1179,15 +1186,15 @@ mod tests {
         // Move to column 2
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
-        assert_eq!(app.ui.selected_col, 2);
+        assert_eq!(app.ui.selected_col, ColIndex::new(2));
 
         // Execute 0j (should treat as "0" to first column, not "0 times j")
         app.handle_key(key_event(KeyCode::Char('0'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
 
         // Should have moved to first column, then down one row
-        assert_eq!(app.ui.selected_col, 0);
-        assert_eq!(app.selected_row(), Some(1));
+        assert_eq!(app.ui.selected_col, ColIndex::new(0));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
     }
 
     // ===== Priority 2: State Management Tests =====
@@ -1200,7 +1207,7 @@ mod tests {
 
         // Start a multi-key command
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-        assert_eq!(app.pending_key, Some(KeyCode::Char('g')));
+        assert_eq!(app.pending_key, Some(PendingCommand::G));
 
         // Press ESC to cancel
         app.handle_key(key_event(KeyCode::Esc)).unwrap();
@@ -1217,7 +1224,7 @@ mod tests {
 
         // Execute gg command
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-        assert_eq!(app.pending_key, Some(KeyCode::Char('g')));
+        assert_eq!(app.pending_key, Some(PendingCommand::G));
 
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
 
@@ -1234,7 +1241,7 @@ mod tests {
         // Build count prefix 25
         app.handle_key(key_event(KeyCode::Char('2'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('5'))).unwrap();
-        assert_eq!(app.command_count, Some("25".to_string()));
+        assert_eq!(app.command_count, NonZeroUsize::new(25));
 
         // Execute j (move down 25 rows, will clamp to last row)
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
@@ -1257,7 +1264,7 @@ mod tests {
 
         // State should still be valid
         assert!(app.selected_row().is_some());
-        assert!(app.ui.selected_col < app.csv_data.column_count());
+        assert!(app.ui.selected_col.get() < app.csv_data.column_count());
         assert_eq!(app.pending_key, None);
         assert_eq!(app.command_count, None);
     }
@@ -1297,7 +1304,7 @@ mod tests {
 
         // Start g command
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-        assert_eq!(app.pending_key, Some(KeyCode::Char('g')));
+        assert_eq!(app.pending_key, Some(PendingCommand::G));
 
         // Send invalid character (should clear pending state)
         app.handle_key(key_event(KeyCode::Char('x'))).unwrap();
@@ -1328,6 +1335,6 @@ mod tests {
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
 
         // Should clamp to valid range (last row)
-        assert_eq!(app.selected_row(), Some(2)); // Last row in test data
+        assert_eq!(app.selected_row(), Some(RowIndex::new(2))); // Last row in test data
     }
 }
