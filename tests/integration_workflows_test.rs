@@ -282,10 +282,7 @@ fn test_status_message_lifecycle() {
 #[test]
 fn test_complete_user_session_workflow() {
     let csv_data = create_test_csv();
-    let csv_files = vec![
-        PathBuf::from("file1.csv"),
-        PathBuf::from("file2.csv"),
-    ];
+    let csv_files = vec![PathBuf::from("file1.csv"), PathBuf::from("file2.csv")];
     let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     // Simulate realistic user session
@@ -460,10 +457,7 @@ fn test_navigation_state_preserved_across_help() {
 #[test]
 fn test_count_prefix_with_file_switching() {
     let csv_data = create_test_csv();
-    let csv_files = vec![
-        PathBuf::from("file1.csv"),
-        PathBuf::from("file2.csv"),
-    ];
+    let csv_files = vec![PathBuf::from("file1.csv"), PathBuf::from("file2.csv")];
     let mut app = App::new(csv_data, csv_files, 0, None, false, None);
 
     // Build count prefix
