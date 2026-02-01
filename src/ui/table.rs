@@ -14,7 +14,7 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     let csv = &app.csv_data;
 
     // Calculate visible columns (max 10)
-    let start_col = app.ui.horizontal_offset;
+    let start_col = app.view_state.horizontal_offset;
     let end_col = (start_col + MAX_VISIBLE_COLS).min(csv.column_count());
     let visible_col_count = end_col - start_col;
 
@@ -31,12 +31,12 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     for i in start_col..end_col {
         let letter = column_index_to_letter(i);
         let col_idx = ColIndex::new(i);
-        let display = if col_idx == app.ui.selected_col {
+        let display = if col_idx == app.view_state.selected_col {
             format!("►{}", letter) // Show indicator on selected column
         } else {
             format!(" {}", letter) // Space for alignment
         };
-        let style = if col_idx == app.ui.selected_col {
+        let style = if col_idx == app.view_state.selected_col {
             Style::default().add_modifier(Modifier::BOLD)
         } else {
             Style::default().add_modifier(Modifier::DIM)
@@ -62,11 +62,11 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
         as usize;
 
     // Get current scroll position from table state
-    let selected_idx = app.ui.table_state.selected().unwrap_or(0);
+    let selected_idx = app.view_state.table_state.selected().unwrap_or(0);
 
     // Calculate scroll offset based on viewport mode (zt, zz, zb, or auto)
-    let scroll_offset = match app.ui.viewport_mode {
-        crate::app::ViewportMode::Auto => {
+    let scroll_offset = match app.view_state.viewport_mode {
+        crate::ui::ViewportMode::Auto => {
             // Auto-center: keep selected row centered when possible
             if selected_idx < table_height / 2 {
                 0 // Near top, no scroll
@@ -74,11 +74,11 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
                 (selected_idx - table_height / 2).min(csv.row_count().saturating_sub(table_height))
             }
         }
-        crate::app::ViewportMode::Top => {
+        crate::ui::ViewportMode::Top => {
             // zt: selected row at top of screen
             selected_idx.min(csv.row_count().saturating_sub(table_height))
         }
-        crate::app::ViewportMode::Center => {
+        crate::ui::ViewportMode::Center => {
             // zz: selected row at center of screen
             if selected_idx < table_height / 2 {
                 0
@@ -86,7 +86,7 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
                 (selected_idx - table_height / 2).min(csv.row_count().saturating_sub(table_height))
             }
         }
-        crate::app::ViewportMode::Bottom => {
+        crate::ui::ViewportMode::Bottom => {
             // zb: selected row at bottom of screen
             selected_idx.saturating_sub(table_height.saturating_sub(1))
         }
@@ -119,7 +119,7 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
                 .selected_row()
                 .map(|r| r.get() == row_idx)
                 .unwrap_or(false)
-                && ColIndex::new(col_idx) == app.ui.selected_col
+                && ColIndex::new(col_idx) == app.view_state.selected_col
             {
                 Style::default().add_modifier(Modifier::REVERSED)
             } else {
@@ -164,7 +164,7 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     // Render stateful widget
     // With virtual scrolling, we need to adjust the selected position
     // to be relative to the visible window, then offset by 2 for headers
-    let mut adjusted_state = app.ui.table_state.clone();
+    let mut adjusted_state = app.view_state.table_state.clone();
     if let Some(selected) = adjusted_state.selected() {
         // Calculate position within visible window
         let position_in_window = if selected >= scroll_offset && selected < end_row {

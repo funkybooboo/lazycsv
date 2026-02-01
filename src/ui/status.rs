@@ -9,15 +9,15 @@ use std::borrow::Cow;
 
 /// Render sheet/file switcher at bottom
 pub fn render_sheet_switcher(frame: &mut Frame, app: &App, area: Rect) {
-    if app.csv_files.is_empty() {
+    if app.session.files().is_empty() {
         return;
     }
 
-    let count_info: Cow<'_, str> = if app.csv_files.len() > 1 {
+    let count_info: Cow<'_, str> = if app.session.files().len() > 1 {
         Cow::Owned(format!(
             "Files ({}/{}): ",
-            app.current_file_index + 1,
-            app.csv_files.len()
+            app.session.current_file_index() + 1,
+            app.session.files().len()
         ))
     } else {
         Cow::Borrowed("File: ")
@@ -25,7 +25,7 @@ pub fn render_sheet_switcher(frame: &mut Frame, app: &App, area: Rect) {
 
     // Build file list with indicator
     let mut file_list = String::new();
-    for (idx, path) in app.csv_files.iter().enumerate() {
+    for (idx, path) in app.session.files().iter().enumerate() {
         if idx > 0 {
             file_list.push_str(" | ");
         }
@@ -35,7 +35,7 @@ pub fn render_sheet_switcher(frame: &mut Frame, app: &App, area: Rect) {
             .and_then(|n| n.to_str())
             .unwrap_or("unknown");
 
-        if idx == app.current_file_index {
+        if idx == app.session.current_file_index() {
             file_list.push_str(&format!("► {}", filename));
         } else {
             file_list.push_str(filename);
@@ -60,13 +60,13 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         .map(|r| r.to_line_number().get())
         .unwrap_or(0);
     let total_rows = app.csv_data.row_count();
-    let col_letter = column_index_to_letter(app.ui.selected_col.get());
-    let col_name = app.csv_data.get_header(app.ui.selected_col);
+    let col_letter = column_index_to_letter(app.view_state.selected_col.get());
+    let col_name = app.csv_data.get_header(app.view_state.selected_col);
     let total_cols = app.csv_data.column_count();
 
     // Get current cell value
     let cell_value: Cow<'_, str> = if let Some(row_idx) = app.selected_row() {
-        let value = app.csv_data.get_cell(row_idx, app.ui.selected_col);
+        let value = app.csv_data.get_cell(row_idx, app.view_state.selected_col);
         if value.is_empty() {
             Cow::Borrowed("<empty>")
         } else if value.len() > 30 {
@@ -83,7 +83,7 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         format!(" {} ", msg.as_str())
     } else {
         // Build left side: help, quit, files
-        let left_side = if app.csv_files.len() > 1 {
+        let left_side = if app.session.files().len() > 1 {
             "[?] help │ [q] quit │ [ ] files"
         } else {
             "[?] help │ [q] quit"
@@ -96,7 +96,7 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             total_rows,
             col_letter,
             col_name,
-            app.ui.selected_col.to_column_number().get(),
+            app.view_state.selected_col.to_column_number().get(),
             total_cols,
             cell_value
         );

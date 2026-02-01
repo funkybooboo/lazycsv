@@ -17,7 +17,7 @@ fn test_delimiter_integration() {
 
     assert_eq!(app.csv_data.headers, vec!["a", "b", "c"]);
     assert_eq!(app.csv_data.rows[0], vec!["1", "2", "3"]);
-    assert_eq!(app.delimiter, Some(b';'));
+    assert_eq!(app.session.config().delimiter, Some(b';'));
 }
 
 #[test]
@@ -38,7 +38,7 @@ fn test_no_headers_integration() {
     assert_eq!(app.csv_data.rows.len(), 2);
     assert_eq!(app.csv_data.rows[0], vec!["a", "b", "c"]);
     assert_eq!(app.csv_data.rows[1], vec!["1", "2", "3"]);
-    assert!(app.no_headers);
+    assert!(app.session.config().no_headers);
 }
 
 #[test]
@@ -52,8 +52,8 @@ fn test_default_csv_loading_integration() {
 
     assert_eq!(app.csv_data.headers, vec!["header1", "header2"]);
     assert_eq!(app.csv_data.rows[0], vec!["val1", "val2"]);
-    assert_eq!(app.delimiter, None);
-    assert!(!app.no_headers);
+    assert_eq!(app.session.config().delimiter, None);
+    assert!(!app.session.config().no_headers);
 }
 
 #[test]
@@ -68,8 +68,8 @@ fn test_directory_path_integration() {
     let app = App::from_cli(args).unwrap();
 
     assert_eq!(app.csv_data.headers, vec!["h1", "h2"]);
-    assert_eq!(app.csv_files.len(), 2);
-    assert_eq!(app.current_file_index, 0);
+    assert_eq!(app.session.files().len(), 2);
+    assert_eq!(app.session.current_file_index(), 0);
 }
 
 #[test]
@@ -146,6 +146,6 @@ fn test_delimiter_and_no_headers_integration() {
     assert_eq!(app.csv_data.rows.len(), 2);
     assert_eq!(app.csv_data.rows[0], vec!["a", "b"]);
     assert_eq!(app.csv_data.rows[1], vec!["1", "2"]);
-    assert!(app.no_headers);
-    assert_eq!(app.delimiter, Some(b';'));
+    assert!(app.session.config().no_headers);
+    assert_eq!(app.session.config().delimiter, Some(b';'));
 }

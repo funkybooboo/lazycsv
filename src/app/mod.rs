@@ -1,15 +1,14 @@
 mod input;
 mod navigation;
 
-use crate::domain::position::{ColIndex, RowIndex};
-use crate::input::{InputResult, PendingCommand, StatusMessage};
+use crate::domain::position::RowIndex;
+use crate::input::{InputResult, InputState, StatusMessage};
+use crate::session::Session;
+use crate::ui::{ViewState, ViewportMode};
 use crate::CsvData;
 use anyhow::{Context, Result};
 use crossterm::event::KeyEvent;
-use ratatui::widgets::TableState;
-use std::num::NonZeroUsize;
 use std::path::PathBuf;
-use std::time::Instant;
 
 /// Application modes
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -20,79 +19,29 @@ pub enum Mode {
             // Command, // v1.1.0: Command input mode
 }
 
-/// Viewport centering mode for view commands (zt, zz, zb)
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum ViewportMode {
-    Auto,   // Auto-center when possible (default)
-    Top,    // Selected row at top (zt)
-    Center, // Selected row centered (zz)
-    Bottom, // Selected row at bottom (zb)
-}
-
-/// Holds state for the UI
-#[derive(Debug)]
-pub struct UiState {
-    pub table_state: TableState,
-    pub selected_col: ColIndex,
-    pub horizontal_offset: usize,
-    pub show_cheatsheet: bool,
-    pub viewport_mode: ViewportMode,
-}
-
-impl Default for UiState {
-    fn default() -> Self {
-        Self {
-            table_state: TableState::default(),
-            selected_col: ColIndex::new(0),
-            horizontal_offset: 0,
-            show_cheatsheet: false,
-            viewport_mode: ViewportMode::Auto,
-        }
-    }
-}
-
-/// Main application state
+/// Main application state (v0.2.0 Phase 2: Refactored for separation of concerns)
 #[derive(Debug)]
 pub struct App {
     /// Loaded CSV data
     pub csv_data: CsvData,
 
-    /// UI-related state
-    pub ui: UiState,
+    /// View/UI state (renamed from ui, moved to ui module)
+    pub view_state: ViewState,
 
-    /// Flag to quit application
-    pub should_quit: bool,
+    /// Input handling state (extracted from App)
+    pub input_state: InputState,
+
+    /// Multi-file session state (extracted from App)
+    pub session: Session,
 
     /// Current application mode
     pub mode: Mode,
 
-    /// List of CSV files in the same directory
-    pub csv_files: Vec<PathBuf>,
-
-    /// Index of current file in csv_files
-    pub current_file_index: usize,
-
     /// Optional status message to display
     pub status_message: Option<StatusMessage>,
 
-    // Multi-key command support
-    /// Pending multi-key command (e.g., waiting for second key after 'g' or 'z')
-    pub pending_key: Option<PendingCommand>,
-
-    /// Time when pending key was set (for timeout)
-    pub pending_key_time: Option<Instant>,
-
-    /// Count prefix for vim commands (e.g., 5 for "5j")
-    pub command_count: Option<NonZeroUsize>,
-
-    /// Delimiter used for CSV parsing
-    pub delimiter: Option<u8>,
-
-    /// Whether CSV was parsed without headers
-    pub no_headers: bool,
-
-    /// The character encoding used for file loading
-    pub encoding: Option<String>,
+    /// Flag to quit application
+    pub should_quit: bool,
     // v0.4.0: Cell editing fields (to be implemented)
     // pub edit_buffer: String,
 }
@@ -119,6 +68,13 @@ impl App {
             anyhow::bail!("Invalid path: {}", path.display());
         };
 
+        // Create file configuration
+        let file_config = crate::session::FileConfig::with_options(
+            cli_args.delimiter,
+            cli_args.no_headers,
+            cli_args.encoding.clone(),
+        );
+
         // Load CSV data
         let csv_data = crate::csv_data::CsvData::from_file(
             &file_path,
@@ -133,38 +89,35 @@ impl App {
             csv_data,
             csv_files,
             current_file_index,
-            cli_args.delimiter,
-            cli_args.no_headers,
-            cli_args.encoding,
+            file_config,
         ))
     }
 
-    /// Create new App from loaded CSV data, file list, and CLI parsing options
+    /// Create new App from loaded CSV data, file list, and file configuration
     pub fn new(
         csv_data: CsvData,
         csv_files: Vec<PathBuf>,
         current_file_index: usize,
-        delimiter: Option<u8>,
-        no_headers: bool,
-        encoding: Option<String>,
+        file_config: crate::session::FileConfig,
     ) -> Self {
-        let mut ui_state = UiState::default();
-        ui_state.table_state.select(Some(0));
+        // Initialize view state with first row selected
+        let mut view_state = ViewState::default();
+        view_state.table_state.select(Some(0));
+
+        // Create session
+        let session = Session::new(csv_files, current_file_index, file_config);
+
+        // Create input state
+        let input_state = InputState::new();
 
         Self {
             csv_data,
-            ui: ui_state,
-            should_quit: false,
+            view_state,
+            input_state,
+            session,
             mode: Mode::Normal,
-            csv_files,
-            current_file_index,
             status_message: None,
-            pending_key: None,
-            pending_key_time: None,
-            command_count: None,
-            delimiter,
-            no_headers,
-            encoding,
+            should_quit: false,
         }
     }
 
@@ -175,28 +128,30 @@ impl App {
 
     /// Get current selected row index (for status display)
     pub fn selected_row(&self) -> Option<RowIndex> {
-        self.ui.table_state.selected().map(RowIndex::new)
+        self.view_state.table_state.selected().map(RowIndex::new)
     }
 
     /// Get current file path
     pub fn current_file(&self) -> &PathBuf {
-        &self.csv_files[self.current_file_index]
+        self.session.current_file()
     }
 
     /// Reload CSV data from current file
     pub fn reload_current_file(&mut self) -> Result<()> {
         let file_path = self.current_file().clone();
+        let config = self.session.config();
+
         self.csv_data = CsvData::from_file(
             &file_path,
-            self.delimiter,
-            self.no_headers,
-            self.encoding.clone(),
+            config.delimiter,
+            config.no_headers,
+            config.encoding.clone(),
         )
         .context(format!("Failed to reload file: {}", file_path.display()))?;
 
-        // Reset UI state
-        self.ui = UiState::default();
-        self.ui.table_state.select(Some(0));
+        // Reset view state
+        self.view_state = ViewState::default();
+        self.view_state.table_state.select(Some(0));
 
         Ok(())
     }
@@ -208,6 +163,7 @@ mod tests {
     use crate::domain::position::{ColIndex, RowIndex};
     use crate::input::{InputResult, PendingCommand};
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use std::num::NonZeroUsize;
     use std::path::PathBuf;
 
     fn create_test_csv_data() -> CsvData {
@@ -231,19 +187,19 @@ mod tests {
     fn test_app_initialization() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let app = App::new(csv_data, csv_files, 0, None, false, None);
+        let app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
-        assert_eq!(app.ui.selected_col, ColIndex::new(0));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(0));
         assert!(!app.should_quit);
-        assert!(!app.ui.show_cheatsheet);
+        assert!(!app.view_state.help_overlay_visible);
     }
 
     #[test]
     fn test_navigation_down() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
         assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
@@ -260,9 +216,9 @@ mod tests {
     fn test_navigation_up() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        app.ui.table_state.select(Some(2));
+        app.view_state.table_state.select(Some(2));
 
         app.handle_key(key_event(KeyCode::Char('k'))).unwrap();
         assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
@@ -279,38 +235,38 @@ mod tests {
     fn test_navigation_left_right() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        assert_eq!(app.ui.selected_col, ColIndex::new(0));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(0));
 
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
-        assert_eq!(app.ui.selected_col, ColIndex::new(1));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(1));
 
         app.handle_key(key_event(KeyCode::Right)).unwrap();
-        assert_eq!(app.ui.selected_col, ColIndex::new(2));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(2));
 
         // Try to go beyond last column
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
-        assert_eq!(app.ui.selected_col, ColIndex::new(2));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(2));
 
         app.handle_key(key_event(KeyCode::Char('h'))).unwrap();
-        assert_eq!(app.ui.selected_col, ColIndex::new(1));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(1));
 
         app.handle_key(key_event(KeyCode::Left)).unwrap();
-        assert_eq!(app.ui.selected_col, ColIndex::new(0));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(0));
 
         // Try to go before first column
         app.handle_key(key_event(KeyCode::Char('h'))).unwrap();
-        assert_eq!(app.ui.selected_col, ColIndex::new(0));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(0));
     }
 
     #[test]
     fn test_navigation_home_end() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        app.ui.table_state.select(Some(1));
+        app.view_state.table_state.select(Some(1));
 
         app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
         assert_eq!(app.selected_row(), Some(RowIndex::new(2))); // Last row
@@ -325,22 +281,22 @@ mod tests {
     fn test_navigation_first_last_column() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        app.ui.selected_col = ColIndex::new(1);
+        app.view_state.selected_col = ColIndex::new(1);
 
         app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
-        assert_eq!(app.ui.selected_col, ColIndex::new(2)); // Last column
+        assert_eq!(app.view_state.selected_col, ColIndex::new(2)); // Last column
 
         app.handle_key(key_event(KeyCode::Char('0'))).unwrap();
-        assert_eq!(app.ui.selected_col, ColIndex::new(0)); // First column
+        assert_eq!(app.view_state.selected_col, ColIndex::new(0)); // First column
     }
 
     #[test]
     fn test_quit_functionality() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         assert!(!app.should_quit);
 
@@ -353,7 +309,7 @@ mod tests {
         let mut csv_data = create_test_csv_data();
         csv_data.is_dirty = true;
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         assert!(!app.should_quit);
 
@@ -366,27 +322,27 @@ mod tests {
     fn test_help_toggle() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        assert!(!app.ui.show_cheatsheet);
-
-        app.handle_key(key_event(KeyCode::Char('?'))).unwrap();
-        assert!(app.ui.show_cheatsheet);
+        assert!(!app.view_state.help_overlay_visible);
 
         app.handle_key(key_event(KeyCode::Char('?'))).unwrap();
-        assert!(!app.ui.show_cheatsheet);
+        assert!(app.view_state.help_overlay_visible);
+
+        app.handle_key(key_event(KeyCode::Char('?'))).unwrap();
+        assert!(!app.view_state.help_overlay_visible);
     }
 
     #[test]
     fn test_help_close_with_esc() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        app.ui.show_cheatsheet = true;
+        app.view_state.help_overlay_visible = true;
 
         app.handle_key(key_event(KeyCode::Esc)).unwrap();
-        assert!(!app.ui.show_cheatsheet);
+        assert!(!app.view_state.help_overlay_visible);
     }
 
     #[test]
@@ -397,22 +353,22 @@ mod tests {
             PathBuf::from("file2.csv"),
             PathBuf::from("file3.csv"),
         ];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        assert_eq!(app.current_file_index, 0);
-
-        let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-        assert_eq!(should_reload, InputResult::ReloadFile);
-        assert_eq!(app.current_file_index, 1);
+        assert_eq!(app.session.current_file_index(), 0);
 
         let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
         assert_eq!(should_reload, InputResult::ReloadFile);
-        assert_eq!(app.current_file_index, 2);
+        assert_eq!(app.session.current_file_index(), 1);
+
+        let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
+        assert_eq!(should_reload, InputResult::ReloadFile);
+        assert_eq!(app.session.current_file_index(), 2);
 
         // Wrap around to first file
         let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
         assert_eq!(should_reload, InputResult::ReloadFile);
-        assert_eq!(app.current_file_index, 0);
+        assert_eq!(app.session.current_file_index(), 0);
     }
 
     #[test]
@@ -423,24 +379,24 @@ mod tests {
             PathBuf::from("file2.csv"),
             PathBuf::from("file3.csv"),
         ];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        assert_eq!(app.current_file_index, 0);
-
-        let should_reload = app.handle_key(key_event(KeyCode::Char('['))).unwrap();
-        assert_eq!(should_reload, InputResult::ReloadFile);
-        assert_eq!(app.current_file_index, 2); // Wrap to last file
+        assert_eq!(app.session.current_file_index(), 0);
 
         let should_reload = app.handle_key(key_event(KeyCode::Char('['))).unwrap();
         assert_eq!(should_reload, InputResult::ReloadFile);
-        assert_eq!(app.current_file_index, 1);
+        assert_eq!(app.session.current_file_index(), 2); // Wrap to last file
+
+        let should_reload = app.handle_key(key_event(KeyCode::Char('['))).unwrap();
+        assert_eq!(should_reload, InputResult::ReloadFile);
+        assert_eq!(app.session.current_file_index(), 1);
     }
 
     #[test]
     fn test_no_file_switching_with_single_file() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("file1.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
         assert_eq!(should_reload, InputResult::Continue); // Should not reload with single file
@@ -450,18 +406,18 @@ mod tests {
     fn test_navigation_blocked_when_help_shown() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        app.ui.show_cheatsheet = true;
+        app.view_state.help_overlay_visible = true;
         let initial_row = app.selected_row();
-        let initial_col = app.ui.selected_col;
+        let initial_col = app.view_state.selected_col;
 
         // Try navigation with help shown
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
         assert_eq!(app.selected_row(), initial_row);
 
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
-        assert_eq!(app.ui.selected_col, initial_col);
+        assert_eq!(app.view_state.selected_col, initial_col);
 
         // File switching should also be blocked
         let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
@@ -472,7 +428,12 @@ mod tests {
     fn test_current_file_path() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv"), PathBuf::from("other.csv")];
-        let app = App::new(csv_data, csv_files.clone(), 0, None, false, None);
+        let app = App::new(
+            csv_data,
+            csv_files.clone(),
+            0,
+            crate::session::FileConfig::new(),
+        );
 
         assert_eq!(app.current_file(), &csv_files[0]);
     }
@@ -484,7 +445,7 @@ mod tests {
         // Setup: Create app at row 2 (last row)
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Move to last row first
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
@@ -504,7 +465,7 @@ mod tests {
         // Setup: Create app at row 0 (first row)
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 
@@ -520,7 +481,7 @@ mod tests {
         // Setup: Create app at row 0
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 
@@ -543,7 +504,7 @@ mod tests {
         // Setup: Create app at row 0
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 
@@ -561,18 +522,18 @@ mod tests {
         // Setup: Create app at column 2 (last column)
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Move to last column (column 2, index 2)
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
-        assert_eq!(app.ui.selected_col, ColIndex::new(2));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(2));
 
         // Press '0' alone (no existing count) - should go to first column
         app.handle_key(key_event(KeyCode::Char('0'))).unwrap();
 
         // Should be at column 0 (not treated as start of count)
-        assert_eq!(app.ui.selected_col, ColIndex::new(0));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(0));
     }
 
     #[test]
@@ -580,7 +541,7 @@ mod tests {
         // Setup: Create app at row 0
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Set count prefix '2'
         app.handle_key(key_event(KeyCode::Char('2'))).unwrap();
@@ -627,16 +588,16 @@ mod tests {
         // Setup: Create app with only 1 file
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        let initial_index = app.current_file_index;
+        let initial_index = app.session.current_file_index();
 
         // Try to switch to next file with only 1 file
         let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
 
         // Should not reload (no other files), index should stay the same
         assert_eq!(should_reload, InputResult::Continue);
-        assert_eq!(app.current_file_index, initial_index);
+        assert_eq!(app.session.current_file_index(), initial_index);
     }
 
     #[test]
@@ -644,7 +605,7 @@ mod tests {
         // Setup: Create app with clean data
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Initially not dirty
         assert!(!app.csv_data.is_dirty);
@@ -663,13 +624,13 @@ mod tests {
         // Setup: Create app
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let initial_row = app.selected_row();
 
         // Open help
         app.handle_key(key_event(KeyCode::Char('?'))).unwrap();
-        assert!(app.ui.show_cheatsheet);
+        assert!(app.view_state.help_overlay_visible);
 
         // Navigation should be blocked when help is shown
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
@@ -677,7 +638,7 @@ mod tests {
 
         // Close help
         app.handle_key(key_event(KeyCode::Char('?'))).unwrap();
-        assert!(!app.ui.show_cheatsheet);
+        assert!(!app.view_state.help_overlay_visible);
 
         // Now navigation should work
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
@@ -692,9 +653,9 @@ mod tests {
         // Setup: Create app at column 0
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        assert_eq!(app.ui.selected_col, ColIndex::new(0));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(0));
 
         // Press '2' to set count prefix
         app.handle_key(key_event(KeyCode::Char('2'))).unwrap();
@@ -702,7 +663,7 @@ mod tests {
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
 
         // Should be at column 2 (moved right 2 columns from column 0)
-        assert_eq!(app.ui.selected_col, ColIndex::new(2));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(2));
     }
 
     #[test]
@@ -714,16 +675,21 @@ mod tests {
             PathBuf::from("file2.csv"),
             PathBuf::from("file3.csv"),
         ];
-        let mut app = App::new(csv_data, csv_files.clone(), 2, None, false, None);
+        let mut app = App::new(
+            csv_data,
+            csv_files.clone(),
+            2,
+            crate::session::FileConfig::new(),
+        );
 
-        assert_eq!(app.current_file_index, 2);
+        assert_eq!(app.session.current_file_index(), 2);
 
         // Try to go to next file (should wrap to first)
         let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
 
         // Should reload and wrap to first file
         assert_eq!(should_reload, InputResult::ReloadFile);
-        assert_eq!(app.current_file_index, 0);
+        assert_eq!(app.session.current_file_index(), 0);
     }
 
     #[test]
@@ -731,20 +697,20 @@ mod tests {
         // Setup: Create app with multiple files
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("file1.csv"), PathBuf::from("file2.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Set some state
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
         let _row_before = app.selected_row();
-        let _col_before = app.ui.selected_col;
+        let _col_before = app.view_state.selected_col;
 
         // Switch file
         let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
         assert_eq!(should_reload, InputResult::ReloadFile);
 
         // Verify file index changed
-        assert_eq!(app.current_file_index, 1);
+        assert_eq!(app.session.current_file_index(), 1);
 
         // Note: State (row/col) behavior depends on implementation
         // This test documents current behavior
@@ -755,10 +721,10 @@ mod tests {
         // Setup: Create app
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let initial_row = app.selected_row();
-        let initial_col = app.ui.selected_col;
+        let initial_col = app.view_state.selected_col;
 
         // Press various special keys that should be ignored
         app.handle_key(key_event(KeyCode::F(1))).unwrap();
@@ -767,7 +733,7 @@ mod tests {
 
         // State should remain unchanged
         assert_eq!(app.selected_row(), initial_row);
-        assert_eq!(app.ui.selected_col, initial_col);
+        assert_eq!(app.view_state.selected_col, initial_col);
         assert!(!app.should_quit);
     }
 
@@ -776,17 +742,17 @@ mod tests {
         // Setup: Create app
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Start multi-key by pressing 'g'
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-        assert!(app.pending_key.is_some());
+        assert!(app.input_state.pending_command.is_some());
 
         // Press ESC to cancel
         app.handle_key(key_event(KeyCode::Esc)).unwrap();
 
         // Pending key should be cleared
-        assert!(app.pending_key.is_none());
+        assert!(app.input_state.pending_command.is_none());
     }
 
     #[test]
@@ -805,7 +771,7 @@ mod tests {
             is_dirty: false,
         };
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 
@@ -822,15 +788,15 @@ mod tests {
         // Setup: Create app
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Open help
         app.handle_key(key_event(KeyCode::Char('?'))).unwrap();
-        assert!(app.ui.show_cheatsheet);
+        assert!(app.view_state.help_overlay_visible);
 
         // Close help with ESC
         app.handle_key(key_event(KeyCode::Esc)).unwrap();
-        assert!(!app.ui.show_cheatsheet);
+        assert!(!app.view_state.help_overlay_visible);
     }
 
     #[test]
@@ -838,7 +804,7 @@ mod tests {
         // Setup: Create app
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Complex navigation sequence
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap(); // Down to row 1
@@ -849,7 +815,7 @@ mod tests {
 
         // Should be at row 1, col 0
         assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
-        assert_eq!(app.ui.selected_col, ColIndex::new(0));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(0));
     }
 
     #[test]
@@ -857,15 +823,15 @@ mod tests {
         // Setup: Create app at column 0
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        assert_eq!(app.ui.selected_col, ColIndex::new(0));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(0));
 
         // Press '$' to go to last column
         app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
 
         // Should be at last column (column 2)
-        assert_eq!(app.ui.selected_col, ColIndex::new(2));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(2));
     }
 
     #[test]
@@ -873,18 +839,18 @@ mod tests {
         // Setup: Create app at last column
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Move to last column
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
-        assert_eq!(app.ui.selected_col, ColIndex::new(2));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(2));
 
         // Press '0' to go to first column
         app.handle_key(key_event(KeyCode::Char('0'))).unwrap();
 
         // Should be at first column (column 0)
-        assert_eq!(app.ui.selected_col, ColIndex::new(0));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(0));
     }
 
     #[test]
@@ -908,7 +874,7 @@ mod tests {
             is_dirty: false,
         };
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Start at row 5
         for _ in 0..5 {
@@ -931,11 +897,11 @@ mod tests {
         // Setup: Create app at middle
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Move to middle column
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
-        assert_eq!(app.ui.selected_col, ColIndex::new(1));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(1));
 
         // Home and End keys should work without crashing
         app.handle_key(key_event(KeyCode::Home)).unwrap();
@@ -948,19 +914,19 @@ mod tests {
         // Setup: Create app
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Try to go left from first column (should stay)
         app.handle_key(key_event(KeyCode::Char('h'))).unwrap();
-        assert_eq!(app.ui.selected_col, ColIndex::new(0));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(0));
 
         // Go to last column
         app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
-        assert_eq!(app.ui.selected_col, ColIndex::new(2));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(2));
 
         // Try to go right from last column (should stay)
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
-        assert_eq!(app.ui.selected_col, ColIndex::new(2));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(2));
     }
 
     #[test]
@@ -968,7 +934,7 @@ mod tests {
         // Setup: Create app, navigate to row 2, column 2
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("file1.csv"), PathBuf::from("file2.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Navigate to row 2, column 2
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
@@ -977,7 +943,7 @@ mod tests {
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
 
         assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
-        assert_eq!(app.ui.selected_col, ColIndex::new(2));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(2));
 
         // Note: In real app, file switch would reload and reset position
         // This test verifies current behavior
@@ -992,16 +958,21 @@ mod tests {
             PathBuf::from("file2.csv"),
             PathBuf::from("file3.csv"),
         ];
-        let mut app = App::new(csv_data, csv_files.clone(), 0, None, false, None);
+        let mut app = App::new(
+            csv_data,
+            csv_files.clone(),
+            0,
+            crate::session::FileConfig::new(),
+        );
 
-        assert_eq!(app.current_file_index, 0);
+        assert_eq!(app.session.current_file_index(), 0);
 
         // Try to go to previous file (should wrap to last)
         let should_reload = app.handle_key(key_event(KeyCode::Char('['))).unwrap();
 
         // Should reload and wrap to last file
         assert_eq!(should_reload, InputResult::ReloadFile);
-        assert_eq!(app.current_file_index, 2);
+        assert_eq!(app.session.current_file_index(), 2);
     }
 
     // ===== Priority 1: Navigation Edge Cases =====
@@ -1016,7 +987,7 @@ mod tests {
             is_dirty: false,
         };
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Execute gg
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
@@ -1035,7 +1006,7 @@ mod tests {
             is_dirty: false,
         };
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Execute G (go to last row)
         app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
@@ -1048,7 +1019,7 @@ mod tests {
     fn test_count_prefix_exceeds_row_bounds() {
         let csv_data = create_test_csv_data(); // Has 3 rows
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Try to jump to row 9999 with 9999G
         app.handle_key(key_event(KeyCode::Char('9'))).unwrap();
@@ -1065,7 +1036,7 @@ mod tests {
     fn test_count_prefix_exceeds_column_bounds() {
         let csv_data = create_test_csv_data(); // Has 3 columns
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Try to move right 100 columns with 100l
         app.handle_key(key_event(KeyCode::Char('1'))).unwrap();
@@ -1074,7 +1045,7 @@ mod tests {
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
 
         // Should clamp to last column (column 2)
-        assert_eq!(app.ui.selected_col, ColIndex::new(2));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(2));
     }
 
     #[test]
@@ -1086,37 +1057,37 @@ mod tests {
             is_dirty: false,
         };
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        assert_eq!(app.ui.selected_col, ColIndex::new(0));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(0));
 
         // Execute $ (go to last column)
         app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
 
         // Should stay at column 0 (only column)
-        assert_eq!(app.ui.selected_col, ColIndex::new(0));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(0));
     }
 
     #[test]
     fn test_navigation_zero_already_at_first_column() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        assert_eq!(app.ui.selected_col, ColIndex::new(0));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(0));
 
         // Execute 0 (go to first column)
         app.handle_key(key_event(KeyCode::Char('0'))).unwrap();
 
         // Should stay at column 0
-        assert_eq!(app.ui.selected_col, ColIndex::new(0));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(0));
     }
 
     #[test]
     fn test_navigation_j_on_last_row() {
         let csv_data = create_test_csv_data(); // 3 rows
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Move to last row
         app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
@@ -1133,7 +1104,7 @@ mod tests {
     fn test_navigation_k_on_first_row() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Should start at row 0
         assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
@@ -1149,51 +1120,51 @@ mod tests {
     fn test_navigation_h_on_first_column() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        assert_eq!(app.ui.selected_col, ColIndex::new(0));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(0));
 
         // Try to move left from first column
         app.handle_key(key_event(KeyCode::Char('h'))).unwrap();
 
         // Should stay at column 0
-        assert_eq!(app.ui.selected_col, ColIndex::new(0));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(0));
     }
 
     #[test]
     fn test_navigation_l_on_last_column() {
         let csv_data = create_test_csv_data(); // 3 columns
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Move to last column
         app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
-        assert_eq!(app.ui.selected_col, ColIndex::new(2));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(2));
 
         // Try to move right from last column
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
 
         // Should stay at column 2
-        assert_eq!(app.ui.selected_col, ColIndex::new(2));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(2));
     }
 
     #[test]
     fn test_count_prefix_zero_special_case() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Move to column 2
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
-        assert_eq!(app.ui.selected_col, ColIndex::new(2));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(2));
 
         // Execute 0j (should treat as "0" to first column, not "0 times j")
         app.handle_key(key_event(KeyCode::Char('0'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
 
         // Should have moved to first column, then down one row
-        assert_eq!(app.ui.selected_col, ColIndex::new(0));
+        assert_eq!(app.view_state.selected_col, ColIndex::new(0));
         assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
     }
 
@@ -1203,58 +1174,58 @@ mod tests {
     fn test_pending_key_cleared_on_esc() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Start a multi-key command
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-        assert_eq!(app.pending_key, Some(PendingCommand::G));
+        assert_eq!(app.input_state.pending_command, Some(PendingCommand::G));
 
         // Press ESC to cancel
         app.handle_key(key_event(KeyCode::Esc)).unwrap();
 
         // Pending key should be cleared
-        assert_eq!(app.pending_key, None);
+        assert_eq!(app.input_state.pending_command, None);
     }
 
     #[test]
     fn test_pending_key_cleared_on_valid_command() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Execute gg command
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-        assert_eq!(app.pending_key, Some(PendingCommand::G));
+        assert_eq!(app.input_state.pending_command, Some(PendingCommand::G));
 
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
 
         // Pending key should be cleared after command completes
-        assert_eq!(app.pending_key, None);
+        assert_eq!(app.input_state.pending_command, None);
     }
 
     #[test]
     fn test_count_prefix_cleared_after_use() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Build count prefix 25
         app.handle_key(key_event(KeyCode::Char('2'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('5'))).unwrap();
-        assert_eq!(app.command_count, NonZeroUsize::new(25));
+        assert_eq!(app.input_state.command_count, NonZeroUsize::new(25));
 
         // Execute j (move down 25 rows, will clamp to last row)
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
 
         // Count should be cleared
-        assert_eq!(app.command_count, None);
+        assert_eq!(app.input_state.command_count, None);
     }
 
     #[test]
     fn test_state_consistency_after_rapid_navigation() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Rapid navigation sequence
         let keys = vec!['j', 'j', 'k', 'l', 'h', 'j', 'l', 'k'];
@@ -1264,16 +1235,16 @@ mod tests {
 
         // State should still be valid
         assert!(app.selected_row().is_some());
-        assert!(app.ui.selected_col.get() < app.csv_data.column_count());
-        assert_eq!(app.pending_key, None);
-        assert_eq!(app.command_count, None);
+        assert!(app.view_state.selected_col.get() < app.csv_data.column_count());
+        assert_eq!(app.input_state.pending_command, None);
+        assert_eq!(app.input_state.command_count, None);
     }
 
     #[test]
     fn test_dirty_flag_persistence_across_operations() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Initial state should not be dirty
         assert!(!app.csv_data.is_dirty);
@@ -1297,30 +1268,30 @@ mod tests {
     fn test_state_after_invalid_g_sequence() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let initial_row = app.selected_row();
-        let initial_col = app.ui.selected_col;
+        let initial_col = app.view_state.selected_col;
 
         // Start g command
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-        assert_eq!(app.pending_key, Some(PendingCommand::G));
+        assert_eq!(app.input_state.pending_command, Some(PendingCommand::G));
 
         // Send invalid character (should clear pending state)
         app.handle_key(key_event(KeyCode::Char('x'))).unwrap();
 
         // State should be reset
-        assert_eq!(app.pending_key, None);
+        assert_eq!(app.input_state.pending_command, None);
         // Position should not have changed
         assert_eq!(app.selected_row(), initial_row);
-        assert_eq!(app.ui.selected_col, initial_col);
+        assert_eq!(app.view_state.selected_col, initial_col);
     }
 
     #[test]
     fn test_count_prefix_max_digits() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, None, false, None);
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Build a very large count
         app.handle_key(key_event(KeyCode::Char('9'))).unwrap();
@@ -1329,7 +1300,7 @@ mod tests {
         app.handle_key(key_event(KeyCode::Char('9'))).unwrap();
 
         // Should have count set
-        assert!(app.command_count.is_some());
+        assert!(app.input_state.command_count.is_some());
 
         // Execute command
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();

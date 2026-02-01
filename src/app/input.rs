@@ -18,26 +18,26 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Result<InputResult> {
 /// Handle keyboard input in Normal mode
 fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     // Check if pending key has timed out
-    if let Some(time) = app.pending_key_time {
+    if let Some(time) = app.input_state.pending_command_time {
         if time.elapsed().as_millis() > MULTI_KEY_TIMEOUT_MS {
-            app.pending_key = None;
-            app.pending_key_time = None;
+            app.input_state.pending_command = None;
+            app.input_state.pending_command_time = None;
             app.status_message = Some(StatusMessage::from("Command timeout"));
         }
     }
 
     // Handle pending multi-key sequences
-    if let Some(pending) = app.pending_key {
+    if let Some(pending) = app.input_state.pending_command {
         return handle_multi_key_command(app, pending, key.code);
     }
 
     // Handle numeric prefixes (5, 10, 25, etc.) - only when help is closed
     // Special case: '0' alone means "go to first column", not start of count
-    if !app.ui.show_cheatsheet {
+    if !app.view_state.help_overlay_visible {
         if let KeyCode::Char(c) = key.code {
             if c.is_numeric() {
                 // If '0' is pressed without existing count, treat it as "first column" command
-                if c == '0' && app.command_count.is_none() {
+                if c == '0' && app.input_state.command_count.is_none() {
                     // Let it fall through to navigation handling
                 } else {
                     return handle_count_prefix(app, c);
@@ -48,7 +48,7 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
 
     match key.code {
         // Quit - vim-style (warns if unsaved in Phase 2)
-        KeyCode::Char('q') if !app.ui.show_cheatsheet => {
+        KeyCode::Char('q') if !app.view_state.help_overlay_visible => {
             if app.csv_data.is_dirty {
                 app.status_message = Some(StatusMessage::from(
                     "Unsaved changes! Use :q! to force quit",
@@ -60,52 +60,54 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
 
         // Toggle help/cheatsheet
         KeyCode::Char('?') => {
-            app.ui.show_cheatsheet = !app.ui.show_cheatsheet;
+            app.view_state.help_overlay_visible = !app.view_state.help_overlay_visible;
         }
 
         // Close help overlay
-        KeyCode::Esc if app.ui.show_cheatsheet => {
-            app.ui.show_cheatsheet = false;
+        KeyCode::Esc if app.view_state.help_overlay_visible => {
+            app.view_state.help_overlay_visible = false;
         }
 
         // Clear pending command on Esc
-        KeyCode::Esc if app.pending_key.is_some() => {
-            app.pending_key = None;
-            app.pending_key_time = None;
+        KeyCode::Esc if app.input_state.pending_command.is_some() => {
+            app.input_state.pending_command = None;
+            app.input_state.pending_command_time = None;
             app.status_message = Some(StatusMessage::from("Command cancelled"));
         }
 
         // File switching - Previous file
-        KeyCode::Char('[') if !app.ui.show_cheatsheet && app.csv_files.len() > 1 => {
-            app.current_file_index = if app.current_file_index == 0 {
-                app.csv_files.len() - 1
-            } else {
-                app.current_file_index - 1
-            };
-            return Ok(InputResult::ReloadFile);
+        KeyCode::Char('[')
+            if !app.view_state.help_overlay_visible && app.session.has_multiple_files() =>
+        {
+            if app.session.prev_file() {
+                return Ok(InputResult::ReloadFile);
+            }
         }
 
         // File switching - Next file
-        KeyCode::Char(']') if !app.ui.show_cheatsheet && app.csv_files.len() > 1 => {
-            app.current_file_index = (app.current_file_index + 1) % app.csv_files.len();
-            return Ok(InputResult::ReloadFile);
+        KeyCode::Char(']')
+            if !app.view_state.help_overlay_visible && app.session.has_multiple_files() =>
+        {
+            if app.session.next_file() {
+                return Ok(InputResult::ReloadFile);
+            }
         }
 
         // Start multi-key sequences (only when help is closed)
-        KeyCode::Char('g') if !app.ui.show_cheatsheet => {
-            app.pending_key = Some(PendingCommand::G);
-            app.pending_key_time = Some(std::time::Instant::now());
+        KeyCode::Char('g') if !app.view_state.help_overlay_visible => {
+            app.input_state.pending_command = Some(PendingCommand::G);
+            app.input_state.pending_command_time = Some(std::time::Instant::now());
             return Ok(InputResult::Continue);
         }
 
-        KeyCode::Char('z') if !app.ui.show_cheatsheet => {
-            app.pending_key = Some(PendingCommand::Z);
-            app.pending_key_time = Some(std::time::Instant::now());
+        KeyCode::Char('z') if !app.view_state.help_overlay_visible => {
+            app.input_state.pending_command = Some(PendingCommand::Z);
+            app.input_state.pending_command_time = Some(std::time::Instant::now());
             return Ok(InputResult::Continue);
         }
 
         // Navigation (only when help is closed)
-        _ if !app.ui.show_cheatsheet => navigation::handle_navigation(app, key.code)?,
+        _ if !app.view_state.help_overlay_visible => navigation::handle_navigation(app, key.code)?,
 
         _ => {}
     }
@@ -119,8 +121,8 @@ fn handle_multi_key_command(
     first: PendingCommand,
     second: KeyCode,
 ) -> Result<InputResult> {
-    app.pending_key = None;
-    app.pending_key_time = None;
+    app.input_state.pending_command = None;
+    app.input_state.pending_command_time = None;
 
     match (first, second) {
         // gg - Go to first row
@@ -131,19 +133,19 @@ fn handle_multi_key_command(
 
         // zt - Top of screen
         (PendingCommand::Z, KeyCode::Char('t')) => {
-            app.ui.viewport_mode = ViewportMode::Top;
+            app.view_state.viewport_mode = ViewportMode::Top;
             app.status_message = Some(StatusMessage::from("View: top"));
         }
 
         // zz - Center of screen
         (PendingCommand::Z, KeyCode::Char('z')) => {
-            app.ui.viewport_mode = ViewportMode::Center;
+            app.view_state.viewport_mode = ViewportMode::Center;
             app.status_message = Some(StatusMessage::from("View: center"));
         }
 
         // zb - Bottom of screen
         (PendingCommand::Z, KeyCode::Char('b')) => {
-            app.ui.viewport_mode = ViewportMode::Bottom;
+            app.view_state.viewport_mode = ViewportMode::Bottom;
             app.status_message = Some(StatusMessage::from("View: bottom"));
         }
 
@@ -162,7 +164,7 @@ fn handle_multi_key_command(
 fn handle_count_prefix(app: &mut App, digit: char) -> Result<InputResult> {
     let digit_value = digit.to_digit(10).unwrap() as usize;
 
-    app.command_count = match app.command_count.take() {
+    app.input_state.command_count = match app.input_state.command_count.take() {
         None => NonZeroUsize::new(digit_value),
         Some(existing) => {
             let new_value = existing.get() * 10 + digit_value;
