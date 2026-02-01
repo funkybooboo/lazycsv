@@ -1,4 +1,4 @@
-use super::{navigation, App, Mode, ViewportMode};
+use crate::app::{navigation, App, Mode, ViewportMode};
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 
@@ -21,7 +21,7 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<bool> {
         if time.elapsed().as_millis() > MULTI_KEY_TIMEOUT_MS {
             app.pending_key = None;
             app.pending_key_time = None;
-            app.status_message = Some("Command timeout".to_string());
+            app.status_message = Some("Command timeout".into());
         }
     }
 
@@ -49,7 +49,7 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<bool> {
         // Quit - vim-style (warns if unsaved in Phase 2)
         KeyCode::Char('q') if !app.ui.show_cheatsheet => {
             if app.csv_data.is_dirty {
-                app.status_message = Some("Unsaved changes! Use :q! to force quit".to_string());
+                app.status_message = Some("Unsaved changes! Use :q! to force quit".into());
             } else {
                 app.should_quit = true;
             }
@@ -69,7 +69,7 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<bool> {
         KeyCode::Esc if app.pending_key.is_some() => {
             app.pending_key = None;
             app.pending_key_time = None;
-            app.status_message = Some("Command cancelled".to_string());
+            app.status_message = Some("Command cancelled".into());
         }
 
         // File switching - Previous file
@@ -119,29 +119,29 @@ fn handle_multi_key_command(app: &mut App, first: KeyCode, second: KeyCode) -> R
         // gg - Go to first row
         (KeyCode::Char('g'), KeyCode::Char('g')) => {
             navigation::goto_first_row(app);
-            app.status_message = Some("Jumped to first row".to_string());
+            app.status_message = Some("Jumped to first row".into());
         }
 
         // zt - Top of screen
         (KeyCode::Char('z'), KeyCode::Char('t')) => {
             app.ui.viewport_mode = ViewportMode::Top;
-            app.status_message = Some("View: top".to_string());
+            app.status_message = Some("View: top".into());
         }
 
         // zz - Center of screen
         (KeyCode::Char('z'), KeyCode::Char('z')) => {
             app.ui.viewport_mode = ViewportMode::Center;
-            app.status_message = Some("View: center".to_string());
+            app.status_message = Some("View: center".into());
         }
 
         // zb - Bottom of screen
         (KeyCode::Char('z'), KeyCode::Char('b')) => {
             app.ui.viewport_mode = ViewportMode::Bottom;
-            app.status_message = Some("View: bottom".to_string());
+            app.status_message = Some("View: bottom".into());
         }
 
         _ => {
-            app.status_message = Some(format!("Unknown command: {:?} {:?}", first, second));
+            app.status_message = Some(format!("Unknown command: {:?} {:?}", first, second).into());
         }
     }
 

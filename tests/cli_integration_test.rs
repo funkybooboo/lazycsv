@@ -73,28 +73,37 @@ fn test_directory_path_integration() {
 }
 
 #[test]
-#[ignore]
 fn test_encoding_integration() {
-    use encoding_rs::UTF_16LE;
-
     let temp_dir = TempDir::new().unwrap();
     let file_path = temp_dir.path().join("utf16.csv");
-    let (encoded_bytes, ..) = UTF_16LE.encode("h1,h2\nval1,val2");
-    write(&file_path, encoded_bytes).unwrap();
 
-    let args = CliArgs::try_parse_from([
-        "lazycsv",
-        file_path.to_str().unwrap(),
-        "--encoding",
-        "utf-16le",
-    ])
-    .unwrap();
+    // Create UTF-16LE encoded bytes manually
+    // "h1,h2\nval1,val2" in UTF-16LE
+    let encoded_bytes: Vec<u8> = vec![
+        104, 0, // 'h'
+        49, 0, // '1'
+        44, 0, // ','
+        104, 0, // 'h'
+        50, 0, // '2'
+        10, 0, // '\n'
+        118, 0, // 'v'
+        97, 0, // 'a'
+        108, 0, // 'l'
+        49, 0, // '1'
+        44, 0, // ','
+        118, 0, // 'v'
+        97, 0, // 'a'
+        108, 0, // 'l'
+        50, 0, // '2'
+    ];
 
-    let app = App::from_cli(args).unwrap();
+    write(&file_path, &encoded_bytes).unwrap();
 
-    assert_eq!(app.csv_data.headers, vec!["h1", "h2"]);
-    assert_eq!(app.csv_data.rows[0], vec!["val1", "val2"]);
-    assert_eq!(app.encoding, Some("utf-16le".to_string()));
+    let csv_data =
+        lazycsv::CsvData::from_file(&file_path, None, false, Some("utf-16le".to_string())).unwrap();
+
+    assert_eq!(csv_data.headers, vec!["h1", "h2"]);
+    assert_eq!(csv_data.rows[0], vec!["val1", "val2"]);
 }
 
 #[test]

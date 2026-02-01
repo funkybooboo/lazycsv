@@ -5,6 +5,10 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 ## Version Milestones
 
 - **v0.1.0** - Foundation ✅ (Complete)
+- **v0.1.1** - Foundation Cleanup ✅ (Complete)
+- **v0.1.2** - Test Coverage Expansion ✅ (Complete)
+- **v0.1.3** - Rust Idioms & Code Quality ✅ (Complete)
+- **v0.1.4** - Comprehensive Test Coverage ✅ (Complete)
 - **v0.2.0** - Type Safety Refactor
 - **v0.3.0** - Advanced Navigation
 - **v0.4.0** - Quick Editing
@@ -29,7 +33,18 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 - **Ephemeral Edits:** No changes are saved to the file until the user explicitly commands it with `:w` or `:wq`. All cell edits update an in-memory representation first.
 - **Intuitive UX:** While inspired by Vim, the UX should be clean, clear, and intuitive.
 - **In-Memory Only:** All CSV files are loaded entirely into RAM for maximum performance.
+- **CSV Only:** No Excel (.xlsx) support - CSV files only for simplicity.
 - **Robust Error Handling:** Handle errors gracefully with clear user feedback.
+
+## CLI Options
+
+*These foundational options are implemented in early versions*
+
+- **`--delimiter <CHAR>`**: Specify custom CSV delimiter (`,`, `;`, `\t`, etc.) - Default: `,`
+- **`--no-headers`**: Indicate file has no header row - Default: headers present
+- **`--encoding <ENCODING>`**: Specify file encoding (e.g., `utf-8`, `latin1`, `iso-8859-1`)
+  - Fallback: If specified encoding fails, automatically fall back to UTF-8 with warning
+  - Default: UTF-8
 
 ---
 
@@ -43,158 +58,6 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 - ✅ Help overlay (?)
 - ✅ File scanning and loading
 - ✅ Row/column numbering (A, B, C...)
-
----
-
-## v0.1.1 - Foundation Cleanup (Patch Release) ✅
-
-### Version 0.1.1: Code Quality & Safety Fixes ✅
-
-*Address audit findings before v0.2.0 refactor*
-
-#### Critical Fixes (Must Do) ✅
-- [x] **Fix Clippy Error 1:** `csv_data.rs:89` - Change `rows.get(0)` to `rows.first()`
-- [x] **Fix Clippy Error 2:** `csv_data.rs:95` - Change `.unwrap_or_else(Vec::new)` to `.unwrap_or_default()`
-- [x] **Fix Dangerous unwrap():** `app/mod.rs:101` - Replace `cli_args.path.unwrap()` with proper error handling using `.context("No path provided")?`
-
-#### Code Cleanup (Should Do) ✅
-- [x] **Update Phase Comments:** Replace all "// Phase X" comments with version numbers
-  - `csv_data.rs` lines 125, 129
-  - `app/mod.rs` lines 15-17, 93
-  - `app/input.rs` line 13
-- [x] **Update Mode Comments:** Clean up commented future modes in `Mode` enum
-- [x] **Verify Clippy Clean:** Run `cargo clippy -- -D warnings` and ensure zero errors ✅ (0 warnings)
-
-#### Test File Fixes ✅
-- [x] **Fix Test Warnings:** `file_scanner_test.rs` - Changed `len() >= 1` to `!is_empty()` (4 occurrences)
-- [x] **Fix Test Warnings:** `csv_edge_cases_test.rs` - Removed empty string from `writeln!()`
-- [x] **Fix Test Warnings:** `cli_test.rs` & `cli_integration_test.rs` - Removed needless borrows `&[...]` → `[...]` (16 occurrences)
-
-#### Verification ✅
-- [x] **Run Tests:** Confirm all tests pass after fixes ✅ (51 tests passing)
-- [x] **Build Check:** Verify release build succeeds ✅ (clean build)
-- [x] **Clippy Check:** Full check with `--all-targets --all-features` ✅ (0 warnings across all targets)
-
----
-
-## v0.1.2 - Test Coverage Expansion ✅ COMPLETE
-
-### Version 0.1.2: Comprehensive Test Suite ✅
-
-*Fill critical test gaps before v0.2.0 refactor*
-
-#### Critical Test Gaps (P0 - Must Have) ✅ COMPLETE
-- [x] **Multi-Key Command Tests:**
-  - [x] `test_multi_key_gg_goes_to_first_row()` - Test `gg` command ✅
-  - [x] `test_multi_key_G_goes_to_last_row()` - Test `G` command ✅
-  - [x] `test_multi_key_2G_goes_to_row_2()` - Test count + G ✅
-  - [x] `test_count_prefix_2j_moves_down_2_rows()` - Count prefix ✅
-  - [x] `test_count_prefix_0_goes_to_first_column()` - 0 behavior ✅
-  - [x] `test_count_prefix_clears_after_use()` - State cleanup ✅
-
-- [x] **Count Prefix Tests (COMPLETE):**
-  - [x] `test_count_prefix_2j_moves_down_2_rows()` - Count prefix ✅
-  - [x] `test_count_prefix_2l_moves_right_2_columns()` - Count + l ✅
-  - [x] `test_count_prefix_0_goes_to_first_column()` - 0 behavior ✅
-  - [x] `test_count_prefix_clears_after_use()` - State cleanup ✅
-
-#### Important Test Gaps (P1 - Should Have) ✅ COMPLETE
-- [x] **Error Handling Tests:**
-  - [x] `test_error_file_not_found_shows_message()` - File not found ✅
-  - [x] `test_error_malformed_csv_recovered()` - Invalid CSV ✅
-  - [x] `test_scan_empty_directory_no_csvs()` - Empty dir ✅
-
-- [x] **File Switching Edge Cases:**
-  - [x] `test_file_switch_single_file_no_op()` - Only 1 file ✅
-  - [x] `test_file_switch_at_first_boundary()` - First file wrap ✅
-  - [x] `test_file_switch_at_last_boundary()` - Last file wrap ✅
-  - [x] `test_file_switch_preserves_position()` - Position ✅
-
-- [x] **State Consistency Tests:**
-  - [x] `test_state_after_help_toggle()` - Help + navigation ✅
-  - [x] `test_state_comprehensive_after_file_switch()` - File switch state ✅
-  - [x] `test_dirty_flag_behavior()` - Dirty flag ✅
-
-- [x] **Input Edge Cases:**
-  - [x] `test_special_keys_ignored_in_normal_mode()` - Special keys ✅
-
-#### Target Metrics ✅ ALL ACHIEVED
-- [x] **Reach 70+ tests** - **ACHIEVED: 136 tests!** ✅
-- [x] **Multi-key command coverage** - 100% ✅
-- [x] **Count prefix coverage** - 100% ✅
-- [x] **Error handling coverage** - Core cases covered ✅
-- [x] **All tests passing** - 136/136 passing ✅
-- [x] **90%+ code coverage** for input handling
-- [x] **100% coverage** for multi-key commands
-- [x] **All P0 tests passing** before v0.2.0
-
----
-
-## v0.1.3 - Rust Idioms & Code Quality
-
-### Version 0.1.3: Idiomatic Rust Refactoring
-
-*Address code quality issues and make code more idiomatic before v0.2.0*
-
-#### Critical Issues Found
-
-**1. Test Organization (Major Issue)**
-- [ ] **Move unit tests inline:** All tests are in separate `tests/` directory
-  - Should use `#[cfg(test)] mod tests { }` in source files
-  - Keep integration tests in `tests/`, move unit tests inline
-  - Benefits: Tests are with code they test, better visibility, faster compilation
-  - Files to refactor: `app/mod.rs`, `app/input.rs`, `app/navigation.rs`, `csv_data.rs`, `ui/table.rs`, `ui/status.rs`
-
-**2. String Allocations (19 found)**
-- [ ] **Reduce `.to_string()` calls:** Many could use `&'static str` or `Cow<str>`
-  - `input.rs`: 8 calls for status messages
-  - `mod.rs`: 3 calls for cloning
-  - `csv_data.rs`: 2 calls for headers
-  - `ui/*.rs`: 6 calls for UI strings
-  - Replace with: `&'static str` for constants, `Cow<str>` for flexibility
-
-**3. Clone Usage (Potential optimization)**
-- [ ] **Audit clone calls:** 19 `.clone()`, `.to_string()`, `.to_owned()` calls
-  - Some clones may be unnecessary with better lifetime management
-  - Use references where possible (`&str` instead of `String`)
-  - Pass by reference instead of cloning
-
-**4. Function Signatures**
-- [ ] **Use `&[T]` instead of `&Vec<T>`:** More flexible, accepts slices
-- [ ] **Return `&str` instead of `String`:** When possible, avoid allocations
-  - `column_index_to_letter()` returns `String`, could return `&'static str`
-
-**5. Iterator Usage**
-- [ ] **Replace manual index loops:** 3 found with `for _ in 0..count`
-  - Use iterator methods like `.take()`, `.skip()`, `.step_by()`
-  - More idiomatic and often more efficient
-
-**6. Error Handling**
-- [ ] **Use `?` operator more:** Some places manually match on Result
-- [ ] **Use `.context()` from anyhow:** Better error messages
-- [ ] **Consider `thiserror` for custom errors:** More structured than anyhow for library code
-
-**7. Traits Implementation**
-- [ ] **Implement `Default` trait:** For `App`, `UiState`, `CsvData`
-  - Remove manual `Default::default()` calls
-  - Use `#[derive(Default)]` where possible
-- [ ] **Use `From`/`Into` traits:** For conversions instead of helper functions
-
-**8. Module Organization**
-- [ ] **Re-export commonly used items:** Reduce deep imports
-- [ ] **Use `use crate::` consistently:** Some mix of relative and absolute paths
-
-#### Code Smells to Fix
-- [ ] **Magic numbers:** Replace hardcoded values (20, 1000, etc.) with constants
-- [ ] **String literals in code:** Move to constants or config
-- [ ] **Large functions:** Break up functions over 50 lines
-  - `input.rs:handle_key()` - 60+ lines
-  - `navigation.rs:handle_navigation()` - 80+ lines
-
-#### Documentation
-- [ ] **Add `#![warn(missing_docs)]`:** Enforce documentation
-- [ ] **Document all public APIs:** Add missing doc comments
-- [ ] **Add examples in doc comments:** Show usage
 
 ---
 
@@ -334,9 +197,12 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
   - Text wrapping and scrolling for multi-line content
   - Show mode indicator within magnifier (`-- INSERT --`, `-- NORMAL --`)
 - [ ] **Navigation Between Cells:**
-  - `Ctrl-h/j/k/l` moves magnifier to adjacent cell
-  - If unsaved changes exist, prompt: "Save changes? (y/n/cancel)"
-  - At edge cells, Ctrl-hjkl is blocked (no wrapping)
+  - `Ctrl-h/j/k/l` moves magnifier to adjacent cell (left/down/up/right)
+  - If unsaved changes exist in current cell, show prompt: "Save changes? (y/n/cancel)"
+    - Press `y`: Save to memory (`:w`), then move to adjacent cell
+    - Press `n`: Discard changes, move to adjacent cell
+    - Press ESC or `cancel`: Stay in current cell, do not move
+  - At edge cells (first/last row or column), Ctrl-hjkl is blocked (no wrapping, no-op)
 - [ ] **Error Handling:**
   - If vim editor fails to initialize, fall back to simple text area
   - Handle empty cells gracefully
@@ -366,28 +232,58 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 
 ### Version 0.7.0: Row Manipulation
 
-*Add, delete, copy, and paste rows*
+*Add and delete rows*
 
 - [ ] **Add Row:**
   - `o`: Add row below current, automatically enter Insert mode for first cell of new row
   - `O`: Add row above current, automatically enter Insert mode for first cell
-  - Support count prefixes: `2o` adds 2 rows
+  - Support count prefixes: `2o` adds 2 rows (creates 2 rows, enters Insert on first)
+  - Cursor moves to first cell of new row
 - [ ] **Delete Row:**
   - `dd`: Delete current row
-  - Support count prefixes: `3dd` deletes 3 rows
+  - Support count prefixes: `3dd` deletes 3 rows starting from current
+  - Cursor stays in same position (or moves up if at end)
 - [ ] **New Row Behavior:**
   - All cells start as empty strings
-  - After creating row, cursor moves to new row's first cell
-  - User can press Esc to exit Insert mode without editing
-- [ ] **Copy/Paste:**
-  - `yy`: Copy (yank) current row
-  - `5yy`: Copy 5 rows
-  - `p`: Paste row below current
-  - `P`: Paste row above current
-- [ ] **Cursor Positioning:** After operations, cursor moves appropriately
+  - After creating row, automatically enter Insert mode for first cell (leftmost column)
+  - User can press Esc to exit Insert mode without editing, returns to Normal mode
+- [ ] **Cursor Positioning:** After operations, cursor moves to appropriate position
 - [ ] **Error Handling:**
-  - Allow deleting last row (file can have zero data rows)
-  - Handle deleting more rows than available
+  - Allow deleting last row (file can have zero data rows, only headers)
+  - If deleting more rows than available (e.g., `5dd` with only 2 rows left), delete what's available
+  - Show status message: "Deleted 2 rows" (actual count)
+
+---
+
+### Version 0.7.1: Copy/Paste System
+
+*Comprehensive yank and paste operations*
+
+- [ ] **Internal Clipboard:** App-internal clipboard for yank/paste operations
+- [ ] **Yank Operations (Copy):**
+  - `yy`: Yank (copy) current row
+  - `5yy`: Yank 5 rows starting from current
+  - `yw`: Yank current cell (word-level, single cell)
+  - `yc`: Yank entire column (all rows in current column)
+  - `Y`: Yank from current cell to end of row (like vim's Y)
+- [ ] **Paste Operations:**
+  - `p`: Paste below current row (for rows), or after current cell (for cells)
+  - `P`: Paste above current row (for rows), or before current cell (for cells)
+  - Pasting rows: Inserts yanked rows at cursor position
+  - Pasting cells: Replaces current cell with yanked content
+  - Pasting columns: Inserts yanked column after current column
+- [ ] **Clipboard State:**
+  - Track clipboard type (row, cell, column) to determine paste behavior
+  - Show clipboard status in status bar: "Yanked 3 rows" or "Yanked cell B5"
+  - Clipboard persists across operations until overwritten
+- [ ] **System Clipboard Integration:**
+  - `Ctrl+c`: Copy current cell to system clipboard (OS clipboard)
+  - `Ctrl+v`: Paste from system clipboard into current cell
+  - System clipboard operates independently from internal yank/paste
+- [ ] **Error Handling:**
+  - Cannot paste if clipboard is empty (show message: "Nothing in register")
+  - Handle clipboard type mismatches gracefully
+  - Ensure paste operations maintain data integrity
 
 ---
 
@@ -395,24 +291,31 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 
 ### Version 0.8.0: Column Manipulation
 
-*Vim-style column operators (more intuitive than commands)*
+*Vim-style column operators*
 
 - [ ] **Column Operators:**
   - `dc`: Delete current column (like `dd` for rows)
-  - `yc`: Yank (copy) current column (like `yy` for rows)
+  - `yc`: Yank (copy) current column (already in v0.7.1, this handles paste integration)
   - `pc`: Paste column after current (like `p` for rows)
   - `Pc`: Paste column before current (like `P` for rows)
-- [ ] **Add Column (Header Context):**
-  - When in header row, `o` adds column after and enters HeaderEdit mode
-  - When in header row, `O` adds column before and enters HeaderEdit mode
+- [ ] **Add Column Commands:**
+  - `:addcol`: Add column after current column, enter HeaderEdit mode for new column
+  - `:addcol before`: Add column before current column, enter HeaderEdit mode
+  - `:addcol <name>`: Add column with specified name after current
 - [ ] **New Column Behavior:**
-  - All cells start as empty strings
-  - After adding column with `o`/`O`, automatically enter HeaderEdit mode
-- [ ] **Cursor Positioning:** After adding, cursor moves to header cell of new column
+  - All cells in new column start as empty strings
+  - After adding column, automatically enter HeaderEdit mode (`gh`) for new column's header
+  - User provides header name (or leaves empty) and presses Enter to continue
+  - Cursor moves to header cell of new column in HeaderEdit mode
+- [ ] **Delete Column:**
+  - `dc` command deletes current column
+  - Support count prefix: `3dc` deletes 3 columns starting from current
+  - Sets `is_dirty = true`
+- [ ] **Cursor Positioning:** After column operations, cursor moves to appropriate cell
 - [ ] **Error Handling:**
-  - Allow deleting last column
-  - No confirmation needed (undo with `u`)
-  - Clear feedback on operations
+  - Allow deleting last column (file can have zero columns - edge case)
+  - If deleting more columns than available, delete what's available
+  - Show status message: "Deleted 2 columns" or "Added column C"
 
 ---
 
@@ -458,14 +361,22 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 
 *Undo and redo for all mutations*
 
-- [ ] **Create Command History Stack:** Track all mutations (edits, row/col ops, header edits, toggle)
+- [ ] **Create Command History Stack:** Track all mutations (edits, row/col ops, header edits, toggle, sort, filter)
 - [ ] **Keybindings:**
   - `u`: Undo last operation
   - `Ctrl+r`: Redo
-  - `.` (dot command): Repeat last edit operation
-- [ ] **Status Feedback:** Show "Undo: Edit cell A5" or similar
-- [ ] **History Limits:** Up to 100 operations
-- [ ] **Error Handling:** Ensure undo/redo operations are robust
+  - `.` (dot command): Repeat last edit operation (vim-style)
+- [ ] **Status Feedback:** Show "Undo: Edit cell A5" or similar in status bar
+- [ ] **History Limits:** Unlimited undo depth (keep all changes in memory until app closes)
+- [ ] **Undo Scope:** All undoable operations:
+  - Cell edits (Insert mode, Magnifier)
+  - Row operations (add, delete, paste)
+  - Column operations (add, delete, paste)
+  - Header edits
+  - Toggle headers
+  - Sort operations
+  - Filter operations
+- [ ] **Error Handling:** Ensure undo/redo operations are robust, handle undo stack at boundaries
 
 ### Version 1.0.1: Marks System
 
@@ -484,22 +395,35 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 
 ## v1.1.0 - Search & Visual
 
-### Version 1.1.0: Fuzzy Search
+### Version 1.1.0: Search
 
-*Find rows, columns, and cell data*
+*Find cell data with literal text search*
 
 - [ ] **Keybindings:**
-  - `/`: Open fuzzy finder
-  - `n`: Next match
-  - `N`: Previous match
-  - `*`: Search for current cell value
-- [ ] **Search Overlay:**
-  - Centered, live results as you type
-  - Shows match type: [Row], [Col], [Cell]
-  - `j`/`k` to navigate results
-  - `Enter` to jump, `Esc` to cancel
-- [ ] **Fuzzy Matching:** Scoring-based fuzzy matching
-- [ ] **Error Handling:** Handle no matches found, invalid search patterns
+  - `/`: Enter search mode (status bar input)
+  - `n`: Jump to next match
+  - `N`: Jump to previous match
+  - `*`: Search for exact content of current cell (like vim)
+  - `#`: Search backwards for current cell content (like vim)
+- [ ] **Search Mode:**
+  - `/` opens search input in status bar (like vim command mode)
+  - Type search pattern, press Enter to find first match
+  - `Esc` cancels search input
+  - Search is case-insensitive by default
+  - Search is literal text matching (not regex, not fuzzy)
+- [ ] **Search Behavior:**
+  - Highlights all matches in the visible area
+  - `n` jumps cursor to next match (wraps to top)
+  - `N` jumps cursor to previous match (wraps to bottom)
+  - Show "Pattern not found" if no matches
+  - Show match count in status bar: "Match 3 of 15"
+- [ ] **Search State:**
+  - Last search pattern persists (can use `n`/`N` without re-searching)
+  - Clear search highlights with `:noh` command (like vim)
+- [ ] **Error Handling:** Handle no matches found, empty search pattern
+
+
+---
 
 ### Version 1.1.1: Visual Selection
 
@@ -513,9 +437,10 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
   - `y`: Yank (copy) selection
   - `o`: Move cursor to other end of selection
   - `Esc`: Exit visual mode
-- [ ] **Visual Indicators:** Use `══` markers on selected rows
+- [ ] **Visual Indicators:** Use highlighting or `══` markers on selected rows
 - [ ] **Visual Block:** Rectangle selection for copying/pasting cell blocks
 - [ ] **Selection Logic:** Robust selection handling
+- [ ] **Integration:** Visual selection works with yank/delete operations from v0.7.1
 
 ---
 
@@ -525,29 +450,47 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 
 *Sort data by columns*
 
-- [ ] **Keybinding:** `s` - Sort by current column (toggle asc/desc)
 - [ ] **Commands:**
-  - `:sort`: Sort ascending
-  - `:sort!`: Sort descending
-- [ ] **Smart Sorting:** Numeric sort for numbers, text sort for strings
-- [ ] **Header Indicator:** Show ↑ or ↓ in header
+  - `:sort`: Sort current column ascending (toggle to descending on repeat)
+  - `:sort!`: Force sort descending
+  - `:sort <column>`: Sort by specified column name or letter (e.g., `:sort Age` or `:sort B`)
+- [ ] **Smart Sorting:** Numeric sort for numbers, text sort for strings, auto-detect type
+- [ ] **Header Indicator:** Show ↑ or ↓ in header to indicate sort column and direction
+- [ ] **Header Row:** Header row always stays at top, never gets sorted with data
 - [ ] **Undoable:** Sort operations tracked in undo history
-- [ ] **Error Handling:** Handle sorting on mixed-type columns
+- [ ] **Error Handling:** Handle sorting on mixed-type columns (warn user, treat as text)
 
 ### Version 1.2.1: Filtering
 
 *Filter rows by criteria*
 
-- [ ] **Command:** `:filter <expr>` (e.g., `:filter Age>30`, `:filter Name contains "John"`)
+- [ ] **Command:** `:filter <expr>` (e.g., `:filter Age > 30`, `:filter Name contains "John"`)
+- [ ] **Column Specification:**
+  - Support both column names and letters: `:filter Age > 30` or `:filter B > 30`
+  - Case-insensitive column name matching
 - [ ] **Filter Operators:**
-  - `=`: Equals
-  - `!=`: Not equals
+  - `=`: Equals (case-insensitive for text)
+  - `!=`: Not equals (case-insensitive for text)
   - `>`, `<`, `>=`, `<=`: Comparisons (numeric)
-  - `contains`: Contains substring
-  - `starts`: Starts with
-  - `ends`: Ends with
-- [ ] **Clear Filter:** `:nofilter` or `:nof`
-- [ ] **Error Handling:** Validate filter syntax, handle invalid column names
+  - `contains`: Contains substring (case-insensitive)
+  - `starts`: Starts with (case-insensitive)
+  - `ends`: Ends with (case-insensitive)
+- [ ] **Multiple Conditions:**
+  - Support AND logic: `:filter Age > 30 AND City = NYC`
+  - All conditions must match for row to be included
+  - Syntax: `condition1 AND condition2 AND condition3 ...`
+- [ ] **Filter Behavior:**
+  - Filtered rows are hidden from view (not deleted)
+  - Row numbers update to show only visible rows
+  - Status bar shows: "Filtered: 45 of 100 rows"
+  - Editing, navigation, and operations only affect visible (filtered) rows
+- [ ] **Clear Filter:**
+  - `:nofilter` or `:nof` command removes all filters
+  - `:filter` with no arguments also clears filter
+- [ ] **Error Handling:**
+  - Validate filter syntax, show clear error for invalid syntax
+  - Handle invalid column names: "Column 'Xyz' not found"
+  - Handle type mismatches: warn if comparing text column with numeric operator
 
 ---
 
@@ -572,32 +515,83 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 *Freeze columns and adjust widths*
 
 - [ ] **Column Freezing:**
-  - `:freeze` command locks current column and all to its left
-  - Frozen columns remain visible during horizontal scrolling
-  - Visual indicator on frozen column headers
+  - `:freeze` command locks current column and all columns to its left
+  - `:freeze <column>` freezes specified column and all to its left (e.g., `:freeze C`)
+  - Frozen columns remain visible at left during horizontal scrolling
+  - Visual indicator on frozen column headers (e.g., lock icon or different color)
+  - `:unfreeze` or `:freeze off` command removes all frozen columns
 - [ ] **Column Sizing:**
-  - Manual: `Ctrl+Left/Right` to resize
-  - Auto: `:autowidth` resizes current column to fit longest visible data
-- [ ] **Error Handling:** Ensure resizing/freezing works with horizontal scrolling
+  - **Manual Resizing:** `Ctrl+Left/Right` adjusts current column width
+  - **Auto-sizing Commands:**
+    - `:autowidth`: Resize current column to fit longest visible data in that column
+    - `:autowidth <column>`: Resize specified column (e.g., `:autowidth B`)
+    - `:autowidth *`: Auto-resize ALL columns to fit their content
+  - Width is constrained by config.toml min/max values
+- [ ] **Persistence:** Column widths and freeze state saved in session (v1.4.1)
+- [ ] **Error Handling:**
+  - Ensure resizing/freezing works correctly with horizontal scrolling
+  - Handle edge cases: frozen columns wider than terminal, all columns frozen
 
 ### Version 1.4.1: Session Persistence
 
 *Save and restore view state*
 
 - [ ] **Save View State:**
-  - On quit, save cursor position, scroll offsets, sort order, filters, frozen columns
-  - Store in `~/.cache/lazycsv/`
+  - **When:** Only on quit (`:q`, `:wq`, or normal exit)
+  - **What to Save:**
+    - Cursor position (row and column)
+    - Scroll offsets (horizontal and vertical)
+    - Sort state (column, direction)
+    - Active filters
+    - Frozen columns
+    - Column widths (if manually adjusted)
+  - **Where:** Store in `~/.cache/lazycsv/sessions/` (or `$XDG_CACHE_HOME/lazycsv/sessions/`)
+- [ ] **File Identification:**
+  - Use absolute file path + last modified timestamp as session key
+  - Format: Hash of `"{path}:{mtime}"` as session filename
+  - If file is moved or modified, session won't restore (intentional - stale state)
 - [ ] **Restore View State:**
-  - On startup, restore to previous state if session file exists
-- [ ] **Error Handling:** Handle corrupted or outdated session files gracefully
+  - On startup, check if session file exists for current CSV
+  - If found and file timestamp matches, restore state
+  - If timestamp differs, discard session (file was modified)
+  - Silently skip restoration on any error
+- [ ] **Session Management:**
+  - Automatically clean up old session files (>30 days unused)
+  - Option to disable: `persist_session = false` in config.toml
+- [ ] **Error Handling:**
+  - Handle corrupted session files gracefully (discard and continue)
+  - Handle outdated session format (from older lazycsv version)
 
-### Version 1.4.2: Theming
+### Version 1.4.2: Configuration System
 
-*Custom color themes*
+*Customization via config.toml*
 
-- [ ] **Configuration:** Allow custom colors in `config.toml`
-- [ ] **Themeable Elements:** Headers, selected cell, dirty indicator, status bar
-- [ ] **Fallback:** Monochrome theme if config is invalid
+- [ ] **Config File Location:** `~/.config/lazycsv/config.toml` (or `$XDG_CONFIG_HOME/lazycsv/config.toml`)
+- [ ] **Default Delimiter:**
+  - `default_delimiter = ","` - Set default CSV delimiter
+  - Overridden by `--delimiter` CLI flag
+- [ ] **Color Theme:**
+  - Customize colors for UI elements
+  - **Themeable Elements:**
+    - Header row background/foreground
+    - Selected cell highlight
+    - Dirty indicator (`*`)
+    - Status bar background/foreground
+    - Normal text, cursor
+  - **Color Format:** RGB hex (`#RRGGBB`) or named colors (`"red"`, `"blue"`, etc.)
+  - **Fallback:** If theme config is invalid, fall back to default monochrome theme
+- [ ] **Key Bindings:**
+  - Allow remapping keys to custom bindings
+  - Example: Remap `hjkl` to arrow keys, or `dd` to different key
+  - Validation: Prevent conflicting bindings
+- [ ] **Column Width Defaults:**
+  - `default_column_width = 20` - Default width for columns
+  - `min_column_width = 5` - Minimum allowed width
+  - `max_column_width = 100` - Maximum allowed width
+- [ ] **Error Handling:**
+  - Validate config on load
+  - Show clear errors for invalid config entries
+  - Fall back to defaults for invalid values
 
 ---
 
@@ -608,27 +602,36 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 *Advanced data manipulation*
 
 - [ ] **Regex Search & Replace:**
-  - `:s/pattern/replacement/g` command
-  - Apply to column or whole file
+  - **Syntax:** `:s/pattern/replacement/flags scope`
+  - **Scope (required):**
+    - `column <name>`: Apply to all rows in specified column (e.g., `:s/foo/bar/g column Age`)
+    - `column <letter>`: Apply to column by letter (e.g., `:s/foo/bar/g column B`)
+    - `all`: Apply to entire file, all cells (e.g., `:s/foo/bar/g all`)
+  - **Flags:**
+    - `g`: Global replace all matches in each cell (default: replace first match only)
+    - `i`: Case-insensitive matching (default: case-sensitive)
+  - **Examples:**
+    - `:s/john/Jane/gi column Name` - Replace all 'john' (case-insensitive) with 'Jane' in Name column
+    - `:s/^\s+//g all` - Remove leading whitespace from all cells
+  - Sets `is_dirty = true`, undoable
 - [ ] **Transpose View:**
   - `:transpose` command toggles between normal and transposed view
+  - Rows become columns, columns become rows
+  - Transposed view is **fully editable** - all edit operations work normally
+  - Cell edits, row/column operations, all apply in transposed space
+  - Toggling back to normal view preserves all edits
+  - Visual indicator in status bar: "-- TRANSPOSED --"
+  - Undoable (transpose itself is an undoable operation)
 - [ ] **Advanced Sorting:**
-  - Multi-column sort: `:sort State, City`
-  - Natural sorting for alphanumeric (e.g., `file1`, `file2`, `file10`)
-- [ ] **Undoable:** All transformations tracked in history
-
-### Version 1.5.1: Statistics & Plotting
-
-*In-app data analysis*
-
-- [ ] **Enhanced Statistics:**
-  - `:stats` command shows rich popup panel
-  - Numeric columns: count, mean, median, mode, stddev, text-based histogram
-  - Text columns: unique count, frequency distribution
-- [ ] **Terminal Plotting:**
-  - `:plot` command generates text-based charts
-  - Bar charts and scatter plots (using `textplots` crate)
-- [ ] **Error Handling:** Handle analysis on unsuitable data types
+  - **Multi-column sort:** `:sort <col1>, <col2>` (e.g., `:sort State, City`)
+    - Sorts by first column, then by second column for ties, etc.
+  - **Natural sorting:** Auto-detect and use natural sort for alphanumeric data
+    - Example: `file1`, `file2`, `file10` instead of `file1`, `file10`, `file2`
+  - Undoable
+- [ ] **Error Handling:**
+  - Validate regex patterns, show clear error for invalid regex
+  - Handle invalid column names in scope
+  - Ensure all transformations can be undone
 
 ---
 
@@ -671,10 +674,15 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 *These may become future versions if prioritized*
 
 - [ ] Network file loading (HTTP/HTTPS URLs)
-- [ ] System clipboard integration
 - [ ] SQL query mode (query CSV like a database)
-- [ ] Export to other formats (JSON, Markdown)
+- [ ] Export to other formats (JSON, Markdown, Excel)
 - [ ] Formula evaluation (basic spreadsheet functions)
 - [ ] Diff mode (compare two CSV files)
 - [ ] Merge/join operations
 - [ ] Pivot table support
+- [ ] **Statistics & Plotting:**
+  - `:stats` command with rich popup panel
+  - Numeric columns: count, mean, median, mode, stddev, histogram
+  - Text columns: unique count, frequency distribution
+  - `:plot` command for text-based bar/scatter plots
+- [ ] Excel file support (.xlsx, .xls)

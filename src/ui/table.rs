@@ -1,20 +1,20 @@
-use super::utils::column_index_to_letter;
-use crate::app::App;
+use super::{utils::column_index_to_letter, MAX_CELL_WIDTH, MAX_VISIBLE_COLS};
+use crate::App;
 use ratatui::{
     layout::{Constraint, Rect},
     style::{Modifier, Style},
     widgets::{Block, Borders, Cell, Row, Table},
     Frame,
 };
+use std::borrow::Cow;
 
 /// Render CSV data table with row/column numbers
 pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     let csv = &app.csv_data;
 
     // Calculate visible columns (max 10)
-    let max_visible_cols = 10;
     let start_col = app.ui.horizontal_offset;
-    let end_col = (start_col + max_visible_cols).min(csv.column_count());
+    let end_col = (start_col + MAX_VISIBLE_COLS).min(csv.column_count());
     let visible_col_count = end_col - start_col;
 
     if visible_col_count == 0 {
@@ -106,11 +106,10 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
             let cell_value = row.get(col_idx).map(|s| s.as_str()).unwrap_or("");
 
             // Truncate long text with ...
-            let max_cell_width = 20;
-            let display_text = if cell_value.len() > max_cell_width {
-                format!("{}...", &cell_value[..max_cell_width - 3])
+            let display_text: Cow<'_, str> = if cell_value.len() > MAX_CELL_WIDTH {
+                Cow::Owned(format!("{}...", &cell_value[..MAX_CELL_WIDTH - 3]))
             } else {
-                cell_value.to_string()
+                Cow::Borrowed(cell_value)
             };
 
             // Highlight current cell

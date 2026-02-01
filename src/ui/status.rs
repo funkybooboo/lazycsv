@@ -1,10 +1,11 @@
-use crate::app::App;
+use crate::App;
 use ratatui::{
     layout::Rect,
     style::Style,
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
+use std::borrow::Cow;
 
 /// Render sheet/file switcher at bottom
 pub fn render_sheet_switcher(frame: &mut Frame, app: &App, area: Rect) {
@@ -12,14 +13,14 @@ pub fn render_sheet_switcher(frame: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
-    let count_info = if app.csv_files.len() > 1 {
-        format!(
+    let count_info: Cow<'_, str> = if app.csv_files.len() > 1 {
+        Cow::Owned(format!(
             "Files ({}/{}): ",
             app.current_file_index + 1,
             app.csv_files.len()
-        )
+        ))
     } else {
-        "File: ".to_string()
+        Cow::Borrowed("File: ")
     };
 
     // Build file list with indicator
@@ -52,7 +53,7 @@ pub fn render_sheet_switcher(frame: &mut Frame, app: &App, area: Rect) {
 
 /// Render status bar at bottom
 pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
-    use super::utils::column_index_to_letter;
+    use crate::ui::utils::column_index_to_letter;
 
     let selected_row = app.selected_row().map(|i| i + 1).unwrap_or(0);
     let total_rows = app.csv_data.row_count();
@@ -61,17 +62,17 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     let total_cols = app.csv_data.column_count();
 
     // Get current cell value
-    let cell_value = if let Some(row_idx) = app.selected_row() {
+    let cell_value: Cow<'_, str> = if let Some(row_idx) = app.selected_row() {
         let value = app.csv_data.get_cell(row_idx, app.ui.selected_col);
         if value.is_empty() {
-            "<empty>".to_string()
+            Cow::Borrowed("<empty>")
         } else if value.len() > 30 {
-            format!("\"{}...\"", &value[..27])
+            Cow::Owned(format!("\"{}...\"", &value[..27]))
         } else {
-            format!("\"{}\"", value)
+            Cow::Owned(format!("\"{}\"", value))
         }
     } else {
-        "<no data>".to_string()
+        Cow::Borrowed("<no data>")
     };
 
     let status_text = if let Some(ref msg) = app.status_message {

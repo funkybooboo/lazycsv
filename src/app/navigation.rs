@@ -1,4 +1,5 @@
 use super::{App, ViewportMode};
+use crate::ui::MAX_VISIBLE_COLS;
 use anyhow::Result;
 use crossterm::event::KeyCode;
 
@@ -42,9 +43,8 @@ pub fn handle_navigation(app: &mut App, code: KeyCode) -> Result<()> {
         KeyCode::Char('$') => {
             app.ui.selected_col = app.csv_data.column_count().saturating_sub(1);
             // Adjust horizontal offset to show last column
-            let max_visible_cols = 10;
-            if app.csv_data.column_count() > max_visible_cols {
-                app.ui.horizontal_offset = app.csv_data.column_count() - max_visible_cols;
+            if app.csv_data.column_count() > MAX_VISIBLE_COLS {
+                app.ui.horizontal_offset = app.csv_data.column_count() - MAX_VISIBLE_COLS;
             }
             app.ui.viewport_mode = ViewportMode::Auto;
         }
@@ -68,7 +68,7 @@ pub fn handle_navigation(app: &mut App, code: KeyCode) -> Result<()> {
         KeyCode::End | KeyCode::Char('G') => {
             if count > 1 {
                 goto_line(app, count);
-                app.status_message = Some(format!("Jumped to line {}", count));
+                app.status_message = Some(format!("Jumped to line {}", count).into());
             } else {
                 goto_last_row(app);
             }
@@ -78,29 +78,6 @@ pub fn handle_navigation(app: &mut App, code: KeyCode) -> Result<()> {
     }
 
     Ok(())
-}
-
-fn select_next_col(app: &mut App) {
-    if app.ui.selected_col < app.csv_data.column_count().saturating_sub(1) {
-        app.ui.selected_col += 1;
-
-        // Auto-scroll horizontally if needed
-        let max_visible_cols = 10;
-        if app.ui.selected_col >= app.ui.horizontal_offset + max_visible_cols {
-            app.ui.horizontal_offset = app.ui.selected_col - max_visible_cols + 1;
-        }
-    }
-}
-
-fn select_previous_col(app: &mut App) {
-    if app.ui.selected_col > 0 {
-        app.ui.selected_col -= 1;
-
-        // Auto-scroll horizontally if needed
-        if app.ui.selected_col < app.ui.horizontal_offset {
-            app.ui.horizontal_offset = app.ui.selected_col;
-        }
-    }
 }
 
 fn select_next_page(app: &mut App) {
@@ -167,16 +144,20 @@ pub fn move_up_by(app: &mut App, count: usize) {
 
 /// Move right by count columns (3l moves right 3 columns)
 pub fn move_right_by(app: &mut App, count: usize) {
-    for _ in 0..count {
-        select_next_col(app);
+    let new_col = (app.ui.selected_col + count).min(app.csv_data.column_count().saturating_sub(1));
+    app.ui.selected_col = new_col;
+    if app.ui.selected_col >= app.ui.horizontal_offset + MAX_VISIBLE_COLS {
+        app.ui.horizontal_offset = app.ui.selected_col - MAX_VISIBLE_COLS + 1;
     }
     app.ui.viewport_mode = ViewportMode::Auto;
 }
 
 /// Move left by count columns (3h moves left 3 columns)
 pub fn move_left_by(app: &mut App, count: usize) {
-    for _ in 0..count {
-        select_previous_col(app);
+    let new_col = app.ui.selected_col.saturating_sub(count);
+    app.ui.selected_col = new_col;
+    if app.ui.selected_col < app.ui.horizontal_offset {
+        app.ui.horizontal_offset = new_col;
     }
     app.ui.viewport_mode = ViewportMode::Auto;
 }
