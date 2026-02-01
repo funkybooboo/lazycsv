@@ -6,7 +6,7 @@ const SINGLE_LETTER_COLS: [&str; 26] = [
 ];
 
 /// Convert column index to letter (0 -> A, 1 -> B, ..., 26 -> AA, etc.)
-pub fn column_index_to_letter(index: usize) -> Cow<'static, str> {
+pub fn column_to_excel_letter(index: usize) -> Cow<'static, str> {
     if let Some(s) = SINGLE_LETTER_COLS.get(index) {
         return Cow::Borrowed(s);
     }
@@ -28,13 +28,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_column_index_to_letter() {
-        assert_eq!(column_index_to_letter(0), "A");
-        assert_eq!(column_index_to_letter(1), "B");
-        assert_eq!(column_index_to_letter(25), "Z");
-        assert_eq!(column_index_to_letter(26), "AA");
-        assert_eq!(column_index_to_letter(27), "AB");
-        assert_eq!(column_index_to_letter(51), "AZ");
-        assert_eq!(column_index_to_letter(52), "BA");
+    fn test_column_to_excel_letter() {
+        assert_eq!(column_to_excel_letter(0), "A");
+        assert_eq!(column_to_excel_letter(1), "B");
+        assert_eq!(column_to_excel_letter(25), "Z");
+        assert_eq!(column_to_excel_letter(26), "AA");
+        assert_eq!(column_to_excel_letter(27), "AB");
+        assert_eq!(column_to_excel_letter(51), "AZ");
+        assert_eq!(column_to_excel_letter(52), "BA");
     }
 }

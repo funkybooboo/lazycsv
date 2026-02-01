@@ -15,12 +15,12 @@ use ratatui::{
 
 /// Main UI rendering function
 pub fn render(frame: &mut Frame, app: &mut App) {
-    // Split terminal into main area + sheet switcher + status bar
+    // Split terminal into main area + file switcher + status bar
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Min(0),    // Table area
-            Constraint::Length(3), // Sheet switcher
+            Constraint::Length(3), // File switcher
             Constraint::Length(3), // Status bar
         ])
         .split(frame.area());
@@ -28,33 +28,33 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     // Render table with row/column numbers
     table::render_table(frame, app, chunks[0]);
 
-    // Render sheet switcher (always visible)
-    status::render_sheet_switcher(frame, app, chunks[1]);
+    // Render file switcher (always visible)
+    status::render_file_switcher(frame, app, chunks[1]);
 
     // Render status bar
     status::render_status_bar(frame, app, chunks[2]);
 
     // Render help overlay if active
     if app.view_state.help_overlay_visible {
-        help::render_cheatsheet(frame);
+        help::render_help_overlay(frame);
     }
 }
 
 // Re-export public utilities and types
-pub use utils::column_index_to_letter;
+pub use utils::column_to_excel_letter;
 pub use view_state::{ViewState, ViewportMode};
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{App, CsvData};
+    use crate::{App, Document};
     use ratatui::{backend::TestBackend, Terminal};
     use std::io;
     use std::path::PathBuf;
 
     // from ui_rendering_test.rs
-    fn create_test_csv() -> CsvData {
-        CsvData {
+    fn create_test_csv() -> Document {
+        Document {
             headers: vec!["ID".to_string(), "Name".to_string(), "Email".to_string()],
             rows: vec![
                 vec![
@@ -274,8 +274,8 @@ mod tests {
     }
 
     // from ui_state_test.rs
-    fn create_small_csv() -> CsvData {
-        CsvData {
+    fn create_small_csv() -> Document {
+        Document {
             headers: vec!["A".to_string(), "B".to_string()],
             rows: vec![
                 vec!["1".to_string(), "2".to_string()],
@@ -286,8 +286,8 @@ mod tests {
         }
     }
 
-    fn create_empty_csv() -> CsvData {
-        CsvData {
+    fn create_empty_csv() -> Document {
+        Document {
             headers: vec!["A".to_string(), "B".to_string()],
             rows: vec![],
             filename: "empty.csv".to_string(),
@@ -295,8 +295,8 @@ mod tests {
         }
     }
 
-    fn create_single_cell_csv() -> CsvData {
-        CsvData {
+    fn create_single_cell_csv() -> Document {
+        Document {
             headers: vec!["A".to_string()],
             rows: vec![vec!["1".to_string()]],
             filename: "single.csv".to_string(),
@@ -563,7 +563,7 @@ mod tests {
         let buffer1 = terminal.backend().buffer().clone();
 
         // Make dirty
-        app.csv_data.is_dirty = true;
+        app.document.is_dirty = true;
         terminal.draw(|frame| {
             render(frame, &mut app);
         })?;
@@ -725,7 +725,7 @@ mod tests {
 
     #[test]
     fn test_ui_unicode_emoji_in_cells() -> io::Result<()> {
-        let csv_data = CsvData {
+        let csv_data = Document {
             headers: vec!["Name".to_string(), "Status".to_string()],
             rows: vec![
                 vec!["Alice".to_string(), "🎉 Happy".to_string()],
@@ -769,7 +769,7 @@ mod tests {
     #[test]
     fn test_ui_cell_with_very_long_content() -> io::Result<()> {
         let long_text = "A".repeat(10000);
-        let csv_data = CsvData {
+        let csv_data = Document {
             headers: vec!["Name".to_string(), "Data".to_string()],
             rows: vec![vec!["Alice".to_string(), long_text]],
             filename: "test.csv".to_string(),
@@ -791,7 +791,7 @@ mod tests {
 
     #[test]
     fn test_ui_special_characters_in_cells() -> io::Result<()> {
-        let csv_data = CsvData {
+        let csv_data = Document {
             headers: vec!["Col1".to_string(), "Col2".to_string()],
             rows: vec![
                 vec!["\t\n\r".to_string(), "Normal".to_string()],

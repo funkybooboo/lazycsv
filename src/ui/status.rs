@@ -7,8 +7,8 @@ use ratatui::{
 };
 use std::borrow::Cow;
 
-/// Render sheet/file switcher at bottom
-pub fn render_sheet_switcher(frame: &mut Frame, app: &App, area: Rect) {
+/// Render file switcher at bottom
+pub fn render_file_switcher(frame: &mut Frame, app: &App, area: Rect) {
     if app.session.files().is_empty() {
         return;
     }
@@ -16,7 +16,7 @@ pub fn render_sheet_switcher(frame: &mut Frame, app: &App, area: Rect) {
     let count_info: Cow<'_, str> = if app.session.files().len() > 1 {
         Cow::Owned(format!(
             "Files ({}/{}): ",
-            app.session.current_file_index() + 1,
+            app.session.active_file_index() + 1,
             app.session.files().len()
         ))
     } else {
@@ -35,7 +35,7 @@ pub fn render_sheet_switcher(frame: &mut Frame, app: &App, area: Rect) {
             .and_then(|n| n.to_str())
             .unwrap_or("unknown");
 
-        if idx == app.session.current_file_index() {
+        if idx == app.session.active_file_index() {
             file_list.push_str(&format!("► {}", filename));
         } else {
             file_list.push_str(filename);
@@ -53,20 +53,22 @@ pub fn render_sheet_switcher(frame: &mut Frame, app: &App, area: Rect) {
 
 /// Render status bar at bottom
 pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
-    use crate::ui::utils::column_index_to_letter;
+    use crate::ui::utils::column_to_excel_letter;
 
     let selected_row = app
-        .selected_row()
+        .get_selected_row()
         .map(|r| r.to_line_number().get())
         .unwrap_or(0);
-    let total_rows = app.csv_data.row_count();
-    let col_letter = column_index_to_letter(app.view_state.selected_col.get());
-    let col_name = app.csv_data.get_header(app.view_state.selected_col);
-    let total_cols = app.csv_data.column_count();
+    let total_rows = app.document.row_count();
+    let col_letter = column_to_excel_letter(app.view_state.selected_column.get());
+    let col_name = app.document.get_header(app.view_state.selected_column);
+    let total_cols = app.document.column_count();
 
     // Get current cell value
-    let cell_value: Cow<'_, str> = if let Some(row_idx) = app.selected_row() {
-        let value = app.csv_data.get_cell(row_idx, app.view_state.selected_col);
+    let cell_value: Cow<'_, str> = if let Some(row_idx) = app.get_selected_row() {
+        let value = app
+            .document
+            .get_cell(row_idx, app.view_state.selected_column);
         if value.is_empty() {
             Cow::Borrowed("<empty>")
         } else if value.len() > 30 {
@@ -96,7 +98,7 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             total_rows,
             col_letter,
             col_name,
-            app.view_state.selected_col.to_column_number().get(),
+            app.view_state.selected_column.to_column_number().get(),
             total_cols,
             cell_value
         );

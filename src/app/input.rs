@@ -1,4 +1,4 @@
-use crate::app::{navigation, App, Mode, ViewportMode};
+use crate::app::{messages, navigation, App, Mode, ViewportMode};
 use crate::input::{InputResult, PendingCommand, StatusMessage};
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
@@ -22,7 +22,7 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         if time.elapsed().as_millis() > MULTI_KEY_TIMEOUT_MS {
             app.input_state.pending_command = None;
             app.input_state.pending_command_time = None;
-            app.status_message = Some(StatusMessage::from("Command timeout"));
+            app.status_message = Some(StatusMessage::from(messages::CMD_TIMEOUT));
         }
     }
 
@@ -49,16 +49,14 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     match key.code {
         // Quit - vim-style (warns if unsaved in Phase 2)
         KeyCode::Char('q') if !app.view_state.help_overlay_visible => {
-            if app.csv_data.is_dirty {
-                app.status_message = Some(StatusMessage::from(
-                    "Unsaved changes! Use :q! to force quit",
-                ));
+            if app.document.is_dirty {
+                app.status_message = Some(StatusMessage::from(messages::UNSAVED_CHANGES));
             } else {
                 app.should_quit = true;
             }
         }
 
-        // Toggle help/cheatsheet
+        // Toggle help overlay
         KeyCode::Char('?') => {
             app.view_state.help_overlay_visible = !app.view_state.help_overlay_visible;
         }
@@ -72,7 +70,7 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         KeyCode::Esc if app.input_state.pending_command.is_some() => {
             app.input_state.pending_command = None;
             app.input_state.pending_command_time = None;
-            app.status_message = Some(StatusMessage::from("Command cancelled"));
+            app.status_message = Some(StatusMessage::from(messages::CMD_CANCELLED));
         }
 
         // File switching - Previous file
@@ -128,31 +126,31 @@ fn handle_multi_key_command(
         // gg - Go to first row
         (PendingCommand::G, KeyCode::Char('g')) => {
             navigation::goto_first_row(app);
-            app.status_message = Some(StatusMessage::from("Jumped to first row"));
+            app.status_message = Some(StatusMessage::from(messages::JUMPED_TO_FIRST_ROW));
         }
 
         // zt - Top of screen
         (PendingCommand::Z, KeyCode::Char('t')) => {
             app.view_state.viewport_mode = ViewportMode::Top;
-            app.status_message = Some(StatusMessage::from("View: top"));
+            app.status_message = Some(StatusMessage::from(messages::VIEW_TOP));
         }
 
         // zz - Center of screen
         (PendingCommand::Z, KeyCode::Char('z')) => {
             app.view_state.viewport_mode = ViewportMode::Center;
-            app.status_message = Some(StatusMessage::from("View: center"));
+            app.status_message = Some(StatusMessage::from(messages::VIEW_CENTER));
         }
 
         // zb - Bottom of screen
         (PendingCommand::Z, KeyCode::Char('b')) => {
             app.view_state.viewport_mode = ViewportMode::Bottom;
-            app.status_message = Some(StatusMessage::from("View: bottom"));
+            app.status_message = Some(StatusMessage::from(messages::VIEW_BOTTOM));
         }
 
         _ => {
-            app.status_message = Some(StatusMessage::from(format!(
-                "Unknown command: {:?} {:?}",
-                first, second
+            app.status_message = Some(StatusMessage::from(messages::unknown_command(
+                &format!("{:?}", first),
+                &format!("{:?}", second),
             )));
         }
     }

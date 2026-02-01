@@ -46,7 +46,7 @@ pub struct Session {
     files: Vec<PathBuf>,
 
     /// Index of the currently active file
-    current_file_index: usize,
+    active_file_index: usize,
 
     /// Configuration for CSV parsing
     config: FileConfig,
@@ -54,22 +54,22 @@ pub struct Session {
 
 impl Session {
     /// Create a new session
-    pub fn new(files: Vec<PathBuf>, current_file_index: usize, config: FileConfig) -> Self {
+    pub fn new(files: Vec<PathBuf>, active_file_index: usize, config: FileConfig) -> Self {
         Self {
             files,
-            current_file_index,
+            active_file_index,
             config,
         }
     }
 
     /// Get the currently active file path
-    pub fn current_file(&self) -> &PathBuf {
-        &self.files[self.current_file_index]
+    pub fn get_current_file(&self) -> &PathBuf {
+        &self.files[self.active_file_index]
     }
 
     /// Get the current file index
-    pub fn current_file_index(&self) -> usize {
-        self.current_file_index
+    pub fn active_file_index(&self) -> usize {
+        self.active_file_index
     }
 
     /// Get the total number of files in the session
@@ -94,7 +94,7 @@ impl Session {
             return false;
         }
 
-        self.current_file_index = (self.current_file_index + 1) % self.files.len();
+        self.active_file_index = (self.active_file_index + 1) % self.files.len();
         true
     }
 
@@ -105,10 +105,10 @@ impl Session {
             return false;
         }
 
-        if self.current_file_index == 0 {
-            self.current_file_index = self.files.len() - 1;
+        if self.active_file_index == 0 {
+            self.active_file_index = self.files.len() - 1;
         } else {
-            self.current_file_index -= 1;
+            self.active_file_index -= 1;
         }
         true
     }
@@ -153,8 +153,8 @@ mod tests {
         let config = FileConfig::new();
         let session = Session::new(files.clone(), 0, config);
 
-        assert_eq!(session.current_file(), &files[0]);
-        assert_eq!(session.current_file_index(), 0);
+        assert_eq!(session.get_current_file(), &files[0]);
+        assert_eq!(session.active_file_index(), 0);
         assert_eq!(session.file_count(), 3);
     }
 
@@ -165,14 +165,14 @@ mod tests {
         let mut session = Session::new(files.clone(), 0, config);
 
         assert!(session.next_file());
-        assert_eq!(session.current_file_index(), 1);
+        assert_eq!(session.active_file_index(), 1);
 
         assert!(session.next_file());
-        assert_eq!(session.current_file_index(), 2);
+        assert_eq!(session.active_file_index(), 2);
 
         // Wrap around to first file
         assert!(session.next_file());
-        assert_eq!(session.current_file_index(), 0);
+        assert_eq!(session.active_file_index(), 0);
     }
 
     #[test]
@@ -183,13 +183,13 @@ mod tests {
 
         // Wrap to last file
         assert!(session.prev_file());
-        assert_eq!(session.current_file_index(), 2);
+        assert_eq!(session.active_file_index(), 2);
 
         assert!(session.prev_file());
-        assert_eq!(session.current_file_index(), 1);
+        assert_eq!(session.active_file_index(), 1);
 
         assert!(session.prev_file());
-        assert_eq!(session.current_file_index(), 0);
+        assert_eq!(session.active_file_index(), 0);
     }
 
     #[test]
@@ -199,10 +199,10 @@ mod tests {
         let mut session = Session::new(files, 0, config);
 
         assert!(!session.next_file());
-        assert_eq!(session.current_file_index(), 0);
+        assert_eq!(session.active_file_index(), 0);
 
         assert!(!session.prev_file());
-        assert_eq!(session.current_file_index(), 0);
+        assert_eq!(session.active_file_index(), 0);
     }
 
     #[test]

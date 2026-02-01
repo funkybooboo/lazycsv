@@ -1,4 +1,4 @@
-use super::{App, ViewportMode};
+use super::{messages, App, ViewportMode};
 use crate::domain::position::ColIndex;
 use crate::ui::MAX_VISIBLE_COLS;
 use anyhow::Result;
@@ -36,18 +36,19 @@ pub fn handle_navigation(app: &mut App, code: KeyCode) -> Result<()> {
 
         // First column
         KeyCode::Char('0') => {
-            app.view_state.selected_col = ColIndex::new(0);
-            app.view_state.horizontal_offset = 0;
+            app.view_state.selected_column = ColIndex::new(0);
+            app.view_state.column_scroll_offset = 0;
             app.view_state.viewport_mode = ViewportMode::Auto;
         }
 
         // Last column
         KeyCode::Char('$') => {
-            app.view_state.selected_col =
-                ColIndex::new(app.csv_data.column_count().saturating_sub(1));
+            app.view_state.selected_column =
+                ColIndex::new(app.document.column_count().saturating_sub(1));
             // Adjust horizontal offset to show last column
-            if app.csv_data.column_count() > MAX_VISIBLE_COLS {
-                app.view_state.horizontal_offset = app.csv_data.column_count() - MAX_VISIBLE_COLS;
+            if app.document.column_count() > MAX_VISIBLE_COLS {
+                app.view_state.column_scroll_offset =
+                    app.document.column_count() - MAX_VISIBLE_COLS;
             }
             app.view_state.viewport_mode = ViewportMode::Auto;
         }
@@ -71,7 +72,7 @@ pub fn handle_navigation(app: &mut App, code: KeyCode) -> Result<()> {
         KeyCode::End | KeyCode::Char('G') => {
             if count > 1 {
                 goto_line(app, count);
-                app.status_message = Some(format!("Jumped to line {}", count).into());
+                app.status_message = Some(messages::jumped_to_line(count).into());
             } else {
                 goto_last_row(app);
             }
@@ -86,7 +87,7 @@ pub fn handle_navigation(app: &mut App, code: KeyCode) -> Result<()> {
 fn select_next_page(app: &mut App) {
     const PAGE_SIZE: usize = 20;
     let i = match app.view_state.table_state.selected() {
-        Some(i) => (i + PAGE_SIZE).min(app.csv_data.row_count().saturating_sub(1)),
+        Some(i) => (i + PAGE_SIZE).min(app.document.row_count().saturating_sub(1)),
         None => 0,
     };
     app.view_state.table_state.select(Some(i));
@@ -109,14 +110,14 @@ pub fn goto_first_row(app: &mut App) {
 
 /// Go to last row (G command)
 pub fn goto_last_row(app: &mut App) {
-    let last = app.csv_data.row_count().saturating_sub(1);
+    let last = app.document.row_count().saturating_sub(1);
     app.view_state.table_state.select(Some(last));
     app.view_state.viewport_mode = ViewportMode::Auto;
 }
 
 /// Go to specific line number (5G or :5 command)
 pub fn goto_line(app: &mut App, line_number: usize) {
-    let row_count = app.csv_data.row_count();
+    let row_count = app.document.row_count();
 
     // Line numbers are 1-indexed in vim, but we use 0-indexed internally
     let target = if line_number == 0 {
@@ -132,7 +133,7 @@ pub fn goto_line(app: &mut App, line_number: usize) {
 /// Move down by count rows (5j moves down 5 rows)
 pub fn move_down_by(app: &mut App, count: usize) {
     let current = app.view_state.table_state.selected().unwrap_or(0);
-    let target = (current + count).min(app.csv_data.row_count().saturating_sub(1));
+    let target = (current + count).min(app.document.row_count().saturating_sub(1));
     app.view_state.table_state.select(Some(target));
     app.view_state.viewport_mode = ViewportMode::Auto;
 }
@@ -149,23 +150,26 @@ pub fn move_up_by(app: &mut App, count: usize) {
 pub fn move_right_by(app: &mut App, count: usize) {
     let new_col = app
         .view_state
-        .selected_col
+        .selected_column
         .saturating_add(count)
         .get()
-        .min(app.csv_data.column_count().saturating_sub(1));
-    app.view_state.selected_col = ColIndex::new(new_col);
-    if app.view_state.selected_col.get() >= app.view_state.horizontal_offset + MAX_VISIBLE_COLS {
-        app.view_state.horizontal_offset = app.view_state.selected_col.get() - MAX_VISIBLE_COLS + 1;
+        .min(app.document.column_count().saturating_sub(1));
+    app.view_state.selected_column = ColIndex::new(new_col);
+    if app.view_state.selected_column.get()
+        >= app.view_state.column_scroll_offset + MAX_VISIBLE_COLS
+    {
+        app.view_state.column_scroll_offset =
+            app.view_state.selected_column.get() - MAX_VISIBLE_COLS + 1;
     }
     app.view_state.viewport_mode = ViewportMode::Auto;
 }
 
 /// Move left by count columns (3h moves left 3 columns)
 pub fn move_left_by(app: &mut App, count: usize) {
-    let new_col = app.view_state.selected_col.saturating_sub(count);
-    app.view_state.selected_col = new_col;
-    if app.view_state.selected_col.get() < app.view_state.horizontal_offset {
-        app.view_state.horizontal_offset = new_col.get();
+    let new_col = app.view_state.selected_column.saturating_sub(count);
+    app.view_state.selected_column = new_col;
+    if app.view_state.selected_column.get() < app.view_state.column_scroll_offset {
+        app.view_state.column_scroll_offset = new_col.get();
     }
     app.view_state.viewport_mode = ViewportMode::Auto;
 }

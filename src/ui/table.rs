@@ -1,4 +1,4 @@
-use super::{utils::column_index_to_letter, MAX_CELL_WIDTH, MAX_VISIBLE_COLS};
+use super::{utils::column_to_excel_letter, MAX_CELL_WIDTH, MAX_VISIBLE_COLS};
 use crate::domain::position::ColIndex;
 use crate::App;
 use ratatui::{
@@ -11,10 +11,10 @@ use std::borrow::Cow;
 
 /// Render CSV data table with row/column numbers
 pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
-    let csv = &app.csv_data;
+    let csv = &app.document;
 
     // Calculate visible columns (max 10)
-    let start_col = app.view_state.horizontal_offset;
+    let start_col = app.view_state.column_scroll_offset;
     let end_col = (start_col + MAX_VISIBLE_COLS).min(csv.column_count());
     let visible_col_count = end_col - start_col;
 
@@ -29,14 +29,14 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     // Build column letters row (A, B, C...) with indicator for selected column
     let mut col_letter_cells = vec![Cell::from("")]; // Empty cell for row numbers column
     for i in start_col..end_col {
-        let letter = column_index_to_letter(i);
+        let letter = column_to_excel_letter(i);
         let col_idx = ColIndex::new(i);
-        let display = if col_idx == app.view_state.selected_col {
+        let display = if col_idx == app.view_state.selected_column {
             format!("►{}", letter) // Show indicator on selected column
         } else {
             format!(" {}", letter) // Space for alignment
         };
-        let style = if col_idx == app.view_state.selected_col {
+        let style = if col_idx == app.view_state.selected_column {
             Style::default().add_modifier(Modifier::BOLD)
         } else {
             Style::default().add_modifier(Modifier::DIM)
@@ -116,10 +116,10 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
 
             // Highlight current cell
             let style = if app
-                .selected_row()
+                .get_selected_row()
                 .map(|r| r.get() == row_idx)
                 .unwrap_or(false)
-                && ColIndex::new(col_idx) == app.view_state.selected_col
+                && ColIndex::new(col_idx) == app.view_state.selected_column
             {
                 Style::default().add_modifier(Modifier::REVERSED)
             } else {

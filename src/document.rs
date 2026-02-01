@@ -5,9 +5,9 @@ use encoding_rs::Encoding;
 use std::fs;
 use std::path::Path;
 
-/// Holds parsed CSV data in memory
+/// Holds parsed CSV document in memory
 #[derive(Debug)]
-pub struct CsvData {
+pub struct Document {
     /// Column headers (first row)
     pub headers: Vec<String>,
 
@@ -21,7 +21,7 @@ pub struct CsvData {
     pub is_dirty: bool,
 }
 
-impl CsvData {
+impl Document {
     /// Load CSV from file path with optional delimiter, header, and encoding settings.
     pub fn from_file(
         path: &Path,
@@ -41,7 +41,7 @@ impl CsvData {
         let decoded_content = Self::decode_file_bytes(&file_bytes, encoding_label)?;
         let (headers, rows) = Self::parse_csv_content(&decoded_content, delimiter, no_headers)?;
 
-        Ok(CsvData {
+        Ok(Document {
             headers,
             rows,
             filename,
@@ -110,18 +110,18 @@ impl CsvData {
 
     /// Get specific cell value (returns "" if out of bounds)
     #[allow(dead_code)]
-    pub fn get_cell(&self, row: RowIndex, col: ColIndex) -> &str {
+    pub fn get_cell(&self, row_idx: RowIndex, col_idx: ColIndex) -> &str {
         self.rows
-            .get(row.get())
-            .and_then(|r| r.get(col.get()))
+            .get(row_idx.get())
+            .and_then(|r| r.get(col_idx.get()))
             .map(|s| s.as_str())
             .unwrap_or("")
     }
 
     /// Get column header by index (returns "" if out of bounds)
-    pub fn get_header(&self, col: ColIndex) -> &str {
+    pub fn get_header(&self, col_idx: ColIndex) -> &str {
         self.headers
-            .get(col.get())
+            .get(col_idx.get())
             .map(|s| s.as_str())
             .unwrap_or("")
     }
@@ -151,7 +151,7 @@ mod tests {
         writeln!(file, "Alice,30,NYC").unwrap();
         writeln!(file, "Bob,25,LA").unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.column_count(), 3);
         assert_eq!(csv_data.row_count(), 2);
@@ -168,7 +168,7 @@ mod tests {
         let mut file = NamedTempFile::new().unwrap();
         writeln!(file, "Name,Age").unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.column_count(), 2);
         assert_eq!(csv_data.row_count(), 0);
@@ -180,7 +180,7 @@ mod tests {
         writeln!(file, "Name,Age").unwrap();
         writeln!(file, "Alice,30").unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.get_cell(RowIndex::new(10), ColIndex::new(0)), ""); // Row out of bounds
         assert_eq!(csv_data.get_cell(RowIndex::new(0), ColIndex::new(10)), ""); // Column out of bounds
@@ -197,7 +197,7 @@ mod tests {
         writeln!(file, "Test2,🎉 Emoji").unwrap(); // Emoji
         writeln!(file, "Test3,ñóëü").unwrap(); // Accented chars
 
-        let result = CsvData::from_file(file.path(), None, false, None);
+        let result = Document::from_file(file.path(), None, false, None);
 
         assert!(result.is_ok());
         let csv_data = result.unwrap();
@@ -212,7 +212,7 @@ mod tests {
         writeln!(file, "Name,Age,City").unwrap();
         writeln!(file, "Alice,30,NYC").unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 1);
         assert_eq!(csv_data.column_count(), 3);
@@ -229,7 +229,7 @@ mod tests {
         writeln!(file, "Alice").unwrap();
         writeln!(file, "Bob").unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 2);
         assert_eq!(csv_data.column_count(), 1);
@@ -243,7 +243,7 @@ mod tests {
         writeln!(file, "1,,3").unwrap();
         writeln!(file, ",2,").unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 2);
         assert_eq!(csv_data.get_cell(RowIndex::new(0), ColIndex::new(0)), "1");
@@ -261,7 +261,7 @@ mod tests {
         writeln!(file, "Alice,\"Hello, World\"").unwrap();
         writeln!(file, "Bob,\"Line1\nLine2\"").unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 2);
         assert_eq!(
@@ -284,7 +284,7 @@ mod tests {
         writeln!(file, "Text").unwrap();
         writeln!(file, r#""She said ""hello""""#).unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 1);
         assert_eq!(
@@ -299,7 +299,7 @@ mod tests {
         writeln!(file, "A,B,C").unwrap();
         writeln!(file, "  1  ,  2  ,  3  ").unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         // CSV parser should preserve whitespace
         assert_eq!(
@@ -319,7 +319,7 @@ mod tests {
         writeln!(file, "★,😀").unwrap();
         writeln!(file, "€,日本").unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 2);
         assert_eq!(csv_data.get_cell(RowIndex::new(0), ColIndex::new(0)), "★");
@@ -338,7 +338,7 @@ mod tests {
         let long_text = "a".repeat(1000);
         writeln!(file, "{}", long_text).unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 1);
         assert_eq!(
@@ -354,7 +354,7 @@ mod tests {
         writeln!(file, "123,456.789,1.23e10").unwrap();
         writeln!(file, "-999,0.001,-5e-3").unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 2);
         // Numbers are stored as strings
@@ -377,7 +377,7 @@ mod tests {
         writeln!(file, "4,5").unwrap(); // Missing last column
 
         // CSV parser is strict - should fail with inconsistent field count
-        let result = CsvData::from_file(file.path(), None, false, None);
+        let result = Document::from_file(file.path(), None, false, None);
         assert!(result.is_err());
     }
 
@@ -392,7 +392,7 @@ mod tests {
         writeln!(file, "1,2").unwrap(); // Missing third field
         writeln!(file, "3,4,5").unwrap();
 
-        let result = CsvData::from_file(file.path(), None, false, None);
+        let result = Document::from_file(file.path(), None, false, None);
 
         // Should either handle gracefully or return error (not panic)
         // Current behavior: CSV crate returns error for inconsistent column counts
@@ -411,7 +411,7 @@ mod tests {
         let long_text = "a".repeat(250);
         writeln!(file, "Test,{}", long_text).unwrap();
 
-        let result = CsvData::from_file(file.path(), None, false, None);
+        let result = Document::from_file(file.path(), None, false, None);
 
         assert!(result.is_ok());
         let csv_data = result.unwrap();
@@ -426,7 +426,7 @@ mod tests {
             writeln!(file, "{},{},{}", i, i * 2, i * 3).unwrap();
         }
 
-        let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 10000);
         assert_eq!(csv_data.get_cell(RowIndex::new(0), ColIndex::new(0)), "0");
@@ -448,7 +448,7 @@ mod tests {
         let row: Vec<String> = (0..100).map(|i| format!("val{}", i)).collect();
         writeln!(file, "{}", row.join(",")).unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.column_count(), 100);
         assert_eq!(csv_data.row_count(), 1);
@@ -464,7 +464,7 @@ mod tests {
         writeln!(file).unwrap(); // Blank line
         writeln!(file, "3,4").unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         // CSV parser should handle blank lines appropriately
         // Standard CSV parsers may include or exclude them
@@ -477,7 +477,7 @@ mod tests {
         writeln!(file, "A").unwrap();
         writeln!(file, "1").unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         // Should extract filename from path
         assert!(!csv_data.filename.is_empty());
@@ -489,7 +489,7 @@ mod tests {
         writeln!(file, "Name,Address").unwrap();
         writeln!(file, "Alice,\"123 Main St, Apt 4, City\"").unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 1);
         assert_eq!(
@@ -504,7 +504,7 @@ mod tests {
         writeln!(file, "A").unwrap();
         writeln!(file, "1").unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert!(!csv_data.is_dirty);
     }
@@ -515,7 +515,7 @@ mod tests {
         writeln!(file, "Name,Age,City").unwrap();
         writeln!(file, "Alice,30,NYC").unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         for col in 0..csv_data.column_count() {
             // Should be able to access both header and cells for all columns
@@ -534,7 +534,7 @@ mod tests {
         writeln!(file, "Name,Age,City").unwrap();
         // No data rows - only header
 
-        let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.column_count(), 3);
         assert_eq!(csv_data.row_count(), 0);
@@ -553,7 +553,7 @@ mod tests {
         write!(file, "Alice,30\n").unwrap();
         write!(file, "Bob,25\r\n").unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 2);
         assert_eq!(
@@ -568,7 +568,7 @@ mod tests {
         let file = NamedTempFile::new().unwrap();
         // Empty file - 0 bytes
 
-        let result = CsvData::from_file(file.path(), None, false, None);
+        let result = Document::from_file(file.path(), None, false, None);
 
         // Should either error or return empty data gracefully
         assert!(result.is_ok() || result.is_err());
@@ -584,7 +584,7 @@ mod tests {
         writeln!(file, "Name\tAge\tCity").unwrap();
         writeln!(file, "Alice\t30\tNYC").unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), Some(b'\t'), false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), Some(b'\t'), false, None).unwrap();
 
         assert_eq!(csv_data.column_count(), 3);
         assert_eq!(csv_data.row_count(), 1);
@@ -601,7 +601,7 @@ mod tests {
         writeln!(file, "Name;Age;City").unwrap();
         writeln!(file, "Alice;30;NYC").unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), Some(b';'), false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), Some(b';'), false, None).unwrap();
 
         assert_eq!(csv_data.column_count(), 3);
         assert_eq!(
@@ -616,7 +616,7 @@ mod tests {
         writeln!(file, "Name|Age|City").unwrap();
         writeln!(file, "Alice|30|NYC").unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), Some(b'|'), false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), Some(b'|'), false, None).unwrap();
 
         assert_eq!(csv_data.column_count(), 3);
         assert_eq!(
@@ -631,7 +631,7 @@ mod tests {
         writeln!(file, "Name,Age").unwrap();
         writeln!(file, "\"Alice,30").unwrap(); // Unclosed quote
 
-        let result = CsvData::from_file(file.path(), None, false, None);
+        let result = Document::from_file(file.path(), None, false, None);
 
         // CSV parser should handle this gracefully (either error or recover)
         // The csv crate will typically treat this as an error
@@ -647,7 +647,7 @@ mod tests {
         let long_text = "A".repeat(100_000);
         writeln!(file, "Alice,\"{}\"", long_text).unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 1);
         assert_eq!(
@@ -668,7 +668,7 @@ mod tests {
         let row: Vec<String> = (0..100).map(|i| format!("val{}", i)).collect();
         writeln!(file, "{}", row.join(",")).unwrap();
 
-        let csv_data = CsvData::from_file(file.path(), None, false, None).unwrap();
+        let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.column_count(), 100);
         assert_eq!(
@@ -693,7 +693,7 @@ mod tests {
 
         std::fs::write(&file_path, content).unwrap();
 
-        let csv_data = CsvData::from_file(&file_path, None, false, None).unwrap();
+        let csv_data = Document::from_file(&file_path, None, false, None).unwrap();
 
         // BOM should be stripped, headers should be clean
         assert_eq!(csv_data.get_header(ColIndex::new(0)), "Name");
@@ -702,7 +702,7 @@ mod tests {
 
     #[test]
     fn test_csv_file_not_found() {
-        let result = CsvData::from_file(Path::new("/nonexistent/file.csv"), None, false, None);
+        let result = Document::from_file(Path::new("/nonexistent/file.csv"), None, false, None);
 
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
@@ -715,7 +715,7 @@ mod tests {
         writeln!(file, "   ").unwrap();
         writeln!(file, "\t\t").unwrap();
 
-        let result = CsvData::from_file(file.path(), None, false, None);
+        let result = Document::from_file(file.path(), None, false, None);
 
         // Should either parse as empty/single column or error
         assert!(result.is_ok() || result.is_err());
@@ -731,7 +731,7 @@ mod tests {
         writeln!(file, "1,2").unwrap(); // Only 2 columns instead of 3
         writeln!(file, "3,4,5,6,7").unwrap(); // Too many columns
 
-        let result = CsvData::from_file(file.path(), None, false, None);
+        let result = Document::from_file(file.path(), None, false, None);
 
         // CSV parser should handle gracefully (either succeed with padding or error)
         assert!(result.is_ok() || result.is_err());
@@ -745,7 +745,7 @@ mod tests {
         // Write file with null bytes
         std::fs::write(&file_path, b"Name,Age\x00\nAlice,30\n").unwrap();
 
-        let result = CsvData::from_file(&file_path, None, false, None);
+        let result = Document::from_file(&file_path, None, false, None);
 
         // Should handle null bytes (may succeed or fail depending on parser)
         assert!(result.is_ok() || result.is_err());
@@ -760,7 +760,7 @@ mod tests {
         let huge_line = format!("Alice,{}", "X".repeat(1_000_000));
         writeln!(file, "{}", huge_line).unwrap();
 
-        let result = CsvData::from_file(file.path(), None, false, None);
+        let result = Document::from_file(file.path(), None, false, None);
 
         // Should handle very long lines
         assert!(result.is_ok());
@@ -781,7 +781,7 @@ mod tests {
         // Write invalid UTF-8 bytes (0xFF is invalid in UTF-8)
         std::fs::write(&file_path, [0xFF, 0xFE, b'a', b',', b'b', b'\n']).unwrap();
 
-        let result = CsvData::from_file(&file_path, None, false, None);
+        let result = Document::from_file(&file_path, None, false, None);
 
         // Should either handle with replacement chars or succeed
         assert!(result.is_ok());
@@ -794,7 +794,7 @@ mod tests {
         writeln!(file).unwrap();
         writeln!(file).unwrap();
 
-        let result = CsvData::from_file(file.path(), None, false, None);
+        let result = Document::from_file(file.path(), None, false, None);
 
         // Should handle file with only newlines
         assert!(result.is_ok());
@@ -813,7 +813,7 @@ mod tests {
 
         std::fs::write(&file_path, "A,B\n1,2\n").unwrap();
 
-        let csv_data = CsvData::from_file(&file_path, None, false, None).unwrap();
+        let csv_data = Document::from_file(&file_path, None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 1);
         assert!(csv_data.filename.len() > 100);

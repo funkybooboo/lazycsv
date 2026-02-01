@@ -67,7 +67,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 
 *Comprehensive refactoring to improve type safety, code organization, naming, and separation of concerns*
 
-**Progress: Phase 1 ✅ | Phase 2 ✅ | Phase 3-6 (Pending)**
+**Progress: Phase 1 ✅ | Phase 2 ✅ | Phase 3 ✅ | Phase 4-6 (Pending)**
 
 ---
 
@@ -175,31 +175,43 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 
 ---
 
-#### Phase 3: Better Naming & Consistency
+#### Phase 3: Better Naming & Consistency ✅ COMPLETED
 
-**3.1 Struct/Field Naming**
-- [ ] Rename `csv_data` → `document` throughout
-- [ ] Rename `ui` → `view_state` throughout
-- [ ] Rename `show_cheatsheet` → `help_overlay_visible`
-- [ ] Rename `selected_col` → `selected_column` (match `column_count()`)
-- [ ] Rename `horizontal_offset` → `column_scroll_offset`
-- [ ] Rename `current_file_index` → `active_file_index`
+**3.1 Struct/Field Naming** ✅
+- [x] Rename `csv_data` → `document` throughout
+- [x] Rename `ui` → `view_state` throughout
+- [x] Rename `show_cheatsheet` → `help_overlay_visible`
+- [x] Rename `selected_col` → `selected_column` (match `column_count()`)
+- [x] Rename `horizontal_offset` → `column_scroll_offset`
+- [x] Rename `current_file_index` → `active_file_index`
 
-**3.2 Function Naming**
-- [ ] Rename `selected_row()` → `get_selected_row()`
-- [ ] Rename `current_file()` → `get_current_file()`
-- [ ] Rename `column_index_to_letter()` → `column_to_excel_letter()`
-- [ ] Make navigation functions consistent: `move_*`, `goto_*`, `jump_to_*`
+**3.2 Function Naming** ✅
+- [x] Rename `selected_row()` → `get_selected_row()`
+- [x] Rename `current_file()` → `get_current_file()`
+- [x] Rename `column_index_to_letter()` → `column_to_excel_letter()`
+- [x] Make navigation functions consistent: `move_*`, `goto_*`, `jump_to_*`
 
-**3.3 Module Naming**
-- [ ] Rename `file_scanner.rs` → `file_discovery.rs` (more accurate)
-- [ ] Consider `app/constants.rs` → `app/messages.rs` (more specific)
+**3.3 Module Naming** ✅
+- [x] Rename `file_scanner.rs` → `file_discovery.rs` (more accurate)
+- [x] Rename `csv_data.rs` → `document.rs` (consistent with struct name)
+- [x] Rename `CsvData` struct → `Document` (semantic clarity)
+- [x] Create `app/messages.rs` for centralized user-facing messages (replaces constants.rs)
 
-**3.4 Terminology Consistency**
-- [ ] Standardize on "help overlay" (not "cheatsheet" or "help")
-- [ ] Standardize on "file switcher" (not "sheet switcher")
-- [ ] Standardize on row index variables: always `row_idx` (never `i`, `row`, `r`)
-- [ ] Standardize on column index variables: always `col_idx` (never `i`, `col`, `c`)
+**3.4 Terminology Consistency** ✅
+- [x] Standardize on "help overlay" (not "cheatsheet" or "help")
+- [x] Standardize on "file switcher" (not "sheet switcher")
+- [x] Standardize on row index variables: always `row_idx` (never `i`, `row`, `r`)
+- [x] Standardize on column index variables: always `col_idx` (never `i`, `col`, `c`)
+
+**Phase 3 Results:**
+- ✅ All 235 tests passing (207 unit + 7 CLI integration + 21 workflow)
+- ✅ Zero compilation warnings
+- ✅ Zero clippy warnings
+- ✅ Consistent naming throughout codebase
+- ✅ Centralized message management in `app/messages.rs`
+- ✅ Module names match struct names (`document.rs` → `Document`)
+- ✅ All getter functions use `get_*` prefix
+- ✅ Standardized terminology across UI and code
 
 ---
 

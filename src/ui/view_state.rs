@@ -17,10 +17,10 @@ pub struct ViewState {
     pub table_state: TableState,
 
     /// Currently selected column
-    pub selected_col: ColIndex,
+    pub selected_column: ColIndex,
 
-    /// Horizontal scroll offset (how many columns to skip on the left)
-    pub horizontal_offset: usize,
+    /// Column scroll offset (how many columns to skip on the left)
+    pub column_scroll_offset: usize,
 
     /// Whether the help overlay is currently shown
     pub help_overlay_visible: bool,
@@ -33,8 +33,8 @@ impl Default for ViewState {
     fn default() -> Self {
         Self {
             table_state: TableState::default(),
-            selected_col: ColIndex::new(0),
-            horizontal_offset: 0,
+            selected_column: ColIndex::new(0),
+            column_scroll_offset: 0,
             help_overlay_visible: false,
             viewport_mode: ViewportMode::Auto,
         }
@@ -75,8 +75,8 @@ mod tests {
     #[test]
     fn test_view_state_default() {
         let state = ViewState::new();
-        assert_eq!(state.selected_col, ColIndex::new(0));
-        assert_eq!(state.horizontal_offset, 0);
+        assert_eq!(state.selected_column, ColIndex::new(0));
+        assert_eq!(state.column_scroll_offset, 0);
         assert!(!state.help_overlay_visible);
         assert_eq!(state.viewport_mode, ViewportMode::Auto);
     }

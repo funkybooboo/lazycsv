@@ -1,13 +1,13 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use lazycsv::{App, ColIndex, CsvData, FileConfig, InputResult, RowIndex};
+use lazycsv::{App, ColIndex, Document, FileConfig, InputResult, RowIndex};
 use std::path::PathBuf;
 
 fn key_event(code: KeyCode) -> KeyEvent {
     KeyEvent::new(code, KeyModifiers::NONE)
 }
 
-fn create_test_csv() -> CsvData {
-    CsvData {
+fn create_test_csv() -> Document {
+    Document {
         headers: vec!["A".to_string(), "B".to_string(), "C".to_string()],
         rows: vec![
             vec!["1".to_string(), "2".to_string(), "3".to_string()],
@@ -28,17 +28,17 @@ fn test_complete_navigation_workflow() {
     // User workflow: Navigate to bottom-right, then back to top-left
     app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
-    assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
-    assert_eq!(app.view_state.selected_col, ColIndex::new(2));
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(2)));
+    assert_eq!(app.view_state.selected_column, ColIndex::new(2));
 
     // gg - Go to first row (multi-key command)
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-    assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(0)));
 
     // 0 - Go to first column
     app.handle_key(key_event(KeyCode::Char('0'))).unwrap();
-    assert_eq!(app.view_state.selected_col, ColIndex::new(0));
+    assert_eq!(app.view_state.selected_column, ColIndex::new(0));
 }
 
 #[test]
@@ -52,9 +52,9 @@ fn test_help_workflow() {
     assert!(app.view_state.help_overlay_visible);
 
     // Try to navigate (should be blocked)
-    let initial_row = app.selected_row();
+    let initial_row = app.get_selected_row();
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-    assert_eq!(app.selected_row(), initial_row);
+    assert_eq!(app.get_selected_row(), initial_row);
 
     // Close help with Esc
     app.handle_key(key_event(KeyCode::Esc)).unwrap();
@@ -62,7 +62,7 @@ fn test_help_workflow() {
 
     // Navigation should work again
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-    assert_ne!(app.selected_row(), initial_row);
+    assert_ne!(app.get_selected_row(), initial_row);
 }
 
 #[test]
@@ -103,26 +103,26 @@ fn test_file_switching_workflow() {
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
     // Start at file 0
-    assert_eq!(app.session.current_file_index(), 0);
+    assert_eq!(app.session.active_file_index(), 0);
 
     // Switch forward through all files
     let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
     assert_eq!(should_reload, InputResult::ReloadFile);
-    assert_eq!(app.session.current_file_index(), 1);
+    assert_eq!(app.session.active_file_index(), 1);
 
     let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
     assert_eq!(should_reload, InputResult::ReloadFile);
-    assert_eq!(app.session.current_file_index(), 2);
+    assert_eq!(app.session.active_file_index(), 2);
 
     // Wrap around to first file
     let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
     assert_eq!(should_reload, InputResult::ReloadFile);
-    assert_eq!(app.session.current_file_index(), 0);
+    assert_eq!(app.session.active_file_index(), 0);
 
     // Switch backward
     let should_reload = app.handle_key(key_event(KeyCode::Char('['))).unwrap();
     assert_eq!(should_reload, InputResult::ReloadFile);
-    assert_eq!(app.session.current_file_index(), 2);
+    assert_eq!(app.session.active_file_index(), 2);
 }
 
 #[test]
@@ -157,13 +157,13 @@ fn test_navigate_then_switch_file_workflow() {
     // Navigate to a specific position
     app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
-    assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
-    assert_eq!(app.view_state.selected_col, ColIndex::new(2));
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(2)));
+    assert_eq!(app.view_state.selected_column, ColIndex::new(2));
 
     // Switch file
     let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
     assert_eq!(should_reload, InputResult::ReloadFile);
-    assert_eq!(app.session.current_file_index(), 1);
+    assert_eq!(app.session.active_file_index(), 1);
 }
 
 #[test]
@@ -179,8 +179,8 @@ fn test_rapid_key_sequence_workflow() {
     }
 
     // Should end at maximum position
-    assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
-    assert_eq!(app.view_state.selected_col, ColIndex::new(2));
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(2)));
+    assert_eq!(app.view_state.selected_column, ColIndex::new(2));
 }
 
 #[test]
@@ -195,8 +195,8 @@ fn test_zigzag_navigation_workflow() {
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
 
-    assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
-    assert_eq!(app.view_state.selected_col, ColIndex::new(2));
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(2)));
+    assert_eq!(app.view_state.selected_column, ColIndex::new(2));
 }
 
 #[test]
@@ -224,8 +224,8 @@ fn test_boundary_navigation_workflow() {
         app.handle_key(key_event(KeyCode::Char('k'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('h'))).unwrap();
     }
-    assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
-    assert_eq!(app.view_state.selected_col, ColIndex::new(0));
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(0)));
+    assert_eq!(app.view_state.selected_column, ColIndex::new(0));
 
     // Go to opposite corner
     app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
@@ -236,8 +236,8 @@ fn test_boundary_navigation_workflow() {
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
     }
-    assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
-    assert_eq!(app.view_state.selected_col, ColIndex::new(2));
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(2)));
+    assert_eq!(app.view_state.selected_column, ColIndex::new(2));
 }
 
 #[test]
@@ -251,13 +251,13 @@ fn test_current_file_tracking() {
     let mut app = App::new(csv_data, csv_files.clone(), 1, FileConfig::new());
 
     // Should start at file index 1
-    assert_eq!(app.current_file(), &csv_files[1]);
+    assert_eq!(app.get_current_file(), &csv_files[1]);
 
     app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-    assert_eq!(app.current_file(), &csv_files[2]);
+    assert_eq!(app.get_current_file(), &csv_files[2]);
 
     app.handle_key(key_event(KeyCode::Char('['))).unwrap();
-    assert_eq!(app.current_file(), &csv_files[1]);
+    assert_eq!(app.get_current_file(), &csv_files[1]);
 }
 
 #[test]
@@ -270,7 +270,7 @@ fn test_status_message_lifecycle() {
     assert!(app.status_message.is_none());
 
     // Make data dirty and try to quit
-    app.csv_data.is_dirty = true;
+    app.document.is_dirty = true;
     app.handle_key(key_event(KeyCode::Char('q'))).unwrap();
 
     // Should have status message
@@ -294,12 +294,12 @@ fn test_complete_user_session_workflow() {
     // 2. Go to specific location with gg
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-    assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(0)));
 
     // 3. Use count prefix
     app.handle_key(key_event(KeyCode::Char('2'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-    assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(2)));
 
     // 4. Navigate to end
     app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
@@ -313,7 +313,7 @@ fn test_complete_user_session_workflow() {
 
     // 6. Switch files
     app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-    assert_eq!(app.session.current_file_index(), 1);
+    assert_eq!(app.session.active_file_index(), 1);
 
     // 7. Navigate in new file
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
@@ -339,7 +339,7 @@ fn test_rapid_file_switching_10_times() {
     }
 
     // Should wrap around correctly (10 % 3 = 1)
-    assert_eq!(app.session.current_file_index(), 1);
+    assert_eq!(app.session.active_file_index(), 1);
 
     // Try backward switches
     for _ in 0..10 {
@@ -347,7 +347,7 @@ fn test_rapid_file_switching_10_times() {
     }
 
     // Should wrap correctly backward
-    assert_eq!(app.session.current_file_index(), 0);
+    assert_eq!(app.session.active_file_index(), 0);
 }
 
 #[test]
@@ -391,7 +391,7 @@ fn test_all_navigation_keys_in_sequence() {
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
 
     // All should complete without panic
-    assert!(app.selected_row().is_some());
+    assert!(app.get_selected_row().is_some());
 }
 
 #[test]
@@ -429,7 +429,7 @@ fn test_error_recovery_from_invalid_sequence() {
 
     // Next command should work normally
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-    assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(1)));
 }
 
 #[test]
@@ -442,16 +442,16 @@ fn test_navigation_state_preserved_across_help() {
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
 
-    let row_before = app.selected_row();
-    let col_before = app.view_state.selected_col;
+    let row_before = app.get_selected_row();
+    let col_before = app.view_state.selected_column;
 
     // Open and close help
     app.handle_key(key_event(KeyCode::Char('?'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('?'))).unwrap();
 
     // Position should be preserved
-    assert_eq!(app.selected_row(), row_before);
-    assert_eq!(app.view_state.selected_col, col_before);
+    assert_eq!(app.get_selected_row(), row_before);
+    assert_eq!(app.view_state.selected_column, col_before);
 }
 
 #[test]
@@ -467,5 +467,5 @@ fn test_count_prefix_with_file_switching() {
     app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
 
     // State should be valid
-    assert_eq!(app.session.current_file_index(), 1);
+    assert_eq!(app.session.active_file_index(), 1);
 }

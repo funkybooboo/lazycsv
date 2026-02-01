@@ -15,8 +15,8 @@ fn test_delimiter_integration() {
 
     let app = App::from_cli(args).unwrap();
 
-    assert_eq!(app.csv_data.headers, vec!["a", "b", "c"]);
-    assert_eq!(app.csv_data.rows[0], vec!["1", "2", "3"]);
+    assert_eq!(app.document.headers, vec!["a", "b", "c"]);
+    assert_eq!(app.document.rows[0], vec!["1", "2", "3"]);
     assert_eq!(app.session.config().delimiter, Some(b';'));
 }
 
@@ -32,12 +32,12 @@ fn test_no_headers_integration() {
     let app = App::from_cli(args).unwrap();
 
     assert_eq!(
-        app.csv_data.headers,
+        app.document.headers,
         vec!["Column 1", "Column 2", "Column 3"]
     );
-    assert_eq!(app.csv_data.rows.len(), 2);
-    assert_eq!(app.csv_data.rows[0], vec!["a", "b", "c"]);
-    assert_eq!(app.csv_data.rows[1], vec!["1", "2", "3"]);
+    assert_eq!(app.document.rows.len(), 2);
+    assert_eq!(app.document.rows[0], vec!["a", "b", "c"]);
+    assert_eq!(app.document.rows[1], vec!["1", "2", "3"]);
     assert!(app.session.config().no_headers);
 }
 
@@ -50,8 +50,8 @@ fn test_default_csv_loading_integration() {
     let args = CliArgs::try_parse_from(["lazycsv", file_path.to_str().unwrap()]).unwrap();
     let app = App::from_cli(args).unwrap();
 
-    assert_eq!(app.csv_data.headers, vec!["header1", "header2"]);
-    assert_eq!(app.csv_data.rows[0], vec!["val1", "val2"]);
+    assert_eq!(app.document.headers, vec!["header1", "header2"]);
+    assert_eq!(app.document.rows[0], vec!["val1", "val2"]);
     assert_eq!(app.session.config().delimiter, None);
     assert!(!app.session.config().no_headers);
 }
@@ -67,9 +67,9 @@ fn test_directory_path_integration() {
     let args = CliArgs::try_parse_from(["lazycsv", temp_dir.path().to_str().unwrap()]).unwrap();
     let app = App::from_cli(args).unwrap();
 
-    assert_eq!(app.csv_data.headers, vec!["h1", "h2"]);
+    assert_eq!(app.document.headers, vec!["h1", "h2"]);
     assert_eq!(app.session.files().len(), 2);
-    assert_eq!(app.session.current_file_index(), 0);
+    assert_eq!(app.session.active_file_index(), 0);
 }
 
 #[test]
@@ -100,7 +100,8 @@ fn test_encoding_integration() {
     write(&file_path, &encoded_bytes).unwrap();
 
     let csv_data =
-        lazycsv::CsvData::from_file(&file_path, None, false, Some("utf-16le".to_string())).unwrap();
+        lazycsv::Document::from_file(&file_path, None, false, Some("utf-16le".to_string()))
+            .unwrap();
 
     assert_eq!(csv_data.headers, vec!["h1", "h2"]);
     assert_eq!(csv_data.rows[0], vec!["val1", "val2"]);
@@ -112,7 +113,7 @@ fn test_invalid_encoding_integration() {
     let file_path = temp_dir.path().join("test.csv");
     write(&file_path, "a,b,c").unwrap();
 
-    let result = lazycsv::CsvData::from_file(
+    let result = lazycsv::Document::from_file(
         &file_path,
         None,
         false,
@@ -142,10 +143,10 @@ fn test_delimiter_and_no_headers_integration() {
 
     let app = App::from_cli(args).unwrap();
 
-    assert_eq!(app.csv_data.headers, vec!["Column 1", "Column 2"]);
-    assert_eq!(app.csv_data.rows.len(), 2);
-    assert_eq!(app.csv_data.rows[0], vec!["a", "b"]);
-    assert_eq!(app.csv_data.rows[1], vec!["1", "2"]);
+    assert_eq!(app.document.headers, vec!["Column 1", "Column 2"]);
+    assert_eq!(app.document.rows.len(), 2);
+    assert_eq!(app.document.rows[0], vec!["a", "b"]);
+    assert_eq!(app.document.rows[1], vec!["1", "2"]);
     assert!(app.session.config().no_headers);
     assert_eq!(app.session.config().delimiter, Some(b';'));
 }

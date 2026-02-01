@@ -7,7 +7,7 @@ use ratatui::{
 };
 
 /// Render centered help overlay
-pub fn render_cheatsheet(frame: &mut Frame) {
+pub fn render_help_overlay(frame: &mut Frame) {
     // Create centered area (60% width, 70% height)
     let area = centered_rect(60, 70, frame.area());
 
