@@ -1,3 +1,8 @@
+//! Help overlay rendering with keybinding reference.
+//!
+//! Displays a modal help overlay showing all available keybindings and
+//! navigation commands when triggered by '?'.
+
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
@@ -6,10 +11,28 @@ use ratatui::{
     Frame,
 };
 
-/// Render centered help overlay
+/// Width percentage for help overlay (60% of terminal width)
+const HELP_OVERLAY_WIDTH_PERCENT: u16 = 60;
+
+/// Height percentage for help overlay (70% of terminal height)
+const HELP_OVERLAY_HEIGHT_PERCENT: u16 = 70;
+
+/// Render the help overlay with keybinding reference.
+///
+/// Displays a centered modal window showing all available keybindings
+/// for navigation, editing, and other commands. The overlay covers
+/// 60% of terminal width and 70% of height.
+///
+/// # Arguments
+///
+/// * `frame` - The Ratatui frame to render into
 pub fn render_help_overlay(frame: &mut Frame) {
     // Create centered area (60% width, 70% height)
-    let area = centered_rect(60, 70, frame.area());
+    let area = centered_rect(
+        HELP_OVERLAY_WIDTH_PERCENT,
+        HELP_OVERLAY_HEIGHT_PERCENT,
+        frame.area(),
+    );
 
     let help_text = vec![
         Line::from(Span::styled(

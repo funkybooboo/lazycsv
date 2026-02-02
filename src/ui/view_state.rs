@@ -1,3 +1,8 @@
+//! UI view state management including viewport control and scroll offsets.
+//!
+//! This module manages the state of the user interface including the current
+//! selection, scroll position, and viewport positioning modes.
+
 use crate::domain::position::ColIndex;
 use ratatui::widgets::TableState;
 

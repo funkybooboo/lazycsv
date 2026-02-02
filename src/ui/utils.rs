@@ -1,3 +1,8 @@
+//! UI utility functions for table rendering.
+//!
+//! Helper functions for column letter conversion (A, B, C... AA, AB)
+//! and other table display utilities.
+
 use std::borrow::Cow;
 
 const SINGLE_LETTER_COLS: [&str; 26] = [

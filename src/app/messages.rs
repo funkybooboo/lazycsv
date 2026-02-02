@@ -1,4 +1,7 @@
-//! User-facing status messages used throughout the application
+//! Centralized user-facing message strings.
+//!
+//! All status messages, error messages, and user feedback strings
+//! are defined here for consistency and easy localization.
 
 // Command-related messages
 pub const CMD_TIMEOUT: &str = "Command timeout";

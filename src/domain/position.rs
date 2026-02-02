@@ -1,3 +1,8 @@
+//! Type-safe position types for CSV table navigation.
+//!
+//! This module provides newtype wrappers for row and column indices to prevent
+//! accidental mixing of row/column coordinates at compile time.
+
 use std::num::NonZeroUsize;
 
 /// Newtype wrapper for row indices to prevent confusion with column indices

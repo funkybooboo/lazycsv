@@ -1,4 +1,10 @@
+//! Input state management for multi-key commands and count prefixes.
+//!
+//! This module tracks the state of pending multi-key commands (like 'gg', 'zz')
+//! and count prefixes (like '5j' to move down 5 rows).
+
 use super::actions::PendingCommand;
+use super::handler::{MAX_COMMAND_COUNT, MULTI_KEY_TIMEOUT_MS};
 use std::num::NonZeroUsize;
 use std::time::Instant;
 
@@ -41,7 +47,7 @@ impl InputState {
     /// Check if the pending command has timed out (1 second)
     pub fn is_pending_command_timed_out(&self) -> bool {
         if let Some(time) = self.pending_command_time {
-            time.elapsed().as_millis() > 1000
+            time.elapsed().as_millis() > MULTI_KEY_TIMEOUT_MS
         } else {
             false
         }
@@ -65,7 +71,7 @@ impl InputState {
             Some(existing) => {
                 let new_value = existing.get() * 10 + digit_value;
                 // Limit to reasonable size to prevent overflow
-                if new_value < 100000 {
+                if new_value < MAX_COMMAND_COUNT {
                     NonZeroUsize::new(new_value)
                 } else {
                     Some(existing)

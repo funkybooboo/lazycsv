@@ -12,10 +12,7 @@ use std::path::PathBuf;
 /// Application modes
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Mode {
-    Normal, // Navigation mode
-            // Edit,    // v0.4.0: Quick cell editing
-            // Visual,  // v1.1.0: Visual selection mode
-            // Command, // v1.1.0: Command input mode
+    Normal,
 }
 
 /// Main application state (v0.2.0 Phase 2: Refactored for separation of concerns)
@@ -41,8 +38,6 @@ pub struct App {
 
     /// Flag to quit application
     pub should_quit: bool,
-    // v0.4.0: Cell editing fields (to be implemented)
-    // pub edit_buffer: String,
 }
 
 impl App {

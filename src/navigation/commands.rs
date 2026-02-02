@@ -1,4 +1,7 @@
-//! Navigation command implementations
+//! Navigation command implementations for vim-style movement.
+//!
+//! This module provides functions for navigating the CSV table including
+//! cursor movement, page scrolling, and jump commands with count prefixes.
 
 use crate::app::{messages, App};
 use crate::domain::position::ColIndex;

@@ -1,3 +1,8 @@
+//! Multi-file session management and CSV configuration.
+//!
+//! This module handles file switching between multiple CSV files and
+//! maintains the configuration settings for parsing CSV files.
+
 use std::path::PathBuf;
 
 /// Configuration for CSV file parsing

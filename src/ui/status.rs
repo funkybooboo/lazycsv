@@ -1,3 +1,8 @@
+//! Status bar and file switcher rendering.
+//!
+//! This module handles rendering the bottom status bar showing current cell
+//! position and value, plus the file switcher for multi-file sessions.
+
 use crate::App;
 use ratatui::{
     layout::Rect,
@@ -7,7 +12,22 @@ use ratatui::{
 };
 use std::borrow::Cow;
 
-/// Render file switcher at bottom
+/// Maximum length for cell value display in status bar
+const MAX_STATUS_CELL_LENGTH: usize = 30;
+
+/// Number of characters used for ellipsis truncation
+const ELLIPSIS_LENGTH: usize = 3;
+
+/// Render the file switcher showing all open CSV files.
+///
+/// Displays a list of all CSV files in the current directory with an indicator
+/// showing which file is currently active. Only rendered when multiple files exist.
+///
+/// # Arguments
+///
+/// * `frame` - The Ratatui frame to render into
+/// * `app` - Application state containing session file list
+/// * `area` - The rectangle area to render the switcher within
 pub fn render_file_switcher(frame: &mut Frame, app: &App, area: Rect) {
     if app.session.files().is_empty() {
         return;
@@ -51,7 +71,17 @@ pub fn render_file_switcher(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(switcher, area);
 }
 
-/// Render status bar at bottom
+/// Render the main status bar showing position and cell information.
+///
+/// Displays current row/column position, column name, total rows/columns,
+/// current cell value (truncated if too long), and help/quit keybinding hints.
+/// Also shows any pending status messages.
+///
+/// # Arguments
+///
+/// * `frame` - The Ratatui frame to render into
+/// * `app` - Application state containing cursor position and document data
+/// * `area` - The rectangle area to render the status bar within
 pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     use crate::ui::utils::column_to_excel_letter;
 
@@ -71,8 +101,9 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             .get_cell(row_idx, app.view_state.selected_column);
         if value.is_empty() {
             Cow::Borrowed("<empty>")
-        } else if value.len() > 30 {
-            Cow::Owned(format!("\"{}...\"", &value[..27]))
+        } else if value.len() > MAX_STATUS_CELL_LENGTH {
+            let truncate_at = MAX_STATUS_CELL_LENGTH - ELLIPSIS_LENGTH;
+            Cow::Owned(format!("\"{}...\"", &value[..truncate_at]))
         } else {
             Cow::Owned(format!("\"{}\"", value))
         }

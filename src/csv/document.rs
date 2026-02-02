@@ -127,16 +127,6 @@ impl Document {
             .map(|s| s.as_str())
             .unwrap_or("")
     }
-
-    // v0.4.0-v0.6.0: Cell editing methods (to be implemented)
-    // pub fn set_cell(&mut self, row: usize, col: usize, value: String)
-    // pub fn save_to_file(&self, path: &Path) -> Result<()>
-
-    // v0.7.0-v0.8.0: Row/column operations (to be implemented)
-    // pub fn add_row(&mut self, at: usize)
-    // pub fn delete_row(&mut self, at: usize)
-    // pub fn add_column(&mut self, at: usize, header: String)
-    // pub fn delete_column(&mut self, at: usize)
 }
 
 #[cfg(test)]
