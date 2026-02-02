@@ -211,4 +211,35 @@ mod tests {
         assert_eq!(row.get(), 5);
         assert_eq!(col.get(), 10);
     }
+
+    // ==========================================
+    // Type Safety Verification (Compile-Time)
+    // ==========================================
+    //
+    // The following code demonstrates type safety at compile time.
+    // These examples will NOT compile, which is the desired behavior:
+    //
+    // Example 1: Cannot pass ColIndex where RowIndex is expected
+    // ```compile_fail
+    // let col = ColIndex::new(5);
+    // let pos = Position::new(col, col); // ERROR: expected RowIndex, found ColIndex
+    // ```
+    //
+    // Example 2: Cannot pass RowIndex where ColIndex is expected
+    // ```compile_fail
+    // let row = RowIndex::new(10);
+    // let pos = Position::new(row, row); // ERROR: expected ColIndex, found RowIndex
+    // ```
+    //
+    // Example 3: Cannot accidentally use wrong index in get_cell()
+    // ```compile_fail
+    // let row = RowIndex::new(5);
+    // let col = ColIndex::new(10);
+    // let cell = document.get_cell(col, row); // ERROR: arguments in wrong order
+    // ```
+    //
+    // These compile-time checks prevent an entire class of bugs where
+    // row and column indices could be accidentally swapped. Before the
+    // introduction of type-safe indices in Phase 1, this was a common
+    // source of subtle bugs that only manifested at runtime.
 }

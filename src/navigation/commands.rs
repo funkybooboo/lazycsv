@@ -179,3 +179,213 @@ pub fn move_left_by(app: &mut App, count: usize) {
     }
     app.view_state.viewport_mode = ViewportMode::Auto;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::csv::Document;
+    use crate::domain::position::ColIndex;
+    use std::path::PathBuf;
+
+    fn create_test_app() -> App {
+        let document = Document {
+            headers: vec!["A".to_string(), "B".to_string(), "C".to_string()],
+            rows: {
+                let mut rows = Vec::new();
+                for i in 0..50 {
+                    rows.push(vec![
+                        format!("{}", i),
+                        format!("{}", i + 1),
+                        format!("{}", i + 2),
+                    ]);
+                }
+                rows
+            },
+            filename: "test.csv".to_string(),
+            is_dirty: false,
+        };
+
+        let csv_files = vec![PathBuf::from("test.csv")];
+        App::new(document, csv_files, 0, crate::session::FileConfig::new())
+    }
+
+    #[test]
+    fn test_goto_first_row() {
+        let mut app = create_test_app();
+
+        // Move to middle
+        app.view_state.table_state.select(Some(25));
+
+        goto_first_row(&mut app);
+
+        assert_eq!(app.view_state.table_state.selected(), Some(0));
+        assert_eq!(app.view_state.viewport_mode, ViewportMode::Auto);
+    }
+
+    #[test]
+    fn test_goto_last_row() {
+        let mut app = create_test_app();
+
+        goto_last_row(&mut app);
+
+        let last_row = app.document.row_count().saturating_sub(1);
+        assert_eq!(app.view_state.table_state.selected(), Some(last_row));
+        assert_eq!(app.view_state.viewport_mode, ViewportMode::Auto);
+    }
+
+    #[test]
+    fn test_goto_line_valid() {
+        let mut app = create_test_app();
+
+        goto_line(&mut app, 10);
+
+        assert_eq!(app.view_state.table_state.selected(), Some(9)); // 0-indexed
+        assert_eq!(app.view_state.viewport_mode, ViewportMode::Auto);
+    }
+
+    #[test]
+    fn test_goto_line_out_of_bounds() {
+        let mut app = create_test_app();
+        let max_row = app.document.row_count().saturating_sub(1);
+
+        goto_line(&mut app, 9999);
+
+        assert_eq!(app.view_state.table_state.selected(), Some(max_row));
+    }
+
+    #[test]
+    fn test_goto_line_zero() {
+        let mut app = create_test_app();
+
+        goto_line(&mut app, 0);
+
+        assert_eq!(app.view_state.table_state.selected(), Some(0));
+    }
+
+    #[test]
+    fn test_move_down_by_with_count() {
+        let mut app = create_test_app();
+        app.view_state.table_state.select(Some(5));
+
+        move_down_by(&mut app, 10);
+
+        assert_eq!(app.view_state.table_state.selected(), Some(15));
+        assert_eq!(app.view_state.viewport_mode, ViewportMode::Auto);
+    }
+
+    #[test]
+    fn test_move_down_saturating_at_last_row() {
+        let mut app = create_test_app();
+        let last_row = app.document.row_count().saturating_sub(1);
+        app.view_state.table_state.select(Some(last_row - 5));
+
+        move_down_by(&mut app, 100);
+
+        assert_eq!(app.view_state.table_state.selected(), Some(last_row));
+    }
+
+    #[test]
+    fn test_move_up_by_with_count() {
+        let mut app = create_test_app();
+        app.view_state.table_state.select(Some(20));
+
+        move_up_by(&mut app, 10);
+
+        assert_eq!(app.view_state.table_state.selected(), Some(10));
+        assert_eq!(app.view_state.viewport_mode, ViewportMode::Auto);
+    }
+
+    #[test]
+    fn test_move_up_saturating_at_zero() {
+        let mut app = create_test_app();
+        app.view_state.table_state.select(Some(5));
+
+        move_up_by(&mut app, 100);
+
+        assert_eq!(app.view_state.table_state.selected(), Some(0));
+    }
+
+    #[test]
+    fn test_move_right_by_with_count() {
+        let mut app = create_test_app();
+        app.view_state.selected_column = ColIndex::new(0);
+
+        move_right_by(&mut app, 2);
+
+        assert_eq!(app.view_state.selected_column, ColIndex::new(2));
+        assert_eq!(app.view_state.viewport_mode, ViewportMode::Auto);
+    }
+
+    #[test]
+    fn test_move_right_saturating_at_last_column() {
+        let mut app = create_test_app();
+        let last_col = app.document.column_count().saturating_sub(1);
+        app.view_state.selected_column = ColIndex::new(0);
+
+        move_right_by(&mut app, 999);
+
+        assert_eq!(app.view_state.selected_column, ColIndex::new(last_col));
+    }
+
+    #[test]
+    fn test_move_left_by_with_count() {
+        let mut app = create_test_app();
+        app.view_state.selected_column = ColIndex::new(2);
+
+        move_left_by(&mut app, 1);
+
+        assert_eq!(app.view_state.selected_column, ColIndex::new(1));
+        assert_eq!(app.view_state.viewport_mode, ViewportMode::Auto);
+    }
+
+    #[test]
+    fn test_move_left_saturating_at_zero() {
+        let mut app = create_test_app();
+        app.view_state.selected_column = ColIndex::new(1);
+
+        move_left_by(&mut app, 100);
+
+        assert_eq!(app.view_state.selected_column, ColIndex::new(0));
+    }
+
+    #[test]
+    fn test_select_next_page() {
+        let mut app = create_test_app();
+        app.view_state.table_state.select(Some(0));
+
+        select_next_page(&mut app);
+
+        assert_eq!(app.view_state.table_state.selected(), Some(PAGE_SIZE));
+    }
+
+    #[test]
+    fn test_select_previous_page() {
+        let mut app = create_test_app();
+        app.view_state.table_state.select(Some(PAGE_SIZE));
+
+        select_previous_page(&mut app);
+
+        assert_eq!(app.view_state.table_state.selected(), Some(0));
+    }
+
+    #[test]
+    fn test_page_down_at_end() {
+        let mut app = create_test_app();
+        let last_row = app.document.row_count().saturating_sub(1);
+        app.view_state.table_state.select(Some(last_row - 5));
+
+        select_next_page(&mut app);
+
+        assert_eq!(app.view_state.table_state.selected(), Some(last_row));
+    }
+
+    #[test]
+    fn test_page_up_at_beginning() {
+        let mut app = create_test_app();
+        app.view_state.table_state.select(Some(5));
+
+        select_previous_page(&mut app);
+
+        assert_eq!(app.view_state.table_state.selected(), Some(0));
+    }
+}

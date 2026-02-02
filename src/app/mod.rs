@@ -1302,4 +1302,103 @@ mod tests {
         // Should clamp to valid range (last row)
         assert_eq!(app.get_selected_row(), Some(RowIndex::new(2))); // Last row in test data
     }
+
+    // ===== Z-Command Integration Tests (Viewport Positioning) =====
+
+    #[test]
+    fn test_z_command_top_viewport() {
+        let csv_data = create_test_csv_data();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        // Move to middle row
+        app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
+        assert_eq!(app.get_selected_row(), Some(RowIndex::new(1)));
+
+        // Execute zt (viewport top)
+        app.handle_key(key_event(KeyCode::Char('z'))).unwrap();
+        app.handle_key(key_event(KeyCode::Char('t'))).unwrap();
+
+        assert_eq!(app.view_state.viewport_mode, crate::ui::ViewportMode::Top);
+        assert!(app.status_message.is_some());
+        assert!(app
+            .status_message
+            .as_ref()
+            .unwrap()
+            .as_str()
+            .contains("top"));
+    }
+
+    #[test]
+    fn test_z_command_center_viewport() {
+        let csv_data = create_test_csv_data();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        // Move to middle row
+        app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
+        assert_eq!(app.get_selected_row(), Some(RowIndex::new(1)));
+
+        // Execute zz (viewport center)
+        app.handle_key(key_event(KeyCode::Char('z'))).unwrap();
+        app.handle_key(key_event(KeyCode::Char('z'))).unwrap();
+
+        assert_eq!(
+            app.view_state.viewport_mode,
+            crate::ui::ViewportMode::Center
+        );
+        assert!(app.status_message.is_some());
+        assert!(app
+            .status_message
+            .as_ref()
+            .unwrap()
+            .as_str()
+            .contains("center"));
+    }
+
+    #[test]
+    fn test_z_command_bottom_viewport() {
+        let csv_data = create_test_csv_data();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        // Move to middle row
+        app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
+        assert_eq!(app.get_selected_row(), Some(RowIndex::new(1)));
+
+        // Execute zb (viewport bottom)
+        app.handle_key(key_event(KeyCode::Char('z'))).unwrap();
+        app.handle_key(key_event(KeyCode::Char('b'))).unwrap();
+
+        assert_eq!(
+            app.view_state.viewport_mode,
+            crate::ui::ViewportMode::Bottom
+        );
+        assert!(app.status_message.is_some());
+        assert!(app
+            .status_message
+            .as_ref()
+            .unwrap()
+            .as_str()
+            .contains("bottom"));
+    }
+
+    #[test]
+    fn test_viewport_mode_persists_across_navigation() {
+        let csv_data = create_test_csv_data();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        // Set viewport to center
+        app.handle_key(key_event(KeyCode::Char('z'))).unwrap();
+        app.handle_key(key_event(KeyCode::Char('z'))).unwrap();
+        assert_eq!(
+            app.view_state.viewport_mode,
+            crate::ui::ViewportMode::Center
+        );
+
+        // Move down - viewport should reset to Auto
+        app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
+        assert_eq!(app.view_state.viewport_mode, crate::ui::ViewportMode::Auto);
+    }
 }

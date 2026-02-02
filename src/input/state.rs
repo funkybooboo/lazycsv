@@ -137,9 +137,22 @@ mod tests {
         let mut state = InputState::new();
         state.set_pending_command(PendingCommand::G);
 
-        // Immediately after setting, should not be timed out
+        // Verify NOT timed out immediately
         assert!(!state.is_pending_command_timed_out());
 
-        // Sleeping for 1+ second would make it timeout, but we won't do that in tests
+        // Sleep for timeout duration + buffer
+        std::thread::sleep(std::time::Duration::from_millis(
+            MULTI_KEY_TIMEOUT_MS as u64 + 100,
+        ));
+
+        // Verify IS timed out after sleep
+        assert!(state.is_pending_command_timed_out());
+    }
+
+    #[test]
+    fn test_pending_command_no_timeout_when_none() {
+        let state = InputState::new();
+        // No pending command set
+        assert!(!state.is_pending_command_timed_out());
     }
 }
