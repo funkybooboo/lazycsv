@@ -4,7 +4,12 @@ mod table;
 pub mod utils;
 pub mod view_state;
 
+/// Maximum number of columns to display simultaneously
+/// This prevents horizontal overflow on standard terminals
 pub const MAX_VISIBLE_COLS: usize = 10;
+
+/// Maximum width for cell content display (characters)
+/// Longer content will be truncated with "..."
 pub const MAX_CELL_WIDTH: usize = 20;
 
 use crate::App;

@@ -1,8 +1,13 @@
-use super::{messages, App, ViewportMode};
+//! Navigation command implementations
+
+use crate::app::{messages, App};
 use crate::domain::position::ColIndex;
-use crate::ui::MAX_VISIBLE_COLS;
+use crate::ui::{ViewportMode, MAX_VISIBLE_COLS};
 use anyhow::Result;
 use crossterm::event::KeyCode;
+
+/// Rows per page for PageUp/PageDown navigation
+pub const PAGE_SIZE: usize = 20;
 
 /// Handle navigation keys with optional count prefix
 pub fn handle_navigation(app: &mut App, code: KeyCode) -> Result<()> {
@@ -85,7 +90,6 @@ pub fn handle_navigation(app: &mut App, code: KeyCode) -> Result<()> {
 }
 
 fn select_next_page(app: &mut App) {
-    const PAGE_SIZE: usize = 20;
     let i = match app.view_state.table_state.selected() {
         Some(i) => (i + PAGE_SIZE).min(app.document.row_count().saturating_sub(1)),
         None => 0,
@@ -94,7 +98,6 @@ fn select_next_page(app: &mut App) {
 }
 
 fn select_previous_page(app: &mut App) {
-    const PAGE_SIZE: usize = 20;
     let i = match app.view_state.table_state.selected() {
         Some(i) => i.saturating_sub(PAGE_SIZE),
         None => 0,

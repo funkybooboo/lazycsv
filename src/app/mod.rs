@@ -1,11 +1,9 @@
-mod input;
 pub mod messages;
-mod navigation;
 
 use crate::domain::position::RowIndex;
 use crate::input::{InputResult, InputState, StatusMessage};
 use crate::session::Session;
-use crate::ui::{ViewState, ViewportMode};
+use crate::ui::ViewState;
 use crate::Document;
 use anyhow::{Context, Result};
 use crossterm::event::KeyEvent;
@@ -55,11 +53,11 @@ impl App {
 
         // Determine the CSV file to load and scan directory for others
         let (file_path, csv_files, current_file_index) = if path.is_file() {
-            let csv_files = crate::file_discovery::scan_directory_for_csvs(&path)?;
+            let csv_files = crate::file_system::scan_directory_for_csvs(&path)?;
             let current_file_index = csv_files.iter().position(|p| p == &path).unwrap_or(0);
             (path, csv_files, current_file_index)
         } else if path.is_dir() {
-            let csv_files = crate::file_discovery::scan_directory(&path)?;
+            let csv_files = crate::file_system::scan_directory(&path)?;
             if csv_files.is_empty() {
                 anyhow::bail!("{}", messages::no_csv_files_found(&path));
             }
@@ -77,7 +75,7 @@ impl App {
         );
 
         // Load CSV data
-        let csv_data = crate::document::Document::from_file(
+        let csv_data = crate::csv::Document::from_file(
             &file_path,
             cli_args.delimiter,
             cli_args.no_headers,
@@ -124,7 +122,7 @@ impl App {
 
     /// Handle keyboard input events
     pub fn handle_key(&mut self, key: KeyEvent) -> Result<InputResult> {
-        input::handle_key(self, key)
+        crate::input::handle_key(self, key)
     }
 
     /// Get current selected row index (for status display)

@@ -1,3 +1,5 @@
+//! Directory scanning and CSV file discovery
+
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 

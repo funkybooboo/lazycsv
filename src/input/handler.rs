@@ -1,11 +1,16 @@
-use crate::app::{messages, navigation, App, Mode, ViewportMode};
-use crate::input::{InputResult, PendingCommand, StatusMessage};
+//! Input handling and keyboard event processing
+
+use crate::app::{messages, App, Mode};
+use crate::navigation;
+use crate::ui::ViewportMode;
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 use std::num::NonZeroUsize;
 
+use super::{InputResult, PendingCommand, StatusMessage};
+
 /// Timeout for multi-key commands (1 second)
-const MULTI_KEY_TIMEOUT_MS: u128 = 1000;
+pub const MULTI_KEY_TIMEOUT_MS: u128 = 1000;
 
 /// Handle keyboard input events
 pub fn handle_key(app: &mut App, key: KeyEvent) -> Result<InputResult> {

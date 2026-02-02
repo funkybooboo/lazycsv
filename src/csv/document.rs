@@ -1,3 +1,5 @@
+//! In-memory CSV document with headers and rows
+
 use crate::domain::position::{ColIndex, RowIndex};
 use anyhow::{Context, Result};
 use csv;
