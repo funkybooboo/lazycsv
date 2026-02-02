@@ -64,7 +64,7 @@ The current mode is always shown in the status bar:
 
 ---
 
-## v0.3.0 - Advanced Navigation
+## v0.3.0 - Advanced Navigation (✅ Complete)
 
 ### Enhanced Movement
 
@@ -77,8 +77,9 @@ The current mode is always shown in the status bar:
 | `$` | Jump to last column |
 | `PageUp` | Page up (~20 rows) |
 | `PageDown` | Page down (~20 rows) |
+| `Enter` | Move down one row (like `j`) |
 
-### Column Jumping
+### Column Jumping (Excel-style)
 
 | Key | Action |
 |-----|--------|
@@ -95,14 +96,38 @@ The current mode is always shown in the status bar:
 | `5j` | Move down 5 rows |
 | `3h` | Move left 3 columns |
 | `10l` | Move right 10 columns |
+| `3w` | Jump to 3rd next non-empty cell |
 
-### Command-Line Jumps
+### Command Mode
 
 | Command | Action |
 |---------|--------|
+| `:` | Enter command mode |
 | `:15` | Jump to row 15 |
 | `:B` | Jump to column B |
 | `:BC` | Jump to column 55 |
+| `Esc` | Cancel command input |
+
+### Viewport Control
+
+| Key | Action |
+|-----|--------|
+| `zt` | Position current row at top of screen |
+| `zz` | Position current row at center of screen |
+| `zb` | Position current row at bottom of screen |
+
+---
+
+## v0.3.1 - UI/UX Polish (✅ Complete)
+
+*User interface improvements - no new keybindings*
+
+**Features:**
+- Mode indicator (-- NORMAL -- / -- COMMAND --)
+- Dirty flag display ([*])
+- Transient messages that auto-clear on keypress
+- Enhanced help menu with better organization
+- File list horizontal scrolling
 
 ---
 
@@ -714,9 +739,10 @@ status_bar = "blue"
 
 | Version | Features Added |
 |---------|----------------|
-| v0.1.0 | Foundation - viewing, basic navigation |
-| v0.2.0 | Type safety refactor (internal) |
-| v0.3.0 | Advanced navigation (gg, G, counts, column jumps) |
+| v0.1.0 | ✅ Foundation - viewing, basic navigation |
+| v0.2.0 | ✅ Type safety refactor (internal) |
+| v0.3.0 | ✅ Advanced navigation (column jumps, command mode, word motion) |
+| v0.3.1 | ✅ UI/UX polish (mode indicator, transient messages, help redesign) |
 | v0.4.0 | Quick editing (Insert mode) |
 | v0.5.0 | Vim magnifier (power editing) |
 | v0.6.0 | Save/quit guards |

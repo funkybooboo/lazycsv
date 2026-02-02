@@ -13,6 +13,7 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Mode {
     Normal,
+    Command,
 }
 
 /// Main application state (v0.2.0 Phase 2: Refactored for separation of concerns)
@@ -1265,20 +1266,29 @@ mod tests {
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let initial_row = app.get_selected_row();
-        let initial_col = app.view_state.selected_column;
 
         // Start g command
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
         assert_eq!(app.input_state.pending_command, Some(PendingCommand::G));
 
-        // Send invalid character (should clear pending state)
+        // Send letter (now starts column jump sequence)
         app.handle_key(key_event(KeyCode::Char('x'))).unwrap();
 
-        // State should be reset
+        // Should transition to GotoColumn state (x is a valid letter)
+        assert!(matches!(
+            app.input_state.pending_command,
+            Some(PendingCommand::GotoColumn(_))
+        ));
+
+        // Send Enter to execute the column jump
+        app.handle_key(key_event(KeyCode::Enter)).unwrap();
+
+        // State should be cleared after executing
         assert_eq!(app.input_state.pending_command, None);
-        // Position should not have changed
+        // Row should not have changed
         assert_eq!(app.get_selected_row(), initial_row);
-        assert_eq!(app.view_state.selected_column, initial_col);
+        // Column should have moved (clamped to last column since X doesn't exist)
+        assert_eq!(app.view_state.selected_column, ColIndex::new(2)); // Last column
     }
 
     #[test]

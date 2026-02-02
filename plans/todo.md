@@ -9,8 +9,9 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 - **v0.1.2** - Test Coverage Expansion ✅ (Complete)
 - **v0.1.3** - Rust Idioms & Code Quality ✅ (Complete)
 - **v0.1.4** - Comprehensive Test Coverage ✅ (Complete)
-- **v0.2.0** - Type Safety Refactor
-- **v0.3.0** - Advanced Navigation
+- **v0.2.0** - Type Safety Refactor ✅ (Complete)
+- **v0.3.0** - Advanced Navigation ✅ (Complete)
+- **v0.3.1** - UI/UX Polish ✅ (Complete)
 - **v0.4.0** - Quick Editing
 - **v0.5.0** - Vim Magnifier
 - **v0.6.0** - Save/Quit Guards
@@ -76,54 +77,54 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 
 ---
 
-## v0.3.0 - Advanced Navigation
+## v0.3.0 - Advanced Navigation ✅
 
 ### Version 0.3.0: Enhanced Navigation
 
-*Vim-style navigation enhancements*
+*Vim-style navigation enhancements (COMPLETE)*
 
-- [ ] **Row Jumping:** Implement `gg`, `G`, `<number>G` (e.g., `15G`)
+- ✅ **Row Jumping:** Implement `gg`, `G`, `<number>G` (e.g., `15G`)
   - `gg` jumps to first row
   - `G` jumps to last row
   - `15G` jumps to row 15
   - Buffer number keys before G
-- [ ] **Column Jumping:** Implement `g<letter(s)>` for column navigation
+- ✅ **Column Jumping:** Implement `g<letter(s)>` for column navigation
   - `ga` or `gA` jumps to column A (first column)
   - `gBC` jumps to column 55 (Excel-style letters)
   - Base-26 conversion: A=1, B=2, ..., Z=26, AA=27, AB=28
   - Buffer letter keys after `g`
-- [ ] **Command-line Jumps:** Implement `:<number>` and `:<column>`
+- ✅ **Command-line Jumps:** Implement `:<number>` and `:<column>`
   - `:15` jumps to row 15
   - `:B` jumps to column B
   - `:BC` jumps to column 55
-- [ ] **Count Prefixes:** Support vim-style count prefixes for all navigation
+- ✅ **Count Prefixes:** Support vim-style count prefixes for all navigation
   - `5j` moves down 5 rows
   - `3h` moves left 3 columns
-- [ ] **Enter Key:** In Normal mode, `Enter` moves cursor down one row (like vim)
-- [ ] **Word Motion:** Add vim-style word navigation for sparse data
+- ✅ **Enter Key:** In Normal mode, `Enter` moves cursor down one row (like vim)
+- ✅ **Word Motion:** Add vim-style word navigation for sparse data
   - `w` jumps to next non-empty cell in row
   - `b` jumps to previous non-empty cell in row
   - `e` jumps to last non-empty cell in row
-- [ ] **Error Handling:**
+- ✅ **Error Handling:**
   - Out-of-bounds jumps clamp to valid range
   - Invalid column letters show "Invalid column" error
   - `99999G` on 100-row file goes to last row
 
-### Version 0.3.1: UI/UX Polish
+### Version 0.3.1: UI/UX Polish ✅
 
-*Polish the user interface and feedback systems*
+*Polish the user interface and feedback systems (COMPLETE)*
 
-- [ ] **Intuitive Bottom Bar:**
+- ✅ **Intuitive Bottom Bar:**
   - Redesign status bar with clear mode indicators
   - Prominent file status (dirty `*`, filename, read-only)
-- [ ] **Transient Message System:**
+- ✅ **Transient Message System:**
   - Non-critical feedback ("File Saved", "Copied 1 row", "Invalid key")
   - Messages persist until next keypress, then clear
   - Invalid multi-key sequences show feedback (e.g., after `g`, invalid key → "Invalid column")
-- [ ] **Scrolling File Viewer:**
+- ✅ **Scrolling File Viewer:**
   - Horizontal scroll for file list if wider than terminal
   - Track horizontal scroll offset
-- [ ] **Clean Help Menu:**
+- ✅ **Clean Help Menu:**
   - Redesign `?` help overlay for clarity
   - Group keybindings logically (Navigation, Editing, Global)
   - Easy to read at a glance

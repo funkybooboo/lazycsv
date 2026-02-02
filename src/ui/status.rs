@@ -62,9 +62,22 @@ pub fn render_file_switcher(frame: &mut Frame, app: &App, area: Rect) {
         }
     }
 
-    let switcher_text = format!("{}{}", count_info, file_list);
+    let full_text = format!("{}{}", count_info, file_list);
 
-    let switcher = Paragraph::new(switcher_text)
+    // Apply horizontal scrolling if text is too wide
+    // Account for borders (2 chars) and padding (2 chars)
+    let available_width = area.width.saturating_sub(4) as usize;
+    let scroll_offset = app.view_state.file_list_scroll_offset;
+
+    let display_text = if full_text.len() > available_width {
+        let start = scroll_offset.min(full_text.len().saturating_sub(available_width));
+        let end = (start + available_width).min(full_text.len());
+        &full_text[start..end]
+    } else {
+        &full_text
+    };
+
+    let switcher = Paragraph::new(display_text)
         .block(Block::default().borders(Borders::ALL).title(" Files "))
         .style(Style::default());
 
@@ -111,30 +124,37 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         Cow::Borrowed("<no data>")
     };
 
-    let status_text = if let Some(ref msg) = app.status_message {
-        // Show status message if present
-        format!(" {} ", msg.as_str())
-    } else {
-        // Build left side: help, quit, files
-        let left_side = if app.session.files().len() > 1 {
-            "[?] help │ [q] quit │ [ ] files"
-        } else {
-            "[?] help │ [q] quit"
-        };
+    let status_text = match app.mode {
+        crate::app::Mode::Command => {
+            // Show command input with cursor
+            format!(" :{}_", app.input_state.command_buffer)
+        }
+        crate::app::Mode::Normal => {
+            if let Some(ref msg) = app.status_message {
+                // Show status message if present
+                format!(" {} ", msg.as_str())
+            } else {
+                // Mode indicator
+                let mode_indicator = "-- NORMAL --";
 
-        // Build right side: row, col, cell info
-        let right_side = format!(
-            "Row {}/{} │ Col {}: {} ({}/{}) │ Cell: {}",
-            selected_row,
-            total_rows,
-            col_letter,
-            col_name,
-            app.view_state.selected_column.to_column_number().get(),
-            total_cols,
-            cell_value
-        );
+                // Dirty flag
+                let dirty_flag = if app.document.is_dirty { " [*]" } else { "" };
 
-        format!(" {} │ {}", left_side, right_side)
+                // Build right side: row, col, cell info
+                let right_side = format!(
+                    "Row {}/{} │ Col {}: {} ({}/{}) │ Cell: {} │ [?] help",
+                    selected_row,
+                    total_rows,
+                    col_letter,
+                    col_name,
+                    app.view_state.selected_column.to_column_number().get(),
+                    total_cols,
+                    cell_value
+                );
+
+                format!(" {}{} │ {}", mode_indicator, dirty_flag, right_side)
+            }
+        }
     };
 
     let status = Paragraph::new(status_text).style(Style::default());

@@ -79,12 +79,14 @@ pub enum FileDirection {
 }
 
 /// Pending multi-key command state
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum PendingCommand {
     /// Waiting for second 'g' (for gg - go to first row)
     G,
     /// Waiting for second key after 'z' (zt, zz, zb)
     Z,
+    /// Buffering column letters (e.g., after 'g', receiving 'B' then 'C' for column BC)
+    GotoColumn(String),
 }
 
 impl PendingCommand {
@@ -96,31 +98,73 @@ impl PendingCommand {
             _ => None,
         }
     }
+
+    /// Append a letter to GotoColumn buffer, or create new GotoColumn from G
+    pub fn append_letter(self, letter: char) -> Self {
+        match self {
+            PendingCommand::G => PendingCommand::GotoColumn(letter.to_string()),
+            PendingCommand::GotoColumn(mut s) => {
+                s.push(letter);
+                PendingCommand::GotoColumn(s)
+            }
+            other => other,
+        }
+    }
+
+    /// Get the buffered column letters if this is a GotoColumn command
+    pub fn get_column_letters(&self) -> Option<&str> {
+        match self {
+            PendingCommand::GotoColumn(s) => Some(s.as_str()),
+            _ => None,
+        }
+    }
 }
 
 /// Newtype wrapper for status messages
 #[derive(Debug, Clone, PartialEq)]
-pub struct StatusMessage(Cow<'static, str>);
+pub struct StatusMessage {
+    content: Cow<'static, str>,
+    clear_on_keypress: bool,
+}
 
 impl StatusMessage {
-    /// Create a new status message from a static string
+    /// Create a new status message from a static string (clears on keypress by default)
     pub const fn new_static(msg: &'static str) -> Self {
-        Self(Cow::Borrowed(msg))
+        Self {
+            content: Cow::Borrowed(msg),
+            clear_on_keypress: true,
+        }
     }
 
-    /// Create a new status message from an owned String
+    /// Create a new status message from an owned String (clears on keypress by default)
     pub fn new_owned(msg: String) -> Self {
-        Self(Cow::Owned(msg))
+        Self {
+            content: Cow::Owned(msg),
+            clear_on_keypress: true,
+        }
+    }
+
+    /// Create a persistent message that won't clear on keypress
+    pub fn new_persistent(msg: String) -> Self {
+        Self {
+            content: Cow::Owned(msg),
+            clear_on_keypress: false,
+        }
     }
 
     /// Get the message as a string slice
     pub fn as_str(&self) -> &str {
-        &self.0
+        &self.content
+    }
+
+    /// Check if this message should clear on next keypress
+    pub fn should_clear_on_keypress(&self) -> bool {
+        self.clear_on_keypress
     }
 
     /// Convert to Cow<'static, str> for backwards compatibility
     pub fn into_cow(self) -> Cow<'static, str> {
-        self.0
+        self.content
     }
 }
 

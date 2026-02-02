@@ -19,6 +19,7 @@ pub const MAX_COMMAND_COUNT: usize = 100000;
 pub fn handle_key(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     match app.mode {
         Mode::Normal => handle_normal_mode(app, key),
+        Mode::Command => handle_command_mode(app, key),
     }
 }
 
@@ -26,9 +27,15 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Result<InputResult> {
 fn check_pending_timeout(app: &mut App) {
     if let Some(time) = app.input_state.pending_command_time {
         if time.elapsed().as_millis() > MULTI_KEY_TIMEOUT_MS {
-            app.input_state.pending_command = None;
-            app.input_state.pending_command_time = None;
-            app.status_message = Some(StatusMessage::from(messages::CMD_TIMEOUT));
+            // If we have buffered column letters, execute the jump
+            if let Some(PendingCommand::GotoColumn(ref letters)) = app.input_state.pending_command {
+                let letters = letters.clone();
+                app.input_state.clear_pending_command();
+                navigation::commands::goto_column(app, &letters);
+            } else {
+                app.input_state.clear_pending_command();
+                app.status_message = Some(StatusMessage::from(messages::CMD_TIMEOUT));
+            }
         }
     }
 }
@@ -73,11 +80,18 @@ fn handle_file_switch(app: &mut App, next: bool) -> InputResult {
 
 /// Handle keyboard input in Normal mode
 fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
+    // Clear transient messages on keypress
+    if let Some(ref msg) = app.status_message {
+        if msg.should_clear_on_keypress() {
+            app.status_message = None;
+        }
+    }
+
     // Check if pending command has timed out
     check_pending_timeout(app);
 
     // Handle pending multi-key sequences
-    if let Some(pending) = app.input_state.pending_command {
+    if let Some(pending) = app.input_state.pending_command.clone() {
         return handle_multi_key_command(app, pending, key.code);
     }
 
@@ -132,6 +146,18 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             return Ok(InputResult::Continue);
         }
 
+        // Enter command mode
+        KeyCode::Char(':') if is_navigation_allowed(app) => {
+            app.mode = Mode::Command;
+            app.input_state.clear_command_buffer();
+            return Ok(InputResult::Continue);
+        }
+
+        // Enter key - move down one row (like j)
+        KeyCode::Enter if is_navigation_allowed(app) => {
+            navigation::commands::move_down_by(app, 1);
+        }
+
         // Navigation commands
         _ if is_navigation_allowed(app) => {
             navigation::handle_navigation(app, key.code)?;
@@ -143,41 +169,66 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     Ok(InputResult::Continue)
 }
 
-/// Handle multi-key command sequences (gg, zz, zt, zb, etc.)
+/// Handle multi-key command sequences (gg, zz, zt, zb, g<letters>, etc.)
 fn handle_multi_key_command(
     app: &mut App,
     first: PendingCommand,
     second: KeyCode,
 ) -> Result<InputResult> {
-    app.input_state.pending_command = None;
-    app.input_state.pending_command_time = None;
-
-    match (first, second) {
+    match (&first, second) {
         // gg - Go to first row
         (PendingCommand::G, KeyCode::Char('g')) => {
+            app.input_state.clear_pending_command();
             navigation::goto_first_row(app);
             app.status_message = Some(StatusMessage::from(messages::JUMPED_TO_FIRST_ROW));
         }
 
+        // g + letter - Start column jump (e.g., gA, gB)
+        (PendingCommand::G, KeyCode::Char(c)) if c.is_ascii_alphabetic() => {
+            let new_pending = first.append_letter(c);
+            app.input_state.set_pending_command(new_pending);
+            return Ok(InputResult::Continue);
+        }
+
+        // g + letter + more letters - Continue buffering (e.g., gB -> gBC)
+        (PendingCommand::GotoColumn(_), KeyCode::Char(c)) if c.is_ascii_alphabetic() => {
+            let new_pending = first.append_letter(c);
+            app.input_state.set_pending_command(new_pending);
+            return Ok(InputResult::Continue);
+        }
+
+        // g + letter(s) + Enter or non-letter - Execute column jump
+        (PendingCommand::GotoColumn(_), KeyCode::Enter)
+        | (PendingCommand::GotoColumn(_), KeyCode::Char(_)) => {
+            app.input_state.clear_pending_command();
+            if let Some(letters) = first.get_column_letters() {
+                navigation::commands::goto_column(app, letters);
+            }
+        }
+
         // zt - Top of screen
         (PendingCommand::Z, KeyCode::Char('t')) => {
+            app.input_state.clear_pending_command();
             app.view_state.viewport_mode = ViewportMode::Top;
             app.status_message = Some(StatusMessage::from(messages::VIEW_TOP));
         }
 
         // zz - Center of screen
         (PendingCommand::Z, KeyCode::Char('z')) => {
+            app.input_state.clear_pending_command();
             app.view_state.viewport_mode = ViewportMode::Center;
             app.status_message = Some(StatusMessage::from(messages::VIEW_CENTER));
         }
 
         // zb - Bottom of screen
         (PendingCommand::Z, KeyCode::Char('b')) => {
+            app.input_state.clear_pending_command();
             app.view_state.viewport_mode = ViewportMode::Bottom;
             app.status_message = Some(StatusMessage::from(messages::VIEW_BOTTOM));
         }
 
         _ => {
+            app.input_state.clear_pending_command();
             app.status_message = Some(StatusMessage::from(messages::unknown_command(
                 &format!("{:?}", first),
                 &format!("{:?}", second),
@@ -206,4 +257,66 @@ fn handle_count_prefix(app: &mut App, digit: char) -> Result<InputResult> {
     };
 
     Ok(InputResult::Continue)
+}
+
+/// Handle keyboard input in Command mode
+fn handle_command_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
+    // Clear transient messages on keypress
+    if let Some(ref msg) = app.status_message {
+        if msg.should_clear_on_keypress() {
+            app.status_message = None;
+        }
+    }
+
+    match key.code {
+        KeyCode::Esc => {
+            app.mode = Mode::Normal;
+            app.input_state.clear_command_buffer();
+            app.status_message = Some(StatusMessage::from(messages::CMD_CANCELLED));
+        }
+
+        KeyCode::Enter => {
+            execute_command(app)?;
+            app.mode = Mode::Normal;
+            app.input_state.clear_command_buffer();
+        }
+
+        KeyCode::Backspace => {
+            app.input_state.pop_command_char();
+        }
+
+        KeyCode::Char(c) => {
+            app.input_state.push_command_char(c);
+        }
+
+        _ => {}
+    }
+
+    Ok(InputResult::Continue)
+}
+
+/// Execute command from command buffer
+fn execute_command(app: &mut App) -> Result<()> {
+    let cmd = app.input_state.command_buffer.trim().to_string();
+
+    if cmd.is_empty() {
+        return Ok(());
+    }
+
+    // Try to parse as number first (line jump)
+    if let Ok(line_num) = cmd.parse::<usize>() {
+        navigation::commands::goto_line(app, line_num);
+        app.status_message = Some(StatusMessage::from(format!("Jumped to line {}", line_num)));
+        return Ok(());
+    }
+
+    // Try to parse as column letter
+    if cmd.chars().all(|c| c.is_ascii_alphabetic()) {
+        navigation::commands::goto_column(app, &cmd);
+        return Ok(());
+    }
+
+    // Unknown command
+    app.status_message = Some(StatusMessage::from(format!("Unknown command: :{}", cmd)));
+    Ok(())
 }

@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use lazycsv::input::PendingCommand;
 use lazycsv::{App, ColIndex, Document, FileConfig, InputResult, RowIndex};
 use std::path::PathBuf;
 
@@ -420,11 +421,20 @@ fn test_error_recovery_from_invalid_sequence() {
     let csv_files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
-    // Try invalid sequence: g followed by invalid char
+    // Try column jump sequence: g followed by letter 'z'
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-    app.handle_key(key_event(KeyCode::Char('z'))).unwrap(); // Invalid
+    app.handle_key(key_event(KeyCode::Char('z'))).unwrap(); // Start column jump to Z
 
-    // Should recover cleanly
+    // Should be in GotoColumn state (z is a valid letter for column names)
+    assert!(matches!(
+        app.input_state.pending_command,
+        Some(PendingCommand::GotoColumn(_))
+    ));
+
+    // Press Enter to execute the column jump (will clamp to last column)
+    app.handle_key(key_event(KeyCode::Enter)).unwrap();
+
+    // Should be cleared after executing
     assert_eq!(app.input_state.pending_command, None);
 
     // Next command should work normally

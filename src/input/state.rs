@@ -19,6 +19,9 @@ pub struct InputState {
 
     /// Time when pending command was set (for timeout)
     pub pending_command_time: Option<Instant>,
+
+    /// Command buffer for command mode (stores text after ":")
+    pub command_buffer: String,
 }
 
 impl InputState {
@@ -78,6 +81,21 @@ impl InputState {
                 }
             }
         };
+    }
+
+    /// Clear the command buffer
+    pub fn clear_command_buffer(&mut self) {
+        self.command_buffer.clear();
+    }
+
+    /// Push a character to the command buffer
+    pub fn push_command_char(&mut self, c: char) {
+        self.command_buffer.push(c);
+    }
+
+    /// Pop a character from the command buffer
+    pub fn pop_command_char(&mut self) {
+        self.command_buffer.pop();
     }
 }
 

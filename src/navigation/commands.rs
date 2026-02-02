@@ -86,6 +86,21 @@ pub fn handle_navigation(app: &mut App, code: KeyCode) -> Result<()> {
             }
         }
 
+        // Word motion: next non-empty cell
+        KeyCode::Char('w') => {
+            next_word(app);
+        }
+
+        // Word motion: previous non-empty cell
+        KeyCode::Char('b') => {
+            prev_word(app);
+        }
+
+        // Word motion: last non-empty cell
+        KeyCode::Char('e') => {
+            end_word(app);
+        }
+
         _ => {}
     }
 
@@ -178,6 +193,121 @@ pub fn move_left_by(app: &mut App, count: usize) {
         app.view_state.column_scroll_offset = new_col.get();
     }
     app.view_state.viewport_mode = ViewportMode::Auto;
+}
+
+/// Jump to column by Excel-style letter (A, B, ..., AA, AB, ...)
+pub fn goto_column(app: &mut App, column_letter: &str) {
+    use crate::input::StatusMessage;
+    use crate::ui::utils::excel_letter_to_column;
+
+    match excel_letter_to_column(column_letter) {
+        Ok(col_idx) => {
+            let max_col = app.document.column_count().saturating_sub(1);
+            let target_col = col_idx.min(max_col);
+
+            app.view_state.selected_column = ColIndex::new(target_col);
+
+            // Update horizontal scroll
+            if target_col < app.view_state.column_scroll_offset {
+                app.view_state.column_scroll_offset = target_col;
+            } else if target_col >= app.view_state.column_scroll_offset + MAX_VISIBLE_COLS {
+                app.view_state.column_scroll_offset = target_col - MAX_VISIBLE_COLS + 1;
+            }
+
+            app.view_state.viewport_mode = ViewportMode::Auto;
+            app.status_message = Some(StatusMessage::from(format!(
+                "Jumped to column {}",
+                column_letter
+            )));
+        }
+        Err(msg) => {
+            app.status_message = Some(StatusMessage::from(msg));
+        }
+    }
+}
+
+/// Move to next non-empty cell in current row (w)
+pub fn next_word(app: &mut App) {
+    use crate::domain::position::RowIndex;
+    use crate::input::StatusMessage;
+
+    let current_row = app.view_state.table_state.selected().unwrap_or(0);
+    let current_col = app.view_state.selected_column.get();
+    let max_col = app.document.column_count().saturating_sub(1);
+
+    for col in (current_col + 1)..=max_col {
+        let cell = app
+            .document
+            .get_cell(RowIndex::new(current_row), ColIndex::new(col));
+        if !cell.is_empty() {
+            app.view_state.selected_column = ColIndex::new(col);
+            update_horizontal_scroll(app, col);
+            app.view_state.viewport_mode = ViewportMode::Auto;
+            return;
+        }
+    }
+    app.status_message = Some(StatusMessage::from("No more non-empty cells"));
+}
+
+/// Move to previous non-empty cell in current row (b)
+pub fn prev_word(app: &mut App) {
+    use crate::domain::position::RowIndex;
+    use crate::input::StatusMessage;
+
+    let current_row = app.view_state.table_state.selected().unwrap_or(0);
+    let current_col = app.view_state.selected_column.get();
+
+    if current_col == 0 {
+        app.status_message = Some(StatusMessage::from("Already at first column"));
+        return;
+    }
+
+    for col in (0..current_col).rev() {
+        let cell = app
+            .document
+            .get_cell(RowIndex::new(current_row), ColIndex::new(col));
+        if !cell.is_empty() {
+            app.view_state.selected_column = ColIndex::new(col);
+            update_horizontal_scroll(app, col);
+            app.view_state.viewport_mode = ViewportMode::Auto;
+            return;
+        }
+    }
+    app.status_message = Some(StatusMessage::from("No previous non-empty cells"));
+}
+
+/// Move to last non-empty cell in current row (e)
+pub fn end_word(app: &mut App) {
+    use crate::domain::position::RowIndex;
+    use crate::input::StatusMessage;
+
+    let current_row = app.view_state.table_state.selected().unwrap_or(0);
+    let max_col = app.document.column_count().saturating_sub(1);
+
+    for col in (0..=max_col).rev() {
+        let cell = app
+            .document
+            .get_cell(RowIndex::new(current_row), ColIndex::new(col));
+        if !cell.is_empty() {
+            app.view_state.selected_column = ColIndex::new(col);
+            update_horizontal_scroll(app, col);
+            app.view_state.viewport_mode = ViewportMode::Auto;
+            return;
+        }
+    }
+    // All cells are empty, go to last column
+    app.view_state.selected_column = ColIndex::new(max_col);
+    update_horizontal_scroll(app, max_col);
+    app.status_message = Some(StatusMessage::from("All cells empty"));
+}
+
+/// Helper to update horizontal scroll position
+fn update_horizontal_scroll(app: &mut App, target_col: usize) {
+    if target_col < app.view_state.column_scroll_offset {
+        app.view_state.column_scroll_offset = target_col;
+    } else if target_col >= app.view_state.column_scroll_offset + MAX_VISIBLE_COLS {
+        app.view_state.column_scroll_offset = target_col - MAX_VISIBLE_COLS + 1;
+    }
 }
 
 #[cfg(test)]
@@ -387,5 +517,55 @@ mod tests {
         select_previous_page(&mut app);
 
         assert_eq!(app.view_state.table_state.selected(), Some(0));
+    }
+
+    #[test]
+    fn test_goto_column_valid() {
+        let mut app = create_test_app();
+
+        goto_column(&mut app, "A");
+        assert_eq!(app.view_state.selected_column, ColIndex::new(0));
+
+        goto_column(&mut app, "B");
+        assert_eq!(app.view_state.selected_column, ColIndex::new(1));
+
+        goto_column(&mut app, "C");
+        assert_eq!(app.view_state.selected_column, ColIndex::new(2));
+    }
+
+    #[test]
+    fn test_goto_column_case_insensitive() {
+        let mut app = create_test_app();
+
+        goto_column(&mut app, "a");
+        assert_eq!(app.view_state.selected_column, ColIndex::new(0));
+
+        goto_column(&mut app, "b");
+        assert_eq!(app.view_state.selected_column, ColIndex::new(1));
+    }
+
+    #[test]
+    fn test_goto_column_out_of_bounds() {
+        let mut app = create_test_app();
+
+        // Try to jump to column ZZ (701), which does not exist (only have 3 columns)
+        goto_column(&mut app, "ZZ");
+
+        // Should clamp to last column (2)
+        assert_eq!(app.view_state.selected_column, ColIndex::new(2));
+    }
+
+    #[test]
+    fn test_goto_column_invalid() {
+        let mut app = create_test_app();
+        let initial_col = app.view_state.selected_column;
+
+        // Invalid column letter
+        goto_column(&mut app, "123");
+
+        // Should stay at same position
+        assert_eq!(app.view_state.selected_column, initial_col);
+        // Should have error message
+        assert!(app.status_message.is_some());
     }
 }

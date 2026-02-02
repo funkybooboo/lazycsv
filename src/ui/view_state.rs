@@ -32,6 +32,9 @@ pub struct ViewState {
 
     /// Current viewport positioning mode
     pub viewport_mode: ViewportMode,
+
+    /// File list horizontal scroll offset (for wide file lists)
+    pub file_list_scroll_offset: usize,
 }
 
 impl Default for ViewState {
@@ -42,6 +45,7 @@ impl Default for ViewState {
             column_scroll_offset: 0,
             help_overlay_visible: false,
             viewport_mode: ViewportMode::Auto,
+            file_list_scroll_offset: 0,
         }
     }
 }

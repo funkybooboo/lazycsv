@@ -65,13 +65,17 @@ That's it! Press `?` in the app for full keybindings.
 
 | Key | Action |
 |-----|--------|
-| `hjkl` or arrows | Move around |
-| `gg` / `G` | Jump to top/bottom |
+| `hjkl` or arrows | Move around (with count: `5j`, `10h`) |
+| `gg` / `G` / `15G` | Jump to first/last/line 15 |
+| `ga` / `gB` / `gBC` | Jump to column A/B/BC (Excel-style) |
+| `w` / `b` / `e` | Next/prev/last non-empty cell |
+| `:15` / `:B` | Command mode: jump to line/column |
+| `zt` / `zz` / `zb` | Position row at top/center/bottom |
 | `[` / `]` | Switch CSV files |
 | `?` | Show help |
 | `q` | Quit |
 
-**Vim users:** All your favorite motions work (`0`, `$`, `15G`, `gBC`, etc.)
+**Vim users:** All your favorite motions work (`0`, `$`, count prefixes, etc.)
 
 ## Innovation: Multi-File Navigation
 
@@ -83,7 +87,8 @@ LazyCSV treats CSV files in the same directory like Excel sheets. Open one file,
 |---------|----------|
 | **v0.1.0** | ✅ Foundation - viewing, navigation, multi-file |
 | **v0.2.0** | ✅ Type safety refactor (COMPLETE - all 6 phases) |
-| **v0.3.0** | Advanced navigation - `gg`, `G`, counts, column jumps |
+| **v0.3.0** | ✅ Advanced navigation - column jumps, command mode, word motion |
+| **v0.3.1** | ✅ UI/UX polish - mode indicator, transient messages, help redesign |
 | **v0.4.0** | Quick editing - Insert mode for fast cell edits |
 | **v0.5.0** | **Vim magnifier** - full vim editor embedded in TUI |
 | **v0.6.0** | Save/quit guards - `:w`, `:q`, dirty tracking |
@@ -129,29 +134,38 @@ See [docs/development.md](docs/development.md) for contributing guidelines.
 
 ## Status
 
-🎉 **v0.1.0 Complete!** LazyCSV is ready to use for viewing CSV files.
-🚀 **v0.2.0 Phase 1 Complete!** Type-safe architecture with strong compile-time guarantees.
+🎉 **v0.3.1 Complete!** Advanced navigation and polished UI ready to use.
 
 - ✅ Fast CSV viewer with vim navigation
 - ✅ Multi-file switching with `[` `]`
 - ✅ Row/column numbering (A, B, C...)
-- ✅ **NEW:** Type-safe position indices (RowIndex, ColIndex)
-- ✅ **NEW:** Semantic action types (InputResult, UserAction)
-- ✅ Comprehensive test suite (257 tests passing)
+- ✅ **NEW v0.3.0:** Column jumping (ga, gB, gBC)
+- ✅ **NEW v0.3.0:** Command mode (:15, :B)
+- ✅ **NEW v0.3.0:** Word motion (w/b/e for sparse data)
+- ✅ **NEW v0.3.0:** Viewport control (zt/zz/zb)
+- ✅ **NEW v0.3.1:** Mode indicator and dirty flag
+- ✅ **NEW v0.3.1:** Enhanced help menu
+- ✅ Comprehensive test suite (265 tests passing)
 - 📋 Cell editing coming in v0.4.0
 - 🎯 Target: v1.0.0 with full editing, undo, rows/columns
 
-**Current:** v0.2.0 Complete (All 6 phases) | **Performance:** 60 FPS on 100K+ rows | **Architecture:** Clean, type-safe, well-tested
+**Current:** v0.3.1 Complete | **Performance:** 60 FPS on 100K+ rows | **Architecture:** Clean, type-safe, well-tested
 
-### What's New in v0.2.0
+### What's New in v0.3.0 & v0.3.1
 
-Internal architecture improvements (no user-facing changes):
-- ✅ Type-safe position types (RowIndex/ColIndex)
-- ✅ Action abstraction layer
-- ✅ Separation of concerns (InputState, Session, ViewState)
-- ✅ Module reorganization
-- ✅ Consistent naming
-- ✅ Comprehensive test suite (257 tests)
+**v0.3.0 - Advanced Navigation:**
+- Column jumping with Excel notation (`ga`, `gB`, `gBC`)
+- Vim-style command mode (`:15` for line, `:B` for column)
+- Word motion for sparse data (`w`, `b`, `e`)
+- Viewport positioning (`zt`, `zz`, `zb`)
+- Enter key navigation
+
+**v0.3.1 - UI/UX Polish:**
+- Mode indicator (-- NORMAL -- / -- COMMAND --)
+- Dirty flag display ([*])
+- Transient messages that auto-clear
+- Redesigned help menu with better organization
+- File list horizontal scrolling
 
 ## Philosophy
 
