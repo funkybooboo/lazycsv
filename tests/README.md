@@ -4,9 +4,9 @@ Comprehensive testing for the LazyCSV TUI application.
 
 ## Test Statistics
 
-- **Total Tests:** 133
-- **Test Suites:** 11
-- **Coverage:** All v0.1.0 features including directory handling and workflows
+- **Total Tests:** 257 (v0.2.0)
+- **Breakdown:** 229 unit + 7 CLI integration + 21 workflow integration
+- **Coverage:** All v0.2.0 features including type safety, navigation, and architecture
 - **Status:** ✅ All Passing
 
 ## Test Organization
@@ -29,6 +29,20 @@ tests/
 ├── ui_state_test.rs                # UI state transitions (13 tests)
 └── ui_test.rs                      # UI utilities (1 test)
 ```
+
+### Test Growth in v0.2.0
+
+v0.2.0 expanded the test suite from 133 to 257 tests (+124 new tests):
+- **4 z-command integration tests** - Viewport positioning (zt/zz/zb)
+- **1 timeout behavior test** - Multi-key command timeout (with actual sleep)
+- **17 navigation unit tests** - Comprehensive edge case coverage
+- **Plus:** Updated all existing tests to use new type-safe APIs (RowIndex/ColIndex)
+
+**Key Improvements:**
+- All tests now use type-safe position types
+- Better test isolation with unit tests for navigation module
+- Actual timeout verification (not just immediate check)
+- Comprehensive viewport positioning coverage
 
 ## Test Categories
 
@@ -296,14 +310,14 @@ task test-verbose      # Run with full output
 
 ### Test Structure
 ```rust
-use lazycsv::{App, CsvData};
+use lazycsv::{App, Document};
 use std::path::PathBuf;
 
 #[test]
 fn test_your_feature() {
     // Setup
-    let csv_data = create_test_csv();
-    let mut app = App::new(csv_data, vec![PathBuf::from("test.csv")], 0);
+    let document = create_test_csv();
+    let mut app = App::new(document, vec![PathBuf::from("test.csv")], 0);
 
     // Execute
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
@@ -393,5 +407,5 @@ When adding features:
 ---
 
 **Test Coverage:** v0.1.0 Complete ✅
-**Status:** All 133 tests passing 🎉
+**Status:** All 257 tests passing 🎉 (v0.2.0)
 **Quality:** Production-ready

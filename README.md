@@ -82,7 +82,7 @@ LazyCSV treats CSV files in the same directory like Excel sheets. Open one file,
 | Version | Features |
 |---------|----------|
 | **v0.1.0** | ✅ Foundation - viewing, navigation, multi-file |
-| **v0.2.0** | 🔄 Type safety refactor (Phase 1 ✅, internal improvements) |
+| **v0.2.0** | ✅ Type safety refactor (COMPLETE - all 6 phases) |
 | **v0.3.0** | Advanced navigation - `gg`, `G`, counts, column jumps |
 | **v0.4.0** | Quick editing - Insert mode for fast cell edits |
 | **v0.5.0** | **Vim magnifier** - full vim editor embedded in TUI |
@@ -137,11 +137,21 @@ See [docs/development.md](docs/development.md) for contributing guidelines.
 - ✅ Row/column numbering (A, B, C...)
 - ✅ **NEW:** Type-safe position indices (RowIndex, ColIndex)
 - ✅ **NEW:** Semantic action types (InputResult, UserAction)
-- ✅ Comprehensive test suite (219 tests passing)
+- ✅ Comprehensive test suite (257 tests passing)
 - 📋 Cell editing coming in v0.4.0
 - 🎯 Target: v1.0.0 with full editing, undo, rows/columns
 
-**Current:** v0.2.0 (Phase 1) | **Performance:** 60 FPS on 100K+ rows | **Architecture:** In-memory with type safety
+**Current:** v0.2.0 Complete (All 6 phases) | **Performance:** 60 FPS on 100K+ rows | **Architecture:** Clean, type-safe, well-tested
+
+### What's New in v0.2.0
+
+Internal architecture improvements (no user-facing changes):
+- ✅ Type-safe position types (RowIndex/ColIndex)
+- ✅ Action abstraction layer
+- ✅ Separation of concerns (InputState, Session, ViewState)
+- ✅ Module reorganization
+- ✅ Consistent naming
+- ✅ Comprehensive test suite (257 tests)
 
 ## Philosophy
 

@@ -4,7 +4,7 @@ System architecture and code organization for LazyCSV.
 
 ## Overview
 
-LazyCSV follows a clean, modular architecture with strong type safety (v0.2.0 Phase 1):
+LazyCSV follows a clean, modular architecture with strong type safety (v0.2.0 Complete):
 
 ```
 ┌─────────────┐
@@ -13,19 +13,26 @@ LazyCSV follows a clean, modular architecture with strong type safety (v0.2.0 Ph
        │
        ▼
 ┌──────────────────────────────────────────┐
-│  app module  │  Application state & logic│
+│  app module  │  Application coordinator  │
 └──────┬───────┴──────────────────────────┬┘
        │                                   │
        ├───► domain (RowIndex, ColIndex)   │
-       ├───► input  (UserAction, Result)   │
-       ├───► csv_data (Type-safe access)   │
-       └───► ui     (Rendering)            │
+       ├───► input (Actions, State)        │
+       ├───► csv (Document)                │
+       ├───► session (Multi-file)          │
+       ├───► navigation (Commands)         │
+       ├───► file_system (Discovery)       │
+       └───► ui (Rendering, ViewState)     │
 ```
 
-**New in v0.2.0 Phase 1:**
-- `domain/` - Position types for type safety
-- `input/` - Action enums and semantic types
-- Type-safe APIs throughout (no raw usize for positions)
+**Key Changes in v0.2.0:**
+- `domain/` - Type-safe position types
+- `input/` - Action abstraction layer, InputState
+- `csv/` - Document (renamed from csv_data)
+- `session/` - Multi-file session management (NEW)
+- `navigation/` - Movement commands (extracted)
+- `file_system/` - File discovery (extracted)
+- `ui/` - ViewState (renamed from UiState)
 
 ## Core Components
 
@@ -134,35 +141,79 @@ The `app` module is split into three parts:
 - **`input.rs`**: Handles keyboard input using new action types
 - **`navigation.rs`**: Navigation logic with type-safe position handling
 
+### App State Structure (v0.2.0)
+
+The `App` struct has been refactored to be minimal and well-organized:
+
 ```rust
-// In app/mod.rs (v0.2.0 Phase 1)
+// In app/mod.rs (v0.2.0 Complete)
 pub struct App {
-    // Data
-    csv_data: CsvData,
-    csv_files: Vec<PathBuf>,
-    current_file_index: usize,
+    /// CSV document data
+    pub document: Document,
 
-    // UI State (type-safe)
-    ui: UiState,
-    mode: Mode,
+    /// UI view state (selection, scroll, viewport)
+    pub view_state: ViewState,
 
-    // Input state (improved types)
-    pending_key: Option<PendingCommand>,        // Was: Option<KeyCode>
-    command_count: Option<NonZeroUsize>,         // Was: Option<String>
-    status_message: Option<StatusMessage>,       // Was: Option<Cow<'static, str>>
+    /// Input state (pending commands, count prefixes)
+    pub input_state: InputState,
 
-    // Config
-    delimiter: Option<u8>,
-    no_headers: bool,
-    encoding: Option<String>,
+    /// Multi-file session management
+    pub session: Session,
+
+    /// Whether the application should quit
+    pub should_quit: bool,
+
+    /// Optional status message to display
+    pub status_message: Option<StatusMessage>,
+}
+```
+
+#### Document Structure
+
+```rust
+pub struct Document {
+    pub headers: Vec<String>,
+    pub rows: Vec<Vec<String>>,
+    pub filename: String,
+    pub is_dirty: bool,
+}
+```
+
+#### ViewState Structure
+
+```rust
+pub struct ViewState {
+    pub table_state: TableState,           // Ratatui table state
+    pub selected_column: ColIndex,         // Current column
+    pub column_scroll_offset: usize,       // Horizontal scroll
+    pub help_overlay_visible: bool,        // Help shown?
+    pub viewport_mode: ViewportMode,       // Viewport positioning
+}
+```
+
+#### InputState Structure (NEW in v0.2.0)
+
+```rust
+pub struct InputState {
+    pending_command: Option<PendingCommand>,  // Multi-key command state
+    command_count: Option<NonZeroUsize>,      // Count prefix (e.g., "5" in "5j")
+    pending_command_time: Option<Instant>,    // Timeout tracking
+}
+```
+
+#### Session Structure (NEW in v0.2.0)
+
+```rust
+pub struct Session {
+    files: Vec<PathBuf>,              // All CSV files in directory
+    active_file_index: usize,         // Current file
+    config: FileConfig,               // File parsing config
 }
 
-pub struct UiState {
-    table_state: TableState,
-    selected_col: ColIndex,                      // Was: usize
-    horizontal_offset: usize,
-    show_cheatsheet: bool,
-    viewport_mode: ViewportMode,
+pub struct FileConfig {
+    pub delimiter: u8,
+    pub no_headers: bool,
+    pub encoding: Option<String>,
 }
 ```
 
@@ -187,16 +238,18 @@ KeyEvent → handle_key()
 - **Mode dispatch**: `handle_key()` dispatches by current mode
 - **Stateful widgets**: Uses ratatui's `TableState` for row tracking
 
-### 5. CSV Data (`csv_data.rs`)
+### 5. CSV Document (`csv/` module)
 
 **Responsibility**: CSV data structures and file I/O
 
+**Location:** `src/csv/document.rs` (renamed from `csv_data.rs` in v0.2.0)
+
 ```rust
-pub struct CsvData {
-    headers: Vec<String>,      // Column names
-    rows: Vec<Vec<String>>,    // All data rows
-    filename: String,          // Original filename
-    is_dirty: bool,            // Unsaved changes (v0.4.0+)
+pub struct Document {
+    pub headers: Vec<String>,      // Column names
+    pub rows: Vec<Vec<String>>,    // All data rows
+    pub filename: String,          // Original filename
+    pub is_dirty: bool,            // Unsaved changes (v0.4.0+)
 }
 ```
 
@@ -208,7 +261,7 @@ pub struct CsvData {
 **API Design (v0.2.0 - Type-safe):**
 ```rust
 // Loading
-CsvData::from_file(path) -> Result<CsvData>
+Document::from_file(path) -> Result<Document>
 
 // Querying (type-safe in v0.2.0)
 .row_count() -> usize
@@ -337,15 +390,15 @@ User presses ']' (next file)
     ↓
 app.handle_key() detects file switch
     ↓
-current_file_index += 1
+session.next_file()
     ↓
 Returns true (signal to reload)
     ↓
 main::run() calls app.reload_current_file()
     ↓
-CsvData::from_file(new_path)
+Document::from_file(new_path)
     ↓
-app.csv_data = new_data
+app.document = new_document
     ↓
 Reset cursor to (0, 0)
     ↓
@@ -358,56 +411,109 @@ ui::render() draws new file
 
 ```
 main.rs
-  ├─ uses: app, csv_data, ui, cli, file_scanner, domain, input
-  ├─ depends on: crossterm, ratatui, anyhow
-  └─ exports: none (binary crate)
+  └─> app::App
+       ├─> csv::Document         (CSV data)
+       ├─> ui::ViewState         (UI state)
+       ├─> input::InputState     (Input state)
+       ├─> session::Session      (Multi-file session)
+       ├─> input::handler        (Key handling)
+       ├─> navigation::commands  (Movement)
+       └─> ui::render            (UI rendering)
 
-domain/
-  ├─ uses: none (pure types)
-  ├─ depends on: std only
-  └─ exports: RowIndex, ColIndex, Position
+input::handler
+  ├─> input::actions   (UserAction, NavigateAction)
+  ├─> input::state     (InputState management)
+  └─> app::messages    (User-facing strings)
 
-input/
-  ├─ uses: domain (for action types)
-  ├─ depends on: crossterm, std
-  └─ exports: UserAction, InputResult, PendingCommand, etc.
+navigation::commands
+  └─> domain::position (RowIndex, ColIndex)
 
-app/
-  ├─ uses: csv_data, domain, input
-  ├─ depends on: crossterm, ratatui, anyhow
-  └─ exports: App, Mode, UiState
+ui::render
+  ├─> ui::table        (Table rendering)
+  ├─> ui::status       (Status bar)
+  ├─> ui::help         (Help overlay)
+  └─> ui::view_state   (ViewState)
 
-csv_data.rs
-  ├─ uses: domain (RowIndex, ColIndex)
-  ├─ depends on: csv, anyhow, encoding_rs
-  └─ exports: CsvData
+session::Session
+  └─> file_system::discovery (CSV file scanning)
 
-ui/
-  ├─ uses: app, domain
-  ├─ depends on: ratatui
-  └─ exports: render()
+csv::Document
+  └─> domain::position (RowIndex, ColIndex)
 ```
 
-**Dependency Graph (v0.2.0):**
+**Key Design Decisions:**
+- **App** is a thin coordinator, delegates to specialized modules
+- **Clear separation:** Input handling → Actions → State changes
+- **Type safety:** RowIndex/ColIndex prevent coordinate bugs at compile-time
+- **Single responsibility:** Each module has one clear purpose
+- **No circular dependencies:** Clean layering maintained
+
+**Module Structure (v0.2.0):**
 ```
-         main.rs
-        /   |   \
-       /    |    \
-   app/   ui/   csv_data
-    /  \   |     /
-   /    \ |    /
-domain  input
-  \      /
-   \    /
-  (shared)
+src/
+├── domain/            # Domain types (RowIndex, ColIndex, Position)
+├── input/             # Input handling
+│   ├── actions.rs     # UserAction, NavigateAction, ViewportAction
+│   ├── state.rs       # InputState (pending commands, counts)
+│   └── handler.rs     # Input event handling
+├── navigation/        # Navigation commands
+│   └── commands.rs    # Vim-style movement functions
+├── session/           # Multi-file session management
+│   └── mod.rs         # Session, FileConfig
+├── csv/               # CSV data operations
+│   └── document.rs    # Document struct (CSV loading/parsing)
+├── file_system/       # File operations
+│   └── discovery.rs   # CSV file scanning
+├── app/               # Application coordinator
+│   ├── mod.rs         # App struct, main loop
+│   └── messages.rs    # User-facing message strings
+└── ui/                # UI rendering
+    ├── mod.rs         # Main render function
+    ├── view_state.rs  # ViewState (viewport control)
+    ├── table.rs       # Table rendering with virtual scrolling
+    ├── status.rs      # Status bar and file switcher
+    ├── help.rs        # Help overlay
+    └── utils.rs       # Utility functions
 ```
 
-**Key Observations**:
-- ✅ No circular dependencies
-- ✅ Clear layering: domain → input → app → main
-- ✅ `domain` is pure (no dependencies)
-- ✅ `input` uses domain types
-- ✅ Everything uses domain for type safety
+## v0.2.0 Refactoring Summary
+
+The v0.2.0 release completed a major 6-phase refactor to improve code quality, maintainability, and type safety:
+
+**Phase 1: Type Safety Foundation**
+- Introduced RowIndex/ColIndex newtypes to prevent coordinate bugs
+- Created UserAction abstraction layer for all input handling
+- Eliminated primitive obsession with semantic types (NonZeroUsize, StatusMessage)
+
+**Phase 2: Separation of Concerns**
+- Extracted InputState from App (pending commands, count prefixes)
+- Extracted Session management (multi-file, file config)
+- Renamed UiState → ViewState for clarity
+
+**Phase 3: Better Naming & Consistency**
+- Renamed csv_data → Document throughout codebase
+- Renamed ui → view_state for consistency
+- Standardized function naming: get_*, move_*, goto_*
+- Centralized user messages in app/messages.rs
+
+**Phase 4: Code Organization**
+- Reorganized modules: csv/, file_system/, session/, navigation/
+- Defined clear module boundaries and public APIs
+- Reduced App struct from 12 fields to 6 fields
+
+**Phase 5: Clean Code Improvements**
+- Decomposed long functions (render_table: 180 → 74 lines)
+- Removed all magic numbers, replaced with named constants
+- Added comprehensive module-level documentation
+- Removed all commented-out dead code
+
+**Phase 6: Testing & Validation**
+- Expanded test suite from 133 to 257 tests (+124 new tests)
+- Added z-command tests, timeout tests, navigation unit tests
+- Zero compiler warnings
+- Zero clippy warnings
+
+**Result:** Clean, maintainable, type-safe architecture ready for future feature development. All internal refactoring with no user-facing changes.
 
 ## Error Handling Strategy
 
@@ -415,10 +521,10 @@ LazyCSV uses `anyhow` for error handling:
 
 ```rust
 // Propagate errors with ?
-let csv_data = CsvData::from_file(path)?;
+let document = Document::from_file(path)?;
 
 // Add context
-let csv_data = CsvData::from_file(path)
+let document = Document::from_file(path)
     .context(format!("Failed to load {}", path.display()))?;
 
 // Handle errors at top level (main)

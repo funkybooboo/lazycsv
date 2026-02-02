@@ -2,27 +2,54 @@
 
 This directory contains the Rust source code for LazyCSV.
 
-## Structure
+## Module Structure (v0.2.0)
+
+- **`domain/`** - Domain types (RowIndex, ColIndex, Position)
+- **`input/`** - Input handling (actions, state, handler)
+- **`navigation/`** - Navigation commands (vim-style movement)
+- **`session/`** - Multi-file session management
+- **`csv/`** - CSV operations (Document struct)
+- **`file_system/`** - File system operations (file discovery)
+- **`app/`** - Application coordinator (thin layer)
+- **`ui/`** - UI rendering (table, status, help)
 
 ```
 src/
-├── main.rs         - Entry point & TUI lifecycle
-├── lib.rs          - Main library crate
-├── cli.rs          - CLI argument parsing
-├── file_scanner.rs - Scans for CSV files
-├── csv_data.rs     - CSV data loading and storage
+├── main.rs              - Entry point & TUI lifecycle
+├── lib.rs               - Main library crate
+├── cli.rs               - CLI argument parsing
 │
-├── app/
-│   ├── mod.rs      - Core application state (`App` struct)
-│   ├── input.rs    - Keyboard input handling
-│   └── navigation.rs - Vim-style navigation logic
+├── domain/              - Domain types
+│   └── position.rs      - RowIndex, ColIndex, Position
 │
-└── ui/
-    ├── mod.rs      - Main UI rendering entrypoint
-    ├── table.rs    - CSV table rendering (with virtual scrolling)
-    ├── status.rs   - Status bar and file switcher UI
-    ├── help.rs     - Help/cheatsheet overlay
-    └── utils.rs    - UI helper functions
+├── input/               - Input handling
+│   ├── actions.rs       - UserAction, NavigateAction
+│   ├── state.rs         - InputState (pending commands, counts)
+│   └── handler.rs       - Keyboard event handling
+│
+├── navigation/          - Navigation commands
+│   └── commands.rs      - Vim-style movement functions
+│
+├── session/             - Multi-file session management
+│   └── mod.rs           - Session, FileConfig
+│
+├── csv/                 - CSV operations
+│   └── document.rs      - Document struct (loading, parsing)
+│
+├── file_system/         - File system operations
+│   └── discovery.rs     - CSV file scanning
+│
+├── app/                 - Application coordinator
+│   ├── mod.rs           - App struct, main loop
+│   └── messages.rs      - User-facing messages
+│
+└── ui/                  - UI rendering
+    ├── mod.rs           - Main render function
+    ├── view_state.rs    - ViewState (viewport control)
+    ├── table.rs         - Table rendering (virtual scrolling)
+    ├── status.rs        - Status bar and file switcher
+    ├── help.rs          - Help overlay
+    └── utils.rs         - UI utilities
 ```
 
 ## Modules
@@ -46,30 +73,43 @@ src/
 - Parses the arguments provided when the application is started.
 - Determines the initial file or directory to open.
 
-### `file_scanner.rs`
-**Purpose**: Finds CSV files in a given directory.
+### Key Modules (v0.2.0)
 
-**Responsibilities:**
-- Scans a directory for files with `.csv` or `.CSV` extensions.
-- Ignores subdirectories.
-- Sorts the found files alphabetically.
+#### `domain/position.rs`
+Type-safe position types: `RowIndex`, `ColIndex`, `Position`.
+Prevents entire class of coordinate bugs at compile time.
 
-### `csv_data.rs`
-**Purpose**: Manages loading, storing, and accessing CSV data.
+#### `csv/document.rs`
+The `Document` struct handles CSV loading, parsing, and cell access.
+Renamed from `CsvData` in v0.2.0.
 
-**Key Structures:**
-- `CsvData` - Holds the file path, headers, and all rows of a CSV file.
+#### `ui/view_state.rs`
+The `ViewState` struct manages UI state: selection, scroll, viewport.
+Renamed from `UiState` in v0.2.0.
 
-**Responsibilities:**
-- Loads a CSV file from a given path using the `csv` crate.
-- Stores the entire dataset in memory as a `Vec<Vec<String>>`.
-- Provides safe methods to access headers and cell data.
-- Tracks whether the data has been modified (the `is_dirty` flag).
+#### `input/state.rs`
+The `InputState` struct manages input state: pending commands, count prefixes.
+NEW in v0.2.0 - extracted from App for separation of concerns.
 
-### `app/` Module
-**Purpose**: Manages the application's state and logic.
+#### `session/mod.rs`
+The `Session` struct manages multi-file sessions and configuration.
+NEW in v0.2.0 - extracted from App for separation of concerns.
 
 #### `app/mod.rs`
+The `App` struct coordinates everything. It's intentionally thin (6 fields):
+- document: Document
+- view_state: ViewState
+- input_state: InputState
+- session: Session
+- should_quit: bool
+- status_message: Option<StatusMessage>
+
+### Legacy Module Documentation
+
+#### `app/` Module (Pre-v0.2.0)
+**Note:** This section describes the old structure. See above for v0.2.0 organization.
+
+#### Old `app/mod.rs`
 **Purpose**: Defines the core application state.
 - **`App` struct**: The single source of truth for the application's state. It holds the CSV data, selection state, scroll offsets, current mode, file list, and more.
 - **`Mode` enum**: Defines the different application modes (e.g., `Normal`).
@@ -142,7 +182,7 @@ task test-verbose  # With output
 ```
 
 ### Test Coverage
-The project has a comprehensive test suite with 133 tests.
+The project has a comprehensive test suite with 257 tests (v0.2.0).
 - **Unit Tests**: Found alongside the code in each module.
 - **Integration Tests**: Located in the `tests/` directory, covering workflows, UI rendering, and edge cases.
 - `cli_test.rs`: Tests command-line argument parsing.
@@ -180,7 +220,7 @@ Target performance (v0.1.0):
 
 The following are key areas for future development:
 
-- **True Lazy Loading**: The highest priority is to re-engineer `csv_data.rs` to not load the entire file into memory. This will likely involve using a streaming parser and an indexing mechanism to fetch rows on demand, fulfilling the "lazy" promise.
+- **True Lazy Loading**: The highest priority is to re-engineer `csv/document.rs` to not load the entire file into memory. This will likely involve using a streaming parser and an indexing mechanism to fetch rows on demand, fulfilling the "lazy" promise.
 - **Cell Editing**: Implementing `edit.rs` and the `Edit` mode in `app/mod.rs` to allow users to modify cell content and save changes back to the file. This will also require an undo/redo system (`undo.rs`).
 - **Row/Column Operations**: Adding functionality to add, delete, and reorder rows and columns.
 - **Search and Filter**: Implementing fuzzy search (`search.rs`), column sorting, and row filtering.

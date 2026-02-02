@@ -38,30 +38,36 @@ lazycsv/
 │   ├── main.rs             - Entry point & main loop
 │   ├── lib.rs              - Library exports
 │   ├── cli.rs              - CLI argument parsing
-│   ├── file_scanner.rs     - CSV file discovery
-│   ├── csv_data.rs         - CSV data model (type-safe v0.2.0)
-│   ├── domain/             - Domain types (NEW in v0.2.0)
+│   ├── domain/             - Domain types (v0.2.0)
 │   │   ├── mod.rs          - Module exports
 │   │   └── position.rs     - RowIndex, ColIndex, Position types
-│   ├── input/              - Input actions (NEW in v0.2.0)
-│   │   ├── mod.rs          - Module exports
-│   │   └── actions.rs      - UserAction, InputResult enums
-│   ├── app/                - Application logic
-│   │   ├── mod.rs          - App struct & state (type-safe v0.2.0)
-│   │   ├── input.rs        - Keyboard input handling
-│   │   ├── navigation.rs   - Navigation methods (type-safe v0.2.0)
-│   │   └── constants.rs    - App constants & messages
-│   └── ui/                 - User interface
+│   ├── input/              - Input handling (v0.2.0)
+│   │   ├── actions.rs      - UserAction, InputResult enums
+│   │   ├── state.rs        - InputState (pending commands, counts)
+│   │   └── handler.rs      - Keyboard event handling
+│   ├── navigation/         - Navigation commands (v0.2.0)
+│   │   └── commands.rs     - Vim-style movement functions
+│   ├── session/            - Multi-file sessions (v0.2.0)
+│   │   └── mod.rs          - Session, FileConfig structures
+│   ├── csv/                - CSV operations (v0.2.0)
+│   │   └── document.rs     - Document struct (loading, parsing)
+│   ├── file_system/        - File operations (v0.2.0)
+│   │   └── discovery.rs    - CSV file scanning
+│   ├── app/                - Application coordinator (v0.2.0)
+│   │   ├── mod.rs          - App struct (6 fields)
+│   │   └── messages.rs     - User-facing message strings
+│   └── ui/                 - User interface (v0.2.0)
 │       ├── mod.rs          - Main render function
-│       ├── table.rs        - Table rendering (type-safe v0.2.0)
-│       ├── status.rs       - Status bar & file switcher (type-safe v0.2.0)
+│       ├── view_state.rs   - ViewState (viewport control)
+│       ├── table.rs        - Table rendering (virtual scrolling)
+│       ├── status.rs       - Status bar & file switcher
 │       ├── help.rs         - Help overlay
 │       └── utils.rs        - Utility functions
 │
 ├── tests/                  - Test suite
 │   ├── README.md           - Test documentation
-│   ├── app_test.rs         - Application logic tests
-│   ├── cli_test.rs         - CLI parsing tests
+│   ├── cli_integration_test.rs - CLI argument testing (7 tests)
+│   └── integration_workflows_test.rs - End-to-end workflows (21 tests)
 │   ├── csv_data_test.rs    - CSV loading tests
 │   ├── csv_edge_cases_test.rs - Edge case tests
 │   ├── file_scanner_test.rs - File discovery tests
@@ -87,6 +93,46 @@ lazycsv/
 ├── Taskfile.yml      - Task runner config
 └── README.md         - Project readme
 ```
+
+### Module Structure (v0.2.0)
+
+**Current organization after v0.2.0 refactor:**
+
+```
+src/
+├── domain/            # Domain types (RowIndex, ColIndex, Position)
+├── input/             # Input handling
+│   ├── actions.rs     # UserAction, NavigateAction
+│   ├── state.rs       # InputState (pending commands, counts)
+│   └── handler.rs     # Keyboard event handling
+├── navigation/        # Navigation commands
+│   └── commands.rs    # Vim-style movement functions
+├── session/           # Multi-file session management
+│   └── mod.rs         # Session, FileConfig structures
+├── csv/               # CSV operations
+│   └── document.rs    # Document struct (loading, parsing, get_cell)
+├── file_system/       # File system operations
+│   └── discovery.rs   # CSV file scanning
+├── app/               # Application coordinator (thin layer)
+│   ├── mod.rs         # App struct, main loop
+│   └── messages.rs    # User-facing message strings
+└── ui/                # UI rendering
+    ├── view_state.rs  # ViewState (viewport, selection)
+    ├── table.rs       # Table rendering
+    ├── status.rs      # Status bar
+    ├── help.rs        # Help overlay
+    └── utils.rs       # Utility functions
+
+tests/
+├── cli_integration_test.rs      # CLI argument testing (7 tests)
+└── integration_workflows_test.rs # End-to-end workflows (21 tests)
+```
+
+**Important Terminology (v0.2.0):**
+- Use `Document` not `CsvData` or `csv_data`
+- Use `ViewState` not `UiState` or `ui_state`
+- Use `view_state` field not `ui` field
+- `App` struct has 6 fields: document, view_state, input_state, session, should_quit, status_message
 
 ## Development Workflow
 
@@ -192,15 +238,15 @@ Follow Rust conventions:
 
 ```rust
 // Good: Clear names, proper error handling
-pub fn load_file(path: &Path) -> Result<CsvData> {
-    let data = CsvData::from_file(path)
+pub fn load_file(path: &Path) -> Result<Document> {
+    let document = Document::from_file(path)
         .context("Failed to load CSV")?;
-    Ok(data)
+    Ok(document)
 }
 
 // Bad: Unwrap, abbreviations
-pub fn ld_f(p: &Path) -> CsvData {
-    CsvData::from_file(p).unwrap()
+pub fn ld_f(p: &Path) -> Document {
+    Document::from_file(p).unwrap()
 }
 ```
 
@@ -241,14 +287,14 @@ Document public APIs:
 /// * `path` - Path to CSV file
 ///
 /// # Returns
-/// * `Ok(CsvData)` - Loaded data
+/// * `Ok(Document)` - Loaded data
 /// * `Err` - File not found or invalid CSV
 ///
 /// # Example
 /// ```
-/// let data = CsvData::from_file(Path::new("data.csv"))?;
+/// let document = Document::from_file(Path::new("data.csv"))?;
 /// ```
-pub fn from_file(path: &Path) -> Result<CsvData> {
+pub fn from_file(path: &Path) -> Result<Document> {
     // ...
 }
 ```
@@ -267,7 +313,7 @@ mod tests {
 
     #[test]
     fn test_cell_access() {
-        let data = CsvData {
+        let document = Document {
             headers: vec!["Name".to_string()],
             rows: vec![vec!["Alice".to_string()]],
             filename: "test.csv".to_string(),

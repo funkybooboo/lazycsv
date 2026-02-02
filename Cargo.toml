@@ -1,7 +1,15 @@
 [package]
 name = "lazycsv"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
+description = "A blazingly fast terminal UI for viewing and editing CSV files"
+authors = ["Nate Stott <nate.stott@pm.me>"]
+license = "GPL-3.0-or-later"
+repository = "https://github.com/funkybooboo/lazycsv"
+homepage = "https://github.com/funkybooboo/lazycsv"
+keywords = ["csv", "terminal", "tui", "vim", "cli"]
+categories = ["command-line-utilities", "visualization"]
+readme = "README.md"
 
 [dependencies]
 ratatui = { version = "0.29", default-features = false, features = ["crossterm"] }
