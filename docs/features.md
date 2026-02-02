@@ -65,7 +65,7 @@ lazycsv /home/user/csvfiles
 │►2   │  Bob    │ [b@e...]│  25     │... │ ← Current cell (highlighted)
 │  3  │  Charlie│  c@e... │  35     │... │
 ├─────┴─────────┴─────────┴─────────┴────┤
-│ [?] help │ [q] quit │ [ ] files │      │ ← Status bar (left: controls,
+│ ? help │ q quit │ [ ] files │          │ ← Status bar (left: controls,
 │ Row 2/100 │ Col B: Email (2/5) │       │           right: position)
 │ Cell: "bob@example.com"                │
 ├───────────────────────────────────────┤
@@ -126,8 +126,8 @@ lazycsv /path/to/csvfiles
 Always-visible status bar with two sections:
 
 **Left side (controls):**
-- ✅ Quick help: `[?] help`
-- ✅ Quit hint: `[q] quit`
+- ✅ Quick help: `? help`
+- ✅ Quit hint: `q quit`
 - ✅ File switching hint: `[ ] files` (when multiple files)
 
 **Right side (position info):**
@@ -137,7 +137,7 @@ Always-visible status bar with two sections:
 
 **Format:**
 ```
-[?] help │ [q] quit │ [ ] files │ Row 5/100 │ Col B: Email (2/5) │ Cell: "example"
+? help │ q quit │ [ ] files │ Row 5/100 │ Col B: Email (2/5) │ Cell: "example"
 ```
 
 ### File Information

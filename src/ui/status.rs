@@ -138,11 +138,11 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
                 let mode_indicator = "-- NORMAL --";
 
                 // Dirty flag
-                let dirty_flag = if app.document.is_dirty { " [*]" } else { "" };
+                let dirty_flag = if app.document.is_dirty { " *" } else { "" };
 
                 // Build right side: row, col, cell info
                 let right_side = format!(
-                    "Row {}/{} │ Col {}: {} ({}/{}) │ Cell: {} │ [?] help",
+                    "Row {}/{} │ Col {}: {} ({}/{}) │ Cell: {} │ ? help",
                     selected_row,
                     total_rows,
                     col_letter,

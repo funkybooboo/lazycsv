@@ -124,7 +124,7 @@ The current mode is always shown in the status bar:
 
 **Features:**
 - Mode indicator (-- NORMAL -- / -- COMMAND --)
-- Dirty flag display ([*])
+- Dirty flag display (*)
 - Transient messages that auto-clear on keypress
 - Enhanced help menu with better organization
 - File list horizontal scrolling

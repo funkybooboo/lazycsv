@@ -14,7 +14,7 @@ Inspired by [lazygit](https://github.com/jesseduffield/lazygit), [lazydocker](ht
 │►2   │  002    │ [2024...] │ Gadget B     │   50  │
 │  3  │  003    │ 2024-01-17 │ Doohickey... │   75  │
 ├────────────────────────────────────────────────────┤
-│ [?] help │ [q] quit │ [ ] files │                 │
+│ ? help │ q quit │ [ ] files │                     │
 │ Row 2/100 │ Col B: Date (2/4) │ Cell: "2024..." │
 ├────────────────────────────────────────────────────┤
 │ Files (1/2): ► sales.csv | customers.csv         │
@@ -162,7 +162,7 @@ See [docs/development.md](docs/development.md) for contributing guidelines.
 
 **v0.3.1 - UI/UX Polish:**
 - Mode indicator (-- NORMAL -- / -- COMMAND --)
-- Dirty flag display ([*])
+- Dirty flag display (*)
 - Transient messages that auto-clear
 - Redesigned help menu with better organization
 - File list horizontal scrolling

@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Enhanced Status Bar**
 - Mode indicator (-- NORMAL -- / -- COMMAND --)
-- Dirty flag display ([*]) for modified files
+- Dirty flag display (*) for modified files
 - Transient messages that auto-clear on next keypress
 
 **Improved Help Menu**

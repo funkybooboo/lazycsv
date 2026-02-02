@@ -40,7 +40,7 @@ Complete UI/UX design specification for LazyCSV.
 │  5  │  005        │ 2024-01-19 │ Whatchama... │  125  │
 │ ... │                                                  │
 ├──────────────────────────────────────────────────────┤
-│ [?] help │ [q] quit │ [ ] files │                    │ ← Status (left: controls,
+│ ? help │ q quit │ [ ] files │                        │ ← Status (left: controls,
 │ Row 3/1,234 │ Col B: Date (2/4) │                    │           right: info)
 │ Cell: "2024-01-17"                                   │
 ├──────────────────────────────────────────────────────┤
