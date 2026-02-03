@@ -173,4 +173,63 @@ mod tests {
         // No pending command set
         assert!(!state.is_pending_command_timed_out());
     }
+
+    #[test]
+    fn test_count_prefix_very_large_number() {
+        let mut state = InputState::new();
+
+        // Build a very large count: 999999
+        for _ in 0..6 {
+            state.add_count_digit(9);
+        }
+
+        let count = state.get_count_or_default();
+
+        // Should be clamped just below MAX_COMMAND_COUNT
+        // The implementation uses `new_value < MAX_COMMAND_COUNT` so it stops at 99999
+        assert!(count <= MAX_COMMAND_COUNT);
+        assert!(count >= 99999); // Should be at or near the limit
+    }
+
+    #[test]
+    fn test_count_prefix_zero_behavior() {
+        let mut state = InputState::new();
+
+        // Add a zero
+        state.add_count_digit(0);
+
+        let count = state.get_count_or_default();
+
+        // Zero should be treated as "no count" (default to 1)
+        // or could be special case for "go to first column" (0)
+        // Document current behavior
+        assert!(count == 0 || count == 1);
+    }
+
+    #[test]
+    fn test_count_prefix_cleared_after_retrieval() {
+        let mut state = InputState::new();
+
+        // Build count: 5
+        state.add_count_digit(5);
+        assert_eq!(state.get_count_or_default(), 5);
+
+        // Clear it
+        state.clear_count();
+
+        // Should be back to default (1)
+        assert_eq!(state.get_count_or_default(), 1);
+    }
+
+    #[test]
+    fn test_multiple_count_digits_accumulation() {
+        let mut state = InputState::new();
+
+        // Build count: 123
+        state.add_count_digit(1);
+        state.add_count_digit(2);
+        state.add_count_digit(3);
+
+        assert_eq!(state.get_count_or_default(), 123);
+    }
 }

@@ -260,3 +260,206 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
 
     frame.render_stateful_widget(table, area, &mut adjusted_state);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ui::ViewportMode;
+
+    #[test]
+    fn test_calculate_scroll_offset_auto_mode_near_top() {
+        let selected_idx = 5;
+        let table_height = 20;
+        let total_rows = 100;
+
+        let offset =
+            calculate_scroll_offset(selected_idx, table_height, total_rows, &ViewportMode::Auto);
+
+        // Near top, should not scroll
+        assert_eq!(offset, 0);
+    }
+
+    #[test]
+    fn test_calculate_scroll_offset_auto_mode_centered() {
+        let selected_idx = 50;
+        let table_height = 20;
+        let total_rows = 100;
+
+        let offset =
+            calculate_scroll_offset(selected_idx, table_height, total_rows, &ViewportMode::Auto);
+
+        // Should center around selected row
+        let expected = 50 - 20 / 2; // 40
+        assert_eq!(offset, expected);
+    }
+
+    #[test]
+    fn test_calculate_scroll_offset_auto_mode_near_bottom() {
+        let selected_idx = 95;
+        let table_height = 20;
+        let total_rows = 100;
+
+        let offset =
+            calculate_scroll_offset(selected_idx, table_height, total_rows, &ViewportMode::Auto);
+
+        // Should clamp to max scroll (100 - 20 = 80)
+        assert_eq!(offset, 80);
+    }
+
+    #[test]
+    fn test_calculate_scroll_offset_top_mode() {
+        let selected_idx = 50;
+        let table_height = 20;
+        let total_rows = 100;
+
+        let offset =
+            calculate_scroll_offset(selected_idx, table_height, total_rows, &ViewportMode::Top);
+
+        // Selected row should be at top
+        assert_eq!(offset, 50);
+    }
+
+    #[test]
+    fn test_calculate_scroll_offset_top_mode_at_end() {
+        let selected_idx = 95;
+        let table_height = 20;
+        let total_rows = 100;
+
+        let offset =
+            calculate_scroll_offset(selected_idx, table_height, total_rows, &ViewportMode::Top);
+
+        // Should clamp to max scroll
+        assert_eq!(offset, 80);
+    }
+
+    #[test]
+    fn test_calculate_scroll_offset_center_mode() {
+        let selected_idx = 50;
+        let table_height = 20;
+        let total_rows = 100;
+
+        let offset = calculate_scroll_offset(
+            selected_idx,
+            table_height,
+            total_rows,
+            &ViewportMode::Center,
+        );
+
+        // Should center around selected row
+        let expected = 50 - 20 / 2; // 40
+        assert_eq!(offset, expected);
+    }
+
+    #[test]
+    fn test_calculate_scroll_offset_center_mode_near_start() {
+        let selected_idx = 5;
+        let table_height = 20;
+        let total_rows = 100;
+
+        let offset = calculate_scroll_offset(
+            selected_idx,
+            table_height,
+            total_rows,
+            &ViewportMode::Center,
+        );
+
+        // Can't center at start, should be 0
+        assert_eq!(offset, 0);
+    }
+
+    #[test]
+    fn test_calculate_scroll_offset_bottom_mode() {
+        let selected_idx = 50;
+        let table_height = 20;
+        let total_rows = 100;
+
+        let offset = calculate_scroll_offset(
+            selected_idx,
+            table_height,
+            total_rows,
+            &ViewportMode::Bottom,
+        );
+
+        // Selected row should be at bottom (50 - (20 - 1) = 31)
+        let expected = (50 as isize - (table_height as isize - 1)).max(0) as usize;
+        assert_eq!(offset, expected);
+    }
+
+    #[test]
+    fn test_calculate_scroll_offset_bottom_mode_near_start() {
+        let selected_idx = 5;
+        let table_height = 20;
+        let total_rows = 100;
+
+        let offset = calculate_scroll_offset(
+            selected_idx,
+            table_height,
+            total_rows,
+            &ViewportMode::Bottom,
+        );
+
+        // Can't position at bottom near start, should be 0
+        assert_eq!(offset, 0);
+    }
+
+    #[test]
+    fn test_calculate_scroll_offset_small_table() {
+        let selected_idx = 2;
+        let table_height = 10;
+        let total_rows = 5;
+
+        // All modes should return 0 when table fits on screen
+        assert_eq!(
+            calculate_scroll_offset(selected_idx, table_height, total_rows, &ViewportMode::Auto),
+            0
+        );
+        assert_eq!(
+            calculate_scroll_offset(selected_idx, table_height, total_rows, &ViewportMode::Top),
+            0
+        );
+        assert_eq!(
+            calculate_scroll_offset(
+                selected_idx,
+                table_height,
+                total_rows,
+                &ViewportMode::Center
+            ),
+            0
+        );
+        assert_eq!(
+            calculate_scroll_offset(
+                selected_idx,
+                table_height,
+                total_rows,
+                &ViewportMode::Bottom
+            ),
+            0
+        );
+    }
+
+    #[test]
+    fn test_calculate_visible_columns_normal() {
+        let (start, end) = calculate_visible_columns(0, 50);
+        assert_eq!(start, 0);
+        assert!(end <= 50);
+        assert!(end <= start + MAX_VISIBLE_COLS);
+    }
+
+    #[test]
+    fn test_calculate_visible_columns_scrolled() {
+        let (start, end) = calculate_visible_columns(10, 50);
+        assert_eq!(start, 10);
+        assert!(end <= 50);
+        assert_eq!(end - start, MAX_VISIBLE_COLS.min(50 - 10));
+    }
+
+    #[test]
+    fn test_calculate_visible_columns_at_end() {
+        let total_cols = 30;
+        let start_col = 25;
+        let (start, end) = calculate_visible_columns(start_col, total_cols);
+        assert_eq!(start, 25);
+        assert_eq!(end, 30);
+        assert!(end - start <= MAX_VISIBLE_COLS);
+    }
+}

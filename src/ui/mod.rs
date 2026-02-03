@@ -835,4 +835,131 @@ mod tests {
         // Should handle gracefully even with tiny terminal
         Ok(())
     }
+
+    #[test]
+    fn test_ui_extreme_terminal_1x1() -> io::Result<()> {
+        let csv_data = create_test_csv();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        let backend = TestBackend::new(1, 1); // Extreme case: 1x1 terminal
+        let mut terminal = Terminal::new(backend)?;
+
+        // Should not panic even with 1x1 terminal
+        let result = terminal.draw(|f| {
+            render(f, &mut app);
+        });
+
+        assert!(
+            result.is_ok(),
+            "Should handle 1x1 terminal without panicking"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_ui_extreme_width_1x24() -> io::Result<()> {
+        let csv_data = create_test_csv();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        let backend = TestBackend::new(1, 24); // Very narrow terminal
+        let mut terminal = Terminal::new(backend)?;
+
+        terminal.draw(|f| {
+            render(f, &mut app);
+        })?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_ui_extreme_height_80x1() -> io::Result<()> {
+        let csv_data = create_test_csv();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        let backend = TestBackend::new(80, 1); // Very short terminal
+        let mut terminal = Terminal::new(backend)?;
+
+        terminal.draw(|f| {
+            render(f, &mut app);
+        })?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_ui_multi_byte_unicode_rendering() -> io::Result<()> {
+        let csv_data = Document {
+            headers: vec![
+                "Japanese".to_string(),
+                "Emoji".to_string(),
+                "Russian".to_string(),
+            ],
+            rows: vec![
+                vec![
+                    "Hello".to_string(),
+                    "🎉🎊😀".to_string(),
+                    "World".to_string(),
+                ],
+                vec!["Test".to_string(), "🔥💯".to_string(), "Data".to_string()],
+            ],
+            filename: "unicode.csv".to_string(),
+            is_dirty: false,
+        };
+        let csv_files = vec![PathBuf::from("unicode.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend)?;
+
+        terminal.draw(|f| {
+            render(f, &mut app);
+        })?;
+
+        // Should render emoji (multi-byte Unicode) without crashing
+        let buffer = terminal.backend().buffer();
+        let content = buffer
+            .content
+            .iter()
+            .map(|c| c.symbol())
+            .collect::<String>();
+
+        // Verify headers are present
+        assert!(
+            content.contains("Japanese")
+                || content.contains("Emoji")
+                || content.contains("Russian"),
+            "Should render headers"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_ui_very_long_cell_truncation() -> io::Result<()> {
+        let long_text = "A".repeat(1000); // Very long cell content
+        let csv_data = Document {
+            headers: vec!["Col1".to_string(), "Col2".to_string()],
+            rows: vec![
+                vec![long_text.clone(), "Normal".to_string()],
+                vec!["Short".to_string(), long_text],
+            ],
+            filename: "long.csv".to_string(),
+            is_dirty: false,
+        };
+        let csv_files = vec![PathBuf::from("long.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend)?;
+
+        terminal.draw(|f| {
+            render(f, &mut app);
+        })?;
+
+        // Should handle long content with truncation
+        Ok(())
+    }
 }

@@ -1411,4 +1411,8 @@ mod tests {
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
         assert_eq!(app.view_state.viewport_mode, crate::ui::ViewportMode::Auto);
     }
+
+    // Note: Most runtime error tests (file deletion, permission changes, etc.)
+    // are in tests/error_handling_test.rs as integration tests since they
+    // require file system operations with tempfile.
 }

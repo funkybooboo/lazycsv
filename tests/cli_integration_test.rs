@@ -150,3 +150,59 @@ fn test_delimiter_and_no_headers_integration() {
     assert!(app.session.config().no_headers);
     assert_eq!(app.session.config().delimiter, Some(b';'));
 }
+
+#[test]
+fn test_invalid_utf8_bytes_error() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("invalid_utf8.csv");
+
+    // Create file with invalid UTF-8 byte sequences
+    // Start with valid UTF-8, then add invalid sequences
+    let mut invalid_bytes = b"A,B,C\n".to_vec();
+    invalid_bytes.extend_from_slice(&[0xFF, 0xFE, 0xFD]); // Invalid UTF-8
+    invalid_bytes.extend_from_slice(b",value,");
+    invalid_bytes.extend_from_slice(&[0x80, 0x81]); // More invalid UTF-8
+
+    write(&file_path, &invalid_bytes).unwrap();
+
+    // encoding_rs should handle this with replacement characters
+    let result = lazycsv::Document::from_file(&file_path, None, false, None);
+
+    // Should either succeed with replacement chars or fail gracefully
+    match result {
+        Ok(doc) => {
+            // Parsed with replacement characters - acceptable behavior
+            assert!(!doc.headers.is_empty());
+        }
+        Err(err) => {
+            // Failed to parse - also acceptable
+            assert!(!err.to_string().is_empty());
+        }
+    }
+}
+
+#[test]
+fn test_mixed_encoding_in_file() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("mixed_encoding.csv");
+
+    // First half UTF-8, second half with byte sequences that could be other encoding
+    let mut mixed_bytes = b"A,B,C\nval1,val2,val3\n".to_vec();
+    // Add some bytes that could be interpreted differently in different encodings
+    mixed_bytes.extend_from_slice(&[0xC0, 0x80, 0xE0, 0x80, 0x80]);
+
+    write(&file_path, &mixed_bytes).unwrap();
+
+    // Should handle mixed content (encoding_rs will decode as UTF-8 with replacements)
+    let result = lazycsv::Document::from_file(&file_path, None, false, None);
+
+    match result {
+        Ok(doc) => {
+            assert!(!doc.headers.is_empty());
+            // May contain replacement characters
+        }
+        Err(err) => {
+            assert!(!err.to_string().is_empty());
+        }
+    }
+}

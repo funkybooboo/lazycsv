@@ -103,4 +103,41 @@ mod tests {
             assert_eq!(index, i, "Roundtrip failed for index {}", i);
         }
     }
+
+    #[test]
+    fn test_extended_roundtrip_conversion() {
+        // Test more extensive range including 3-letter columns
+        for i in 0..1000 {
+            let letter = column_to_excel_letter(i);
+            let index = excel_letter_to_column(&letter).unwrap();
+            assert_eq!(index, i, "Roundtrip failed for index {}", i);
+        }
+    }
+
+    #[test]
+    fn test_three_letter_columns() {
+        // Test 3-letter column names
+        assert_eq!(column_to_excel_letter(702), "AAA"); // First 3-letter column
+        assert_eq!(excel_letter_to_column("AAA").unwrap(), 702);
+        assert_eq!(excel_letter_to_column("ABC").unwrap(), 730);
+        assert_eq!(excel_letter_to_column("ZZZ").unwrap(), 18277);
+    }
+
+    #[test]
+    fn test_column_letter_boundary_cases() {
+        // Test boundary cases between 1, 2, and 3 letter columns
+        assert_eq!(column_to_excel_letter(25), "Z"); // Last 1-letter
+        assert_eq!(column_to_excel_letter(26), "AA"); // First 2-letter
+        assert_eq!(column_to_excel_letter(701), "ZZ"); // Last 2-letter
+        assert_eq!(column_to_excel_letter(702), "AAA"); // First 3-letter
+    }
+
+    #[test]
+    fn test_column_letter_mixed_case_conversion() {
+        // Test various mixed case inputs
+        assert_eq!(excel_letter_to_column("Ab").unwrap(), 27);
+        assert_eq!(excel_letter_to_column("aB").unwrap(), 27);
+        assert_eq!(excel_letter_to_column("AB").unwrap(), 27);
+        assert_eq!(excel_letter_to_column("ab").unwrap(), 27);
+    }
 }

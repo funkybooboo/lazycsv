@@ -315,6 +315,7 @@ mod tests {
     use super::*;
     use crate::csv::Document;
     use crate::domain::position::ColIndex;
+    use crate::session::FileConfig;
     use std::path::PathBuf;
 
     fn create_test_app() -> App {
@@ -567,5 +568,209 @@ mod tests {
         assert_eq!(app.view_state.selected_column, initial_col);
         // Should have error message
         assert!(app.status_message.is_some());
+    }
+
+    #[test]
+    fn test_goto_column_multi_letter_aa() {
+        let csv_data = create_large_csv_data(3, 50); // 50 columns
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+        // Jump to column AA (26)
+        goto_column(&mut app, "AA");
+        assert_eq!(app.view_state.selected_column, ColIndex::new(26));
+
+        // Jump to column AB (27)
+        goto_column(&mut app, "AB");
+        assert_eq!(app.view_state.selected_column, ColIndex::new(27));
+    }
+
+    #[test]
+    fn test_goto_column_multi_letter_case_mixed() {
+        let csv_data = create_large_csv_data(3, 50);
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+        // Test mixed case: aB, Ab, AB should all go to column 27
+        goto_column(&mut app, "aB");
+        assert_eq!(app.view_state.selected_column, ColIndex::new(27));
+
+        goto_column(&mut app, "Ab");
+        assert_eq!(app.view_state.selected_column, ColIndex::new(27));
+
+        goto_column(&mut app, "ab");
+        assert_eq!(app.view_state.selected_column, ColIndex::new(27));
+    }
+
+    #[test]
+    fn test_goto_column_three_letters() {
+        let csv_data = create_large_csv_data(3, 800); // 800 columns
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+        // Jump to column AAA (702)
+        goto_column(&mut app, "AAA");
+        assert_eq!(app.view_state.selected_column, ColIndex::new(702));
+
+        // Jump to column ABC (730)
+        goto_column(&mut app, "ABC");
+        assert_eq!(app.view_state.selected_column, ColIndex::new(730));
+    }
+
+    #[test]
+    fn test_goto_column_beyond_available_clamps() {
+        let mut app = create_test_app(); // Only 3 columns
+
+        // Try to jump to column BA (52)
+        goto_column(&mut app, "BA");
+
+        // Should clamp to last column (2)
+        assert_eq!(app.view_state.selected_column, ColIndex::new(2));
+    }
+
+    #[test]
+    fn test_next_word_all_empty_cells() {
+        let csv_data = Document {
+            headers: vec![
+                "A".to_string(),
+                "B".to_string(),
+                "C".to_string(),
+                "D".to_string(),
+            ],
+            rows: vec![vec![
+                "value".to_string(),
+                "".to_string(),
+                "".to_string(),
+                "".to_string(),
+            ]],
+            filename: "test.csv".to_string(),
+            is_dirty: false,
+        };
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+        // At column 0 (non-empty)
+        assert_eq!(app.view_state.selected_column, ColIndex::new(0));
+
+        // Try to move to next word
+        next_word(&mut app);
+
+        // Should stay at column 0 or show message (no more non-empty cells)
+        // Current implementation may stay or move, verify it doesn't crash
+        assert!(app.status_message.is_some() || app.view_state.selected_column == ColIndex::new(0));
+    }
+
+    #[test]
+    fn test_prev_word_all_empty_cells() {
+        let csv_data = Document {
+            headers: vec![
+                "A".to_string(),
+                "B".to_string(),
+                "C".to_string(),
+                "D".to_string(),
+            ],
+            rows: vec![vec![
+                "".to_string(),
+                "".to_string(),
+                "".to_string(),
+                "value".to_string(),
+            ]],
+            filename: "test.csv".to_string(),
+            is_dirty: false,
+        };
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+        // Start at last column
+        app.view_state.selected_column = ColIndex::new(3);
+
+        // Try to move to prev word
+        prev_word(&mut app);
+
+        // Should stay at column 3 or show message
+        assert!(app.status_message.is_some() || app.view_state.selected_column == ColIndex::new(3));
+    }
+
+    #[test]
+    fn test_word_motion_single_non_empty_cell() {
+        let csv_data = Document {
+            headers: vec!["A".to_string(), "B".to_string(), "C".to_string()],
+            rows: vec![vec!["".to_string(), "value".to_string(), "".to_string()]],
+            filename: "test.csv".to_string(),
+            is_dirty: false,
+        };
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+        // Start at column 0 (empty)
+        assert_eq!(app.view_state.selected_column, ColIndex::new(0));
+
+        // Move to next word
+        next_word(&mut app);
+
+        // Should move to column 1 (the single non-empty cell)
+        assert_eq!(app.view_state.selected_column, ColIndex::new(1));
+
+        // Try to move to next word again
+        next_word(&mut app);
+
+        // Should stay at column 1 (no more non-empty cells)
+        assert!(app.status_message.is_some() || app.view_state.selected_column == ColIndex::new(1));
+    }
+
+    #[test]
+    fn test_word_motion_alternating_empty_filled() {
+        let csv_data = Document {
+            headers: vec![
+                "A".to_string(),
+                "B".to_string(),
+                "C".to_string(),
+                "D".to_string(),
+                "E".to_string(),
+            ],
+            rows: vec![vec![
+                "a".to_string(),
+                "".to_string(),
+                "b".to_string(),
+                "".to_string(),
+                "c".to_string(),
+            ]],
+            filename: "test.csv".to_string(),
+            is_dirty: false,
+        };
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+        // Start at column 0 ("a")
+        assert_eq!(app.view_state.selected_column, ColIndex::new(0));
+
+        // Move to next word
+        next_word(&mut app);
+        assert_eq!(app.view_state.selected_column, ColIndex::new(2)); // "b"
+
+        // Move to next word
+        next_word(&mut app);
+        assert_eq!(app.view_state.selected_column, ColIndex::new(4)); // "c"
+
+        // Move to prev word
+        prev_word(&mut app);
+        assert_eq!(app.view_state.selected_column, ColIndex::new(2)); // back to "b"
+
+        // Move to prev word
+        prev_word(&mut app);
+        assert_eq!(app.view_state.selected_column, ColIndex::new(0)); // back to "a"
+    }
+
+    fn create_large_csv_data(rows: usize, cols: usize) -> Document {
+        let headers = (0..cols).map(|i| format!("Col{}", i)).collect();
+        let rows_data = (0..rows)
+            .map(|r| (0..cols).map(|c| format!("R{}C{}", r, c)).collect())
+            .collect();
+        Document {
+            headers,
+            rows: rows_data,
+            filename: "large.csv".to_string(),
+            is_dirty: false,
+        }
     }
 }

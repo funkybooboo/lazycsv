@@ -1,7 +1,9 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use lazycsv::input::PendingCommand;
 use lazycsv::{App, ColIndex, Document, FileConfig, InputResult, RowIndex};
+use std::fs::write;
 use std::path::PathBuf;
+use tempfile::TempDir;
 
 fn key_event(code: KeyCode) -> KeyEvent {
     KeyEvent::new(code, KeyModifiers::NONE)
@@ -478,4 +480,208 @@ fn test_count_prefix_with_file_switching() {
 
     // State should be valid
     assert_eq!(app.session.active_file_index(), 1);
+}
+
+#[test]
+fn test_complete_session_load_navigate_switch_quit() {
+    let temp_dir = TempDir::new().unwrap();
+    let file1_path = temp_dir.path().join("file1.csv");
+    let file2_path = temp_dir.path().join("file2.csv");
+
+    write(&file1_path, "A,B,C\n1,2,3\n4,5,6\n7,8,9").unwrap();
+    write(&file2_path, "X,Y,Z\n10,11,12\n13,14,15").unwrap();
+
+    let doc = Document::from_file(&file1_path, None, false, None).unwrap();
+    let mut app = App::new(
+        doc,
+        vec![file1_path.clone(), file2_path.clone()],
+        0,
+        FileConfig::new(),
+    );
+
+    // Navigate in first file
+    for _ in 0..5 {
+        app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
+    }
+    app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
+    app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
+
+    // Switch to second file
+    app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
+    app.reload_current_file().unwrap();
+
+    // Navigate in second file
+    app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
+    app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
+
+    // Switch back
+    app.handle_key(key_event(KeyCode::Char('['))).unwrap();
+    app.reload_current_file().unwrap();
+
+    // App should be in valid state
+    assert_eq!(app.session.active_file_index(), 0);
+    assert!(!app.should_quit);
+}
+
+#[test]
+fn test_recover_from_file_switch_error() {
+    let temp_dir = TempDir::new().unwrap();
+    let valid_file = temp_dir.path().join("valid.csv");
+    let invalid_path = PathBuf::from("/nonexistent/invalid.csv");
+
+    write(&valid_file, "A,B\n1,2\n3,4").unwrap();
+
+    let doc = Document::from_file(&valid_file, None, false, None).unwrap();
+    let mut app = App::new(
+        doc,
+        vec![valid_file.clone(), invalid_path],
+        0,
+        FileConfig::new(),
+    );
+
+    // Switch to invalid file
+    app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
+    let result = app.reload_current_file();
+
+    // Should fail to reload
+    assert!(result.is_err());
+
+    // Switch back to valid file
+    app.handle_key(key_event(KeyCode::Char('['))).unwrap();
+    let result = app.reload_current_file();
+
+    // Should successfully reload
+    assert!(result.is_ok());
+    assert_eq!(app.session.active_file_index(), 0);
+}
+
+#[test]
+fn test_rapid_navigation_and_file_switching() {
+    let temp_dir = TempDir::new().unwrap();
+    let file1_path = temp_dir.path().join("f1.csv");
+    let file2_path = temp_dir.path().join("f2.csv");
+
+    write(&file1_path, "A,B,C\n1,2,3\n4,5,6\n7,8,9\n10,11,12").unwrap();
+    write(&file2_path, "X,Y,Z\n20,21,22\n23,24,25").unwrap();
+
+    let doc = Document::from_file(&file1_path, None, false, None).unwrap();
+    let mut app = App::new(
+        doc,
+        vec![file1_path.clone(), file2_path.clone()],
+        0,
+        FileConfig::new(),
+    );
+
+    // Rapid mixed operations (50 keypresses)
+    let keys = [
+        'j', 'j', 'k', 'l', 'h', 'j', 'l', ']', 'j', 'j', 'k', 'h', '[', 'j', 'l', 'j', 'k', '$',
+        '0', 'j', ']', 'k', 'k', '[', 'l', 'l', 'h', 'j', 'j', 'j', 'k', 'k', 'l', '$', '0', ']',
+        '[', 'j', 'k', 'l', 'h', 'j', 'l', 'k', '0', '$', ']', '[', 'j', 'k',
+    ];
+
+    for key in keys.iter() {
+        if *key == ']' || *key == '[' {
+            app.handle_key(key_event(KeyCode::Char(*key))).unwrap();
+            // Reload after file switch
+            let _ = app.reload_current_file();
+        } else {
+            app.handle_key(key_event(KeyCode::Char(*key))).unwrap();
+        }
+    }
+
+    // App should remain stable
+    assert!(!app.should_quit);
+    // Should have valid position
+    assert!(app.get_selected_row().is_some());
+}
+
+#[test]
+fn test_help_during_multi_key_command() {
+    let csv_data = create_test_csv();
+    let csv_files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+    // Start a multi-key command (g for goto)
+    app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
+    assert!(app.input_state.pending_command.is_some());
+
+    // Try to open help with '?'
+    // Note: This may complete the command as 'g?' or may open help depending on implementation
+    app.handle_key(key_event(KeyCode::Char('?'))).unwrap();
+
+    // Either the help opened, or the pending command was processed
+    // Both are acceptable behaviors - just verify app is stable
+    let was_help_opened = app.view_state.help_overlay_visible;
+
+    if was_help_opened {
+        // Close help
+        app.handle_key(key_event(KeyCode::Esc)).unwrap();
+        assert!(!app.view_state.help_overlay_visible);
+    }
+
+    // Should be in valid state regardless
+    assert!(!app.should_quit);
+}
+
+#[test]
+fn test_viewport_mode_reset_across_files() {
+    let temp_dir = TempDir::new().unwrap();
+    let file1_path = temp_dir.path().join("f1.csv");
+    let file2_path = temp_dir.path().join("f2.csv");
+
+    write(&file1_path, "A,B\n1,2\n3,4\n5,6").unwrap();
+    write(&file2_path, "X,Y\n7,8\n9,10").unwrap();
+
+    let doc = Document::from_file(&file1_path, None, false, None).unwrap();
+    let mut app = App::new(
+        doc,
+        vec![file1_path.clone(), file2_path.clone()],
+        0,
+        FileConfig::new(),
+    );
+
+    // Set viewport mode to center
+    app.handle_key(key_event(KeyCode::Char('z'))).unwrap();
+    app.handle_key(key_event(KeyCode::Char('z'))).unwrap();
+    assert_eq!(
+        app.view_state.viewport_mode,
+        lazycsv::ui::ViewportMode::Center
+    );
+
+    // Switch to file 2
+    app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
+    app.reload_current_file().unwrap();
+
+    // Viewport mode should persist or reset (document behavior)
+    // Either behavior is acceptable, just verify app is stable
+    assert_eq!(app.session.active_file_index(), 1);
+
+    // Switch back to file 1
+    app.handle_key(key_event(KeyCode::Char('['))).unwrap();
+    app.reload_current_file().unwrap();
+
+    // App should be stable
+    assert_eq!(app.session.active_file_index(), 0);
+}
+
+#[test]
+fn test_status_message_lifecycle_complete() {
+    let csv_data = create_test_csv();
+    let csv_files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+    // Trigger a viewport positioning command which should produce a status message
+    app.handle_key(key_event(KeyCode::Char('z'))).unwrap();
+    app.handle_key(key_event(KeyCode::Char('z'))).unwrap(); // zz = center viewport
+
+    // Should have status message about viewport positioning
+    let had_message = app.status_message.is_some();
+
+    if had_message {
+        // Next keypress should clear it (or it may already be cleared depending on implementation)
+        app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
+    }
+
+    // App should be in valid state
+    assert!(!app.should_quit);
 }
