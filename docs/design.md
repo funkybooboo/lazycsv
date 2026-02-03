@@ -2,6 +2,8 @@
 
 Complete UI/UX design specification for LazyCSV.
 
+This document translates the functionality described in the [Features Guide](features.md) into a concrete user interface and experience. The implementation of this design is guided by the project's [Architecture](architecture.md).
+
 ## Design Principles
 
 ### 1. Vim-First Philosophy

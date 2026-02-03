@@ -87,7 +87,7 @@ lazycsv/
 │
 ├── plans/            - Planning documents
 │   ├── README.md     - Plans index
-│   └── todo.md       - Development checklist
+│   └── road_map.md       - Development checklist
 │
 ├── Cargo.toml        - Dependencies
 ├── Taskfile.yml      - Task runner config
@@ -134,103 +134,96 @@ tests/
 - Use `view_state` field not `ui` field
 - `App` struct has 6 fields: document, view_state, input_state, session, should_quit, status_message
 
+## Development Philosophy: The TDD Loop
+
+LazyCSV follows a Test-Driven Development (TDD) approach to ensure code quality, correctness, and maintainability. The development process is an iterative loop: **Test -> Write Code -> Test -> Write Docs -> Repeat**.
+
+This loop ensures that every piece of functionality is:
+1.  **Correctly specified** by a test before it's written.
+2.  **Verified** by that test after it's written.
+3.  **Well-documented** for future users and developers.
+
+The ideal workflow looks like this:
+
+1.  **Write a Failing Test**: Before writing any implementation code, write a unit or integration test that describes the desired functionality and fails because the functionality doesn't exist yet. This is the "red" phase.
+2.  **Write Code to Pass the Test**: Write the simplest, most straightforward code possible to make the test pass. This is the "green" phase.
+3.  **Refactor**: With the safety of a passing test suite, refactor the code for clarity, efficiency, and to ensure it aligns with the project's architecture.
+4.  **Document**: If the change is user-facing, update the relevant documentation. This could be adding a new keybinding to `keybindings.md`, explaining a new feature in `features.md`, or updating screenshots in `design.md`.
+5.  **Commit**: Commit the changes with a clear, conventional commit message.
+6.  **Repeat**: Move to the next task.
+
 ## Development Workflow
 
-### 1. Pick a Task
+This section puts the TDD philosophy into a concrete, step-by-step process for contributing to LazyCSV.
 
-Check [plans/todo.md](../plans/todo.md) for open items:
+### 1. Understand the Task
 
-```bash
-# View todo list
-cat plans/todo.md
+Before you write a single line of code, make sure you understand what you're building.
+- **For the big picture**, check the **[Project Roadmap](../plans/road_map.md)** to see the versioned feature list and where your contribution fits in.
+- **For new features**, start with the **[features.md](features.md)** document to understand the requirements.
+- **For UI/UX changes**, consult the **[design.md](design.md)** document to see how it should look and behave.
+- **To understand the existing codebase**, refer to the **[architecture.md](architecture.md)** document.
 
-# Check current phase
-grep "## Phase" plans/todo.md | head -5
-```
+### 2. Find or Create an Issue
 
-### 2. Create a Branch
+All work should be tied to a GitHub issue. Find an existing issue or create a new one that describes the feature or bug you're working on.
 
+### 3. Create a Branch
+
+Create a new branch from `main` for your changes:
 ```bash
 git checkout -b feature/your-feature-name
 # Or: fix/bug-name
 ```
 
-### 3. Implement
+### 4. Write a Failing Test
 
-```bash
-# Edit code
-vim src/app.rs
+This is the first step of the TDD loop. Add a new test to the test suite in the `tests/` directory or within the relevant module. Run `cargo test` and watch it fail. This is expected and good!
 
-# Build and test
-task build
-task test
+### 5. Implement the Feature
 
-# Run to verify
-task run
-```
+Now, write the code to make your new test pass.
+- Run `cargo test` frequently to check your progress.
+- Use `cargo build` and `cargo run` to manually verify your changes as you go.
 
-### 4. Format and Lint
+### 6. Refactor and Document
 
+Once your test is passing and the feature is working:
+- **Refactor**: Clean up your code. Make it more readable, efficient, and aligned with the project's style. Ensure `cargo test` still passes.
+- **Document**: Update any and all relevant documentation. Did you add a keybinding? Update `keybindings.md`. Did you change the UI? Update `design.md`.
+
+### 7. Format and Lint
+
+Ensure your code adheres to our quality standards by running:
 ```bash
 # Format code
-task fmt
+cargo fmt
 
 # Run clippy
-task clippy
-
-# Or run all checks
-task all
+cargo clippy -- -D warnings
 ```
+Our pre-commit hooks should handle this, but it's good practice to run it manually as well.
 
-### 5. Commit
+### 8. Commit and Push
 
+Commit your changes using the Conventional Commits format (e.g., `feat(search): add fuzzy matching`).
 ```bash
-# Add changes
+# Add your changes
 git add .
 
-# Commit with descriptive message
-git commit -m "feat: add fuzzy search for column names
+# Commit
+git commit -m "feat: your descriptive message"
 
-- Implement fuzzy matching with fuzzy-matcher crate
-- Add search overlay UI
-- Support j/k navigation in results
-- Add tests for search scoring
-
-Closes #42"
-```
-
-### 6. Test
-
-Test your changes thoroughly:
-
-```bash
-# Run unit tests
-task test
-
-# Run with various CSV files
-task run
-cargo run -- customers.csv
-cargo run -- large_file.csv
-
-# Test edge cases
-cargo run -- empty.csv
-cargo run -- single_column.csv
-cargo run -- wide.csv
-```
-
-### 7. Submit PR
-
-```bash
-# Push branch
+# Push to your fork
 git push origin feature/your-feature-name
-
-# Create PR on GitHub
-# - Describe changes
-# - Link to issue
-# - Add screenshots/demos if UI changes
 ```
+
+### 9. Submit a Pull Request
+
+Open a pull request on the main LazyCSV repository. In the description, link to the issue you're resolving and provide a clear summary of the changes.
 
 ## Coding Standards
+
 
 ### Rust Style
 
@@ -365,7 +358,7 @@ cargo run -- test.csv
 ### Add a New Feature
 
 1. Check [features.md](features.md) for spec
-2. Update [todo.md](../plans/todo.md) with tasks
+2. Update [road_map.md](../plans/road_map.md) with tasks
 3. Implement in appropriate module
 4. Add tests
 5. Update documentation

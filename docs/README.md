@@ -4,14 +4,19 @@ Welcome to the LazyCSV documentation! This directory contains comprehensive docu
 
 ## Documentation Index
 
-### User Documentation
-- **[Features](features.md)** - Complete feature specification and usage guide
-- **[Keybindings](keybindings.md)** - Comprehensive keyboard shortcuts reference
+This documentation is structured to guide you from high-level concepts to low-level implementation details.
 
-### Developer Documentation
-- **[Design](design.md)** - UI/UX design decisions and specifications
-- **[Architecture](architecture.md)** - System architecture and code organization
-- **[Development](development.md)** - Development guide and contributing
+### The "What" and "Why"
+- **[Features](features.md)**: What LazyCSV does. Start here to understand the intended functionality and user-facing features. This document defines the "what" we are building.
+
+### The "How" - Design and Architecture
+- **[Design](design.md)**: How LazyCSV should look and feel. This document covers the UI/UX, visual identity, and interaction design. It translates features into a user experience.
+- **[Architecture](architecture.md)**: How LazyCSV is built. This document dives into the code structure, data flow, and core components. It's the blueprint for the implementation.
+
+### The "How-To" - Development and Reference
+- **[Development](development.md)**: How to contribute to LazyCSV. This guide outlines our development process, coding standards, and the "test, write, test, docs" workflow.
+- **[Keybindings](keybindings.md)**: A comprehensive reference for all keyboard shortcuts. Essential for both users and developers.
+- **[Project Roadmap](../plans/road_map.md)**: The master plan. This document contains the versioned checklist of features and milestones.
 
 ## Quick Links
 
@@ -22,7 +27,7 @@ Welcome to the LazyCSV documentation! This directory contains comprehensive docu
 
 ### For Developers
 - **Contributing**: See [development.md](development.md)
-- **Todo List**: See [plans/todo.md](../plans/todo.md) for development checklist
+- **Todo List**: See [plans/road_map.md](../plans/road_map.md) for development checklist
 - **Architecture**: See [architecture.md](architecture.md) for code structure
 
 ## Project Status
@@ -33,14 +38,14 @@ Welcome to the LazyCSV documentation! This directory contains comprehensive docu
 - Multi-file switching
 - Comprehensive test suite
 
-### v0.2.0 - Type Safety Refactor ✅ Complete
-- ✅ **Phase 1-6**: Type safety refactor COMPLETE
-  - Phase 1: Type safety foundation
-  - Phase 2: Separation of concerns
-  - Phase 3: Better naming & consistency
-  - Phase 4: Code organization
-  - Phase 5: Clean code improvements
-  - Phase 6: Testing & validation
+### v0.2.0 - Type Safety Refactor ✅ Complete (v0.2.1 - v0.2.6)
+- ✅ **v0.2.1 - v0.2.6**: Type safety refactor COMPLETE
+  - v0.2.1: Type safety foundation
+  - v0.2.2: Separation of concerns
+  - v0.2.3: Better naming & consistency
+  - v0.2.4: Code organization
+  - v0.2.5: Clean code improvements
+  - v0.2.6: Testing & validation
 
 ### Roadmap to v1.0
 - **v0.2.0** - Type safety refactor ✅ Complete (All 6 phases)

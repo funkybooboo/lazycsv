@@ -2,6 +2,8 @@
 
 System architecture and code organization for LazyCSV.
 
+Before contributing, it's highly recommended to familiarize yourself with the architecture outlined here. This will help you understand where your changes fit into the bigger picture. For the full contribution process, see the [Development Guide](development.md).
+
 ## Overview
 
 LazyCSV follows a clean, modular architecture with strong type safety (v0.2.0 Complete):
@@ -136,10 +138,7 @@ pub enum PendingCommand {
 
 **Responsibility**: Manage all mutable application state and handle user input.
 
-The `app` module is split into three parts:
-- **`mod.rs`**: Defines the central `App` struct (updated with type-safe fields)
-- **`input.rs`**: Handles keyboard input using new action types
-- **`navigation.rs`**: Navigation logic with type-safe position handling
+The `app` module is the central coordinator, bringing together all other components. It defines the main `App` struct, which holds the application's state.
 
 ### App State Structure (v0.2.0)
 
@@ -478,36 +477,36 @@ src/
 
 ## v0.2.0 Refactoring Summary
 
-The v0.2.0 release completed a major 6-phase refactor to improve code quality, maintainability, and type safety:
+The v0.2.0 release was a major refactor to improve code quality, maintainability, and type safety. The work was completed over several point releases:
 
-**Phase 1: Type Safety Foundation**
+**v0.2.1: Type Safety Foundation**
 - Introduced RowIndex/ColIndex newtypes to prevent coordinate bugs
 - Created UserAction abstraction layer for all input handling
 - Eliminated primitive obsession with semantic types (NonZeroUsize, StatusMessage)
 
-**Phase 2: Separation of Concerns**
+**v0.2.2: Separation of Concerns**
 - Extracted InputState from App (pending commands, count prefixes)
 - Extracted Session management (multi-file, file config)
 - Renamed UiState → ViewState for clarity
 
-**Phase 3: Better Naming & Consistency**
+**v0.2.3: Better Naming & Consistency**
 - Renamed csv_data → Document throughout codebase
 - Renamed ui → view_state for consistency
 - Standardized function naming: get_*, move_*, goto_*
 - Centralized user messages in app/messages.rs
 
-**Phase 4: Code Organization**
+**v0.2.4: Code Organization**
 - Reorganized modules: csv/, file_system/, session/, navigation/
 - Defined clear module boundaries and public APIs
 - Reduced App struct from 12 fields to 6 fields
 
-**Phase 5: Clean Code Improvements**
+**v0.2.5: Clean Code Improvements**
 - Decomposed long functions (render_table: 180 → 74 lines)
 - Removed all magic numbers, replaced with named constants
 - Added comprehensive module-level documentation
 - Removed all commented-out dead code
 
-**Phase 6: Testing & Validation**
+**v0.2.6: Testing & Validation**
 - Expanded test suite from 133 to 257 tests (+124 new tests)
 - Added z-command tests, timeout tests, navigation unit tests
 - Zero compiler warnings
@@ -638,7 +637,7 @@ fn test_load_and_navigate() {
 
 ### Version 0.2.0: Type System & State Refactoring
 
-**Phase 1 ✅ COMPLETED:**
+**v0.2.1 ✅ COMPLETED:**
 ```rust
 // Type-safe position types
 pub struct RowIndex(usize);
@@ -661,9 +660,9 @@ command_count: Option<NonZeroUsize>  // Was: Option<String>
 status_message: Option<StatusMessage> // Was: Option<Cow<'static, str>>
 ```
 
-**Phases 2-6 (TODO):**
+**v0.2.2-v0.2.6 ✅ COMPLETED:**
 ```rust
-// Phase 2: Separation of Concerns
+// v0.2.2: Separation of Concerns
 pub struct InputState {
     pending_command: Option<PendingCommand>,
     command_count: Option<NonZeroUsize>,
@@ -676,6 +675,10 @@ pub struct Session {
     config: FileConfig,
 }
 ```
+- **v0.2.3**: Better Naming & Consistency (e.g., `Document`, `ViewState`)
+- **v0.2.4**: Code Organization (clear module boundaries)
+- **v0.2.5**: Clean Code Improvements (long functions decomposed, magic numbers removed)
+- **v0.2.6**: Testing & Validation (test suite expanded, zero warnings)
 
 ### Version 0.4.0: Quick Edit Mode
 ```rust

@@ -86,7 +86,7 @@ LazyCSV treats CSV files in the same directory like Excel sheets. Open one file,
 | Version | Features |
 |---------|----------|
 | **v0.1.0** | ✅ Foundation - viewing, navigation, multi-file |
-| **v0.2.0** | ✅ Type safety refactor (COMPLETE - all 6 phases) |
+| **v0.2.0** | Type safety refactor (internal, completed in v0.2.1-v0.2.6) ✅ |
 | **v0.3.0** | ✅ Advanced navigation - column jumps, command mode, word motion |
 | **v0.3.1** | ✅ UI/UX polish - mode indicator, transient messages, help redesign |
 | **v0.4.0** | Quick editing - Insert mode for fast cell edits |
@@ -108,7 +108,7 @@ LazyCSV treats CSV files in the same directory like Excel sheets. Open one file,
 | v1.5.0 | Data analysis - stats, plotting, regex replace |
 | v1.6.0 | Final polish - comprehensive tests, docs |
 
-See [plans/todo.md](plans/todo.md) for the complete detailed roadmap.
+See [plans/road_map.md](plans/road_map.md) for the complete detailed roadmap.
 
 ## Documentation
 

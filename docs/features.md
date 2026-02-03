@@ -2,6 +2,8 @@
 
 Complete feature specification for LazyCSV.
 
+This document details the functional "what" of LazyCSV. For information on how these features are visually presented and interactable, refer to the [Design Document](design.md) and [Keybindings Reference](keybindings.md).
+
 ## Philosophy
 
 LazyCSV is designed around these core principles:
@@ -12,262 +14,154 @@ LazyCSV is designed around these core principles:
 4. **Simple** - Clean, minimal interface
 5. **Powerful** - Complex operations with simple keystrokes
 
-## Current Features (v0.1.0 - MVP)
+## Implemented Features (v0.1.0 - v0.3.1)
 
-### File Loading
-- ✅ Load CSV files from command line: `lazycsv file.csv`
-- ✅ Load from directory: `lazycsv .` or `lazycsv /path/to/dir`
-- ✅ No arguments defaults to current directory: `lazycsv`
-- ✅ Support absolute and relative paths (files and directories)
-- ✅ Directory mode: loads first CSV file alphabetically
-- ✅ Handle UTF-8 encoding
-- ✅ Parse quoted fields and escaped commas
-- ✅ Error messages for invalid files or missing directories
+This section details all features currently available in the application.
 
-**Usage:**
-```bash
-# Specific file
-lazycsv data.csv
-
-# Current directory (loads first CSV alphabetically)
-lazycsv
-lazycsv .
-
-# Parent directory
-lazycsv ..
-
-# Subdirectory
-lazycsv ./data
-lazycsv data/exports
-
-# Absolute directory path
-lazycsv /home/user/csvfiles
-```
+### File Loading & Handling
+- ✅ Load CSV files from the command line (`lazycsv file.csv`).
+- ✅ Discover and load files from a directory (`lazycsv .`).
+- ✅ Support for custom delimiters, encodings, and files with no headers.
+- ✅ Graceful error handling for invalid files or paths.
 
 ### Table Display
-- ✅ **Row numbers** - Left gutter shows row numbers (1, 2, 3...)
-- ✅ **Column letters** - Top row shows column letters (A, B, C...)
-- ✅ **Headers** - Bold header row with column names
-- ✅ **Data rows** - All CSV data displayed in table format
-- ✅ **Current row indicator** - `►` symbol shows selected row
-- ✅ **Current cell highlight** - Selected cell shown with reverse video
-- ✅ **Text truncation** - Long values truncated with `...` (max 20 chars)
-- ✅ **Horizontal scrolling** - Show ~10 columns at a time
-
-**Visual Layout:**
-```
-┌─ lazycsv: data.csv ────────────────────┐
-│     │  A      │ ►B      │  C      │... │ ← Column letters (► shows selected)
-├─────┼─────────┼─────────┼─────────┼────┤
-│  #  │  Name   │  Email  │  Age    │... │ ← Headers
-├─────┼─────────┼─────────┼─────────┼────┤
-│  1  │  Alice  │  a@e... │  30     │... │
-│►2   │  Bob    │ [b@e...]│  25     │... │ ← Current cell (highlighted)
-│  3  │  Charlie│  c@e... │  35     │... │
-├─────┴─────────┴─────────┴─────────┴────┤
-│ ? help │ q quit │ [ ] files │          │ ← Status bar (left: controls,
-│ Row 2/100 │ Col B: Email (2/5) │       │           right: position)
-│ Cell: "bob@example.com"                │
-├───────────────────────────────────────┤
-│ Files (1/2): ► data.csv | other.csv  │ ← File switcher
-└───────────────────────────────────────┘
-```
+- ✅ **Standard View**: Row numbers, column letters (A, B...), and headers.
+- ✅ **Highlighting**: The current row and cell are clearly indicated.
+- ✅ **Scrolling**: Both vertical and horizontal scrolling are supported.
+- ✅ **Text Truncation**: Long cell content is truncated with `...`.
 
 ### Vim-Style Navigation
-All navigation is keyboard-driven with vim-inspired keys:
+All navigation is keyboard-driven with vim-inspired keys.
 
-**Cursor Movement:**
-- ✅ `h` / `←` - Move left (previous column)
-- ✅ `j` / `↓` - Move down (next row)
-- ✅ `k` / `↑` - Move up (previous row)
-- ✅ `l` / `→` - Move right (next column)
+**Basic Movement:**
+- ✅ `h` / `←` - Move left
+- ✅ `j` / `↓` - Move down
+- ✅ `k` / `↑` - Move up
+- ✅ `l` / `→` - Move right
 
-**Jumps:**
-- ✅ `gg` / `Home` - Jump to first row
-- ✅ `G` / `End` - Jump to last row
-- ✅ `0` - Jump to first column
-- ✅ `$` - Jump to last column
+**Advanced Movement & Jumps:**
+- ✅ `gg` / `Home` - Jump to the first row.
+- ✅ `G` / `End` - Jump to the last row.
+- ✅ `0` - Jump to the first column.
+- ✅ `$` - Jump to the last column.
+- ✅ `w`, `b`, `e` - Word-style motion to jump between non-empty cells.
+- ✅ `PageUp` / `PageDown` - Page up or down.
 
-**Paging:**
-- ✅ `PageUp` / `PageDown` - Page up/down (~20 rows)
+**Count Prefixes:**
+- ✅ Use numbers before commands to repeat them (e.g., `5j` moves down 5 rows).
 
-### Multi-File Navigation
-LazyCSV treats CSV files in the same directory like "worksheets":
+### Command Mode
+- ✅ Press `:` to enter Command mode for direct jumps.
+- ✅ Jump to a specific line (e.g., `:15`).
+- ✅ Jump to a specific column by letter (e.g., `:B`, `:BC`).
 
-- ✅ **Auto-discovery** - Scans directory for all .csv files on startup
-- ✅ **Works with files or directories** - Scans parent dir when given a file, or scans the directory when given a dir path
-- ✅ **Always-visible switcher** - Bottom panel shows all available files
-- ✅ **Quick switching** - Press `[` for previous, `]` for next file
-- ✅ **Current file indicator** - `►` shows active file in top bar and file switcher
-- ✅ **File count** - Shows "Files (2/5): ► file1.csv | file2.csv | ..."
+### Viewport Control
+- ✅ `zt` - Position the current row at the **t**op of the viewport.
+- ✅ `zz` - Position the current row at the **c**enter of the viewport.
+- ✅ `zb` - Position the current row at the **b**ottom of the viewport.
 
-**Usage:**
-```bash
-# Open a specific file - automatically finds other CSVs in same directory
-lazycsv sales.csv
+### Multi-File Management
+- ✅ **Auto-discovery**: Automatically finds all `.csv` files in the same directory.
+- ✅ **File Switcher**: A persistent panel at the bottom shows all available files.
+- ✅ **Quick Switching**: Use `[` and `]` to cycle between files.
 
-# Open a directory - loads first CSV alphabetically, finds all others
-lazycsv .
-lazycsv /path/to/csvfiles
-
-# Now in the app:
-# Press ] to switch to next file (customers.csv)
-# Press [ to switch back to previous file (sales.csv)
-```
-
-### Help System
-- ✅ **Toggle help overlay** - Press `?` to show/hide cheatsheet
-- ✅ **Organized layout** - Grouped by function (Navigation, Editing, etc.)
-- ✅ **Context-aware** - Shows available keys for current phase
-- ✅ **Centered overlay** - Doesn't obscure entire table
-- ✅ **Close with `?` or `Esc`**
-
-### Status Bar
-Always-visible status bar with two sections:
-
-**Left side (controls):**
-- ✅ Quick help: `? help`
-- ✅ Quit hint: `q quit`
-- ✅ File switching hint: `[ ] files` (when multiple files)
-
-**Right side (position info):**
-- ✅ Current row: `Row 5/100`
-- ✅ Current column: `Col B: Email (2/5)` (letter, name, and position)
-- ✅ Current cell value: `Cell: "value"` (or `<empty>` for empty cells)
-
-**Format:**
-```
-? help │ q quit │ [ ] files │ Row 5/100 │ Col B: Email (2/5) │ Cell: "example"
-```
-
-### File Information
-- ✅ Filename in title bar
-- ✅ Dirty indicator `*` when unsaved (v0.6.0)
-- ✅ Row count and column count in status
+### Application Features
+- ✅ **Help System**: A toggleable overlay (`?`) shows available keybindings.
+- ✅ **Status Bar**: Provides contextual information about the file, position, and mode.
+- ✅ **Quit Protection**: Warns on quit if there are unsaved changes (partial implementation of v0.6.0). Note: Editing is not yet implemented, so the `is_dirty` flag can only be set for testing purposes.
 
 ## Planned Features
+
+The following features are on the roadmap and are **not yet implemented**.
 
 ### v0.4.0-v0.6.0: Cell Editing & Persistence
 
 **Edit Mode:**
-- 📋 Press `i` or `Enter` to edit current cell
-- 📋 Select-all text by default (ready to replace)
-- 📋 Type to modify value
-- 📋 `Enter` to save, `Esc` to cancel
-- 📋 Visual indicator (yellow background)
-- 📋 Mode indicator shows `[EDIT]`
+- 📋 Press `i` or `Enter` to edit current cell.
+- 📋 Select-all text by default (ready to replace).
+- 📋 Type to modify value.
+- 📋 `Enter` to save, `Esc` to cancel.
+- 📋 Visual indicator (yellow background).
+- 📋 Mode indicator shows `[EDIT]`.
 
 **File Saving:**
-- 📋 `Ctrl+S` to save changes
-- 📋 `:w` command to save (vim-style)
-- 📋 Atomic write (write to temp, then rename)
-- 📋 Success message: "✓ Saved successfully"
-- 📋 Error handling for save failures
+- 📋 `Ctrl+S` to save changes.
+- 📋 `:w` command to save (vim-style).
+- 📋 Atomic write (write to temp, then rename).
+- 📋 Success message: "✓ Saved successfully".
+- 📋 Error handling for save failures.
 
 **Dirty State Tracking:**
-- 📋 `*` indicator in title when modified
-- 📋 Warning on quit if unsaved changes
+- 📋 `*` indicator in title when modified.
 - 📋 Vim-style quit behavior:
-  - `q` warns and refuses to quit
-  - `:q!` forces quit without saving
+  - `q` warns and refuses to quit (already implemented).
+  - `:q!` forces quit without saving.
 
 **Undo/Redo:**
-- 📋 `u` to undo last operation
-- 📋 `Ctrl+r` to redo
-- 📋 History of 100 operations
-- 📋 Works for cell edits, row/column ops, sorts
-- 📋 Shows what was undone: "Undo: Edit cell A5"
+- 📋 `u` to undo last operation.
+- 📋 `Ctrl+r` to redo.
+- 📋 History of 100 operations.
+- 📋 Works for cell edits, row/column ops, sorts.
+- 📋 Shows what was undone: "Undo: Edit cell A5".
 
 ### v0.7.0-v0.8.0: Row & Column Operations
 
 **Row Operations:**
-- 📋 `o` - Add row below current (empty cells)
-- 📋 `O` - Add row above current (empty cells)
-- 📋 `dd` - Delete current row (no confirmation)
-- 📋 `yy` - Copy (yank) current row
-- 📋 `p` - Paste row below current
-- 📋 `P` - Paste row above current
+- 📋 `o` - Add row below current (empty cells).
+- 📋 `O` - Add row above current (empty cells).
+- 📋 `dd` - Delete current row (no confirmation).
+- 📋 `yy` - Copy (yank) current row.
+- 📋 `p` - Paste row below current.
+- 📋 `P` - Paste row above current.
 
 **Column Operations:**
-- 📋 `Ctrl+A` - Add column after current
-- 📋 `Ctrl+Shift+A` - Add column before current
-- 📋 `D` - Delete current column (no confirmation)
-- 📋 Prompt for column header name on add
-
-**Design Decisions:**
-- No confirmation for delete operations (rely on undo)
-- New rows have empty strings for all cells
-- Clipboard persists across operations (can paste multiple times)
+- 📋 `Ctrl+A` - Add column after current.
+- 📋 `Ctrl+Shift+A` - Add column before current.
+- 📋 `D` - Delete current column (no confirmation).
+- 📋 Prompt for column header name on add.
 
 ### v1.0.0-v1.3.0: Advanced Features
 
 **Fuzzy Search:**
-- 📋 Press `/` to open fuzzy finder overlay
-- 📋 Search multiple types:
-  - Row numbers: "15" finds row 15
-  - Column letters: "C" finds column C
-  - Column names: "Email" finds Email column (fuzzy: "eml" → Email)
-  - Cell data: "widget" finds cells containing "widget"
-- 📋 Live results as you type
-- 📋 `j`/`k` to navigate results
-- 📋 `Enter` to jump to match
-- 📋 `Esc` to cancel without jumping
-- 📋 `n`/`N` to cycle through matches after jumping
-- 📋 `*` to search current cell value
+- 📋 Press `/` to open fuzzy finder overlay.
+- 📋 Search multiple types: row numbers, column letters/names, cell data.
+- 📋 Live results as you type.
+- 📋 `n`/`N` to cycle through matches after jumping.
+- 📋 `*` to search current cell value.
 
 **Sorting:**
-- 📋 `s` - Sort by current column (toggle asc/desc)
-- 📋 In-place sort (actually reorders data)
-- 📋 Smart sorting (numeric vs. text)
-- 📋 Sort indicator in header: ↑ or ↓
-- 📋 Undoable
-- 📋 Sets dirty flag
+- 📋 `s` - Sort by current column (toggle asc/desc).
+- 📋 In-place sort (actually reorders data).
+- 📋 Smart sorting (numeric vs. text).
+- 📋 Sort indicator in header: ↑ or ↓.
+- 📋 Undoable.
 
 **Filtering:**
-- 📋 `:filter` command with expressions
-- 📋 Syntax: `column operator value`
-- 📋 Operators: `=`, `!=`, `>`, `<`, `>=`, `<=`, `contains`, `starts`, `ends`
-- 📋 Examples:
-  - `:filter Age>30`
-  - `:filter Name contains "John"`
-- 📋 Multiple filters (AND logic)
-- 📋 Status indicator: "Filtered: 45/100 rows"
-- 📋 `:nofilter` to clear
+- 📋 `:filter` command with expressions (e.g., `:filter Age>30`).
+- 📋 Support for multiple operators (`=`, `!=`, `>`, `<`, `contains`, etc.).
+- 📋 Multiple filters (AND logic).
+- 📋 `:nofilter` to clear.
 
 **Visual Selection:**
-- 📋 `v` - Enter visual mode (cell selection)
-- 📋 `V` - Visual line mode (row selection)
-- 📋 Extend with `hjkl`
-- 📋 Highlighted region (blue tint)
-- 📋 Operations on selection:
-  - `d` - Delete selected rows
-  - `y` - Copy selected rows
-- 📋 Show selection count: "5 rows selected"
+- 📋 `v` - Enter visual mode (cell selection).
+- 📋 `V` - Visual line mode (row selection).
+- 📋 Extend with `hjkl`.
+- 📋 Operations on selection (`d` to delete, `y` to copy).
 
 **Column Statistics:**
-- 📋 `:stats` command
-- 📋 Show for current column:
-  - Count (non-empty cells)
-  - Sum (if numeric)
-  - Average (if numeric)
-  - Min/Max (if numeric)
-  - Unique values (if text)
-- 📋 Display in overlay panel
-- 📋 Close with `Esc`
+- 📋 `:stats` command to show stats for the current column.
+- 📋 Display in overlay panel.
 
 ### v1.3.0: Multi-File Guards
 
 **CSV Multi-File:**
-- ✅ Already implemented in v0.1.0!
-- ✅ Scan directory on startup
-- ✅ Switch with `[` and `]`
-- ✅ Always-visible file list at bottom
+- ✅ Already implemented!
 
 **Unsaved Changes Protection:**
-- 📋 `[` / `]` blocked if current file has unsaved changes
-- 📋 Status error: "No write since last change"
-- 📋 Force switch with `:next!` / `:prev!` (future)
-- 📋 Prevents accidental data loss when switching files
+- 📋 `[` / `]` blocked if current file has unsaved changes.
+- 📋 Status error: "No write since last change".
+- 📋 Force switch with `:next!` / `:prev!` (future).
+- 📋 Prevents accidental data loss when switching files.
 
 ## Performance Requirements
 
