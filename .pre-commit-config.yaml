@@ -1,0 +1,38 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+-   repo: local
+    hooks:
+    -   id: format
+        name: Cargo Format
+        description: "Format files with rustfmt."
+        entry: cargo fmt -- --check
+        language: rust
+        files: \.rs$
+    -   id: lint
+        name: Cargo Lint
+        description: "Lint files with clippy."
+        entry: cargo clippy -- -D warnings
+        language: rust
+        files: \.rs$
+        args: [--all-targets, --all-features]
+    -   id: test
+        name: Cargo Test
+        description: "Run tests with cargo test."
+        entry: cargo test
+        language: rust
+        files: \.rs$
+        args: [--all-targets, --all-features]
+    -   id: build
+        name: Cargo Build
+        description: "Build with cargo build."
+        entry: cargo build
+        language: rust
+        files: \.rs$
+        args: [--all-targets, --all-features]
+    -   id: commit-msg-check
+        name: Check commit message
+        description: "Check if the commit message follows the Conventional Commits format."
+        entry: scripts/commit-msg.sh
+        language: script
+        stages: [commit-msg]
