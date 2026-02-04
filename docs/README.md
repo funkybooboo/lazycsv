@@ -16,7 +16,7 @@ This documentation is structured to guide you from high-level concepts to low-le
 ### The "How-To" - Development and Reference
 - **[Development](development.md)**: How to contribute to LazyCSV. This guide outlines our development process, coding standards, and the "test, write, test, docs" workflow.
 - **[Keybindings](keybindings.md)**: A comprehensive reference for all keyboard shortcuts. Essential for both users and developers.
-- **[Project Roadmap](../plans/road_map.md)**: The master plan. This document contains the versioned checklist of features and milestones.
+- **[Project Roadmap](../plans/roadmap.md)**: The master plan. This document contains the versioned checklist of features and milestones.
 
 ## Quick Links
 
@@ -27,7 +27,7 @@ This documentation is structured to guide you from high-level concepts to low-le
 
 ### For Developers
 - **Contributing**: See [development.md](development.md)
-- **Todo List**: See [plans/road_map.md](../plans/road_map.md) for development checklist
+- **Todo List**: See [plans/roadmap.md](../plans/roadmap.md) for development checklist
 - **Architecture**: See [architecture.md](architecture.md) for code structure
 
 ## Project Status

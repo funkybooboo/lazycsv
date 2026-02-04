@@ -87,7 +87,7 @@ lazycsv/
 │
 ├── plans/            - Planning documents
 │   ├── README.md     - Plans index
-│   └── road_map.md       - Development checklist
+│   └── roadmap.md       - Development checklist
 │
 ├── Cargo.toml        - Dependencies
 ├── Taskfile.yml      - Task runner config
@@ -159,7 +159,7 @@ This section puts the TDD philosophy into a concrete, step-by-step process for c
 ### 1. Understand the Task
 
 Before you write a single line of code, make sure you understand what you're building.
-- **For the big picture**, check the **[Project Roadmap](../plans/road_map.md)** to see the versioned feature list and where your contribution fits in.
+- **For the big picture**, check the **[Project Roadmap](../plans/roadmap.md)** to see the versioned feature list and where your contribution fits in.
 - **For new features**, start with the **[features.md](features.md)** document to understand the requirements.
 - **For UI/UX changes**, consult the **[design.md](design.md)** document to see how it should look and behave.
 - **To understand the existing codebase**, refer to the **[architecture.md](architecture.md)** document.
@@ -358,7 +358,7 @@ cargo run -- test.csv
 ### Add a New Feature
 
 1. Check [features.md](features.md) for spec
-2. Update [road_map.md](../plans/road_map.md) with tasks
+2. Update [roadmap.md](../plans/roadmap.md) with tasks
 3. Implement in appropriate module
 4. Add tests
 5. Update documentation

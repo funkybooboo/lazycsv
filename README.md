@@ -108,7 +108,7 @@ LazyCSV treats CSV files in the same directory like Excel sheets. Open one file,
 | v1.5.0 | Data analysis - stats, plotting, regex replace |
 | v1.6.0 | Final polish - comprehensive tests, docs |
 
-See [plans/road_map.md](plans/road_map.md) for the complete detailed roadmap.
+See [plans/roadmap.md](plans/roadmap.md) for the complete detailed roadmap.
 
 ## Documentation
 
