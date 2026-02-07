@@ -81,11 +81,12 @@ The current mode is always shown in the status bar:
 
 ### Column Jumping (Excel-style)
 
+**Note:** `g<letter>` column jumping was replaced in v0.3.2 with the `:c` command for better vim compatibility.
+
 | Key | Action |
 |-----|--------|
-| `ga` or `gA` | Jump to column A (first column) |
-| `gB` | Jump to column B |
-| `gBC` | Jump to column 55 (Excel-style letters) |
+| `:c A` | Jump to column A (preferred - see v0.3.2) |
+| `:c 5` | Jump to column E (by number) |
 
 **Column Letter System:** A=1, B=2, ..., Z=26, AA=27, AB=28, etc.
 
@@ -128,6 +129,56 @@ The current mode is always shown in the status bar:
 - Transient messages that auto-clear on keypress
 - Enhanced help menu with better organization
 - File list horizontal scrolling
+
+---
+
+## v0.3.2 - Pre-Edit Polish (✅ Complete)
+
+*Minimal vim-like UI, command mode improvements*
+
+### Column Navigation (New)
+
+| Command | Action |
+|---------|--------|
+| `:c A` or `:c a` | Jump to column A (case-insensitive) |
+| `:c 1` | Jump to column A (by number) |
+| `:c AA` or `:c aa` | Jump to column AA (multi-letter) |
+| `:c 27` | Jump to column 27 (AA) |
+
+**Column Letter System:** A=1, B=2, ..., Z=26, AA=27, AB=28, etc.
+
+### Reserved Commands (Priority)
+
+These commands always take priority over navigation:
+
+| Command | Action |
+|---------|--------|
+| `:q` | Quit |
+| `:w` | Save (future) |
+| `:wq` | Save and quit (future) |
+| `:h` or `:help` | Show help |
+
+### Pending Command Display
+
+Multi-key commands now show in the status bar:
+- `g` shows `g` while waiting for second key
+- `z` shows `z` while waiting for second key
+- `5` shows `5` while typing count prefix
+
+No timeout - pending commands wait indefinitely (vim-like).
+
+### Out-of-Bounds Handling
+
+Commands show clear error messages instead of silently clamping:
+- `:999` on 10-row file → "Row 999 does not exist (max: 10)"
+- `:c Z` on 5-column file → "Column Z does not exist (max: E)"
+
+### UI Changes
+
+- **Minimal borders:** Horizontal rules replace heavy box borders
+- **Vim-like status line:** `NORMAL 3,C "cell value"` format
+- **Auto-width columns:** Columns sized to content (8-50 char range)
+- **Row indicator:** `>` marks current row
 
 ---
 
@@ -528,8 +579,8 @@ Print-friendly summary:
 ║  gg/G First/La │  Enter Magnifier │  ?     Help       ║
 ║  0/$  Col 1/End│  Esc  Cancel     │  q     Quit       ║
 ║  w/b/e Words   │  gi   Last+Edit  │                   ║
-║  gA/gBC Coljmp │  .    Repeat     │                   ║
-║  :15/:B  Jump  │  ^S   Save file  │                   ║
+║  :c A  Col jmp │  .    Repeat     │                   ║
+║  :15   Row jmp │  ^S   Save file  │                   ║
 ╠═══════════════════════════════════════════════════════╣
 ║ ROWS           │ COLUMNS          │ HEADER            ║
 ║  o/O  Add      │  o/O  Add col    │  gh     Edit hdr  ║
@@ -630,9 +681,9 @@ Print-friendly summary:
 gg → 0              # Jump to cell A1 (top-left)
 G → $               # Jump to last cell (bottom-right)
 15G                 # Jump to row 15
-gBC                 # Jump to column 55
-:25 → Enter         # Jump to row 25
-:C → Enter          # Jump to column C
+:c BC               # Jump to column 55 (BC)
+:25                 # Jump to row 25
+:c C                # Jump to column C
 ```
 
 ### Efficient Editing Workflows
@@ -654,9 +705,9 @@ o → type → Enter    # Add row and enter data
 
 **Column Operations:**
 ```
-gA → dc             # Jump to column A, delete it
+:c A → dc           # Jump to column A, delete it
 yc → 5l → pc        # Copy column, move right 5, paste column
-gD → yc → gA → Pc   # Copy column D, paste before column A
+:c D → yc → :c A → Pc   # Copy column D, paste before column A
 o → Name → Enter    # Add column in header, name it
 ```
 
@@ -743,6 +794,7 @@ status_bar = "blue"
 | v0.2.0 | ✅ Type safety refactor (internal) |
 | v0.3.0 | ✅ Advanced navigation (column jumps, command mode, word motion) |
 | v0.3.1 | ✅ UI/UX polish (mode indicator, transient messages, help redesign) |
+| v0.3.2 | ✅ Pre-edit polish (minimal UI, `:c` command, pending display) |
 | v0.4.0 | Quick editing (Insert mode) |
 | v0.5.0 | Vim magnifier (power editing) |
 | v0.6.0 | Save/quit guards |

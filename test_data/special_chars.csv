@@ -1,0 +1,16 @@
+ID,Name,Description,Formula,Path
+1,Simple,No special chars,A+B,/home/user
+2,"Quoted, Name","Description with, comma","=SUM(A1,B1)","/path/with spaces/file"
+3,"With ""Quotes""","He said ""Hello""","=""Text""&A1",C:\Users\Name
+4,Semicolon;Test,Value;With;Semicolons,A;B;C,/usr;/bin;/local
+5,Pipe|Test,Value|With|Pipes,A|B|C,path|to|file
+6,Tab	Here,Value	With	Tabs,A	B,/tab	path
+7,Backslash\Test,Path\Like\This,A\B\C,C:\Windows\System32
+8,Forward/Slash,Unix/Style/Path,A/B/C,/usr/local/bin
+9,Ampersand&Test,Tom & Jerry,A&B&C,path&file
+10,At@Symbol,email@example.com,@SUM,user@host
+11,Hash#Tag,Issue #123,#REF!,/path#anchor
+12,Dollar$Sign,$100.00,$A$1,price$
+13,Percent%Test,50% off,%change,100%
+14,Caret^Power,2^10,A^B,path^
+15,Mixed!@#$%,All!@#$%^&*(),=!@#$%,/!@#/$%/^

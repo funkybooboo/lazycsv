@@ -87,6 +87,10 @@ pub enum PendingCommand {
     Z,
     /// Buffering column letters (e.g., after 'g', receiving 'B' then 'C' for column BC)
     GotoColumn(String),
+    /// Waiting for second 'd' (for dd - delete row)
+    D,
+    /// Waiting for second 'y' (for yy - yank row)
+    Y,
 }
 
 impl PendingCommand {
@@ -95,6 +99,8 @@ impl PendingCommand {
         match key {
             KeyCode::Char('g') => Some(Self::G),
             KeyCode::Char('z') => Some(Self::Z),
+            KeyCode::Char('d') => Some(Self::D),
+            KeyCode::Char('y') => Some(Self::Y),
             _ => None,
         }
     }

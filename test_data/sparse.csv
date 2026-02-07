@@ -1,0 +1,16 @@
+ID,Name,Email,Phone,Address,City,State,Zip,Country,Notes
+1,Alice,alice@example.com,,,New York,NY,,,
+2,,bob@test.com,555-1234,123 Main St,,,12345,,Important client
+3,Charlie,,,,Chicago,IL,,,
+4,,,555-5678,,,,,,Just a phone number
+5,Eve,eve@example.com,,,,,,,
+6,,,,456 Oak Ave,Boston,MA,02101,USA,
+7,Frank,,,,,,,,No contact info
+8,,,,,,,,Empty row with ID,
+9,Grace,grace@test.com,555-9999,789 Pine St,Seattle,WA,98101,USA,Full record
+10,,,,,,,,,
+11,Henry,,,,,Denver,CO,,Partial info
+12,,,555-0000,,,,,USA,
+13,Ivy,ivy@example.com,,,Portland,OR,97201,,
+14,,,,,,,,,
+15,Jack,jack@test.com,555-1111,321 Elm St,Austin,TX,78701,USA,Another full record

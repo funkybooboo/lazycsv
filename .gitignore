@@ -16,10 +16,6 @@ Cargo.lock
 # Contains mutation testing data
 **/mutants.out*/
 
-# Test files (optional - remove if you want to track sample CSVs)
-sample.csv
-customers.csv
-*.csv
 !.gitkeep
 
 # Editors / IDEs

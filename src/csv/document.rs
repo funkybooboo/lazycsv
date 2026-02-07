@@ -127,6 +127,41 @@ impl Document {
             .map(|s| s.as_str())
             .unwrap_or("")
     }
+
+    /// Set a cell value (returns old value, sets is_dirty = true)
+    pub fn set_cell(
+        &mut self,
+        row_idx: RowIndex,
+        col_idx: ColIndex,
+        value: String,
+    ) -> Option<String> {
+        if let Some(row) = self.rows.get_mut(row_idx.get()) {
+            if let Some(cell) = row.get_mut(col_idx.get()) {
+                self.is_dirty = true;
+                let old = std::mem::replace(cell, value);
+                return Some(old);
+            }
+        }
+        None
+    }
+
+    /// Insert a new empty row at the specified index
+    pub fn insert_row(&mut self, at: RowIndex) {
+        let empty_row = vec![String::new(); self.headers.len()];
+        let insert_at = at.get().min(self.rows.len());
+        self.rows.insert(insert_at, empty_row);
+        self.is_dirty = true;
+    }
+
+    /// Delete a row at the specified index
+    pub fn delete_row(&mut self, at: RowIndex) -> Option<Vec<String>> {
+        if at.get() < self.rows.len() {
+            self.is_dirty = true;
+            Some(self.rows.remove(at.get()))
+        } else {
+            None
+        }
+    }
 }
 
 #[cfg(test)]

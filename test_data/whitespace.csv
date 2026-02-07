@@ -1,0 +1,11 @@
+ID,Leading,Trailing,Both,Internal,Tabs,Mixed
+1, leading,trailing ,  both  ,inter  nal,	tab	,  mix	ed
+2,  two spaces,two spaces  ,    four    ,word  word,		,
+3,normal,normal,normal,normal,normal,normal
+4,   three,three   ,      six      ,a   b   c,			,
+5,,,,,,
+6, , , ,   ,	,
+7,single,single,single,a b,	,
+8,  ,,  ,  a  ,,
+9,a,b,c,d,e,f
+10,  a  ,  b  ,  c  ,  d  e  ,	f	,  g	h

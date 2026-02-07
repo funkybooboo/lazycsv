@@ -3,7 +3,7 @@
 //! This module provides functions for navigating the CSV table including
 //! cursor movement, page scrolling, and jump commands with count prefixes.
 
-use crate::app::{messages, App};
+use crate::app::App;
 use crate::domain::position::ColIndex;
 use crate::ui::{ViewportMode, MAX_VISIBLE_COLS};
 use anyhow::Result;
@@ -61,13 +61,13 @@ pub fn handle_navigation(app: &mut App, code: KeyCode) -> Result<()> {
             app.view_state.viewport_mode = ViewportMode::Auto;
         }
 
-        // Page down
-        KeyCode::PageDown | KeyCode::Char('d') if code == KeyCode::Char('d') => {
+        // Page down (Ctrl+d is handled in handler.rs)
+        KeyCode::PageDown => {
             select_next_page(app);
         }
 
-        // Page up
-        KeyCode::PageUp | KeyCode::Char('u') if code == KeyCode::Char('u') => {
+        // Page up (Ctrl+u is handled in handler.rs)
+        KeyCode::PageUp => {
             select_previous_page(app);
         }
 
@@ -79,8 +79,8 @@ pub fn handle_navigation(app: &mut App, code: KeyCode) -> Result<()> {
         // End/G - Go to last row, or specific line with count (5G goes to line 5)
         KeyCode::End | KeyCode::Char('G') => {
             if count > 1 {
+                // goto_line sets its own status message on success or error
                 goto_line(app, count);
-                app.status_message = Some(messages::jumped_to_line(count).into());
             } else {
                 goto_last_row(app);
             }
@@ -138,17 +138,31 @@ pub fn goto_last_row(app: &mut App) {
 
 /// Go to specific line number (5G or :5 command)
 pub fn goto_line(app: &mut App, line_number: usize) {
+    use crate::input::StatusMessage;
+
     let row_count = app.document.row_count();
 
-    // Line numbers are 1-indexed in vim, but we use 0-indexed internally
-    let target = if line_number == 0 {
-        0
-    } else {
-        (line_number - 1).min(row_count.saturating_sub(1))
-    };
+    // Line numbers are 1-indexed in vim
+    if line_number == 0 {
+        app.status_message = Some(StatusMessage::from("Row number must be >= 1"));
+        return;
+    }
 
+    if line_number > row_count {
+        app.status_message = Some(StatusMessage::from(format!(
+            "Row {} does not exist (max: {})",
+            line_number, row_count
+        )));
+        return;
+    }
+
+    let target = line_number - 1; // Convert to 0-indexed
     app.view_state.table_state.select(Some(target));
     app.view_state.viewport_mode = ViewportMode::Auto;
+    app.status_message = Some(StatusMessage::from(format!(
+        "Jumped to row {}",
+        line_number
+    )));
 }
 
 /// Move down by count rows (5j moves down 5 rows)
@@ -198,32 +212,75 @@ pub fn move_left_by(app: &mut App, count: usize) {
 /// Jump to column by Excel-style letter (A, B, ..., AA, AB, ...)
 pub fn goto_column(app: &mut App, column_letter: &str) {
     use crate::input::StatusMessage;
-    use crate::ui::utils::excel_letter_to_column;
+    use crate::ui::utils::{column_to_excel_letter, excel_letter_to_column};
 
     match excel_letter_to_column(column_letter) {
         Ok(col_idx) => {
-            let max_col = app.document.column_count().saturating_sub(1);
-            let target_col = col_idx.min(max_col);
+            let max_col = app.document.column_count();
 
-            app.view_state.selected_column = ColIndex::new(target_col);
+            // Check out-of-bounds (col_idx is 0-indexed, max_col is count)
+            if col_idx >= max_col {
+                let max_letter = column_to_excel_letter(max_col.saturating_sub(1));
+                app.status_message = Some(StatusMessage::from(format!(
+                    "Column {} does not exist (max: {})",
+                    column_letter.to_uppercase(),
+                    max_letter
+                )));
+                return;
+            }
+
+            app.view_state.selected_column = ColIndex::new(col_idx);
 
             // Update horizontal scroll
-            if target_col < app.view_state.column_scroll_offset {
-                app.view_state.column_scroll_offset = target_col;
-            } else if target_col >= app.view_state.column_scroll_offset + MAX_VISIBLE_COLS {
-                app.view_state.column_scroll_offset = target_col - MAX_VISIBLE_COLS + 1;
+            if col_idx < app.view_state.column_scroll_offset {
+                app.view_state.column_scroll_offset = col_idx;
+            } else if col_idx >= app.view_state.column_scroll_offset + MAX_VISIBLE_COLS {
+                app.view_state.column_scroll_offset = col_idx - MAX_VISIBLE_COLS + 1;
             }
 
             app.view_state.viewport_mode = ViewportMode::Auto;
             app.status_message = Some(StatusMessage::from(format!(
                 "Jumped to column {}",
-                column_letter
+                column_letter.to_uppercase()
             )));
         }
         Err(msg) => {
             app.status_message = Some(StatusMessage::from(msg));
         }
     }
+}
+
+/// Jump to column by 1-indexed number
+pub fn goto_column_by_number(app: &mut App, col_num: usize) {
+    use crate::input::StatusMessage;
+    use crate::ui::utils::column_to_excel_letter;
+
+    let max_col = app.document.column_count();
+    if col_num > max_col {
+        let max_letter = column_to_excel_letter(max_col.saturating_sub(1));
+        app.status_message = Some(StatusMessage::from(format!(
+            "Column {} does not exist (max: {} / {})",
+            col_num, max_col, max_letter
+        )));
+        return;
+    }
+
+    let col_idx = col_num.saturating_sub(1); // Convert to 0-indexed
+    app.view_state.selected_column = ColIndex::new(col_idx);
+
+    // Update horizontal scroll
+    if col_idx < app.view_state.column_scroll_offset {
+        app.view_state.column_scroll_offset = col_idx;
+    } else if col_idx >= app.view_state.column_scroll_offset + MAX_VISIBLE_COLS {
+        app.view_state.column_scroll_offset = col_idx - MAX_VISIBLE_COLS + 1;
+    }
+
+    app.view_state.viewport_mode = ViewportMode::Auto;
+    let col_letter = column_to_excel_letter(col_idx);
+    app.status_message = Some(StatusMessage::from(format!(
+        "Jumped to column {} ({})",
+        col_num, col_letter
+    )));
 }
 
 /// Move to next non-empty cell in current row (w)
@@ -377,20 +434,31 @@ mod tests {
     #[test]
     fn test_goto_line_out_of_bounds() {
         let mut app = create_test_app();
-        let max_row = app.document.row_count().saturating_sub(1);
+        let initial_row = app.view_state.table_state.selected();
 
         goto_line(&mut app, 9999);
 
-        assert_eq!(app.view_state.table_state.selected(), Some(max_row));
+        // Position should not change when out of bounds
+        assert_eq!(app.view_state.table_state.selected(), initial_row);
+        // Should show error message
+        assert!(app.status_message.is_some());
+        let msg = app.status_message.as_ref().unwrap().as_str();
+        assert!(msg.contains("does not exist"));
     }
 
     #[test]
     fn test_goto_line_zero() {
         let mut app = create_test_app();
+        let initial_row = app.view_state.table_state.selected();
 
         goto_line(&mut app, 0);
 
-        assert_eq!(app.view_state.table_state.selected(), Some(0));
+        // Row 0 is invalid (1-indexed), position should not change
+        assert_eq!(app.view_state.table_state.selected(), initial_row);
+        // Should show error message
+        assert!(app.status_message.is_some());
+        let msg = app.status_message.as_ref().unwrap().as_str();
+        assert!(msg.contains("must be >= 1"));
     }
 
     #[test]
@@ -548,12 +616,17 @@ mod tests {
     #[test]
     fn test_goto_column_out_of_bounds() {
         let mut app = create_test_app();
+        let initial_col = app.view_state.selected_column;
 
         // Try to jump to column ZZ (701), which does not exist (only have 3 columns)
         goto_column(&mut app, "ZZ");
 
-        // Should clamp to last column (2)
-        assert_eq!(app.view_state.selected_column, ColIndex::new(2));
+        // Position should not change when out of bounds
+        assert_eq!(app.view_state.selected_column, initial_col);
+        // Should show error message
+        assert!(app.status_message.is_some());
+        let msg = app.status_message.as_ref().unwrap().as_str();
+        assert!(msg.contains("does not exist"));
     }
 
     #[test]
@@ -618,14 +691,19 @@ mod tests {
     }
 
     #[test]
-    fn test_goto_column_beyond_available_clamps() {
+    fn test_goto_column_beyond_available_shows_error() {
         let mut app = create_test_app(); // Only 3 columns
+        let initial_col = app.view_state.selected_column;
 
         // Try to jump to column BA (52)
         goto_column(&mut app, "BA");
 
-        // Should clamp to last column (2)
-        assert_eq!(app.view_state.selected_column, ColIndex::new(2));
+        // Position should not change when out of bounds
+        assert_eq!(app.view_state.selected_column, initial_col);
+        // Should show error message
+        assert!(app.status_message.is_some());
+        let msg = app.status_message.as_ref().unwrap().as_str();
+        assert!(msg.contains("does not exist"));
     }
 
     #[test]

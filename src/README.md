@@ -2,7 +2,7 @@
 
 This directory contains the Rust source code for LazyCSV.
 
-## Module Structure (v0.2.0)
+## Module Structure (v0.3.2)
 
 - **`domain/`** - Domain types (RowIndex, ColIndex, Position)
 - **`input/`** - Input handling (actions, state, handler)
@@ -96,13 +96,36 @@ The `Session` struct manages multi-file sessions and configuration.
 NEW in v0.2.0 - extracted from App for separation of concerns.
 
 #### `app/mod.rs`
-The `App` struct coordinates everything. It's intentionally thin (6 fields):
+The `App` struct coordinates everything. It's intentionally thin (7 fields):
 - document: Document
 - view_state: ViewState
 - input_state: InputState
 - session: Session
+- mode: Mode (Normal, Insert, Magnifier, HeaderEdit, Visual, Command)
+- edit_buffer: Option<EditBuffer> (for future editing support)
 - should_quit: bool
 - status_message: Option<StatusMessage>
+
+**Mode enum (v0.3.2):**
+```rust
+pub enum Mode {
+    Normal,      // Default mode for navigation and commands
+    Insert,      // Quick single-cell editing (v0.4.0)
+    Magnifier,   // Full vim editor for cell (v0.5.0)
+    HeaderEdit,  // Edit column headers (v0.9.0)
+    Visual,      // Select rows/cells/blocks (v0.6.0)
+    Command,     // Execute commands via `:` prefix
+}
+```
+
+**EditBuffer struct (v0.3.2, prepared for v0.4.0):**
+```rust
+pub struct EditBuffer {
+    pub content: String,   // Current content being edited
+    pub cursor: usize,     // Cursor position within content
+    pub original: String,  // Original content for cancel/undo
+}
+```
 
 ### Legacy Module Documentation
 
@@ -182,7 +205,7 @@ task test-verbose  # With output
 ```
 
 ### Test Coverage
-The project has a comprehensive test suite with 257 tests (v0.2.0).
+The project has a comprehensive test suite with 344 tests (v0.3.2).
 - **Unit Tests**: Found alongside the code in each module.
 - **Integration Tests**: Located in the `tests/` directory, covering workflows, UI rendering, and edge cases.
 - `cli_test.rs`: Tests command-line argument parsing.

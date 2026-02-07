@@ -72,7 +72,7 @@ fn test_directory_instead_of_file_error() {
     let err_msg = result.unwrap_err().to_string();
     // Error should indicate it's a directory or similar issue
     assert!(
-        err_msg.contains("directory") || err_msg.contains("Is a directory") || err_msg.len() > 0,
+        err_msg.contains("directory") || err_msg.contains("Is a directory") || !err_msg.is_empty(),
         "Error message: {}",
         err_msg
     );
@@ -115,7 +115,7 @@ fn test_corrupt_csv_malformed_quotes() {
         Err(err) => {
             // Failed with error - also acceptable
             let err_msg = err.to_string();
-            assert!(err_msg.len() > 0, "Error message should not be empty");
+            assert!(!err_msg.is_empty(), "Error message should not be empty");
         }
     }
 }
@@ -136,7 +136,7 @@ fn test_corrupt_csv_inconsistent_columns() {
         Err(err) => {
             // Expected to fail with inconsistent columns
             let err_msg = err.to_string();
-            assert!(err_msg.len() > 0);
+            assert!(!err_msg.is_empty());
         }
     }
 }
@@ -161,19 +161,41 @@ fn test_binary_file_treated_as_csv() {
         Err(err) => {
             // Failed to parse - also acceptable
             let err_msg = err.to_string();
-            assert!(err_msg.len() > 0);
+            assert!(!err_msg.is_empty());
         }
     }
 }
 
 #[test]
 fn test_extremely_large_file_memory_limit() {
-    // This test is a placeholder for future streaming/pagination support
-    // Currently, LazyCSV loads entire file into memory
-    // In the future, this should test memory limits and partial loading
+    // This test verifies that a moderately large file can be loaded
+    // In the future, this could test streaming/pagination support
 
-    // For now, just verify the test infrastructure works
-    assert!(true);
+    // Generate CSV content for 1000 rows and 10 columns
+    let mut content = String::from("A,B,C,D,E,F,G,H,I,J\n");
+    for row in 0..1000 {
+        content.push_str(&format!(
+            "{},{},{},{},{},{},{},{},{},{}\n",
+            row,
+            row + 1,
+            row + 2,
+            row + 3,
+            row + 4,
+            row + 5,
+            row + 6,
+            row + 7,
+            row + 8,
+            row + 9
+        ));
+    }
+    let temp_file = common::create_temp_csv_file(&content);
+
+    let result = Document::from_file(temp_file.path(), None, false, None);
+    assert!(result.is_ok(), "Should be able to load a 1000-row file");
+
+    let doc = result.unwrap();
+    assert_eq!(doc.row_count(), 1000);
+    assert_eq!(doc.column_count(), 10);
 }
 
 #[test]

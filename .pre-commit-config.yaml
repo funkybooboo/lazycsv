@@ -12,23 +12,22 @@ repos:
     -   id: lint
         name: Cargo Lint
         description: "Lint files with clippy."
-        entry: cargo clippy -- -D warnings
+        entry: cargo clippy --workspace -- -D warnings
         language: rust
-        files: \.rs$
-        args: [--all-targets, --all-features]
+        pass_filenames: false
     -   id: test
         name: Cargo Test
         description: "Run tests with cargo test."
-        entry: cargo test
+        entry: cargo test --workspace
         language: rust
-        files: \.rs$
-        args: [--all-targets, --all-features]
+        pass_filenames: false
     -   id: build
         name: Cargo Build
         description: "Build with cargo build."
         entry: cargo build
         language: rust
         files: \.rs$
+        pass_filenames: false
         args: [--all-targets, --all-features]
     -   id: commit-msg-check
         name: Check commit message

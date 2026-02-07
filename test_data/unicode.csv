@@ -1,0 +1,16 @@
+ID,Name,Country,Greeting,Emoji,Currency,Description
+1,Tanaka Yuki,Japan,こんにちは,🇯🇵,¥1234,日本語テスト
+2,Kim Min-jun,Korea,안녕하세요,🇰🇷,₩5000,한국어 테스트
+3,Zhang Wei,China,你好,🇨🇳,¥888,中文测试
+4,Ivanov Dmitri,Russia,Привет,🇷🇺,₽1500,Русский тест
+5,Mueller Hans,Germany,Guten Tag,🇩🇪,€99,Deutscher Test
+6,Dubois Marie,France,Bonjour,🇫🇷,€150,Test français
+7,Sato Kenji,Japan,おはよう,🎌,¥999,絵文字テスト
+8,Park Ji-hye,Korea,반갑습니다,🌸,₩3000,이모지 테스트
+9,Chen Mei,China,晚上好,🐉,¥666,表情符号测试
+10,Petrov Anna,Russia,Добрый день,❄️,₽2000,Тест эмодзи
+11,Schmidt Otto,Germany,Hallo,🍺,€45,Emoji-Test
+12,Martin Claire,France,Salut,🥐,€25,Test émoji
+13,Mixed Test,Global,Hello 你好 Привет,🌍🌎🌏,€£¥₽,Multi-language test
+14,Emoji Row,Everywhere,👋😀🎉,🔥💯✨,💰💵💶,All emojis
+15,Special,Unicode,αβγδ ΩΠΣΦ,∞≠≤≥,©®™℃,Math and symbols

@@ -6,7 +6,7 @@ Before contributing, it's highly recommended to familiarize yourself with the ar
 
 ## Overview
 
-LazyCSV follows a clean, modular architecture with strong type safety (v0.2.0 Complete):
+LazyCSV follows a clean, modular architecture with strong type safety (v0.3.2 Complete):
 
 ```
 ┌─────────────┐
@@ -511,8 +511,60 @@ The v0.2.0 release was a major refactor to improve code quality, maintainability
 - Added z-command tests, timeout tests, navigation unit tests
 - Zero compiler warnings
 - Zero clippy warnings
+- (v0.3.2 expanded to 344 tests)
 
 **Result:** Clean, maintainable, type-safe architecture ready for future feature development. All internal refactoring with no user-facing changes.
+
+## v0.3.0-v0.3.2 Feature Summary
+
+### v0.3.0: Advanced Navigation
+- Row jumping: `gg`, `G`, `<number>G`
+- Column jumping: via command mode
+- Command mode: `:` prefix
+- Count prefixes: `5j` moves down 5 rows
+- Word motion: `w`, `b`, `e`
+- Viewport control: `zt`, `zz`, `zb`
+
+### v0.3.1: UI/UX Polish
+- Mode indicator display
+- Transient message system
+- File list horizontal scrolling
+- Redesigned help overlay
+
+### v0.3.2: Pre-Edit Polish (271+ tests)
+
+**UI Redesign:**
+- Minimal borders (horizontal rules only)
+- Vim-like status line: `NORMAL 3,C "cell value"`
+- Auto-width columns (8-50 char range)
+- Current row indicator: `>`
+
+**Command Mode Improvements:**
+- `:c` command for column navigation (`:c A`, `:c 5`, `:c AA`)
+- Reserved commands: `:q`, `:w`, `:h` take priority
+- Out-of-bounds errors (not silent clamping)
+
+**Input Handling:**
+- No timeout on pending commands (vim-like)
+- Pending command display in status bar
+
+**Mode Preparation:**
+```rust
+pub enum Mode {
+    Normal,      // Default mode for navigation
+    Insert,      // Quick single-cell editing (v0.4.0)
+    Magnifier,   // Full vim editor for cell (v0.5.0)
+    HeaderEdit,  // Edit column headers (v0.9.0)
+    Visual,      // Select rows/cells/blocks (v0.6.0)
+    Command,     // Execute commands via `:` prefix
+}
+
+pub struct EditBuffer {
+    pub content: String,   // Current content being edited
+    pub cursor: usize,     // Cursor position within content
+    pub original: String,  // Original content for cancel/undo
+}
+```
 
 ## Error Handling Strategy
 

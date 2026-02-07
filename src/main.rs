@@ -48,6 +48,8 @@ fn run(
 
                     match result {
                         InputResult::ReloadFile => {
+                            // Clear screen before loading new file to prevent stray characters
+                            terminal.clear().context("Failed to clear terminal")?;
                             // Reload CSV data from new file
                             app.reload_current_file()
                                 .context("Failed to reload CSV file")?;

@@ -35,6 +35,9 @@ pub struct ViewState {
 
     /// File list horizontal scroll offset (for wide file lists)
     pub file_list_scroll_offset: usize,
+
+    /// Help overlay vertical scroll offset
+    pub help_scroll_offset: u16,
 }
 
 impl Default for ViewState {
@@ -46,6 +49,7 @@ impl Default for ViewState {
             help_overlay_visible: false,
             viewport_mode: ViewportMode::Auto,
             file_list_scroll_offset: 0,
+            help_scroll_offset: 0,
         }
     }
 }
@@ -69,11 +73,34 @@ impl ViewState {
     /// Hide the help overlay
     pub fn hide_help(&mut self) {
         self.help_overlay_visible = false;
+        self.help_scroll_offset = 0; // Reset scroll when closing
     }
 
     /// Check if help overlay is visible
     pub fn is_help_visible(&self) -> bool {
         self.help_overlay_visible
+    }
+
+    /// Scroll help overlay down
+    pub fn scroll_help_down(&mut self, max_scroll: u16) {
+        if self.help_scroll_offset < max_scroll {
+            self.help_scroll_offset += 1;
+        }
+    }
+
+    /// Scroll help overlay up
+    pub fn scroll_help_up(&mut self) {
+        self.help_scroll_offset = self.help_scroll_offset.saturating_sub(1);
+    }
+
+    /// Scroll help overlay down by a page
+    pub fn scroll_help_page_down(&mut self, page_size: u16, max_scroll: u16) {
+        self.help_scroll_offset = (self.help_scroll_offset + page_size).min(max_scroll);
+    }
+
+    /// Scroll help overlay up by a page
+    pub fn scroll_help_page_up(&mut self, page_size: u16) {
+        self.help_scroll_offset = self.help_scroll_offset.saturating_sub(page_size);
     }
 }
 

@@ -1,6 +1,6 @@
 pub mod messages;
 
-use crate::domain::position::RowIndex;
+use crate::domain::position::{ColIndex, RowIndex};
 use crate::input::{InputResult, InputState, StatusMessage};
 use crate::session::Session;
 use crate::ui::ViewState;
@@ -9,11 +9,32 @@ use anyhow::{Context, Result};
 use crossterm::event::KeyEvent;
 use std::path::PathBuf;
 
-/// Application modes
+/// Application modes (vim-style modal editing)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Mode {
+    /// Default mode for navigation and commands
     Normal,
+    /// Quick single-cell editing (entered via i, a, s)
+    Insert,
+    /// Full vim editor for cell content (entered via Enter)
+    Magnifier,
+    /// Edit column header names (entered via gh)
+    HeaderEdit,
+    /// Select rows/cells/blocks (entered via v, V, Ctrl+v)
+    Visual,
+    /// Execute commands (entered via :)
     Command,
+}
+
+/// Edit buffer for cell editing
+#[derive(Debug, Clone, Default)]
+pub struct EditBuffer {
+    /// Current content being edited
+    pub content: String,
+    /// Cursor position within content
+    pub cursor: usize,
+    /// Original content (for cancel/undo)
+    pub original: String,
 }
 
 /// Main application state (v0.2.0 Phase 2: Refactored for separation of concerns)
@@ -37,6 +58,15 @@ pub struct App {
     /// Optional status message to display
     pub status_message: Option<StatusMessage>,
 
+    /// Edit buffer for cell editing (None when not editing)
+    pub edit_buffer: Option<EditBuffer>,
+
+    /// Last edited cell position (for `gi` command)
+    pub last_edit_position: Option<(RowIndex, ColIndex)>,
+
+    /// Row clipboard for yy/p operations
+    pub row_clipboard: Option<Vec<String>>,
+
     /// Flag to quit application
     pub should_quit: bool,
 }
@@ -45,7 +75,7 @@ impl App {
     /// Create a new `App` instance from CLI arguments.
     /// This function handles file scanning, initial data loading, and App creation.
     pub fn from_cli(cli_args: crate::cli::CliArgs) -> Result<Self> {
-        let path = cli_args.path.context(messages::NO_PATH_PROVIDED)?;
+        let path = cli_args.path.unwrap_or_else(|| PathBuf::from("."));
 
         // Determine the CSV file to load and scan directory for others
         let (file_path, csv_files, current_file_index) = if path.is_file() {
@@ -112,6 +142,9 @@ impl App {
             session,
             mode: Mode::Normal,
             status_message: None,
+            edit_buffer: None,
+            last_edit_position: None,
+            row_clipboard: None,
             should_quit: false,
         }
     }
@@ -1015,6 +1048,7 @@ mod tests {
         let csv_data = create_test_csv_data(); // Has 3 rows
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+        let initial_row = app.get_selected_row();
 
         // Try to jump to row 9999 with 9999G
         app.handle_key(key_event(KeyCode::Char('9'))).unwrap();
@@ -1023,8 +1057,12 @@ mod tests {
         app.handle_key(key_event(KeyCode::Char('9'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
 
-        // Should clamp to last row (row 2)
-        assert_eq!(app.get_selected_row(), Some(RowIndex::new(2)));
+        // Position should not change when out of bounds
+        assert_eq!(app.get_selected_row(), initial_row);
+        // Should show error message
+        assert!(app.status_message.is_some());
+        let msg = app.status_message.as_ref().unwrap().as_str();
+        assert!(msg.contains("does not exist"));
     }
 
     #[test]
@@ -1287,8 +1325,12 @@ mod tests {
         assert_eq!(app.input_state.pending_command, None);
         // Row should not have changed
         assert_eq!(app.get_selected_row(), initial_row);
-        // Column should have moved (clamped to last column since X doesn't exist)
-        assert_eq!(app.view_state.selected_column, ColIndex::new(2)); // Last column
+        // Column should not have changed (X doesn't exist, shows error)
+        assert_eq!(app.view_state.selected_column, ColIndex::new(0));
+        // Should show error message
+        assert!(app.status_message.is_some());
+        let msg = app.status_message.as_ref().unwrap().as_str();
+        assert!(msg.contains("does not exist"));
     }
 
     #[test]

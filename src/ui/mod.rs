@@ -8,10 +8,6 @@ pub mod view_state;
 /// This prevents horizontal overflow on standard terminals
 pub const MAX_VISIBLE_COLS: usize = 10;
 
-/// Maximum width for cell content display (characters)
-/// Longer content will be truncated with "..."
-pub const MAX_CELL_WIDTH: usize = 20;
-
 use crate::App;
 use ratatui::{
     layout::{Constraint, Direction, Layout},
@@ -21,12 +17,13 @@ use ratatui::{
 /// Main UI rendering function
 pub fn render(frame: &mut Frame, app: &mut App) {
     // Split terminal into main area + file switcher + status bar
+    // Minimal layout: no heavy borders, just horizontal rules as separators
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(0),    // Table area
-            Constraint::Length(3), // File switcher
-            Constraint::Length(3), // Status bar
+            Constraint::Min(0),    // Table area (includes title bar + rule)
+            Constraint::Length(2), // File switcher (rule + file list)
+            Constraint::Length(1), // Status bar (single line, vim-like)
         ])
         .split(frame.area());
 
@@ -41,7 +38,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
 
     // Render help overlay if active
     if app.view_state.help_overlay_visible {
-        help::render_help_overlay(frame);
+        help::render_help_overlay(frame, app.view_state.help_scroll_offset);
     }
 }
 
@@ -180,9 +177,9 @@ mod tests {
             .map(|c| c.symbol())
             .collect::<String>();
 
-        // Should show file switcher with multiple files
+        // Should show file switcher with file names
         assert!(
-            content.contains("Files") && (content.contains("file1") || content.contains("file2")),
+            content.contains("file1") || content.contains("file2"),
             "Should show file switcher with file list"
         );
 
@@ -209,10 +206,10 @@ mod tests {
             .map(|c| c.symbol())
             .collect::<String>();
 
-        // Status bar should show row/column info and help hint
+        // Status bar should show mode and position info
         assert!(
-            content.contains("Row") || content.contains("Col") || content.contains("help"),
-            "Should show status bar with navigation info"
+            content.contains("NORMAL") || content.contains(",A") || content.contains(",B"),
+            "Should show status bar with mode and position info"
         );
 
         Ok(())
