@@ -137,37 +137,71 @@ See [docs/development.md](docs/development.md) for contributing guidelines.
 
 ## Status
 
-**v0.3.2 Complete!** Minimal vim-like UI and improved command mode.
+**v0.4.0 Complete!** Fast CSV editing with vim keys. Insert mode for cell editing, row operations, and full keyboard control.
 
-- Fast CSV viewer with vim navigation
+- Fast CSV viewer and editor with vim navigation
 - Multi-file switching with `[` `]`
 - Row/column numbering (A, B, C...)
 - Column jumping with `:c` command (`:c A`, `:c 5`, `:c AA`)
 - Command mode with reserved commands (`:q`, `:w`, `:h`)
 - Word motion (w/b/e for sparse data)
 - Viewport control (zt/zz/zb)
-- **NEW v0.3.2:** Minimal vim-like UI (no heavy borders)
-- **NEW v0.3.2:** Auto-width columns based on content
-- **NEW v0.3.2:** Pending command display (shows `g_`, `z_`, `5_`)
-- **NEW v0.3.2:** Out-of-bounds errors (not silent clamping)
-- **NEW v0.3.2:** Default to current directory when no path provided
-- Comprehensive test suite (344 tests passing)
-- Cell editing coming in v0.4.0
+- Minimal vim-like UI (no heavy borders, clean status line)
+- Auto-width columns based on content
+- Pending command display (shows `g_`, `z_`, `5_`)
+- Out-of-bounds errors (not silent clamping)
+- **NEW v0.4.0:** Insert mode - `i`, `a`, `I`, `A`, `s` for cell editing
+- **NEW v0.4.0:** Text editing - Backspace, Delete, Ctrl+h, Ctrl+w, Ctrl+u
+- **NEW v0.4.0:** Row operations - `o`, `O`, `dd`, `yy`, `p` for rows
+- **NEW v0.4.0:** Clear cells with `Delete` key in Normal mode
+- Comprehensive test suite (271+ unit tests + integration tests)
+- Search and persistence coming in v0.5.0+
 
-**Current:** v0.3.2 Complete | **Performance:** 60 FPS on 100K+ rows | **Architecture:** Clean, type-safe, well-tested
+**Current:** v0.4.0 Complete | **Performance:** 60 FPS on 100K+ rows | **Architecture:** Clean, type-safe, well-tested
 
-### What's New in v0.3.2
+### What's New in v0.4.0
 
-**v0.3.2 - Pre-Edit Polish:**
-- **Minimal UI:** Removed heavy box borders, replaced with clean horizontal rules
-- **Vim-like status line:** `NORMAL  3,C "cell value"` format
-- **`:c` command:** Jump to columns with `:c A`, `:c 5`, or `:c AA`
-- **Reserved commands:** `:q`, `:w`, `:h` work properly (don't jump to columns)
-- **Pending command display:** Shows what you've typed (`g_`, `z_`, `5_`)
-- **Auto-width columns:** Columns size to content (8-50 char range)
-- **Out-of-bounds errors:** Clear messages like "Row 999 does not exist (max: 10)"
-- **Default directory:** Running `lazycsv` without args scans current directory
-- **No more timeout:** Pending commands wait indefinitely (vim-like)
+**v0.4.0 - Insert Mode:**
+- **Enter Insert mode:** `i`, `a`, `I`, `A`, `s`, or `F2` on any cell
+  - `i` - edit at cursor position
+  - `a` - edit at end of cell
+  - `I` - edit at start of cell
+  - `A` - same as `a`
+  - `s` - clear cell and enter Insert mode
+  - `F2` - edit cell (Excel/Calc style)
+- **Text editing in Insert mode:**
+  - Type to insert characters
+  - `Backspace` or `Ctrl+h` - delete before cursor
+  - `Delete` - delete at cursor
+  - `Ctrl+w` - delete word backward
+  - `Ctrl+u` - delete to start of cell
+  - `Home`/`End` - move to start/end
+  - `Left`/`Right` arrows - move cursor within cell
+- **Commit or cancel:**
+  - `Enter` - save and move down
+  - `Shift+Enter` - save and move up
+  - `Tab` - save and move right
+  - `Shift+Tab` - save and move left
+  - `Esc` - cancel without saving
+- **Row operations in Normal mode:**
+  - `o` - add row below, enter Insert mode
+  - `O` - add row above, enter Insert mode
+  - `dd` - delete current row (stored in clipboard)
+  - `yy` - copy current row
+  - `p` - paste row below
+  - `Delete` - clear current cell content
+
+### Previous Versions
+
+**v0.3.0-v0.3.2 - Navigation & UI Polish:**
+- Row jumping: `gg`, `G`, `5G`
+- Column jumping: `:c A`, `:c 1`, `:c AA`
+- Count prefixes: `5j`, `10h`
+- Word motion: `w`, `b`, `e`
+- Viewport control: `zt`, `zz`, `zb`
+- Status bar with mode indicators
+- Help overlay with `?`
+- No timeout on pending commands
 
 ### What's New in v0.3.0 & v0.3.1
 
@@ -176,6 +210,7 @@ See [docs/development.md](docs/development.md) for contributing guidelines.
 - Vim-style command mode (`:15` for line)
 - Word motion for sparse data (`w`, `b`, `e`)
 - Viewport positioning (`zt`, `zz`, `zb`)
+- Count prefixes (5j, 10h, etc.)
 
 **v0.3.1 - UI/UX Polish:**
 - Mode indicator (-- NORMAL -- / -- COMMAND --)

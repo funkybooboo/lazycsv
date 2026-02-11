@@ -1934,7 +1934,135 @@ NORMAL                                                          3,C "Mike Jo..."
 
 ---
 
-## Future Ideas (Post v1.6.0)
+## v1.7.0 - Mouse Interactions
+
+*Mouse support for intuitive navigation and selection*
+
+### Mouse Interactions to Implement
+
+**Cell Navigation:**
+| Action | Behavior |
+|--------|----------|
+| Click cell | Move cursor to clicked cell |
+| Double-click cell | Enter Insert mode for cell |
+| Click header | Jump to column |
+| Click row number | Select entire row |
+
+**Selection & Editing:**
+| Action | Behavior |
+|--------|----------|
+| Drag cells | Select rectangle of cells (Visual Block mode) |
+| Drag rows | Select multiple rows |
+| Shift+click | Extend selection from anchor |
+| Right-click | Show context menu |
+
+**Scrolling:**
+| Action | Behavior |
+|--------|----------|
+| Scroll wheel | Scroll viewport up/down |
+| Shift+scroll | Scroll left/right |
+| Click/drag scrollbar | Navigate viewport |
+
+**Context Menu Options:**
+| Option | Action |
+|--------|--------|
+| Copy | Yank selection |
+| Cut | Delete and yank selection |
+| Paste | Paste from clipboard |
+| Delete | Delete selected cells/rows |
+| Insert row above | Add row above selection |
+| Insert row below | Add row below selection |
+
+### Implementation Steps
+
+**File: `src/input/mouse.rs` (new file)**
+- [ ] Create mouse module
+- [ ] Define `MouseEvent` enum:
+   ```rust
+   pub enum MouseEvent {
+       Click { row: RowIndex, col: ColIndex },
+       DoubleClick { row: RowIndex, col: ColIndex },
+       RightClick { row: RowIndex, col: ColIndex },
+       Drag { start: (RowIndex, ColIndex), end: (RowIndex, ColIndex) },
+       Scroll { direction: ScrollDirection, amount: usize },
+       HeaderClick { col: ColIndex },
+       RowNumberClick { row: RowIndex },
+   }
+   ```
+- [ ] Define `ScrollDirection` enum: `Up`, `Down`, `Left`, `Right`
+- [ ] Implement `parse_mouse_event(event: &ratatui::event::MouseEvent) -> Option<MouseEvent>`
+
+**File: `src/ui/context_menu.rs` (new file)**
+- [ ] Create context menu module
+- [ ] Define `ContextMenu` struct with available options
+- [ ] Implement `render_context_menu(frame: &mut Frame, items: &[&str])`
+- [ ] Handle context menu selection with arrow keys + Enter
+
+**File: `src/app/mod.rs`**
+- [ ] Add `mouse_enabled: bool` field (default true)
+- [ ] Add `context_menu: Option<ContextMenu>` field
+- [ ] Add `selection_anchor: Option<(RowIndex, ColIndex)>` for drag selection
+- [ ] Add method `handle_cell_click(row: RowIndex, col: ColIndex)`
+- [ ] Add method `handle_cell_double_click(row: RowIndex, col: ColIndex)`
+- [ ] Add method `handle_right_click(row: RowIndex, col: ColIndex)`
+- [ ] Add method `handle_drag(start: (RowIndex, ColIndex), end: (RowIndex, ColIndex))`
+
+**File: `src/input/handler.rs`**
+- [ ] Add `handle_mouse_event(app: &mut App, event: MouseEvent)` function
+- [ ] Route mouse events to appropriate handlers
+- [ ] Support mouse navigation in Normal, Visual, and Command modes
+- [ ] Allow mouse in Insert mode (click to reposition cursor)
+
+**File: `src/ui/table.rs`**
+- [ ] Track clickable regions for cells
+- [ ] Render context menu overlay when shown
+- [ ] Highlight hover state (optional visual feedback)
+
+**File: `src/ui/status.rs`**
+- [ ] Show mouse status: "Mouse enabled/disabled"
+- [ ] Show context menu hint on right-click
+
+**File: `src/main.rs` or `src/lib.rs`**
+- [ ] Enable mouse capture in terminal: `enable_mouse_capture()`
+- [ ] Disable mouse capture on exit: `disable_mouse_capture()`
+
+### Tests to Add (`tests/mouse_interaction_test.rs`)
+- [ ] `test_click_cell_moves_cursor`
+- [ ] `test_double_click_enters_insert_mode`
+- [ ] `test_click_header_jumps_column`
+- [ ] `test_click_row_number_selects_row`
+- [ ] `test_drag_cells_selects_block`
+- [ ] `test_drag_rows_selects_multiple_rows`
+- [ ] `test_shift_click_extends_selection`
+- [ ] `test_right_click_shows_menu`
+- [ ] `test_context_menu_copy`
+- [ ] `test_context_menu_paste`
+- [ ] `test_context_menu_delete`
+- [ ] `test_scroll_wheel_scrolls_viewport`
+- [ ] `test_shift_scroll_scrolls_horizontal`
+- [ ] `test_mouse_click_bounds_checking`
+- [ ] `test_mouse_can_be_disabled`
+
+### Acceptance Criteria
+- [ ] Click cell moves cursor to that cell
+- [ ] Double-click enters Insert mode
+- [ ] Click column header jumps to column
+- [ ] Click row number selects entire row
+- [ ] Drag creates visual block selection
+- [ ] Shift+click extends selection
+- [ ] Right-click shows context menu with 6+ options
+- [ ] Context menu works with keyboard navigation
+- [ ] Copy/cut/paste work from context menu
+- [ ] Scroll wheel moves viewport
+- [ ] Shift+scroll moves horizontally
+- [ ] Mouse can be disabled with `:set mouse=off`
+- [ ] All operations work in combination with keyboard shortcuts
+- [ ] All existing tests pass
+- [ ] No clippy warnings
+
+---
+
+## Future Ideas (Post v1.7.0)
 
 *May become future versions*
 
@@ -1946,7 +2074,7 @@ NORMAL                                                          3,C "Mike Jo..."
 - [ ] Merge/join operations
 - [ ] Pivot table support
 - [ ] Advanced plotting:
-  - Scatter plots (two numeric columns)
-  - Time series (date column + value)
-  - Box plots for distribution comparison
-  - Correlation matrix heatmap
+   - Scatter plots (two numeric columns)
+   - Time series (date column + value)
+   - Box plots for distribution comparison
+   - Correlation matrix heatmap

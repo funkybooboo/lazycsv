@@ -6,7 +6,7 @@ Before contributing, it's highly recommended to familiarize yourself with the ar
 
 ## Overview
 
-LazyCSV follows a clean, modular architecture with strong type safety (v0.3.2 Complete):
+LazyCSV follows a clean, modular architecture with strong type safety (v0.4.0 Complete):
 
 ```
 ┌─────────────┐

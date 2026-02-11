@@ -26,7 +26,7 @@ The current mode is always shown in the status bar:
 
 ---
 
-## v0.1.0 - Foundation (Current)
+## v0.1.0 - Foundation
 
 ### Basic Navigation
 
@@ -182,17 +182,18 @@ Commands show clear error messages instead of silently clamping:
 
 ---
 
-## v0.4.0 - Quick Editing
+## v0.4.0 - Insert Mode (✅ Complete)
 
 ### Entering Insert Mode
 
 | Key | Action |
 |-----|--------|
-| `i` | Enter Insert mode at current position |
-| `a` | Enter Insert mode with cursor after current position |
-| `A` | Enter Insert mode at end of cell content |
-| `I` | Enter Insert mode at beginning of cell content |
-| `gi` | Go to last edited cell and enter Insert mode |
+| `i` | Enter Insert mode at current cursor position |
+| `a` | Enter Insert mode at end of cell (append) |
+| `A` | Enter Insert mode at end of cell (same as `a`) |
+| `I` | Enter Insert mode at beginning of cell |
+| `s` | Clear cell and enter Insert mode |
+| `F2` | Enter Insert mode at end (Excel/Calc style) |
 
 ### In Insert Mode
 
@@ -204,11 +205,26 @@ Commands show clear error messages instead of silently clamping:
 | `←` `→` | Move cursor within cell |
 | `Home` | Move to start of cell |
 | `End` | Move to end of cell |
-| `Ctrl+h` | Backspace (vim-style) |
-| `Ctrl+w` | Delete word before cursor |
-| `Ctrl+u` | Delete to start of line |
-| `Enter` | Save changes and exit to Normal mode |
-| `Esc` | Cancel changes and exit to Normal mode |
+| `Ctrl+h` | Delete character before cursor (vim-style) |
+| `Ctrl+w` | Delete word before cursor (vim-style) |
+| `Ctrl+u` | Delete to start of cell (vim-style) |
+| `Enter` | Save changes and move down one row |
+| `Shift+Enter` | Save changes and move up one row |
+| `Tab` | Save changes and move right one column |
+| `Shift+Tab` | Save changes and move left one column |
+| `Esc` | Cancel changes (discard edits) |
+
+### Row Operations (Normal Mode)
+
+| Key | Action |
+|-----|--------|
+| `o` | Add new row below, enter Insert mode |
+| `O` | Add new row above, enter Insert mode |
+| `dd` | Delete current row (stored in clipboard) |
+| `yy` | Copy (yank) current row |
+| `p` | Paste row below current position |
+| `P` | Paste row above current position |
+| `Delete` | Clear current cell content (stay in Normal mode)
 
 ---
 
@@ -815,4 +831,4 @@ status_bar = "blue"
 
 - **In app**: Press `?`
 - **Full reference**: This document
-- **Issues**: [GitHub Issues](https://github.com/yourusername/lazycsv/issues)
+- **Issues**: [GitHub Issues](https://github.com/funkybooboo/lazycsv/issues)
