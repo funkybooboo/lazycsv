@@ -17,9 +17,10 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 - **v0.4.0** - Insert Mode ✅ (Complete)
 - **v0.4.1** - Persistence & Multi-File Workflow
 - **v0.5.0** - Column Operations & Visual Mode
-- **v0.6.0** - Search
-- **v0.7.0** - Undo/Redo
-- **v0.8.0** - Transforms & Polish
+- **v0.6.0** - Vim Magnifier
+- **v0.7.0** - Search
+- **v0.8.0** - Undo/Redo
+- **v0.9.0** - Transforms & Polish
 
 **v1.0.0 - First Stable Release**
 
@@ -33,7 +34,8 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 ## Guiding Principles
 
 - **Vim-First Philosophy:** Navigation and commands should feel native to vim users. Composable commands (operator + motion). No timeouts on pending commands. Clean status line.
-- **Three-Tier Operator System:** Cell (`x`) → Row (`dd`) → Column (`,dd`). Comma as leader for CSV-specific column operations.
+- **Three-Tier Operator System:** Cell (`x`) → Row (`dd`) → Column (`;dd`). Semicolon as leader for CSV-specific column operations.
+- **Command Ranges:** Vim-style ranges for batch operations (`:5,10d`, `:B,D` for columns, `:B,D@5,10` for combined).
 - **Ephemeral Edits:** No changes saved to file until explicit `:w` or `:wq`. All edits update in-memory representation first.
 - **Minimal UI Chrome:** No heavy borders. Use subtle separators. Maximum content, minimum decoration.
 - **In-Memory Only:** All CSV files loaded entirely into RAM for maximum performance.
@@ -52,7 +54,7 @@ LazyCSV uses vim-style modal editing with these modes:
 | Insert | `-- INSERT --` | Quick single-cell editing | `i`, `a`, `A`, `I` | `Enter` (save), `Esc` (cancel) |
 | Magnifier | `-- MAGNIFIER --` | Full vim editor for cell | `Enter` on cell | `:wq`, `:q`, `ZZ` |
 | HeaderEdit | `-- HEADER EDIT --` | Edit column header names | `gh` | `Enter` (save), `Esc` (cancel) |
-| Visual | `-- VISUAL --` | Select rows/cells/blocks | `v`, `V`, `Ctrl+v` | `Esc`, or after operation |
+| Visual | `-- VISUAL --` | Select rows/cells/blocks | `v`, `V`, `;v`, `;V` | `Esc`, or after operation |
 | Command | `:` prompt | Execute commands | `:` | `Enter` (execute), `Esc` (cancel) |
 
 **Mode hierarchy:** Normal is the "home" mode. All other modes return to Normal.
@@ -148,20 +150,20 @@ These commands always take priority over column/row jumps:
 | `5dd` | Delete 5 rows |
 | `5yy` | Yank 5 rows |
 
-### Column Operators (Comma Leader)
+### Column Operators (Semicolon Leader)
 
-**Three-tier system:** Cell (`x`) → Row (`dd`) → Column (`,dd`)
+**Three-tier system:** Cell (`x`) → Row (`dd`) → Column (`;dd`)
 
 | Key | Action |
 |-----|--------|
-| `,o` | Insert column right (enters HeaderEdit mode) |
-| `,O` | Insert column left (enters HeaderEdit mode) |
-| `,dd` | Delete column |
-| `,yy` | Yank column (includes header) |
-| `,p` | Paste column right (cursor moves to new column) |
-| `,P` | Paste column left (cursor moves to new column) |
+| `;o` | Insert column right (enters HeaderEdit mode) |
+| `;O` | Insert column left (enters HeaderEdit mode) |
+| `;dd` | Delete column |
+| `;yy` | Yank column (includes header) |
+| `;p` | Paste column right (cursor moves to new column) |
+| `;P` | Paste column left (cursor moves to new column) |
 
-**Note:** Comma leader waits silently for next key (standard vim behavior).
+**Note:** Semicolon leader waits silently for next key (standard vim behavior).
 
 ### Header Editing
 
@@ -173,14 +175,16 @@ These commands always take priority over column/row jumps:
 
 | Key | Mode | Selection |
 |-----|------|-----------|
-| `v` | Visual | Cell-by-cell |
+| `v` | Visual | Cell-by-cell (free movement) |
 | `V` | Visual Line | Whole rows |
-| `Ctrl+v` | Visual Block | Rectangle of cells |
+| `;v` | Column Visual | Cell-by-cell (free movement, column intent) |
+| `;V` | Column Visual Line | Whole columns |
 
 Then in visual mode:
-- `d` - delete selection
+- `d` - delete selection (clears cells, preserves structure)
 - `y` - yank selection
 - `c` - change selection (clear + insert)
+- `p` - paste selection (overwrites existing, adds rows/cols if needed)
 - `gv` - re-select last selection
 
 ### Search
@@ -198,7 +202,7 @@ Then in visual mode:
 | Key | Action |
 |-----|--------|
 | `"+yy` | Yank row to system clipboard |
-| `"+,yy` | Yank column to system clipboard |
+| `"+;yy` | Yank column to system clipboard |
 | `"+p` | Paste from system clipboard |
 
 ### Undo/Redo
@@ -468,7 +472,7 @@ NORMAL                                                          3,C "Mike Jo..."
 
 ## v0.4.1 - Persistence & Multi-File Workflow
 
-*Save files without quitting, track unsaved changes across multiple files*
+*Save files without quitting, track unsaved changes across multiple files, command ranges*
 
 ### Commands to Implement
 
@@ -480,6 +484,27 @@ NORMAL                                                          3,C "Mike Jo..."
 | `:q` | Quit (fails if any file dirty) |
 | `:q!` | Force quit (discard all changes) |
 
+### Command Ranges
+
+**Row ranges (vim-style):**
+- `:5d` - delete row 5
+- `:5,10d` - delete rows 5-10
+- `:5,10y` - yank rows 5-10
+- `:%d` - delete all rows
+- `:.d` - delete current row
+- `:.,+5d` - delete current row and next 5
+- `:$d` - delete last row
+
+**Column ranges:**
+- `:B,D` - operate on columns B through D
+- `:B,Dd` - delete columns B through D
+- `:B,Dy` - yank columns B through D
+
+**Combined ranges (row AND column):**
+- `:B,D@5,10` - operate on rows 5-10, columns B-D (rectangular region)
+- `:B,D@5,10d` - delete cells in that rectangular region
+- `:B,D@5,10y` - yank cells in that rectangular region
+
 ### Enhanced Command Mode
 
 **New simplified syntax:**
@@ -490,10 +515,11 @@ NORMAL                                                          3,C "Mike Jo..."
 
 **Command detection:**
 1. Reserved commands (`:q`, `:w`, `:wq`, `:W`, `:help`, `:noh`)
-2. Pure number → row jump
-3. Letters only → column jump
-4. Letters + number → cell reference
-5. Otherwise → error
+2. Range patterns (`:5,10d`, `:B,D`, `:B,D@5,10`)
+3. Pure number → row jump
+4. Letters only → column jump
+5. Letters + number → cell reference
+6. Otherwise → error
 
 **Remove old `:c` command entirely.**
 
@@ -583,6 +609,15 @@ customers.csv* | orders.csv | products.csv*                              [1/3]
 - [ ] `test_B_command_jumps_to_column`
 - [ ] `test_A5_command_jumps_to_cell`
 - [ ] `test_old_c_command_removed`
+- [ ] `test_row_range_delete`
+- [ ] `test_row_range_yank`
+- [ ] `test_column_range_delete`
+- [ ] `test_column_range_yank`
+- [ ] `test_combined_range_delete`
+- [ ] `test_combined_range_yank`
+- [ ] `test_percent_range_all_rows`
+- [ ] `test_dollar_range_last_row`
+- [ ] `test_dot_range_current_row`
 
 ### Acceptance Criteria
 - [ ] `:w` saves current file to original path
@@ -595,6 +630,12 @@ customers.csv* | orders.csv | products.csv*                              [1/3]
 - [ ] After `:w`, file removed from cache
 - [ ] `:B` jumps to column B (old `:c B` removed)
 - [ ] `:A5` jumps to cell A5
+- [ ] `:5,10d` deletes rows 5-10
+- [ ] `:B,D` operates on columns B through D
+- [ ] `:B,D@5,10` operates on rectangular region
+- [ ] `:%d` deletes all rows
+- [ ] `:.d` deletes current row
+- [ ] `:$d` deletes last row
 - [ ] CSV output properly escapes special characters
 - [ ] Write errors display clear error messages
 - [ ] All existing tests pass
@@ -604,39 +645,47 @@ customers.csv* | orders.csv | products.csv*                              [1/3]
 
 ## v0.5.0 - Column Operations & Visual Mode
 
-*Full column manipulation with comma leader, visual selections*
+*Full column manipulation with semicolon leader, visual selections*
 
-### Column Operations (Comma Leader)
+### Column Operations (Semicolon Leader)
 
 | Key | Action |
 |-----|--------|
-| `,o` | Insert column right (enters HeaderEdit mode) |
-| `,O` | Insert column left (enters HeaderEdit mode) |
-| `,dd` | Delete column |
-| `,yy` | Yank column (includes header) |
-| `,p` | Paste column right (cursor moves to new column) |
-| `,P` | Paste column left (cursor moves to new column) |
+| `;o` | Insert column right (enters HeaderEdit mode) |
+| `;O` | Insert column left (enters HeaderEdit mode) |
+| `;dd` | Delete column |
+| `;yy` | Yank column (includes header) |
+| `;p` | Paste column right (cursor moves to new column) |
+| `;P` | Paste column left (cursor moves to new column) |
 
 **Behavior:**
-- `,yy` yanks entire column including header
-- `,p` pastes column, cursor moves to new column
-- `,o`/`,O` creates column with generic header (Column letter), enters HeaderEdit mode
-- Comma leader is silent (no visual feedback, standard vim)
+- `;yy` yanks entire column including header
+- `;p` pastes column, cursor moves to new column
+- `;o`/`;O` creates column with generic header (Column letter), enters HeaderEdit mode
+- Semicolon leader is silent (no visual feedback, standard vim)
 
 ### Visual Mode
 
 | Key | Mode | Selection |
 |-----|------|-----------|
-| `v` | Visual | Cell-by-cell |
+| `v` | Visual | Cell-by-cell (free movement) |
 | `V` | Visual Line | Whole rows |
-| `Ctrl+v` | Visual Block | Rectangle of cells |
+| `;v` | Column Visual | Cell-by-cell (free movement, column intent) |
+| `;V` | Column Visual Line | Whole columns |
 
 **Operations in Visual mode:**
-- `d` - delete selection
+- `d` - delete selection (clears cells, preserves structure for cell regions)
 - `y` - yank selection
 - `c` - change selection (clear + insert)
+- `p` - paste selection (overwrites existing, adds rows/cols if needed)
 - `Esc` - exit Visual mode
 - `gv` - re-select last selection
+
+**Notes:**
+- `Ctrl+v` is NOT implemented (redundant with `v`)
+- Delete cell region clears cells, preserves structure
+- Delete whole rows/columns removes them entirely
+- Paste overwrites existing cells, adds rows/cols if needed
 
 ### Count Prefixes
 
@@ -650,16 +699,17 @@ customers.csv* | orders.csv | products.csv*                              [1/3]
 ### Implementation Steps
 
 **File: `src/input/actions.rs`**
-- [ ] Add `LeaderCommand` enum for comma sequences
-- [ ] Track comma leader state in InputState
+- [ ] Add `LeaderCommand` enum for semicolon sequences
+- [ ] Track semicolon leader state in InputState
 
 **File: `src/input/handler.rs`**
-- [ ] Add comma (`,`) handler to enter leader mode
-- [ ] Add leader command handlers: `,o`, `,O`, `,dd`, `,yy`, `,p`, `,P`
+- [ ] Add semicolon (`;`) handler to enter leader mode
+- [ ] Add leader command handlers: `;o`, `;O`, `;dd`, `;yy`, `;p`, `;P`
 - [ ] Add count prefix support for `dd` and `yy`
 - [ ] Add `V` handler to enter Visual Line mode
 - [ ] Add `v` handler to enter Visual cell mode
-- [ ] Add `Ctrl+v` handler to enter Visual Block mode
+- [ ] Add `;v` handler to enter Column Visual cell mode
+- [ ] Add `;V` handler to enter Column Visual Line mode
 - [ ] Add `handle_visual_mode()` function
 - [ ] Add `P` handler for paste above
 - [ ] Add `cc` handler
@@ -683,36 +733,41 @@ customers.csv* | orders.csv | products.csv*                              [1/3]
 - [ ] Different style for visual vs cursor
 
 **File: `src/ui/status.rs`**
-- [ ] Show `VISUAL`, `VISUAL LINE`, `VISUAL BLOCK` mode indicators
+- [ ] Show `VISUAL`, `VISUAL LINE`, `COLUMN VISUAL`, `COLUMN VISUAL LINE` mode indicators
 
 ### Tests to Add
-- [ ] `test_comma_leader_detection`
-- [ ] `test_comma_o_inserts_column_right`
-- [ ] `test_comma_O_inserts_column_left`
-- [ ] `test_comma_dd_deletes_column`
-- [ ] `test_comma_yy_yanks_column_with_header`
-- [ ] `test_comma_p_pastes_column_right`
-- [ ] `test_comma_P_pastes_column_left`
+- [ ] `test_semicolon_leader_detection`
+- [ ] `test_semicolon_o_inserts_column_right`
+- [ ] `test_semicolon_O_inserts_column_left`
+- [ ] `test_semicolon_dd_deletes_column`
+- [ ] `test_semicolon_yy_yanks_column_with_header`
+- [ ] `test_semicolon_p_pastes_column_right`
+- [ ] `test_semicolon_P_pastes_column_left`
 - [ ] `test_5dd_deletes_5_rows`
 - [ ] `test_5yy_yanks_5_rows`
 - [ ] `test_V_enters_visual_line`
 - [ ] `test_v_enters_visual_cell`
-- [ ] `test_ctrl_v_enters_visual_block`
+- [ ] `test_semicolon_v_enters_column_visual_cell`
+- [ ] `test_semicolon_V_enters_column_visual_line`
 - [ ] `test_visual_d_deletes_selection`
+- [ ] `test_visual_d_clears_cells_preserves_structure`
 - [ ] `test_visual_y_yanks_selection`
+- [ ] `test_visual_p_overwrites_and_adds_if_needed`
 - [ ] `test_P_pastes_above`
 - [ ] `test_cc_clears_row_enters_insert`
 - [ ] `test_gv_reselects`
 
 ### Acceptance Criteria
-- [ ] Comma leader works for column operations
-- [ ] `,dd` deletes column
-- [ ] `,yy` yanks column including header
-- [ ] `,p` pastes column, cursor moves to new column
-- [ ] `,o` inserts column, enters HeaderEdit
+- [ ] Semicolon leader works for column operations
+- [ ] `;dd` deletes column
+- [ ] `;yy` yanks column including header
+- [ ] `;p` pastes column, cursor moves to new column
+- [ ] `;o` inserts column, enters HeaderEdit
 - [ ] `5dd` deletes exactly 5 rows
-- [ ] Visual modes work (`v`, `V`, `Ctrl+v`)
-- [ ] Visual operations work (`d`, `y`, `c`)
+- [ ] Visual modes work (`v`, `V`, `;v`, `;V`)
+- [ ] Visual cell delete clears cells, preserves structure
+- [ ] Visual row/column delete removes rows/columns entirely
+- [ ] Visual operations work (`d`, `y`, `c`, `p`)
 - [ ] `P` pastes above
 - [ ] `cc` clears row, enters Insert
 - [ ] `gv` re-selects
@@ -721,7 +776,79 @@ customers.csv* | orders.csv | products.csv*                              [1/3]
 
 ---
 
-## v0.6.0 - Search
+## v0.6.0 - Vim Magnifier
+
+*Full vim editor for complex cell editing*
+
+### Keybindings to Implement
+
+| Key | Action |
+|-----|--------|
+| `Enter` | Open Magnifier on current cell |
+
+**In Magnifier Mode:**
+- Full vim editing (multi-line, word motion, etc.)
+- `:w` - Save cell content (update in-memory document)
+- `:wq` or `ZZ` - Save and close Magnifier
+- `:q!` - Close without saving
+- `Ctrl+h/j/k/l` - Navigate to adjacent cells (prompts to save if dirty)
+
+### Use Cases
+- Editing JSON data in cells
+- Multi-line descriptions or notes
+- Complex text that needs vim power
+- Large cell content (>100 chars)
+
+### Implementation Steps
+
+**File: `src/magnifier/mod.rs` (new file)**
+- [ ] Create magnifier module
+- [ ] Implement vim buffer state
+- [ ] Implement vim mode switching (Normal/Insert within magnifier)
+- [ ] Implement vim motions: `h/j/k/l`, `w/b/e`, `0/$`, `gg/G`
+- [ ] Implement vim operators: `dd`, `yy`, `p`, `i/a/o/O`
+- [ ] Implement line-based editing
+
+**File: `src/app/mod.rs`**
+- [ ] Add `magnifier_state: Option<MagnifierState>` field
+- [ ] Implement `open_magnifier(&mut self)` method
+- [ ] Implement `close_magnifier(&mut self, save: bool)` method
+
+**File: `src/input/handler.rs`**
+- [ ] Add `Enter` handler to open magnifier
+- [ ] Add `handle_magnifier_mode()` function
+- [ ] Handle Ctrl+h/j/k/l for cell navigation in magnifier
+- [ ] Handle `:w`, `:wq`, `:q!` commands in magnifier
+
+**File: `src/ui/magnifier.rs` (new file)**
+- [ ] Render magnifier overlay (centered, 80% width/height)
+- [ ] Show vim mode indicator
+- [ ] Show cursor position
+- [ ] Syntax highlighting for common formats (future)
+
+### Tests to Add
+- [ ] `test_enter_opens_magnifier`
+- [ ] `test_magnifier_vim_motions`
+- [ ] `test_magnifier_save_updates_cell`
+- [ ] `test_magnifier_quit_discards`
+- [ ] `test_magnifier_wq_saves_and_closes`
+- [ ] `test_magnifier_ctrl_hjkl_navigates_cells`
+- [ ] `test_magnifier_multiline_editing`
+
+### Acceptance Criteria
+- [ ] `Enter` opens magnifier for current cell
+- [ ] Vim motions work in magnifier
+- [ ] `:w` saves cell content
+- [ ] `:wq` saves and closes
+- [ ] `:q!` discards changes
+- [ ] Ctrl+h/j/k/l navigate cells
+- [ ] Multi-line editing works
+- [ ] All existing tests pass
+- [ ] No clippy warnings
+
+---
+
+## v0.7.0 - Search
 
 *Find data in the CSV*
 
@@ -763,7 +890,7 @@ customers.csv* | orders.csv | products.csv*                              [1/3]
 
 ---
 
-## v0.7.0 - Undo/Redo
+## v0.8.0 - Undo/Redo
 
 *Command history for all mutations*
 
@@ -799,7 +926,7 @@ customers.csv* | orders.csv | products.csv*                              [1/3]
 
 ---
 
-## v0.8.0 - Transforms & Polish
+## v0.9.0 - Transforms & Polish
 
 *Data cleanup transformations, final polish*
 

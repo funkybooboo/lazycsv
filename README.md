@@ -56,7 +56,7 @@ lazycsv data.csv --delimiter ';' --no-headers
 # hjkl or arrows  -> navigate
 # [ or ]          -> switch between CSV files
 # gg or G         -> jump to top/bottom
-# :c A or :c 5    -> jump to column A or column 5
+# :B or :A5       -> jump to column B or cell A5
 # ?               -> show help
 # :q              -> quit
 ```
@@ -69,7 +69,7 @@ That's it! Press `?` in the app for full keybindings.
 |-----|--------|
 | `hjkl` or arrows | Move around (with count: `5j`, `10h`) |
 | `gg` / `G` / `15G` | Jump to first/last/line 15 |
-| `:c A` / `:c 5` | Jump to column A or column 5 |
+| `:B` / `:A5` | Jump to column B or cell A5 |
 | `w` / `b` / `e` | Next/prev/last non-empty cell |
 | `:15` | Command mode: jump to row 15 |
 | `zt` / `zz` / `zb` | Position row at top/center/bottom |
@@ -91,25 +91,22 @@ LazyCSV treats CSV files in the same directory like Excel sheets. Open one file,
 | **v0.2.0** | Type safety refactor (internal) |
 | **v0.3.0** | Advanced navigation - column jumps, command mode, word motion |
 | **v0.3.1** | UI/UX polish - mode indicator, transient messages, help redesign |
-| **v0.3.2** | Pre-edit polish - minimal UI, vim-like status line, `:c` command |
-| **v0.4.0** | Insert mode - quick cell editing |
-| **v0.5.0** | Operators - `d`, `y`, `c`, `p` for composable editing |
-| **v0.6.0** | Visual mode - `v`, `V`, `Ctrl+v` for selection |
-| **v0.7.0** | Persistence - `:w`, `:q`, `:wq` save/quit |
+| **v0.3.2** | Pre-edit polish - minimal UI, vim-like status line |
+| **v0.4.0** | Insert mode - quick cell editing, row operations |
+| **v0.4.1** | Persistence - `:w`, `:W`, multi-file dirty tracking, command ranges |
+| **v0.5.0** | Column operations - `;o`, `;O`, `;dd`, `;yy`, `;p`, visual mode |
+| **v0.6.0** | Vim Magnifier - multi-line cell editing with full vim |
+| **v0.7.0** | Search - `/`, `n`, `N` fuzzy cell search |
 | **v0.8.0** | Undo/redo - `u`, `Ctrl+r`, `.` dot command |
-| **v0.9.0** | Search - `/`, `?`, `n`, `N`, `*`, `#` |
-| **v1.0.0** | First stable release |
+| **v0.9.0** | Transforms - `:sort`, `:filter`, data operations |
+| **v1.0.0** | Stable release - polish, performance, docs |
 
 ### Post-v1.0 Features
 
-| Version | Features |
-|---------|----------|
-| v1.1.0 | Marks & registers - `m`, `'`, `"` |
-| v1.2.0 | Text objects - `ic`, `ir`, `ac`, `ar` for cells/rows |
-| v1.3.0 | Sorting & filtering - `:sort`, `:filter` |
-| v1.4.0 | Column operations - resize, freeze |
-| v1.5.0 | Advanced features - tab completion, macros |
-| v1.6.0 | Data analysis - stats, export |
+Future considerations (not committed):
+- Column resize & freeze
+- Advanced features - macros, tab completion
+- Data export - JSON, Markdown, HTML
 
 See [plans/roadmap.md](plans/roadmap.md) for the complete detailed roadmap.
 
@@ -142,7 +139,7 @@ See [docs/development.md](docs/development.md) for contributing guidelines.
 - Fast CSV viewer and editor with vim navigation
 - Multi-file switching with `[` `]`
 - Row/column numbering (A, B, C...)
-- Column jumping with `:c` command (`:c A`, `:c 5`, `:c AA`)
+- Column jumping with `:B` syntax (`:B`, `:AA`, `:A5`)
 - Command mode with reserved commands (`:q`, `:w`, `:h`)
 - Word motion (w/b/e for sparse data)
 - Viewport control (zt/zz/zb)
@@ -154,8 +151,8 @@ See [docs/development.md](docs/development.md) for contributing guidelines.
 - **NEW v0.4.0:** Text editing - Backspace, Delete, Ctrl+h, Ctrl+w, Ctrl+u
 - **NEW v0.4.0:** Row operations - `o`, `O`, `dd`, `yy`, `p` for rows
 - **NEW v0.4.0:** Clear cells with `Delete` key in Normal mode
-- Comprehensive test suite (271+ unit tests + integration tests)
-- Search and persistence coming in v0.5.0+
+- Comprehensive test suite (408+ tests passing)
+- Search and persistence coming in v0.4.1+
 
 **Current:** v0.4.0 Complete | **Performance:** 60 FPS on 100K+ rows | **Architecture:** Clean, type-safe, well-tested
 

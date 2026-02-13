@@ -10,7 +10,9 @@ This document translates the functionality described in the [Features Guide](fea
 - Every action must be keyboard accessible
 - Prefer vim motions (hjkl) over arrows
 - Support vim-style operators: `dd`, `yy`, `p`, etc.
-- Modal editing: Normal/Edit/Visual/Command modes
+- Modal editing: Normal/Insert/Magnifier/HeaderEdit/Visual/Command modes
+- **Three-tier operator system**: Cell (`x`) → Row (`dd`) → Column (`;dd`)
+- **Command ranges**: Vim-style ranges for batch operations (`:5,10d`, `:B,D@5,10`)
 
 ### 2. Lazy Tools Aesthetic
 - Clean, organized panels
@@ -493,6 +495,10 @@ LazyCSV's design draws from:
 | Truncate at 20 chars | Readable, fits ~10 columns on screen | 2026-01 |
 | Help as overlay | Doesn't lose context, easy to reference | 2026-01 |
 | Multi-file navigation | Innovation! Consistent with Excel sheets | 2026-01 |
+| Semicolon for columns | Frees comma for ranges, right-hand key | 2026-02 |
+| @ for combined ranges | Clear separator: `:B,D@5,10` = cols@rows | 2026-02 |
+| Command ranges | Vim-native, powerful batch operations | 2026-02 |
+| Skip Ctrl+v visual | Redundant with `v` for rectangular regions | 2026-02 |
 
 ## Future Design Considerations
 

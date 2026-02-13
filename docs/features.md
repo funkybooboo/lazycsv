@@ -74,94 +74,111 @@ All navigation is keyboard-driven with vim-inspired keys.
 
 The following features are on the roadmap and are **not yet implemented**.
 
-### v0.4.0-v0.6.0: Cell Editing & Persistence
+### v0.4.1: Persistence & Multi-File Workflow
 
-**Edit Mode:**
-- 📋 Press `i` or `Enter` to edit current cell.
-- 📋 Select-all text by default (ready to replace).
-- 📋 Type to modify value.
-- 📋 `Enter` to save, `Esc` to cancel.
-- 📋 Visual indicator (yellow background).
-- 📋 Mode indicator shows `[EDIT]`.
+**File Operations:**
+- 📋 `:w` - Save current file
+- 📋 `:W` - Save all dirty files
+- 📋 `:wq` - Save and quit (checks other files for dirty state)
+- 📋 `:q` - Quit (blocks if any file has unsaved changes)
+- 📋 `:q!` - Force quit, discard all changes
 
-**File Saving:**
-- 📋 `Ctrl+S` to save changes.
-- 📋 `:w` command to save (vim-style).
-- 📋 Atomic write (write to temp, then rename).
-- 📋 Success message: "✓ Saved successfully".
-- 📋 Error handling for save failures.
+**Command Ranges:**
+- 📋 Row ranges: `:5,10d`, `:%d`, `:.d`, `:$d`
+- 📋 Column ranges: `:B,D`, `:B,Dd`, `:B,Dy`
+- 📋 Combined ranges: `:B,D@5,10d` (rectangular regions)
 
-**Dirty State Tracking:**
-- 📋 `*` indicator in title when modified.
-- 📋 Vim-style quit behavior:
-  - `q` warns and refuses to quit (already implemented).
-  - `:q!` forces quit without saving.
+**Multi-File Dirty Tracking:**
+- 📋 Session caches dirty documents
+- 📋 File switcher shows `*` for unsaved files
+- 📋 Switching preserves edits in cache
+- 📋 After `:w`, file removed from cache
 
-**Undo/Redo:**
-- 📋 `u` to undo last operation.
-- 📋 `Ctrl+r` to redo.
-- 📋 History of 100 operations.
-- 📋 Works for cell edits, row/column ops, sorts.
-- 📋 Shows what was undone: "Undo: Edit cell A5".
+### v0.5.0: Column Operations & Visual Mode
 
-### v0.7.0-v0.8.0: Row & Column Operations
-
-**Row Operations:**
-- 📋 `o` - Add row below current (empty cells).
-- 📋 `O` - Add row above current (empty cells).
-- 📋 `dd` - Delete current row (no confirmation).
-- 📋 `yy` - Copy (yank) current row.
-- 📋 `p` - Paste row below current.
-- 📋 `P` - Paste row above current.
-
-**Column Operations:**
-- 📋 `Ctrl+A` - Add column after current.
-- 📋 `Ctrl+Shift+A` - Add column before current.
-- 📋 `D` - Delete current column (no confirmation).
-- 📋 Prompt for column header name on add.
-
-### v1.0.0-v1.3.0: Advanced Features
-
-**Fuzzy Search:**
-- 📋 Press `/` to open fuzzy finder overlay.
-- 📋 Search multiple types: row numbers, column letters/names, cell data.
-- 📋 Live results as you type.
-- 📋 `n`/`N` to cycle through matches after jumping.
-- 📋 `*` to search current cell value.
-
-**Sorting:**
-- 📋 `s` - Sort by current column (toggle asc/desc).
-- 📋 In-place sort (actually reorders data).
-- 📋 Smart sorting (numeric vs. text).
-- 📋 Sort indicator in header: ↑ or ↓.
-- 📋 Undoable.
-
-**Filtering:**
-- 📋 `:filter` command with expressions (e.g., `:filter Age>30`).
-- 📋 Support for multiple operators (`=`, `!=`, `>`, `<`, `contains`, etc.).
-- 📋 Multiple filters (AND logic).
-- 📋 `:nofilter` to clear.
+**Semicolon Leader for Column Ops:**
+- 📋 `;o` / `;O` - Insert column right/left (enters HeaderEdit mode)
+- 📋 `;dd` - Delete column
+- 📋 `;yy` - Yank column (includes header)
+- 📋 `;p` / `;P` - Paste column right/left
 
 **Visual Selection:**
-- 📋 `v` - Enter visual mode (cell selection).
-- 📋 `V` - Visual line mode (row selection).
-- 📋 Extend with `hjkl`.
-- 📋 Operations on selection (`d` to delete, `y` to copy).
+- 📋 `v` - Cell-by-cell visual selection (free movement)
+- 📋 `V` - Row visual selection (whole rows)
+- 📋 `;v` - Column cell visual (free movement, column intent)
+- 📋 `;V` - Column visual line (whole columns)
+- 📋 Operations: `d` (delete/clear), `y` (yank), `c` (change), `p` (paste)
 
-**Column Statistics:**
-- 📋 `:stats` command to show stats for the current column.
-- 📋 Display in overlay panel.
+**HeaderEdit Mode:**
+- 📋 `gh` - Edit column header name
+- 📋 Enter to save, Esc to cancel
 
-### v1.3.0: Multi-File Guards
+**Count Prefixes:**
+- 📋 `5dd` - Delete 5 rows
+- 📋 `5yy` - Yank 5 rows
+- 📋 `P` - Paste row above
+- 📋 `cc` - Clear row and enter Insert mode
 
-**CSV Multi-File:**
-- ✅ Already implemented!
+### v0.6.0: Vim Magnifier
 
-**Unsaved Changes Protection:**
-- 📋 `[` / `]` blocked if current file has unsaved changes.
-- 📋 Status error: "No write since last change".
-- 📋 Force switch with `:next!` / `:prev!` (future).
-- 📋 Prevents accidental data loss when switching files.
+**Full Vim Editor for Cells:**
+- 📋 `Enter` - Open Magnifier for current cell
+- 📋 Full vim editing (multi-line, word motion, etc.)
+- 📋 `:w` - Save cell content
+- 📋 `:wq` or `ZZ` - Save and close
+- 📋 `:q!` - Close without saving
+- 📋 `Ctrl+h/j/k/l` - Navigate to adjacent cells (prompts if dirty)
+
+**Use Cases:**
+- Editing JSON data in cells
+- Multi-line descriptions or notes
+- Complex text that needs vim power
+- Large cell content (>100 chars)
+
+### v0.7.0: Search
+
+**Fuzzy Search:**
+- 📋 `/` - Open search
+- 📋 `n` / `N` - Next/previous match
+- 📋 `*` - Search current cell content
+- 📋 `:noh` - Clear highlighting
+
+### v0.8.0: Undo/Redo
+
+**History Management:**
+- 📋 `u` - Undo last operation
+- 📋 `Ctrl+r` - Redo
+- 📋 `.` - Repeat last edit (dot command)
+- 📋 Up to 100 operations in history
+- 📋 Works for: cell edits, row/column ops, sorts
+
+### v0.9.0: Transforms & Polish
+
+**Cell Transforms:**
+- 📋 `~` - Toggle case (UPPER ↔ lower)
+- 📋 `gU` - Uppercase cell
+- 📋 `gu` - Lowercase cell
+- 📋 `g~` - Title Case cell
+- 📋 `g.` - Toggle boolean (yes↔no, true↔false, 1↔0)
+
+**Row Movement:**
+- 📋 `gj` - Swap row with row below
+- 📋 `gk` - Swap row with row above
+
+**Data Operations:**
+- 📋 `:sort` - Sort by current column (ascending)
+- 📋 `:sort!` - Sort by current column (descending)
+- 📋 `:filter <expr>` - Filter rows (e.g., `:filter Age>30`)
+- 📋 `:nof` - Clear all filters
+
+### v1.0.0: First Stable Release
+
+**Polish & Performance:**
+- 📋 All core features working
+- 📋 Stable command interface
+- 📋 500+ tests passing
+- 📋 Complete documentation
+- 📋 Performance targets met
 
 ## Performance Requirements
 
@@ -194,6 +211,29 @@ LazyCSV is designed for speed:
 - Plugin system
 
 ## Design Decisions
+
+### Why Semicolon for Column Operations?
+- Right next to comma on keyboard (easy muscle memory)
+- Vim's `;` (repeat f/t) is less commonly used, acceptable override
+- Visual separator mnemonic (columns separate data)
+- Keeps comma free for vim-style range operations (`:5,10d`)
+
+### Why Command Ranges?
+- Vim-native syntax (`:5,10d`, `:%y`)
+- Powerful batch operations without visual mode
+- Essential for productivity with large datasets
+- Familiar to vim users
+
+### Why @ for Combined Ranges?
+- Clear visual separator between column and row ranges
+- `:B,D@5,10` reads as "columns B-D at rows 5-10"
+- Unambiguous parsing (commas for ranges, @ for combination)
+
+### Why No Ctrl+v Block Visual?
+- Regular `v` already provides rectangular cell selection
+- CSV data is naturally rectangular (cells align to grid)
+- Reduces complexity, maintains simplicity
+- `;v` and `;V` provide column-specific selection
 
 ### Why No Confirmations for Delete?
 - Faster workflow for power users
