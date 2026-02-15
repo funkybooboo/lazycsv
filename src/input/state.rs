@@ -22,6 +22,9 @@ pub struct InputState {
 
     /// Command buffer for command mode (stores text after ":")
     pub command_buffer: String,
+
+    /// File filter buffer for FileList mode (search/filter files)
+    pub file_filter_buffer: String,
 }
 
 impl InputState {
@@ -96,6 +99,21 @@ impl InputState {
     /// Pop a character from the command buffer
     pub fn pop_command_char(&mut self) {
         self.command_buffer.pop();
+    }
+
+    /// Clear the file filter buffer
+    pub fn clear_file_filter(&mut self) {
+        self.file_filter_buffer.clear();
+    }
+
+    /// Push a character to the file filter buffer
+    pub fn push_file_filter_char(&mut self, c: char) {
+        self.file_filter_buffer.push(c);
+    }
+
+    /// Pop a character from the file filter buffer
+    pub fn pop_file_filter_char(&mut self) {
+        self.file_filter_buffer.pop();
     }
 }
 

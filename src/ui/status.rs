@@ -128,10 +128,14 @@ pub fn render_file_switcher(frame: &mut Frame, app: &App, area: Rect) {
             .and_then(|n| n.to_str())
             .unwrap_or("unknown");
 
+        // Add dirty indicator if file is dirty
+        let dirty_indicator = if app.session.is_dirty(path) { "*" } else { "" };
+        let display_name = format!("{}{}", filename, dirty_indicator);
+
         let sep_start = current_pos;
         let sep_end = sep_start + separator.len();
         let file_start = sep_end;
-        let file_end = file_start + filename.len();
+        let file_end = file_start + display_name.len();
 
         // Check if this segment is visible
         if file_end > scroll_offset && sep_start < scroll_offset + visible_width {
@@ -147,7 +151,7 @@ pub fn render_file_switcher(frame: &mut Frame, app: &App, area: Rect) {
                 } else {
                     dim_style
                 };
-                spans.push(Span::styled(filename.to_string(), style));
+                spans.push(Span::styled(display_name, style));
             }
         }
 
@@ -190,10 +194,8 @@ pub fn render_file_switcher(frame: &mut Frame, app: &App, area: Rect) {
 pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     use crate::ui::utils::column_to_excel_letter;
 
-    let selected_row = app
-        .get_selected_row()
-        .map(|r| r.to_line_number().get())
-        .unwrap_or(0);
+    // Absolute row index: 0 = header, 1 = first data, etc.
+    let selected_row = app.get_selected_row().map(|r| r.get()).unwrap_or(0);
     let col_letter = column_to_excel_letter(app.view_state.selected_column.get());
     let col_name = app.document.get_header(app.view_state.selected_column);
 
@@ -234,6 +236,9 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         Some(crate::input::PendingCommand::GotoColumn(letters)) => format!("g{}", letters),
         Some(crate::input::PendingCommand::D) => "d".to_string(),
         Some(crate::input::PendingCommand::Y) => "y".to_string(),
+        Some(crate::input::PendingCommand::Comma) => ",".to_string(),
+        Some(crate::input::PendingCommand::CommaD) => ",d".to_string(),
+        Some(crate::input::PendingCommand::CommaY) => ",y".to_string(),
         None => {
             if let Some(count) = app.input_state.command_count {
                 format!("{}", count)
@@ -283,6 +288,69 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
                 &right_side,
                 area.width as usize,
             )
+        }
+        crate::app::Mode::FileList => {
+            // Show file list with cursor indicator and filter
+            let files = app.session.files();
+            let filter = &app.input_state.file_filter_buffer;
+            let filter_lower = filter.to_lowercase();
+
+            // Filter files based on search
+            let filtered_files: Vec<(usize, &std::path::PathBuf)> = files
+                .iter()
+                .enumerate()
+                .filter(|(_, path)| {
+                    if filter.is_empty() {
+                        true
+                    } else {
+                        path.file_name()
+                            .and_then(|n| n.to_str())
+                            .map(|s| s.to_lowercase().contains(&filter_lower))
+                            .unwrap_or(false)
+                    }
+                })
+                .collect();
+
+            // Build file list with cursor indicator: "> file1.csv* | file2.csv | file3.csv"
+            let mut file_list = String::new();
+            let selected_idx = app.view_state.file_list_selected;
+
+            for (display_num, (_orig_idx, path)) in filtered_files.iter().enumerate() {
+                let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
+
+                // Add dirty indicator
+                let dirty = if app.session.is_dirty(path) { "*" } else { "" };
+
+                // Add cursor indicator for selected file
+                let cursor = if display_num == selected_idx {
+                    "> "
+                } else {
+                    ""
+                };
+
+                // Add separator between files
+                if display_num > 0 {
+                    file_list.push_str(" | ");
+                }
+
+                file_list.push_str(&format!("{}{}{}", cursor, filename, dirty));
+            }
+
+            let left = if filter.is_empty() {
+                format!(
+                    "FILES (j/k or arrows to navigate, Enter to select): {}",
+                    file_list
+                )
+            } else {
+                format!(
+                    "FILTER: \"{}\" ({} matches): {}",
+                    filter,
+                    filtered_files.len(),
+                    file_list
+                )
+            };
+
+            build_status_line(&left, "", area.width as usize)
         }
     };
 

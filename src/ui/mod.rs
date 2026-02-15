@@ -56,9 +56,9 @@ mod tests {
 
     // from ui_rendering_test.rs
     fn create_test_csv() -> Document {
-        Document {
-            headers: vec!["ID".to_string(), "Name".to_string(), "Email".to_string()],
-            rows: vec![
+        Document::new(
+            vec!["ID".to_string(), "Name".to_string(), "Email".to_string()],
+            vec![
                 vec![
                     "1".to_string(),
                     "Alice".to_string(),
@@ -75,9 +75,8 @@ mod tests {
                     "charlie@example.com".to_string(),
                 ],
             ],
-            filename: "test.csv".to_string(),
-            is_dirty: false,
-        }
+            "test.csv".to_string(),
+        )
     }
 
     #[test]
@@ -277,33 +276,30 @@ mod tests {
 
     // from ui_state_test.rs
     fn create_small_csv() -> Document {
-        Document {
-            headers: vec!["A".to_string(), "B".to_string()],
-            rows: vec![
+        Document::new(
+            vec!["A".to_string(), "B".to_string()],
+            vec![
                 vec!["1".to_string(), "2".to_string()],
                 vec!["3".to_string(), "4".to_string()],
             ],
-            filename: "small.csv".to_string(),
-            is_dirty: false,
-        }
+            "small.csv".to_string(),
+        )
     }
 
     fn create_empty_csv() -> Document {
-        Document {
-            headers: vec!["A".to_string(), "B".to_string()],
-            rows: vec![],
-            filename: "empty.csv".to_string(),
-            is_dirty: false,
-        }
+        Document::new(
+            vec!["A".to_string(), "B".to_string()],
+            vec![],
+            "empty.csv".to_string(),
+        )
     }
 
     fn create_single_cell_csv() -> Document {
-        Document {
-            headers: vec!["A".to_string()],
-            rows: vec![vec!["1".to_string()]],
-            filename: "single.csv".to_string(),
-            is_dirty: false,
-        }
+        Document::new(
+            vec!["A".to_string()],
+            vec![vec!["1".to_string()]],
+            "single.csv".to_string(),
+        )
     }
 
     #[test]
@@ -644,14 +640,14 @@ mod tests {
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend)?;
 
-        // Render with row 0 selected
+        // Render with row 1 selected (initial position with header_mode=true)
         terminal.draw(|frame| {
             render(frame, &mut app);
         })?;
         let buffer1 = terminal.backend().buffer().clone();
 
-        // Change selection
-        app.view_state.table_state.select(Some(1));
+        // Change selection to row 2
+        app.view_state.table_state.select(Some(2));
         terminal.draw(|frame| {
             render(frame, &mut app);
         })?;
@@ -727,15 +723,14 @@ mod tests {
 
     #[test]
     fn test_ui_unicode_emoji_in_cells() -> io::Result<()> {
-        let csv_data = Document {
-            headers: vec!["Name".to_string(), "Status".to_string()],
-            rows: vec![
+        let csv_data = Document::new(
+            vec!["Name".to_string(), "Status".to_string()],
+            vec![
                 vec!["Alice".to_string(), "🎉 Happy".to_string()],
                 vec!["Bob".to_string(), "😀 Smile".to_string()],
             ],
-            filename: "emoji.csv".to_string(),
-            is_dirty: false,
-        };
+            "emoji.csv".to_string(),
+        );
         let csv_files = vec![PathBuf::from("emoji.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
@@ -771,12 +766,11 @@ mod tests {
     #[test]
     fn test_ui_cell_with_very_long_content() -> io::Result<()> {
         let long_text = "A".repeat(10000);
-        let csv_data = Document {
-            headers: vec!["Name".to_string(), "Data".to_string()],
-            rows: vec![vec!["Alice".to_string(), long_text]],
-            filename: "test.csv".to_string(),
-            is_dirty: false,
-        };
+        let csv_data = Document::new(
+            vec!["Name".to_string(), "Data".to_string()],
+            vec![vec!["Alice".to_string(), long_text]],
+            "test.csv".to_string(),
+        );
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
@@ -793,15 +787,14 @@ mod tests {
 
     #[test]
     fn test_ui_special_characters_in_cells() -> io::Result<()> {
-        let csv_data = Document {
-            headers: vec!["Col1".to_string(), "Col2".to_string()],
-            rows: vec![
+        let csv_data = Document::new(
+            vec!["Col1".to_string(), "Col2".to_string()],
+            vec![
                 vec!["\t\n\r".to_string(), "Normal".to_string()],
                 vec!["Special: <>{}[]".to_string(), "Quotes: \"'".to_string()],
             ],
-            filename: "test.csv".to_string(),
-            is_dirty: false,
-        };
+            "test.csv".to_string(),
+        );
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
@@ -888,13 +881,13 @@ mod tests {
 
     #[test]
     fn test_ui_multi_byte_unicode_rendering() -> io::Result<()> {
-        let csv_data = Document {
-            headers: vec![
+        let csv_data = Document::new(
+            vec![
                 "Japanese".to_string(),
                 "Emoji".to_string(),
                 "Russian".to_string(),
             ],
-            rows: vec![
+            vec![
                 vec![
                     "Hello".to_string(),
                     "🎉🎊😀".to_string(),
@@ -902,9 +895,8 @@ mod tests {
                 ],
                 vec!["Test".to_string(), "🔥💯".to_string(), "Data".to_string()],
             ],
-            filename: "unicode.csv".to_string(),
-            is_dirty: false,
-        };
+            "unicode.csv".to_string(),
+        );
         let csv_files = vec![PathBuf::from("unicode.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
@@ -937,15 +929,14 @@ mod tests {
     #[test]
     fn test_ui_very_long_cell_truncation() -> io::Result<()> {
         let long_text = "A".repeat(1000); // Very long cell content
-        let csv_data = Document {
-            headers: vec!["Col1".to_string(), "Col2".to_string()],
-            rows: vec![
+        let csv_data = Document::new(
+            vec!["Col1".to_string(), "Col2".to_string()],
+            vec![
                 vec![long_text.clone(), "Normal".to_string()],
                 vec!["Short".to_string(), long_text],
             ],
-            filename: "long.csv".to_string(),
-            is_dirty: false,
-        };
+            "long.csv".to_string(),
+        );
         let csv_files = vec![PathBuf::from("long.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 

@@ -5,6 +5,27 @@ All notable changes to LazyCSV will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - v0.4.1
+
+### Added
+- **Header Mode Toggle** - `:ht` command to toggle header mode ON/OFF
+  - When ON: first row treated as header (row 0), navigation starts at row 1
+  - When OFF: first row is regular data, navigation starts at row 0
+  - Header row is highlighted when selected
+  
+### Changed
+- **Navigation System Refactored** - Migrated from data-row indices to absolute row indices
+  - All row indices now include the header row (0-based absolute indexing)
+  - `gg` respects header_mode: goes to row 1 when ON, row 0 when OFF
+  - Cannot navigate to row 0 when header_mode is ON
+  - Status line shows absolute row numbers (0 for header, 1+ for data)
+  - Row count includes header row
+  
+### Fixed
+- **Delete Header Row** - `dd` on row 0 now automatically turns header_mode OFF
+- All navigation commands properly respect header_mode boundaries
+- Updated 400+ tests to use absolute row indexing
+
 ## [0.4.0] - 2026-02-09
 
 ### Added - Insert Mode & Cell Editing

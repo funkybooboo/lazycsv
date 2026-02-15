@@ -156,7 +156,7 @@ fn test_binary_file_treated_as_csv() {
     match result {
         Ok(doc) => {
             // Parsed with replacement characters - acceptable
-            assert!(!doc.headers.is_empty() || doc.rows.is_empty());
+            assert!(!doc.rows.is_empty()); // Should have at least header row
         }
         Err(err) => {
             // Failed to parse - also acceptable
@@ -194,7 +194,7 @@ fn test_extremely_large_file_memory_limit() {
     assert!(result.is_ok(), "Should be able to load a 1000-row file");
 
     let doc = result.unwrap();
-    assert_eq!(doc.row_count(), 1000);
+    assert_eq!(doc.row_count(), 1001); // 1 header + 1000 data rows
     assert_eq!(doc.column_count(), 10);
 }
 

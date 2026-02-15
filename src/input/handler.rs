@@ -1,7 +1,7 @@
 //! Input handling and keyboard event processing
 
 use crate::app::{messages, App, EditBuffer, Mode};
-use crate::domain::position::RowIndex;
+use crate::domain::position::{ColIndex, RowIndex};
 use crate::navigation;
 use crate::ui::ViewportMode;
 use anyhow::Result;
@@ -47,6 +47,9 @@ fn format_pending_command(cmd: &PendingCommand) -> String {
         PendingCommand::GotoColumn(letters) => format!("g{}", letters),
         PendingCommand::D => "d".to_string(),
         PendingCommand::Y => "y".to_string(),
+        PendingCommand::Comma => ",".to_string(),
+        PendingCommand::CommaD => ",d".to_string(),
+        PendingCommand::CommaY => ",y".to_string(),
     }
 }
 
@@ -56,6 +59,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         Mode::Normal => handle_normal_mode(app, key),
         Mode::Command => handle_command_mode(app, key),
         Mode::Insert => handle_insert_mode(app, key),
+        Mode::FileList => handle_file_list_mode(app, key),
         // TODO: Implement handlers for new modes in v0.5.0+
         Mode::Magnifier | Mode::HeaderEdit | Mode::Visual => {
             // For now, Esc returns to Normal mode
@@ -235,6 +239,14 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
 
         // Start multi-key sequences
         KeyCode::Char('g') if is_navigation_allowed(app) => {
+            // Check if we have a count prefix (e.g., 5 from 5g)
+            if let Some(count) = app.input_state.command_count.take() {
+                // Row jump: 5g → jump to row 5
+                navigation::commands::goto_line(app, count.get());
+                return Ok(InputResult::Continue);
+            }
+
+            // No count - start gg sequence
             app.input_state.set_pending_command(PendingCommand::G);
             return Ok(InputResult::Continue);
         }
@@ -314,12 +326,12 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
 
         // Row operations: 'p' - paste row below
         KeyCode::Char('p') if is_navigation_allowed(app) => {
-            if let Some(clipboard) = app.row_clipboard.clone() {
+            if let Some(clipboard_row) = app.clipboard.as_row() {
                 if let Some(row_idx) = app.get_selected_row() {
                     let new_row_idx = RowIndex::new(row_idx.get() + 1);
                     app.document.insert_row(new_row_idx);
                     // Copy clipboard content into the new row
-                    for (col_idx, value) in clipboard.iter().enumerate() {
+                    for (col_idx, value) in clipboard_row.iter().enumerate() {
                         if col_idx < app.document.column_count() {
                             app.document.set_cell(
                                 new_row_idx,
@@ -458,8 +470,16 @@ fn handle_multi_key_command(
         (PendingCommand::D, KeyCode::Char('d')) => {
             app.input_state.clear_pending_command();
             if let Some(row_idx) = app.get_selected_row() {
+                // If deleting row 0 (header), turn header_mode OFF
+                if row_idx.get() == 0 {
+                    app.document.header_mode = false;
+                    app.session.set_header_mode(false);
+                    app.status_message =
+                        Some(StatusMessage::from("Header row deleted, header mode OFF"));
+                }
+
                 if let Some(deleted) = app.document.delete_row(row_idx) {
-                    app.row_clipboard = Some(deleted);
+                    app.clipboard.yank_row(deleted);
                     // Adjust selection if needed
                     let row_count = app.document.row_count();
                     if row_count == 0 {
@@ -470,7 +490,10 @@ fn handle_multi_key_command(
                         app.view_state.table_state.select(Some(row_count - 1));
                     }
                     // Otherwise selection stays at same index (which is now the next row)
-                    app.status_message = Some(StatusMessage::from("1 row deleted"));
+
+                    if row_idx.get() != 0 {
+                        app.status_message = Some(StatusMessage::from("1 row deleted"));
+                    }
                 }
             }
         }
@@ -479,8 +502,9 @@ fn handle_multi_key_command(
         (PendingCommand::Y, KeyCode::Char('y')) => {
             app.input_state.clear_pending_command();
             if let Some(row_idx) = app.get_selected_row() {
+                // Direct access: row_idx is absolute (0=header, 1+=data)
                 if let Some(row) = app.document.rows.get(row_idx.get()) {
-                    app.row_clipboard = Some(row.clone());
+                    app.clipboard.yank_row(row.clone());
                     app.status_message = Some(StatusMessage::from("1 row yanked"));
                 }
             }
@@ -536,7 +560,11 @@ fn handle_command_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
 
         KeyCode::Enter => {
             execute_command(app)?;
-            app.mode = Mode::Normal;
+            // Only return to Normal if command didn't change mode
+            // (Some commands like :files switch to a different mode)
+            if app.mode == Mode::Command {
+                app.mode = Mode::Normal;
+            }
             app.input_state.clear_command_buffer();
         }
 
@@ -554,6 +582,412 @@ fn handle_command_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     Ok(InputResult::Continue)
 }
 
+/// Parse and execute range commands like :5,10d, :%d, :.d, :$d
+/// Returns Some(Result) if this is a range command, None otherwise
+fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()>> {
+    use crate::RowIndex;
+
+    // Check if command contains a range pattern or special markers
+    // Patterns: 5,10d, %d, .d, $d, 5,10y, %y, etc.
+
+    // Match special range markers
+    if let Some(operation) = cmd.strip_prefix('%') {
+        // %d = delete all rows, %y = yank all rows
+        match operation {
+            "d" => {
+                // Delete all data rows (excluding header)
+                let row_count = app.document.data_row_count();
+                if row_count == 0 {
+                    app.status_message = Some(StatusMessage::from("No data rows to delete"));
+                    return Some(Ok(()));
+                }
+
+                // Delete rows 1 to row_count (all data rows, preserving header at row 0)
+                let deleted = app
+                    .document
+                    .delete_rows(RowIndex::new(1), RowIndex::new(row_count));
+                app.status_message = Some(StatusMessage::from(format!(
+                    "Deleted {} row(s)",
+                    deleted.len()
+                )));
+
+                // Move cursor to row 1 (or row 0 if no data rows left)
+                if app.document.data_row_count() > 0 {
+                    app.view_state.table_state.select(Some(1));
+                } else {
+                    app.view_state.table_state.select(Some(0));
+                }
+
+                return Some(Ok(()));
+            }
+            "y" => {
+                // Yank all data rows
+                let row_count = app.document.data_row_count();
+                if row_count == 0 {
+                    app.status_message = Some(StatusMessage::from("No data rows to yank"));
+                    return Some(Ok(()));
+                }
+
+                let yanked = app
+                    .document
+                    .get_rows(RowIndex::new(1), RowIndex::new(row_count));
+                // TODO: Store in clipboard when clipboard system is implemented
+                app.status_message = Some(StatusMessage::from(format!(
+                    "Yanked {} row(s)",
+                    yanked.len()
+                )));
+
+                return Some(Ok(()));
+            }
+            _ => {
+                app.status_message = Some(StatusMessage::from(format!(
+                    "Unknown range operation: :{}",
+                    cmd
+                )));
+                return Some(Ok(()));
+            }
+        }
+    }
+
+    // Match .d or .y (current row)
+    if let Some(operation) = cmd.strip_prefix('.') {
+        match operation {
+            "d" => {
+                // Delete current row
+                if let Some(row_idx) = app.get_selected_row() {
+                    if let Some(_deleted) = app.document.delete_row(row_idx) {
+                        app.status_message = Some(StatusMessage::from("Deleted 1 row"));
+
+                        // Adjust cursor position
+                        let new_row_count = app.document.data_row_count();
+                        let current_pos = row_idx.get();
+
+                        if new_row_count == 0 {
+                            // No data rows left, move to header
+                            app.view_state.table_state.select(Some(0));
+                        } else if current_pos > new_row_count {
+                            // Cursor past end, move to last row
+                            app.view_state.table_state.select(Some(new_row_count));
+                        }
+                        // Otherwise keep cursor at same position
+                    } else {
+                        app.status_message = Some(StatusMessage::from("Failed to delete row"));
+                    }
+                } else {
+                    app.status_message = Some(StatusMessage::from("No row selected"));
+                }
+                return Some(Ok(()));
+            }
+            "y" => {
+                // Yank current row
+                if let Some(row_idx) = app.get_selected_row() {
+                    let yanked = app.document.get_rows(row_idx, row_idx);
+                    if !yanked.is_empty() {
+                        // TODO: Store in clipboard when clipboard system is implemented
+                        app.status_message = Some(StatusMessage::from("Yanked 1 row"));
+                    } else {
+                        app.status_message = Some(StatusMessage::from("Failed to yank row"));
+                    }
+                } else {
+                    app.status_message = Some(StatusMessage::from("No row selected"));
+                }
+                return Some(Ok(()));
+            }
+            _ => {
+                app.status_message = Some(StatusMessage::from(format!(
+                    "Unknown range operation: :{}",
+                    cmd
+                )));
+                return Some(Ok(()));
+            }
+        }
+    }
+
+    // Match $d or $y (last row)
+    if let Some(operation) = cmd.strip_prefix('$') {
+        match operation {
+            "d" => {
+                // Delete last row
+                let row_count = app.document.data_row_count();
+                if row_count == 0 {
+                    app.status_message = Some(StatusMessage::from("No data rows to delete"));
+                    return Some(Ok(()));
+                }
+
+                if let Some(_deleted) = app.document.delete_row(RowIndex::new(row_count)) {
+                    app.status_message = Some(StatusMessage::from("Deleted 1 row"));
+
+                    // Move cursor to new last row if cursor was on deleted row
+                    if let Some(current_row) = app.get_selected_row() {
+                        if current_row.get() > app.document.data_row_count() {
+                            app.view_state
+                                .table_state
+                                .select(Some(app.document.data_row_count()));
+                        }
+                    }
+                } else {
+                    app.status_message = Some(StatusMessage::from("Failed to delete row"));
+                }
+                return Some(Ok(()));
+            }
+            "y" => {
+                // Yank last row
+                let row_count = app.document.data_row_count();
+                if row_count == 0 {
+                    app.status_message = Some(StatusMessage::from("No data rows to yank"));
+                    return Some(Ok(()));
+                }
+
+                let yanked = app
+                    .document
+                    .get_rows(RowIndex::new(row_count), RowIndex::new(row_count));
+                if !yanked.is_empty() {
+                    // TODO: Store in clipboard when clipboard system is implemented
+                    app.status_message = Some(StatusMessage::from("Yanked 1 row"));
+                } else {
+                    app.status_message = Some(StatusMessage::from("Failed to yank row"));
+                }
+                return Some(Ok(()));
+            }
+            _ => {
+                app.status_message = Some(StatusMessage::from(format!(
+                    "Unknown range operation: :{}",
+                    cmd
+                )));
+                return Some(Ok(()));
+            }
+        }
+    }
+
+    // Match numeric ranges: 5,10d or 5,10y
+    if let Some(comma_pos) = cmd.find(',') {
+        let start_str = &cmd[0..comma_pos];
+        let rest = &cmd[comma_pos + 1..];
+
+        // Parse start number
+        if let Ok(start_num) = start_str.parse::<usize>() {
+            // Find where the operation starts (last letter)
+            if let Some(last_char) = rest.chars().last() {
+                let operation = last_char;
+                let end_str = &rest[0..rest.len() - 1];
+
+                // Parse end number
+                if let Ok(end_num) = end_str.parse::<usize>() {
+                    match operation {
+                        'd' => {
+                            // Delete range
+                            if start_num == 0 || end_num == 0 {
+                                app.status_message = Some(StatusMessage::from(
+                                    "Row numbers must be >= 1 (row 0 is header)",
+                                ));
+                                return Some(Ok(()));
+                            }
+
+                            if start_num > end_num {
+                                app.status_message = Some(StatusMessage::from(
+                                    "Invalid range: start must be <= end",
+                                ));
+                                return Some(Ok(()));
+                            }
+
+                            let deleted = app
+                                .document
+                                .delete_rows(RowIndex::new(start_num), RowIndex::new(end_num));
+
+                            if deleted.is_empty() {
+                                app.status_message = Some(StatusMessage::from(
+                                    "No rows deleted (range out of bounds)",
+                                ));
+                            } else {
+                                app.status_message = Some(StatusMessage::from(format!(
+                                    "Deleted {} row(s)",
+                                    deleted.len()
+                                )));
+
+                                // Adjust cursor position
+                                if let Some(current_row) = app.get_selected_row() {
+                                    let new_row_count = app.document.data_row_count();
+                                    if new_row_count == 0 {
+                                        app.view_state.table_state.select(Some(0));
+                                    } else if current_row.get() > new_row_count {
+                                        app.view_state.table_state.select(Some(new_row_count));
+                                    }
+                                }
+                            }
+
+                            return Some(Ok(()));
+                        }
+                        'y' => {
+                            // Yank range
+                            if start_num == 0 || end_num == 0 {
+                                app.status_message = Some(StatusMessage::from(
+                                    "Row numbers must be >= 1 (row 0 is header)",
+                                ));
+                                return Some(Ok(()));
+                            }
+
+                            if start_num > end_num {
+                                app.status_message = Some(StatusMessage::from(
+                                    "Invalid range: start must be <= end",
+                                ));
+                                return Some(Ok(()));
+                            }
+
+                            let yanked = app
+                                .document
+                                .get_rows(RowIndex::new(start_num), RowIndex::new(end_num));
+
+                            if yanked.is_empty() {
+                                app.status_message = Some(StatusMessage::from(
+                                    "No rows yanked (range out of bounds)",
+                                ));
+                            } else {
+                                // TODO: Store in clipboard when clipboard system is implemented
+                                app.status_message = Some(StatusMessage::from(format!(
+                                    "Yanked {} row(s)",
+                                    yanked.len()
+                                )));
+                            }
+
+                            return Some(Ok(()));
+                        }
+                        _ => {
+                            app.status_message = Some(StatusMessage::from(format!(
+                                "Unknown range operation: {}",
+                                operation
+                            )));
+                            return Some(Ok(()));
+                        }
+                    }
+                }
+            }
+        }
+        // Check for column range: B,Dd or A,Ey
+        else if rest.chars().last().is_some() {
+            let last_char = rest.chars().last().unwrap();
+            let operation = last_char;
+            let end_str = &rest[0..rest.len() - 1];
+
+            // Check if both start and end are letters (column names) and end_str is not empty
+            if !end_str.is_empty()
+                && start_str.chars().all(|c| c.is_ascii_alphabetic())
+                && end_str.chars().all(|c| c.is_ascii_alphabetic())
+            {
+                use crate::ui::utils::excel_letter_to_column;
+
+                // Convert column letters to indices
+                match (
+                    excel_letter_to_column(&start_str.to_uppercase()),
+                    excel_letter_to_column(&end_str.to_uppercase()),
+                ) {
+                    (Ok(start_col), Ok(end_col)) => {
+                        match operation {
+                            'd' => {
+                                // Delete column range
+                                if start_col > end_col {
+                                    app.status_message = Some(StatusMessage::from(
+                                        "Invalid range: start column must be <= end column",
+                                    ));
+                                    return Some(Ok(()));
+                                }
+
+                                let max_col = app.document.column_count();
+                                if start_col >= max_col {
+                                    app.status_message = Some(StatusMessage::from(format!(
+                                        "Column {} does not exist (max: {})",
+                                        start_str.to_uppercase(),
+                                        crate::ui::utils::column_to_excel_letter(
+                                            max_col.saturating_sub(1)
+                                        )
+                                    )));
+                                    return Some(Ok(()));
+                                }
+
+                                let deleted = app.document.delete_columns(
+                                    ColIndex::new(start_col),
+                                    ColIndex::new(end_col),
+                                );
+
+                                if deleted.is_empty() {
+                                    app.status_message = Some(StatusMessage::from(
+                                        "No columns deleted (range out of bounds)",
+                                    ));
+                                } else {
+                                    app.status_message = Some(StatusMessage::from(format!(
+                                        "Deleted {} column(s)",
+                                        deleted.len()
+                                    )));
+
+                                    // Adjust cursor position
+                                    let current_col = app.view_state.selected_column.get();
+                                    let new_col_count = app.document.column_count();
+
+                                    if new_col_count == 0 {
+                                        // No columns left, shouldn't happen but handle it
+                                        app.view_state.selected_column = ColIndex::new(0);
+                                    } else if current_col >= end_col {
+                                        // Cursor at or after deleted range
+                                        let new_pos = current_col.saturating_sub(deleted.len());
+                                        app.view_state.selected_column =
+                                            ColIndex::new(new_pos.min(new_col_count - 1));
+                                    } else if current_col >= start_col {
+                                        // Cursor in deleted range, move to start
+                                        app.view_state.selected_column =
+                                            ColIndex::new(start_col.min(new_col_count - 1));
+                                    }
+                                }
+
+                                return Some(Ok(()));
+                            }
+                            'y' => {
+                                // Yank column range
+                                if start_col > end_col {
+                                    app.status_message = Some(StatusMessage::from(
+                                        "Invalid range: start column must be <= end column",
+                                    ));
+                                    return Some(Ok(()));
+                                }
+
+                                let yanked = app
+                                    .document
+                                    .get_columns(ColIndex::new(start_col), ColIndex::new(end_col));
+
+                                if yanked.is_empty() {
+                                    app.status_message = Some(StatusMessage::from(
+                                        "No columns yanked (range out of bounds)",
+                                    ));
+                                } else {
+                                    // TODO: Store in clipboard when clipboard system is implemented
+                                    app.status_message = Some(StatusMessage::from(format!(
+                                        "Yanked {} column(s)",
+                                        yanked.len()
+                                    )));
+                                }
+
+                                return Some(Ok(()));
+                            }
+                            _ => {
+                                app.status_message = Some(StatusMessage::from(format!(
+                                    "Unknown range operation: {}",
+                                    operation
+                                )));
+                                return Some(Ok(()));
+                            }
+                        }
+                    }
+                    (Err(e), _) | (_, Err(e)) => {
+                        app.status_message = Some(StatusMessage::from(e));
+                        return Some(Ok(()));
+                    }
+                }
+            }
+        }
+    }
+
+    // Not a range command
+    None
+}
+
 /// Execute command from command buffer
 fn execute_command(app: &mut App) -> Result<()> {
     let cmd = app.input_state.command_buffer.trim().to_string();
@@ -562,13 +996,86 @@ fn execute_command(app: &mut App) -> Result<()> {
         return Ok(());
     }
 
+    // Special handling for :c command (column jump)
+    // Support both `:cA` (no space) and `:c A` (with space)
+    if cmd.starts_with('c') || cmd.starts_with('C') {
+        let rest = &cmd[1..]; // Get everything after 'c'
+
+        // Check if rest starts with a letter or digit (column specifier)
+        // AND doesn't contain a comma (to avoid conflicting with column range commands like :C,Cd)
+        if !rest.is_empty() && !rest.starts_with(' ') && !rest.contains(',') {
+            // This is :cA, :cB, :c1, etc. (no space)
+            let column_input = rest.trim();
+
+            // Check if it's a numeric input (e.g., :c1, :c27)
+            if let Ok(col_num) = column_input.parse::<usize>() {
+                // Numeric column jump (1-indexed: 1=A, 2=B, 27=AA)
+                navigation::commands::goto_column_by_number(app, col_num);
+            } else {
+                // Letter column jump (e.g., :cA, :cB, :cAA)
+                // Validate it's only letters
+                let column_letters = column_input.to_uppercase();
+                if column_letters.chars().all(|c| c.is_ascii_alphabetic()) {
+                    navigation::commands::goto_column(app, &column_letters);
+                } else {
+                    app.status_message = Some(StatusMessage::from(
+                        "Invalid column name. Use letters (e.g., :cA, :cAA) or numbers (e.g., :c1, :c27)"
+                    ));
+                }
+            }
+            return Ok(());
+        }
+    }
+
+    // Special handling for range operations: :5,10d, :%d, :.d, :$d, etc.
+    if let Some(range_result) = parse_and_execute_range_command(app, &cmd) {
+        return range_result;
+    }
+
     // Split command into parts for commands with arguments
     let parts: Vec<&str> = cmd.splitn(2, ' ').collect();
-    let cmd_name = parts[0].to_lowercase();
-    let arg = parts.get(1).map(|s| s.trim());
+    let cmd_name_original = parts[0]; // Keep original case
+    let cmd_name_lower = cmd_name_original.to_lowercase();
+    let _arg = parts.get(1).map(|s| s.trim());
 
-    // Reserved commands (take priority)
-    match cmd_name.as_str() {
+    // Check case-sensitive commands first
+    match cmd_name_original {
+        "W" => {
+            // Save all dirty files
+            match app.save_all_files() {
+                Ok(paths) => {
+                    if paths.is_empty() {
+                        app.status_message = Some(StatusMessage::from("No files to save"));
+                    } else {
+                        app.status_message = Some(StatusMessage::from(format!(
+                            "{} file(s) written",
+                            paths.len()
+                        )));
+                    }
+                }
+                Err(e) => {
+                    app.status_message = Some(StatusMessage::from(format!("Error: {}", e)));
+                }
+            }
+            return Ok(());
+        }
+        "Wq" => {
+            // Save all dirty files and quit
+            match app.save_all_files() {
+                Ok(_) => {
+                    app.should_quit = true;
+                }
+                Err(e) => {
+                    app.status_message = Some(StatusMessage::from(format!("Error: {}", e)));
+                }
+            }
+            return Ok(());
+        }
+        _ => {} // Fall through to case-insensitive commands
+    }
+
+    // Case-insensitive commands
+    match cmd_name_lower.as_str() {
         "q" | "quit" => {
             if app.document.is_dirty {
                 app.status_message = Some(StatusMessage::from(
@@ -580,60 +1087,302 @@ fn execute_command(app: &mut App) -> Result<()> {
             return Ok(());
         }
         "q!" => {
+            // Force quit - clear cache and quit
+            app.session.clear_cache();
             app.should_quit = true;
             return Ok(());
         }
         "w" | "write" => {
-            // TODO: Implement save in v0.7.0
-            app.status_message = Some(StatusMessage::from("Save not yet implemented"));
+            // Save current file only
+            match app.save_current_file() {
+                Ok(path) => {
+                    app.status_message = Some(StatusMessage::from(format!(
+                        "\"{}\" written",
+                        path.file_name().and_then(|n| n.to_str()).unwrap_or("file")
+                    )));
+                }
+                Err(e) => {
+                    app.status_message = Some(StatusMessage::from(format!("Error: {}", e)));
+                }
+            }
             return Ok(());
         }
         "wq" | "x" => {
-            // TODO: Implement save and quit in v0.7.0
-            app.status_message = Some(StatusMessage::from("Save not yet implemented"));
+            // Save current file and quit
+            match app.save_current_file() {
+                Ok(_) => {
+                    app.should_quit = true;
+                }
+                Err(e) => {
+                    app.status_message = Some(StatusMessage::from(format!("Error: {}", e)));
+                }
+            }
             return Ok(());
         }
         "h" | "help" => {
             app.status_message = Some(StatusMessage::from("Press ? for help"));
             return Ok(());
         }
-        "c" => {
-            // Column jump: :c A, :c 17, :c AA
-            if let Some(col_arg) = arg {
-                if let Ok(col_num) = col_arg.parse::<usize>() {
-                    // Numeric column (1-indexed)
-                    if col_num == 0 {
-                        app.status_message =
-                            Some(StatusMessage::from("Column number must be >= 1"));
-                    } else {
-                        navigation::commands::goto_column_by_number(app, col_num);
+        "ht" => {
+            // Toggle header mode
+            app.document.toggle_header_mode();
+            app.session.set_header_mode(app.document.header_mode);
+
+            // Adjust cursor position if needed
+            if let Some(row_idx) = app.get_selected_row() {
+                if app.document.header_mode && row_idx.get() == 0 {
+                    // Header mode turned ON and cursor is on row 0 - move to row 1
+                    app.view_state.table_state.select(Some(1));
+                }
+            }
+
+            let mode_str = if app.document.header_mode {
+                "ON"
+            } else {
+                "OFF"
+            };
+            app.status_message = Some(StatusMessage::from(format!("Header mode: {}", mode_str)));
+            return Ok(());
+        }
+        "delim" => {
+            // Change CSV delimiter for current file and reload
+            if let Some(arg) = _arg {
+                if arg.len() == 1 {
+                    let new_delim = arg.chars().next().unwrap();
+
+                    // Track in session for current file
+                    let current_file = app.get_current_file().clone();
+                    app.session.set_delimiter(current_file.clone(), new_delim);
+
+                    // Reload file with new delimiter
+                    match app.reload_current_file_with_delimiter(new_delim) {
+                        Ok(_) => {
+                            app.status_message = Some(StatusMessage::from(format!(
+                                "Delimiter changed to '{}' and file reloaded",
+                                new_delim
+                            )));
+                        }
+                        Err(e) => {
+                            app.status_message =
+                                Some(StatusMessage::from(format!("Reload failed: {}", e)));
+                        }
                     }
-                } else if col_arg.chars().all(|c| c.is_ascii_alphabetic()) {
-                    // Letter column (A, B, AA, etc.)
-                    navigation::commands::goto_column(app, col_arg);
                 } else {
                     app.status_message =
-                        Some(StatusMessage::from(format!("Invalid column: {}", col_arg)));
+                        Some(StatusMessage::from("Delimiter must be a single character"));
                 }
             } else {
-                app.status_message =
-                    Some(StatusMessage::from("Usage: :c <column> (e.g., :c A, :c 5)"));
+                app.status_message = Some(StatusMessage::from(
+                    "Usage: :delim <char> (e.g., :delim ; or :delim |)",
+                ));
             }
+            return Ok(());
+        }
+        "new" => {
+            // Create a new CSV document with optional headers
+            let headers = if let Some(arg) = _arg {
+                // Parse comma-separated headers
+                arg.split(',')
+                    .map(|s| s.trim().to_string())
+                    .collect::<Vec<String>>()
+            } else {
+                // Default: single column named "Column 1"
+                vec!["Column 1".to_string()]
+            };
+
+            // Create new document with headers only (0 data rows)
+            let filename = app.document.filename.clone();
+            let delimiter = app.document.delimiter;
+
+            app.document = crate::csv::Document::new(headers.clone(), vec![], filename);
+            app.document.delimiter = delimiter; // Preserve current delimiter
+            app.document.is_dirty = true;
+            app.document.header_mode = true;
+
+            // Mark current file as dirty in session
+            let current_file = app.get_current_file().clone();
+            app.session.mark_dirty(&current_file);
+
+            // Reset view state and position cursor
+            app.view_state = crate::ui::ViewState::default();
+            // Position at row 1 (first data row position) if header_mode is ON
+            // Since we have 0 data rows, this will be out of bounds but selection will still work
+            if app.document.header_mode {
+                app.view_state.table_state.select(Some(1));
+            } else {
+                app.view_state.table_state.select(Some(0));
+            }
+
+            app.status_message = Some(StatusMessage::from(format!(
+                "New CSV created with {} column(s)",
+                headers.len()
+            )));
+            return Ok(());
+        }
+        "c" => {
+            // Column jump: :cA, :cB, :cAA, :c1, etc.
+            if let Some(arg) = _arg {
+                let column_input = arg.trim();
+
+                // Check if it's a numeric input (e.g., :c1, :c27)
+                if let Ok(col_num) = column_input.parse::<usize>() {
+                    // Numeric column jump (1-indexed: 1=A, 2=B, 27=AA)
+                    navigation::commands::goto_column_by_number(app, col_num);
+                } else {
+                    // Letter column jump (e.g., :cA, :cB, :cAA)
+                    // Validate it's only letters
+                    let column_letters = column_input.to_uppercase();
+                    if column_letters.chars().all(|c| c.is_ascii_alphabetic()) {
+                        navigation::commands::goto_column(app, &column_letters);
+                    } else {
+                        app.status_message = Some(StatusMessage::from(
+                            "Invalid column name. Use letters (e.g., :cA, :cAA) or numbers (e.g., :c1, :c27)"
+                        ));
+                    }
+                }
+            } else {
+                app.status_message = Some(StatusMessage::from(
+                    "Usage: :c<column> (e.g., :cA, :cB, :cAA, :c1, :c27)",
+                ));
+            }
+            return Ok(());
+        }
+        "files" => {
+            // Enter FileList mode to show file picker
+            app.mode = Mode::FileList;
+            app.input_state.clear_file_filter();
+            app.status_message = Some(StatusMessage::from(
+                "Type to filter, number to select, Enter for first, Esc to cancel",
+            ));
             return Ok(());
         }
         _ => {}
     }
 
-    // Try to parse entire command as number (row jump: :15)
-    if let Ok(line_num) = cmd.parse::<usize>() {
-        navigation::commands::goto_line(app, line_num);
-        app.status_message = Some(StatusMessage::from(format!("Jumped to row {}", line_num)));
-        return Ok(());
-    }
-
     // Unknown command
     app.status_message = Some(StatusMessage::from(format!("Unknown command: :{}", cmd)));
     Ok(())
+}
+
+/// Handle keyboard input in FileList mode
+fn handle_file_list_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
+    match key.code {
+        KeyCode::Esc => {
+            // Cancel file picker
+            app.mode = Mode::Normal;
+            app.status_message = None;
+            app.input_state.clear_file_filter();
+            app.view_state.file_list_selected = 0;
+            Ok(InputResult::Continue)
+        }
+        KeyCode::Backspace => {
+            // Delete character from filter
+            app.input_state.pop_file_filter_char();
+            // Reset selection to 0 when filter changes
+            app.view_state.file_list_selected = 0;
+            Ok(InputResult::Continue)
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            // Move selection up
+            if app.view_state.file_list_selected > 0 {
+                app.view_state.file_list_selected -= 1;
+            }
+            Ok(InputResult::Continue)
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            // Move selection down
+            let filter = app.input_state.file_filter_buffer.to_lowercase();
+            let files = app.session.files();
+
+            let filtered_count = files
+                .iter()
+                .filter(|path| {
+                    if filter.is_empty() {
+                        true
+                    } else {
+                        path.file_name()
+                            .and_then(|n| n.to_str())
+                            .map(|s| s.to_lowercase().contains(&filter))
+                            .unwrap_or(false)
+                    }
+                })
+                .count();
+
+            if app.view_state.file_list_selected + 1 < filtered_count {
+                app.view_state.file_list_selected += 1;
+            }
+            Ok(InputResult::Continue)
+        }
+        KeyCode::Enter => {
+            // Select current file
+            let filter = app.input_state.file_filter_buffer.to_lowercase();
+            let files = app.session.files();
+
+            // Get filtered file list
+            let filtered_files: Vec<(usize, &std::path::PathBuf)> = files
+                .iter()
+                .enumerate()
+                .filter(|(_, path)| {
+                    if filter.is_empty() {
+                        true
+                    } else {
+                        path.file_name()
+                            .and_then(|n| n.to_str())
+                            .map(|s| s.to_lowercase().contains(&filter))
+                            .unwrap_or(false)
+                    }
+                })
+                .collect();
+
+            if filtered_files.is_empty() {
+                app.status_message = Some(StatusMessage::from("No matching files"));
+                return Ok(InputResult::Continue);
+            }
+
+            // Get the actual file index from filtered list
+            let selected_idx = app
+                .view_state
+                .file_list_selected
+                .min(filtered_files.len() - 1);
+            let target_index = filtered_files[selected_idx].0;
+
+            // Switch to selected file
+            let current = app.session.active_file_index();
+            if target_index != current {
+                let file_count = app.session.file_count();
+                let diff = if target_index > current {
+                    target_index - current
+                } else {
+                    file_count - current + target_index
+                };
+
+                for _ in 0..diff {
+                    app.session.next_file();
+                }
+            }
+
+            app.mode = Mode::Normal;
+            app.input_state.clear_file_filter();
+            app.view_state.file_list_selected = 0;
+
+            if target_index != current {
+                Ok(InputResult::ReloadFile)
+            } else {
+                Ok(InputResult::Continue)
+            }
+        }
+        KeyCode::Char(c) => {
+            // Add character to filter
+            app.input_state.push_file_filter_char(c);
+            // Reset selection to 0 when filter changes
+            app.view_state.file_list_selected = 0;
+            Ok(InputResult::Continue)
+        }
+        _ => {
+            // Ignore other keys
+            Ok(InputResult::Continue)
+        }
+    }
 }
 
 /// Handle keyboard input in Insert mode

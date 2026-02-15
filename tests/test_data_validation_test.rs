@@ -71,14 +71,14 @@ fn test_all_test_data_files_load() {
 fn test_sparse_csv() {
     let doc = load_test_csv("sparse.csv");
     assert_eq!(doc.column_count(), 10, "sparse.csv should have 10 columns");
-    assert_eq!(doc.row_count(), 15, "sparse.csv should have 15 rows");
+    assert_eq!(doc.row_count(), 16, "sparse.csv should have 15 rows");
 
     // Verify some cells are empty (sparse data)
-    let empty_cell = doc.get_cell(RowIndex::new(9), ColIndex::new(1)); // Row 10, col B
+    let empty_cell = doc.get_cell(RowIndex::new(10), ColIndex::new(1)); // Row 10, col B
     assert!(empty_cell.is_empty(), "Expected empty cell in sparse data");
 
     // Verify some cells have data
-    let filled_cell = doc.get_cell(RowIndex::new(0), ColIndex::new(1)); // Row 1, col B (Name)
+    let filled_cell = doc.get_cell(RowIndex::new(1), ColIndex::new(1)); // Row 1, col B (Name)
     assert_eq!(filled_cell, "Alice");
 }
 
@@ -86,24 +86,24 @@ fn test_sparse_csv() {
 fn test_unicode_csv() {
     let doc = load_test_csv("unicode.csv");
     assert_eq!(doc.column_count(), 7, "unicode.csv should have 7 columns");
-    assert_eq!(doc.row_count(), 15, "unicode.csv should have 15 rows");
+    assert_eq!(doc.row_count(), 16, "unicode.csv should have 15 rows");
 
     // Verify Japanese greeting preserved
-    let greeting = doc.get_cell(RowIndex::new(0), ColIndex::new(3));
+    let greeting = doc.get_cell(RowIndex::new(1), ColIndex::new(3));
     assert!(
         greeting.contains("こんにちは"),
         "Japanese greeting should be preserved"
     );
 
     // Verify emoji preserved
-    let emoji = doc.get_cell(RowIndex::new(0), ColIndex::new(4));
+    let emoji = doc.get_cell(RowIndex::new(1), ColIndex::new(4));
     assert!(
         emoji.contains("🇯🇵"),
         "Japanese flag emoji should be preserved"
     );
 
     // Verify currency symbol preserved
-    let currency = doc.get_cell(RowIndex::new(0), ColIndex::new(5));
+    let currency = doc.get_cell(RowIndex::new(1), ColIndex::new(5));
     assert!(currency.contains("¥"), "Yen symbol should be preserved");
 }
 
@@ -115,10 +115,11 @@ fn test_long_values_csv() {
         4,
         "long_values.csv should have 4 columns"
     );
-    assert_eq!(doc.row_count(), 10, "long_values.csv should have 10 rows");
+    assert_eq!(doc.row_count(), 11, "long_values.csv should have 10 rows");
 
     // Verify long content is preserved (not truncated during parsing)
-    let long_desc = doc.get_cell(RowIndex::new(2), ColIndex::new(2)); // Row 3, Description
+    // Row 0 = header, Row 3 = 4th row in file = data row with ID=3
+    let long_desc = doc.get_cell(RowIndex::new(3), ColIndex::new(2));
     assert!(
         long_desc.len() > 100,
         "Long description should be preserved (got {} chars)",
@@ -134,14 +135,14 @@ fn test_single_column_csv() {
         1,
         "single_column.csv should have 1 column"
     );
-    assert_eq!(doc.row_count(), 15, "single_column.csv should have 15 rows");
+    assert_eq!(doc.row_count(), 16, "single_column.csv should have 15 rows");
 
     // Verify header
     assert_eq!(doc.get_header(ColIndex::new(0)), "Names");
 
     // Verify first few values
-    assert_eq!(doc.get_cell(RowIndex::new(0), ColIndex::new(0)), "Alice");
-    assert_eq!(doc.get_cell(RowIndex::new(1), ColIndex::new(0)), "Bob");
+    assert_eq!(doc.get_cell(RowIndex::new(1), ColIndex::new(0)), "Alice");
+    assert_eq!(doc.get_cell(RowIndex::new(2), ColIndex::new(0)), "Bob");
 }
 
 #[test]
@@ -152,20 +153,24 @@ fn test_special_chars_csv() {
         5,
         "special_chars.csv should have 5 columns"
     );
-    assert_eq!(doc.row_count(), 15, "special_chars.csv should have 15 rows");
+    assert_eq!(doc.row_count(), 16, "special_chars.csv should have 15 rows");
 
     // Verify quoted values with commas are parsed correctly
-    let quoted_name = doc.get_cell(RowIndex::new(1), ColIndex::new(1)); // "Quoted, Name"
+    // Row 0 = header, Row 2 = 3rd row in file = data row with ID=2
+    let quoted_name = doc.get_cell(RowIndex::new(2), ColIndex::new(1));
     assert!(
         quoted_name.contains(","),
-        "Quoted value with comma should be preserved"
+        "Quoted value with comma should be preserved, got: '{}'",
+        quoted_name
     );
 
     // Verify quotes within quotes
-    let with_quotes = doc.get_cell(RowIndex::new(2), ColIndex::new(1)); // 'With "Quotes"'
+    // Row 3 = 4th row in file = data row with ID=3
+    let with_quotes = doc.get_cell(RowIndex::new(3), ColIndex::new(1));
     assert!(
         with_quotes.contains("\""),
-        "Embedded quotes should be preserved"
+        "Embedded quotes should be preserved, got: '{}'",
+        with_quotes
     );
 }
 
@@ -177,16 +182,16 @@ fn test_empty_cells_csv() {
         8,
         "empty_cells.csv should have 8 columns"
     );
-    assert_eq!(doc.row_count(), 22, "empty_cells.csv should have 22 rows");
+    assert_eq!(doc.row_count(), 23, "empty_cells.csv should have 22 rows");
 
     // Verify completely empty row (row 10, 0-indexed row 9)
     for col in 0..8 {
-        let cell = doc.get_cell(RowIndex::new(9), ColIndex::new(col));
+        let cell = doc.get_cell(RowIndex::new(10), ColIndex::new(col));
         assert!(cell.is_empty(), "Row 10 column {} should be empty", col + 1);
     }
 
     // Verify diagonal pattern - first cell of first data row should have value
-    let first_cell = doc.get_cell(RowIndex::new(0), ColIndex::new(0));
+    let first_cell = doc.get_cell(RowIndex::new(1), ColIndex::new(0));
     assert_eq!(first_cell, "1", "First cell should be '1'");
 }
 
@@ -194,18 +199,18 @@ fn test_empty_cells_csv() {
 fn test_numbers_csv() {
     let doc = load_test_csv("numbers.csv");
     assert_eq!(doc.column_count(), 10, "numbers.csv should have 10 columns");
-    assert_eq!(doc.row_count(), 10, "numbers.csv should have 10 rows");
+    assert_eq!(doc.row_count(), 11, "numbers.csv should have 10 rows");
 
     // Verify integer
-    let integer = doc.get_cell(RowIndex::new(0), ColIndex::new(1));
+    let integer = doc.get_cell(RowIndex::new(1), ColIndex::new(1));
     assert_eq!(integer, "42");
 
     // Verify decimal
-    let decimal = doc.get_cell(RowIndex::new(0), ColIndex::new(2));
+    let decimal = doc.get_cell(RowIndex::new(1), ColIndex::new(2));
     assert_eq!(decimal, "3.14");
 
     // Verify scientific notation preserved as string
-    let scientific = doc.get_cell(RowIndex::new(0), ColIndex::new(3));
+    let scientific = doc.get_cell(RowIndex::new(1), ColIndex::new(3));
     assert!(scientific.contains("E") || scientific.contains("e"));
 }
 
@@ -213,14 +218,14 @@ fn test_numbers_csv() {
 fn test_dates_csv() {
     let doc = load_test_csv("dates.csv");
     assert_eq!(doc.column_count(), 8, "dates.csv should have 8 columns");
-    assert_eq!(doc.row_count(), 10, "dates.csv should have 10 rows");
+    assert_eq!(doc.row_count(), 11, "dates.csv should have 10 rows");
 
     // Verify ISO date format preserved
-    let iso_date = doc.get_cell(RowIndex::new(0), ColIndex::new(1));
+    let iso_date = doc.get_cell(RowIndex::new(1), ColIndex::new(1));
     assert_eq!(iso_date, "2024-01-15");
 
     // Verify US date format preserved
-    let us_date = doc.get_cell(RowIndex::new(0), ColIndex::new(2));
+    let us_date = doc.get_cell(RowIndex::new(1), ColIndex::new(2));
     assert_eq!(us_date, "01/15/2024");
 }
 
@@ -232,15 +237,16 @@ fn test_patterns_csv() {
         10,
         "patterns.csv should have 10 columns"
     );
-    assert_eq!(doc.row_count(), 20, "patterns.csv should have 20 rows");
+    assert_eq!(doc.row_count(), 21, "patterns.csv should have 20 rows");
 
     // Verify diagonal pattern - X on diagonal
-    assert_eq!(doc.get_cell(RowIndex::new(0), ColIndex::new(0)), "X");
-    assert_eq!(doc.get_cell(RowIndex::new(1), ColIndex::new(1)), "X");
-    assert_eq!(doc.get_cell(RowIndex::new(2), ColIndex::new(2)), "X");
+    // Row 0 = header, Row 1 = first data row with X at col 0, Row 2 = second data row with X at col 1, etc.
+    assert_eq!(doc.get_cell(RowIndex::new(1), ColIndex::new(0)), "X");
+    assert_eq!(doc.get_cell(RowIndex::new(2), ColIndex::new(1)), "X");
+    assert_eq!(doc.get_cell(RowIndex::new(3), ColIndex::new(2)), "X");
 
     // Off-diagonal should be empty
-    assert!(doc.get_cell(RowIndex::new(0), ColIndex::new(1)).is_empty());
+    assert!(doc.get_cell(RowIndex::new(1), ColIndex::new(1)).is_empty());
 }
 
 #[test]
@@ -251,7 +257,7 @@ fn test_whitespace_csv() {
         7,
         "whitespace.csv should have 7 columns"
     );
-    assert_eq!(doc.row_count(), 10, "whitespace.csv should have 10 rows");
+    assert_eq!(doc.row_count(), 11, "whitespace.csv should have 10 rows");
 
     // CSV parsing typically trims whitespace, but let's verify structure is correct
     let headers: Vec<&str> = (0..7).map(|i| doc.get_header(ColIndex::new(i))).collect();
@@ -267,7 +273,7 @@ fn test_very_wide_csv() {
         101,
         "very_wide.csv should have 101 columns"
     );
-    assert_eq!(doc.row_count(), 20, "very_wide.csv should have 20 rows");
+    assert_eq!(doc.row_count(), 21, "very_wide.csv should have 20 rows");
 
     // Verify we can access last column
     let last_col_header = doc.get_header(ColIndex::new(100));
@@ -277,7 +283,7 @@ fn test_very_wide_csv() {
     );
 
     // Verify data in last column
-    let last_col_data = doc.get_cell(RowIndex::new(0), ColIndex::new(100));
+    let last_col_data = doc.get_cell(RowIndex::new(1), ColIndex::new(100));
     assert!(
         !last_col_data.is_empty() || last_col_data.is_empty(),
         "Should be able to read last column"
@@ -288,7 +294,7 @@ fn test_very_wide_csv() {
 fn test_customers_csv() {
     let doc = load_test_csv("customers.csv");
     assert_eq!(doc.column_count(), 5, "customers.csv should have 5 columns");
-    assert_eq!(doc.row_count(), 5, "customers.csv should have 5 rows");
+    assert_eq!(doc.row_count(), 6, "customers.csv should have 5 rows");
 
     // Verify headers
     assert_eq!(doc.get_header(ColIndex::new(0)), "CustomerID");
@@ -299,11 +305,11 @@ fn test_customers_csv() {
 fn test_sample_csv() {
     let doc = load_test_csv("sample.csv");
     assert_eq!(doc.column_count(), 6, "sample.csv should have 6 columns");
-    assert_eq!(doc.row_count(), 10, "sample.csv should have 10 rows");
+    assert_eq!(doc.row_count(), 11, "sample.csv should have 10 rows");
 
     // Verify first row
     assert_eq!(
-        doc.get_cell(RowIndex::new(0), ColIndex::new(1)),
+        doc.get_cell(RowIndex::new(1), ColIndex::new(1)),
         "Alice Johnson"
     );
 }
@@ -324,19 +330,19 @@ fn test_navigation_on_sparse_data() {
     // Navigate down
     app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE))
         .unwrap();
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(1)));
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(2))); // row 1 + 1 = row 2
 
     // Navigate to last row
     app.handle_key(KeyEvent::new(KeyCode::Char('G'), KeyModifiers::NONE))
         .unwrap();
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(14))); // 15 rows, 0-indexed
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(15))); // 16 total rows (15 data + 1 header), last = row 15
 
-    // Navigate to first row
+    // Navigate to first data row
     app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::NONE))
         .unwrap();
     app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::NONE))
         .unwrap();
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(0)));
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(1))); // First data row with header_mode ON
 }
 
 #[test]
@@ -380,7 +386,7 @@ fn test_navigation_on_single_column() {
     // Navigate down should work
     app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE))
         .unwrap();
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(1)));
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(2))); // row 1 + 1 = row 2
 }
 
 // =============================================================================

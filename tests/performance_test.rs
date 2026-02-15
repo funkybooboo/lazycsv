@@ -16,7 +16,7 @@ fn test_load_10k_rows_completes_quickly() {
 
     assert!(result.is_ok(), "Failed to load large CSV");
     let doc = result.unwrap();
-    assert_eq!(doc.rows.len(), 10_000);
+    assert_eq!(doc.rows.len(), 10_001); // 1 header + 10,000 data rows
 
     println!("Loaded 10K rows in {:?}", duration);
     assert!(
@@ -36,8 +36,8 @@ fn test_load_100_columns_completes_quickly() {
 
     assert!(result.is_ok(), "Failed to load wide CSV");
     let doc = result.unwrap();
-    assert_eq!(doc.headers.len(), 100);
-    assert_eq!(doc.rows.len(), 1000);
+    assert_eq!(doc.rows[0].len(), 100); // Header row has 100 columns
+    assert_eq!(doc.rows.len(), 1001); // 1 header + 1000 data rows
 
     println!("Loaded 100 columns in {:?}", duration);
     assert!(
@@ -69,8 +69,8 @@ fn test_navigate_large_file_responsive() {
 
     let duration = start.elapsed();
 
-    // Verify we're at row 4999 (0-indexed, 5000 is 1-indexed)
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(4999)));
+    // Verify we're at row 5000 (5000G goes to absolute row 5000)
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(5000)));
 
     println!("Navigated to row 5000 in {:?}", duration);
     assert!(

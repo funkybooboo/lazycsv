@@ -56,13 +56,43 @@ fn build_column_letters_row<'a>(
 }
 
 /// Build the header row with column names
-fn build_header_row<'a>(app: &'a App, start_col: usize, end_col: usize) -> Row<'a> {
-    let mut header_cells = vec![Cell::from("")]; // Empty cell for row number column
+/// Highlights the selected column if the cursor is on row 0 (header row)
+fn build_header_row<'a>(
+    app: &'a App,
+    start_col: usize,
+    end_col: usize,
+    selected_row: Option<usize>,
+) -> Row<'a> {
+    let is_header_selected = selected_row == Some(0);
+    let selected_col = app.view_state.selected_column;
+
+    // Row number for header: "0" if selected, otherwise empty or dim
+    let row_num_cell = if is_header_selected {
+        Cell::from("   0").style(Style::default().add_modifier(Modifier::BOLD))
+    } else {
+        Cell::from("")
+    };
+    let mut header_cells = vec![row_num_cell];
 
     for i in start_col..end_col {
         let header_text = app.document.get_header(ColIndex::new(i));
-        header_cells
-            .push(Cell::from(header_text).style(Style::default().add_modifier(Modifier::BOLD)));
+        let is_selected_cell = is_header_selected && ColIndex::new(i) == selected_col;
+
+        let style = if is_selected_cell {
+            // Selected cell in header row: highlight with white background
+            Style::default()
+                .bg(Color::White)
+                .fg(Color::Black)
+                .add_modifier(Modifier::BOLD)
+        } else if app.document.header_mode {
+            // Header mode ON: bold headers
+            Style::default().add_modifier(Modifier::BOLD)
+        } else {
+            // Header mode OFF: normal styling
+            Style::default()
+        };
+
+        header_cells.push(Cell::from(header_text).style(style));
     }
 
     Row::new(header_cells).height(1)
@@ -149,8 +179,8 @@ fn build_data_rows(
             let row_idx = scroll_offset + idx_in_window;
             let is_selected_row = selected_row_idx == Some(row_idx);
 
-            // Row number: bold for selected row, normal for others
-            let row_num_display = format!("{:>4}", row_idx + 1);
+            // Row number: display absolute row index (1, 2, 3... for data rows)
+            let row_num_display = format!("{:>4}", row_idx);
             let row_num_style = if is_selected_row {
                 Style::default().add_modifier(Modifier::BOLD)
             } else {
@@ -323,7 +353,8 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     // Build column letters and header rows
     let col_letters_row =
         build_column_letters_row(start_col, end_col, app.view_state.selected_column);
-    let header_row = build_header_row(app, start_col, end_col);
+    let selected_row = app.get_selected_row().map(|r| r.get());
+    let header_row = build_header_row(app, start_col, end_col, selected_row);
 
     // Calculate visible viewport for virtual scrolling
     let table_height = area
@@ -341,10 +372,12 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
         &app.view_state.viewport_mode,
     );
 
-    // Get visible rows for current viewport
-    let end_row = (scroll_offset + table_height).min(csv.row_count());
-    let visible_rows = if scroll_offset < csv.row_count() {
-        &csv.rows[scroll_offset..end_row]
+    // Get visible rows for current viewport (rows 1+, excluding header at row 0)
+    // Start from row 1 (first data row) since header is rendered separately
+    let data_start = scroll_offset.max(1); // Never show row 0 in data area
+    let end_row = (data_start + table_height).min(csv.row_count());
+    let visible_rows = if data_start < csv.row_count() {
+        &csv.rows[data_start..end_row]
     } else {
         &[]
     };
@@ -356,7 +389,7 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     let rows = build_data_rows(
         app,
         visible_rows,
-        scroll_offset,
+        data_start,
         start_col,
         end_col,
         &raw_widths,

@@ -10,16 +10,15 @@ fn key_event(code: KeyCode) -> KeyEvent {
 }
 
 fn create_test_csv() -> Document {
-    Document {
-        headers: vec!["A".to_string(), "B".to_string(), "C".to_string()],
-        rows: vec![
+    Document::new(
+        vec!["A".to_string(), "B".to_string(), "C".to_string()],
+        vec![
             vec!["1".to_string(), "2".to_string(), "3".to_string()],
             vec!["4".to_string(), "5".to_string(), "6".to_string()],
             vec!["7".to_string(), "8".to_string(), "9".to_string()],
         ],
-        filename: "test.csv".to_string(),
-        is_dirty: false,
-    }
+        "test.csv".to_string(),
+    )
 }
 
 #[test]
@@ -31,13 +30,13 @@ fn test_complete_navigation_workflow() {
     // User workflow: Navigate to bottom-right, then back to top-left
     app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(2)));
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(3))); // Last data row (row 3)
     assert_eq!(app.view_state.selected_column, ColIndex::new(2));
 
-    // gg - Go to first row (multi-key command)
+    // gg - Go to first data row (multi-key command, header_mode=true)
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(0)));
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(1))); // First data row
 
     // 0 - Go to first column
     app.handle_key(key_event(KeyCode::Char('0'))).unwrap();
@@ -160,7 +159,7 @@ fn test_navigate_then_switch_file_workflow() {
     // Navigate to a specific position
     app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(2)));
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(3))); // Last data row
     assert_eq!(app.view_state.selected_column, ColIndex::new(2));
 
     // Switch file
@@ -182,7 +181,7 @@ fn test_rapid_key_sequence_workflow() {
     }
 
     // Should end at maximum position
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(2)));
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(3))); // Last data row
     assert_eq!(app.view_state.selected_column, ColIndex::new(2));
 }
 
@@ -198,7 +197,7 @@ fn test_zigzag_navigation_workflow() {
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
 
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(2)));
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(3))); // row 1 + 2 = row 3
     assert_eq!(app.view_state.selected_column, ColIndex::new(2));
 }
 
@@ -227,7 +226,7 @@ fn test_boundary_navigation_workflow() {
         app.handle_key(key_event(KeyCode::Char('k'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('h'))).unwrap();
     }
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(0)));
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(1))); // Stops at first data row
     assert_eq!(app.view_state.selected_column, ColIndex::new(0));
 
     // Go to opposite corner
@@ -239,7 +238,7 @@ fn test_boundary_navigation_workflow() {
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
     }
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(2)));
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(3))); // Last data row
     assert_eq!(app.view_state.selected_column, ColIndex::new(2));
 }
 
@@ -297,12 +296,12 @@ fn test_complete_user_session_workflow() {
     // 2. Go to specific location with gg
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(0)));
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(1))); // First data row
 
-    // 3. Use count prefix
+    // 3. Use count prefix (2j from row 1 = row 3)
     app.handle_key(key_event(KeyCode::Char('2'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(2)));
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(3))); // row 1 + 2 = row 3
 
     // 4. Navigate to end
     app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
@@ -441,7 +440,7 @@ fn test_error_recovery_from_invalid_sequence() {
 
     // Next command should work normally
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(1)));
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(2))); // row 1 + 1 = row 2
 }
 
 #[test]

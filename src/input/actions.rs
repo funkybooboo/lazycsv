@@ -86,11 +86,18 @@ pub enum PendingCommand {
     /// Waiting for second key after 'z' (zt, zz, zb)
     Z,
     /// Buffering column letters (e.g., after 'g', receiving 'B' then 'C' for column BC)
+    /// NOTE: This variant is deprecated and will be removed
     GotoColumn(String),
     /// Waiting for second 'd' (for dd - delete row)
     D,
     /// Waiting for second 'y' (for yy - yank row)
     Y,
+    /// Waiting for command after comma leader (,o, ,O, ,dd, ,yy, ,p, ,P, ,v)
+    Comma,
+    /// Waiting for second 'd' after comma (for ,dd - delete column)
+    CommaD,
+    /// Waiting for second 'y' after comma (for ,yy - yank column)
+    CommaY,
 }
 
 impl PendingCommand {
@@ -101,6 +108,7 @@ impl PendingCommand {
             KeyCode::Char('z') => Some(Self::Z),
             KeyCode::Char('d') => Some(Self::D),
             KeyCode::Char('y') => Some(Self::Y),
+            KeyCode::Char(',') => Some(Self::Comma),
             _ => None,
         }
     }

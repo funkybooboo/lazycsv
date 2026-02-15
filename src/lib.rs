@@ -1,5 +1,6 @@
 pub mod app;
 pub mod cli;
+pub mod clipboard;
 pub mod csv;
 pub mod domain;
 pub mod file_system;
@@ -9,6 +10,7 @@ pub mod session;
 pub mod ui;
 
 pub use app::App;
+pub use clipboard::Clipboard;
 pub use csv::Document;
 pub use domain::position::{ColIndex, Position, RowIndex};
 pub use input::{InputResult, InputState, UserAction};

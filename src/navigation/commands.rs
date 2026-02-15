@@ -124,39 +124,52 @@ fn select_previous_page(app: &mut App) {
 }
 
 /// Go to first row (gg command)
+/// When header_mode is ON: goes to row 1 (first data row)
+/// When header_mode is OFF: goes to row 0
 pub fn goto_first_row(app: &mut App) {
-    app.view_state.table_state.select(Some(0));
+    let target_row = if app.document.header_mode && app.document.row_count() > 1 {
+        1 // Skip header, go to first data row
+    } else {
+        0
+    };
+    app.view_state.table_state.select(Some(target_row));
     app.view_state.viewport_mode = ViewportMode::Auto;
 }
 
 /// Go to last row (G command)
 pub fn goto_last_row(app: &mut App) {
-    let last = app.document.row_count().saturating_sub(1);
-    app.view_state.table_state.select(Some(last));
-    app.view_state.viewport_mode = ViewportMode::Auto;
+    if app.document.row_count() > 0 {
+        let last = app.document.row_count() - 1;
+        app.view_state.table_state.select(Some(last));
+        app.view_state.viewport_mode = ViewportMode::Auto;
+    }
 }
 
 /// Go to specific line number (5G or :5 command)
+/// Line numbers are 1-indexed (vim style): 1 = row 1 (first data), 2 = row 2, etc.
+/// To go to row 0 (header), use gg or special navigation
 pub fn goto_line(app: &mut App, line_number: usize) {
     use crate::input::StatusMessage;
 
     let row_count = app.document.row_count();
 
-    // Line numbers are 1-indexed in vim
+    // Line numbers are 1-indexed in vim, and map to absolute rows 1, 2, 3...
+    // (Row 0 is the header and is accessed via gg when header_mode OFF)
     if line_number == 0 {
-        app.status_message = Some(StatusMessage::from("Row number must be >= 1"));
+        app.status_message = Some(StatusMessage::from("Line number must be >= 1"));
         return;
     }
 
-    if line_number > row_count {
+    if line_number >= row_count {
         app.status_message = Some(StatusMessage::from(format!(
             "Row {} does not exist (max: {})",
-            line_number, row_count
+            line_number,
+            row_count - 1
         )));
         return;
     }
 
-    let target = line_number - 1; // Convert to 0-indexed
+    let target = line_number; // line_number 1 → row 1 (first data)
     app.view_state.table_state.select(Some(target));
     app.view_state.viewport_mode = ViewportMode::Auto;
     app.status_message = Some(StatusMessage::from(format!(
@@ -168,16 +181,27 @@ pub fn goto_line(app: &mut App, line_number: usize) {
 /// Move down by count rows (5j moves down 5 rows)
 pub fn move_down_by(app: &mut App, count: usize) {
     let current = app.view_state.table_state.selected().unwrap_or(0);
-    let target = (current + count).min(app.document.row_count().saturating_sub(1));
+    let max_row = if app.document.row_count() > 0 {
+        app.document.row_count() - 1
+    } else {
+        0
+    };
+    let target = (current + count).min(max_row);
     app.view_state.table_state.select(Some(target));
     app.view_state.viewport_mode = ViewportMode::Auto;
 }
 
 /// Move up by count rows (5k moves up 5 rows)
+/// Respects header_mode: when ON, stops at row 1 (first data row)
 pub fn move_up_by(app: &mut App, count: usize) {
     let current = app.view_state.table_state.selected().unwrap_or(0);
     let target = current.saturating_sub(count);
-    app.view_state.table_state.select(Some(target));
+
+    // When header_mode is ON, don't allow navigation above row 1
+    let min_row = if app.document.header_mode { 1 } else { 0 };
+    let final_target = target.max(min_row);
+
+    app.view_state.table_state.select(Some(final_target));
     app.view_state.viewport_mode = ViewportMode::Auto;
 }
 
@@ -376,22 +400,23 @@ mod tests {
     use std::path::PathBuf;
 
     fn create_test_app() -> App {
-        let document = Document {
-            headers: vec!["A".to_string(), "B".to_string(), "C".to_string()],
-            rows: {
-                let mut rows = Vec::new();
-                for i in 0..50 {
-                    rows.push(vec![
-                        format!("{}", i),
-                        format!("{}", i + 1),
-                        format!("{}", i + 2),
-                    ]);
-                }
-                rows
-            },
-            filename: "test.csv".to_string(),
-            is_dirty: false,
+        let data_rows = {
+            let mut rows = Vec::new();
+            for i in 0..50 {
+                rows.push(vec![
+                    format!("{}", i),
+                    format!("{}", i + 1),
+                    format!("{}", i + 2),
+                ]);
+            }
+            rows
         };
+
+        let document = Document::new(
+            vec!["A".to_string(), "B".to_string(), "C".to_string()],
+            data_rows,
+            "test.csv".to_string(),
+        );
 
         let csv_files = vec![PathBuf::from("test.csv")];
         App::new(document, csv_files, 0, crate::session::FileConfig::new())
@@ -406,7 +431,8 @@ mod tests {
 
         goto_first_row(&mut app);
 
-        assert_eq!(app.view_state.table_state.selected(), Some(0));
+        // With header_mode=true (default), gg goes to row 1
+        assert_eq!(app.view_state.table_state.selected(), Some(1));
         assert_eq!(app.view_state.viewport_mode, ViewportMode::Auto);
     }
 
@@ -427,7 +453,8 @@ mod tests {
 
         goto_line(&mut app, 10);
 
-        assert_eq!(app.view_state.table_state.selected(), Some(9)); // 0-indexed
+        // 10G goes to absolute row 10
+        assert_eq!(app.view_state.table_state.selected(), Some(10));
         assert_eq!(app.view_state.viewport_mode, ViewportMode::Auto);
     }
 
@@ -501,7 +528,8 @@ mod tests {
 
         move_up_by(&mut app, 100);
 
-        assert_eq!(app.view_state.table_state.selected(), Some(0));
+        // With header_mode=true (default), stops at row 1
+        assert_eq!(app.view_state.table_state.selected(), Some(1));
     }
 
     #[test]
@@ -708,22 +736,21 @@ mod tests {
 
     #[test]
     fn test_next_word_all_empty_cells() {
-        let csv_data = Document {
-            headers: vec![
+        let csv_data = Document::new(
+            vec![
                 "A".to_string(),
                 "B".to_string(),
                 "C".to_string(),
                 "D".to_string(),
             ],
-            rows: vec![vec![
+            vec![vec![
                 "value".to_string(),
                 "".to_string(),
                 "".to_string(),
                 "".to_string(),
             ]],
-            filename: "test.csv".to_string(),
-            is_dirty: false,
-        };
+            "test.csv".to_string(),
+        );
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
@@ -740,22 +767,21 @@ mod tests {
 
     #[test]
     fn test_prev_word_all_empty_cells() {
-        let csv_data = Document {
-            headers: vec![
+        let csv_data = Document::new(
+            vec![
                 "A".to_string(),
                 "B".to_string(),
                 "C".to_string(),
                 "D".to_string(),
             ],
-            rows: vec![vec![
+            vec![vec![
                 "".to_string(),
                 "".to_string(),
                 "".to_string(),
                 "value".to_string(),
             ]],
-            filename: "test.csv".to_string(),
-            is_dirty: false,
-        };
+            "test.csv".to_string(),
+        );
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
@@ -771,12 +797,11 @@ mod tests {
 
     #[test]
     fn test_word_motion_single_non_empty_cell() {
-        let csv_data = Document {
-            headers: vec!["A".to_string(), "B".to_string(), "C".to_string()],
-            rows: vec![vec!["".to_string(), "value".to_string(), "".to_string()]],
-            filename: "test.csv".to_string(),
-            is_dirty: false,
-        };
+        let csv_data = Document::new(
+            vec!["A".to_string(), "B".to_string(), "C".to_string()],
+            vec![vec!["".to_string(), "value".to_string(), "".to_string()]],
+            "test.csv".to_string(),
+        );
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
@@ -798,24 +823,23 @@ mod tests {
 
     #[test]
     fn test_word_motion_alternating_empty_filled() {
-        let csv_data = Document {
-            headers: vec![
+        let csv_data = Document::new(
+            vec![
                 "A".to_string(),
                 "B".to_string(),
                 "C".to_string(),
                 "D".to_string(),
                 "E".to_string(),
             ],
-            rows: vec![vec![
+            vec![vec![
                 "a".to_string(),
                 "".to_string(),
                 "b".to_string(),
                 "".to_string(),
                 "c".to_string(),
             ]],
-            filename: "test.csv".to_string(),
-            is_dirty: false,
-        };
+            "test.csv".to_string(),
+        );
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
@@ -844,11 +868,6 @@ mod tests {
         let rows_data = (0..rows)
             .map(|r| (0..cols).map(|c| format!("R{}C{}", r, c)).collect())
             .collect();
-        Document {
-            headers,
-            rows: rows_data,
-            filename: "large.csv".to_string(),
-            is_dirty: false,
-        }
+        Document::new(headers, rows_data, "large.csv".to_string())
     }
 }

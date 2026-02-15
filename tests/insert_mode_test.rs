@@ -460,21 +460,22 @@ fn test_dd_deletes_row() {
     // Document should be dirty
     assert!(app.document.is_dirty);
     // Row should be in clipboard
-    assert!(app.row_clipboard.is_some());
+    assert!(!app.clipboard.is_empty());
 }
 
 #[test]
 fn test_yy_yanks_row() {
     let mut app = create_test_app();
     let row_idx = app.get_selected_row().unwrap();
+    // With new navigation model, row_idx.get() is already absolute index
     let expected_row: Vec<String> = app.document.rows.get(row_idx.get()).unwrap().clone();
 
     app.handle_key(key_event(KeyCode::Char('y'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('y'))).unwrap();
 
     // Row should be in clipboard
-    assert!(app.row_clipboard.is_some());
-    assert_eq!(app.row_clipboard.as_ref().unwrap(), &expected_row);
+    assert!(!app.clipboard.is_empty());
+    assert_eq!(app.clipboard.as_row().as_ref().unwrap(), &expected_row);
     // Should have status message
     assert!(app
         .status_message
@@ -509,7 +510,7 @@ fn test_p_pastes_row_below() {
 #[test]
 fn test_p_without_clipboard_shows_error() {
     let mut app = create_test_app();
-    assert!(app.row_clipboard.is_none());
+    assert!(app.clipboard.is_empty());
 
     app.handle_key(key_event(KeyCode::Char('p'))).unwrap();
 
@@ -638,15 +639,15 @@ fn test_last_edit_position_tracked() {
     let mut app = create_test_app();
     assert!(app.last_edit_position.is_none());
 
-    // Make an edit
+    // Make an edit at row 1, col 0 (first data row)
     app.handle_key(key_event(KeyCode::Char('s'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('X'))).unwrap();
     app.handle_key(key_event(KeyCode::Enter)).unwrap();
 
-    // Last edit position should be set
+    // Last edit position should be set to row 1, col 0
     assert!(app.last_edit_position.is_some());
     let (row, col) = app.last_edit_position.unwrap();
-    assert_eq!(row.get(), 0);
+    assert_eq!(row.get(), 1);
     assert_eq!(col.get(), 0);
 }
 
@@ -747,15 +748,15 @@ fn test_enter_at_last_row() {
 #[test]
 fn test_shift_enter_at_first_row() {
     let mut app = create_test_app();
-    assert_eq!(app.get_selected_row().unwrap().get(), 0);
+    assert_eq!(app.get_selected_row().unwrap().get(), 1); // First data row
 
     app.handle_key(key_event(KeyCode::Char('i'))).unwrap();
     app.handle_key(shift_key_event(KeyCode::Enter)).unwrap();
 
     // Should be in Normal mode
     assert_eq!(app.mode, Mode::Normal);
-    // Should still be on first row
-    assert_eq!(app.get_selected_row().unwrap().get(), 0);
+    // Should still be on first data row
+    assert_eq!(app.get_selected_row().unwrap().get(), 1);
 }
 
 #[test]
@@ -798,7 +799,7 @@ fn test_yy_then_dd_updates_clipboard() {
     // Yank first row
     app.handle_key(key_event(KeyCode::Char('y'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('y'))).unwrap();
-    let yanked_row = app.row_clipboard.clone();
+    let yanked_row = app.clipboard.as_row();
 
     // Move down and delete
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
@@ -806,8 +807,8 @@ fn test_yy_then_dd_updates_clipboard() {
     app.handle_key(key_event(KeyCode::Char('d'))).unwrap();
 
     // Clipboard should now have the deleted row
-    assert!(app.row_clipboard.is_some());
-    assert_ne!(app.row_clipboard, yanked_row);
+    assert!(!app.clipboard.is_empty());
+    assert_ne!(app.clipboard.as_row(), yanked_row);
 }
 
 #[test]
@@ -891,6 +892,7 @@ fn test_insert_row_has_correct_column_count() {
 
     // New row should have same number of columns
     let new_row_idx = app.get_selected_row().unwrap();
+    // With new navigation model, row_idx.get() is already absolute index
     let new_row = app.document.rows.get(new_row_idx.get()).unwrap();
     assert_eq!(new_row.len(), col_count);
 }
@@ -903,6 +905,7 @@ fn test_insert_row_cells_are_empty() {
     app.handle_key(key_event(KeyCode::Esc)).unwrap();
 
     let new_row_idx = app.get_selected_row().unwrap();
+    // With new navigation model, row_idx.get() is already absolute index
     let new_row = app.document.rows.get(new_row_idx.get()).unwrap();
 
     // All cells should be empty
@@ -915,8 +918,8 @@ fn test_insert_row_cells_are_empty() {
 fn test_paste_row_content_matches_yanked() {
     let mut app = create_test_app();
 
-    // Get the first row content
-    let original_row: Vec<String> = app.document.rows.get(0).unwrap().clone();
+    // Get the first data row content (rows[1] is first data row with new navigation)
+    let original_row: Vec<String> = app.document.rows.get(1).unwrap().clone();
 
     // Yank first row
     app.handle_key(key_event(KeyCode::Char('y'))).unwrap();
@@ -926,7 +929,7 @@ fn test_paste_row_content_matches_yanked() {
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('p'))).unwrap();
 
-    // Get the pasted row
+    // Get the pasted row using absolute row index
     let pasted_row_idx = app.get_selected_row().unwrap();
     let pasted_row = app.document.rows.get(pasted_row_idx.get()).unwrap();
 
@@ -942,13 +945,13 @@ fn test_paste_row_content_matches_yanked() {
 fn test_cursor_position_after_typing_and_commit() {
     let mut app = create_test_app();
 
-    // Start at 0,0
+    // Start at row 1, col 0 (first data row)
     app.handle_key(key_event(KeyCode::Char('s'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('X'))).unwrap();
     app.handle_key(key_event(KeyCode::Tab)).unwrap();
 
-    // Should now be at 0,1
-    assert_eq!(app.get_selected_row().unwrap().get(), 0);
+    // Should now be at row 1, col 1
+    assert_eq!(app.get_selected_row().unwrap().get(), 1);
     assert_eq!(app.view_state.selected_column.get(), 1);
 }
 
@@ -974,7 +977,8 @@ fn test_multiple_enter_commits_traverse_column() {
     let row_count = app.document.row_count();
 
     // Edit and Enter through rows (stop before last since Enter won't go beyond)
-    for row in 0..(row_count - 1) {
+    // Start at row 1 (first data row), so loop from 1 to row_count-1
+    for row in 1..(row_count) {
         assert_eq!(app.get_selected_row().unwrap().get(), row);
         app.handle_key(key_event(KeyCode::Char('i'))).unwrap();
         app.handle_key(key_event(KeyCode::Enter)).unwrap();
@@ -1037,14 +1041,14 @@ fn test_capital_o_at_first_row_inserts_at_beginning() {
     let mut app = create_test_app();
     let initial_count = app.document.row_count();
 
-    // Make sure we're at first row
-    assert_eq!(app.get_selected_row().unwrap().get(), 0);
+    // Make sure we're at first data row (row 1 with header_mode=true)
+    assert_eq!(app.get_selected_row().unwrap().get(), 1);
 
     app.handle_key(key_event(KeyCode::Char('O'))).unwrap();
 
-    // New row should be at beginning
+    // New row should be inserted at row 1 (before current row)
     assert_eq!(app.document.row_count(), initial_count + 1);
-    assert_eq!(app.get_selected_row().unwrap().get(), 0);
+    assert_eq!(app.get_selected_row().unwrap().get(), 1);
 }
 
 #[test]

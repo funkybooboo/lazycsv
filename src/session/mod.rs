@@ -3,6 +3,8 @@
 //! This module handles file switching between multiple CSV files and
 //! maintains the configuration settings for parsing CSV files.
 
+use crate::Document;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 /// Configuration for CSV file parsing
@@ -55,6 +57,18 @@ pub struct Session {
 
     /// Configuration for CSV parsing
     config: FileConfig,
+
+    /// Per-file header mode settings (true = header row styled/frozen)
+    header_modes: HashMap<PathBuf, bool>,
+
+    /// Per-file delimiter settings
+    delimiters: HashMap<PathBuf, char>,
+
+    /// Set of dirty (modified) files
+    dirty_files: HashSet<PathBuf>,
+
+    /// Cache of dirty documents (avoids reloading from disk when switching files)
+    document_cache: HashMap<PathBuf, Document>,
 }
 
 impl Session {
@@ -64,6 +78,10 @@ impl Session {
             files,
             active_file_index,
             config,
+            header_modes: HashMap::new(),
+            delimiters: HashMap::new(),
+            dirty_files: HashSet::new(),
+            document_cache: HashMap::new(),
         }
     }
 
@@ -121,6 +139,80 @@ impl Session {
     /// Check if there are multiple files in the session
     pub fn has_multiple_files(&self) -> bool {
         self.files.len() > 1
+    }
+
+    /// Get header mode for the current file (default: true)
+    pub fn get_header_mode(&self) -> bool {
+        self.header_modes
+            .get(&self.files[self.active_file_index])
+            .copied()
+            .unwrap_or(true) // Default: header mode ON
+    }
+
+    /// Set header mode for the current file
+    pub fn set_header_mode(&mut self, mode: bool) {
+        self.header_modes
+            .insert(self.files[self.active_file_index].clone(), mode);
+    }
+
+    /// Get delimiter for a specific file (default: ',')
+    pub fn get_delimiter(&self, file: &PathBuf) -> char {
+        self.delimiters.get(file).copied().unwrap_or(',')
+    }
+
+    /// Set delimiter for a specific file
+    pub fn set_delimiter(&mut self, file: PathBuf, delimiter: char) {
+        self.delimiters.insert(file, delimiter);
+    }
+
+    /// Mark a file as dirty (modified)
+    pub fn mark_dirty(&mut self, path: &PathBuf) {
+        self.dirty_files.insert(path.clone());
+    }
+
+    /// Mark a file as clean (saved)
+    pub fn mark_clean(&mut self, path: &PathBuf) {
+        self.dirty_files.remove(path);
+    }
+
+    /// Check if a file is dirty
+    pub fn is_dirty(&self, path: &PathBuf) -> bool {
+        self.dirty_files.contains(path)
+    }
+
+    /// Check if the current file is dirty
+    pub fn is_current_file_dirty(&self) -> bool {
+        self.is_dirty(&self.files[self.active_file_index])
+    }
+
+    /// Check if any file in the session is dirty
+    pub fn has_any_dirty_files(&self) -> bool {
+        !self.dirty_files.is_empty()
+    }
+
+    /// Get list of all dirty files
+    pub fn get_dirty_files(&self) -> Vec<PathBuf> {
+        self.dirty_files.iter().cloned().collect()
+    }
+
+    /// Cache a document for a file (used when switching files with unsaved changes)
+    pub fn cache_document(&mut self, path: PathBuf, doc: Document) {
+        self.document_cache.insert(path, doc);
+    }
+
+    /// Get a cached document for a file
+    pub fn get_cached_document(&self, path: &PathBuf) -> Option<&Document> {
+        self.document_cache.get(path)
+    }
+
+    /// Remove a document from cache (called after saving)
+    pub fn remove_from_cache(&mut self, path: &PathBuf) {
+        self.document_cache.remove(path);
+    }
+
+    /// Clear all cached documents
+    pub fn clear_cache(&mut self) {
+        self.document_cache.clear();
     }
 }
 
@@ -219,5 +311,77 @@ mod tests {
 
         let multiple = Session::new(test_files(), 0, config);
         assert!(multiple.has_multiple_files());
+    }
+
+    #[test]
+    fn test_dirty_file_tracking() {
+        let files = test_files();
+        let config = FileConfig::new();
+        let mut session = Session::new(files.clone(), 0, config);
+
+        // Initially no dirty files
+        assert!(!session.is_current_file_dirty());
+        assert!(!session.has_any_dirty_files());
+
+        // Mark current file as dirty
+        session.mark_dirty(&files[0]);
+        assert!(session.is_current_file_dirty());
+        assert!(session.has_any_dirty_files());
+
+        // Mark another file as dirty
+        session.mark_dirty(&files[1]);
+        assert_eq!(session.get_dirty_files().len(), 2);
+
+        // Mark file as clean
+        session.mark_clean(&files[0]);
+        assert!(!session.is_current_file_dirty());
+        assert!(session.has_any_dirty_files()); // Still have file[1] dirty
+    }
+
+    #[test]
+    fn test_document_caching() {
+        let files = test_files();
+        let config = FileConfig::new();
+        let mut session = Session::new(files.clone(), 0, config);
+
+        // Create a test document
+        let doc = crate::Document::new(
+            vec!["A".to_string(), "B".to_string()],
+            vec![vec!["1".to_string(), "2".to_string()]],
+            "test.csv".to_string(),
+        );
+
+        // Cache it
+        session.cache_document(files[0].clone(), doc);
+        assert!(session.get_cached_document(&files[0]).is_some());
+
+        // Remove from cache
+        session.remove_from_cache(&files[0]);
+        assert!(session.get_cached_document(&files[0]).is_none());
+    }
+
+    #[test]
+    fn test_clear_cache() {
+        let files = test_files();
+        let config = FileConfig::new();
+        let mut session = Session::new(files.clone(), 0, config);
+
+        // Cache multiple documents
+        for file in &files {
+            let doc = crate::Document::new(
+                vec!["A".to_string()],
+                vec![vec!["1".to_string()]],
+                "test.csv".to_string(),
+            );
+            session.cache_document(file.clone(), doc);
+        }
+
+        assert!(session.get_cached_document(&files[0]).is_some());
+        assert!(session.get_cached_document(&files[1]).is_some());
+
+        // Clear all
+        session.clear_cache();
+        assert!(session.get_cached_document(&files[0]).is_none());
+        assert!(session.get_cached_document(&files[1]).is_none());
     }
 }

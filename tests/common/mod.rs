@@ -12,12 +12,7 @@ pub fn create_large_csv(rows: usize, cols: usize) -> Document {
     let rows_data = (0..rows)
         .map(|r| (0..cols).map(|c| format!("R{}C{}", r, c)).collect())
         .collect();
-    Document {
-        headers,
-        rows: rows_data,
-        filename: "large.csv".to_string(),
-        is_dirty: false,
-    }
+    Document::new(headers, rows_data, "large.csv".to_string())
 }
 
 /// Create a temporary CSV file with the given content

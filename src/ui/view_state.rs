@@ -38,6 +38,9 @@ pub struct ViewState {
 
     /// Help overlay vertical scroll offset
     pub help_scroll_offset: u16,
+
+    /// Selected index in file list (for FileList mode)
+    pub file_list_selected: usize,
 }
 
 impl Default for ViewState {
@@ -50,6 +53,7 @@ impl Default for ViewState {
             viewport_mode: ViewportMode::Auto,
             file_list_scroll_offset: 0,
             help_scroll_offset: 0,
+            file_list_selected: 0,
         }
     }
 }

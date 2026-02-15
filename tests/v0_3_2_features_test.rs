@@ -1,6 +1,6 @@
 //! Tests for v0.3.2 features
 //!
-//! - `:c` command for column navigation
+//! - Simplified navigation with 5g (row jumps)
 //! - Reserved commands (`:q`, `:w`, `:h`)
 //! - Out-of-bounds error handling
 //! - No timeout on pending commands
@@ -21,15 +21,15 @@ fn key_event(code: KeyCode) -> KeyEvent {
 }
 
 fn create_test_csv_5_cols() -> Document {
-    Document {
-        headers: vec![
+    Document::new(
+        vec![
             "A".to_string(),
             "B".to_string(),
             "C".to_string(),
             "D".to_string(),
             "E".to_string(),
         ],
-        rows: vec![
+        vec![
             vec![
                 "1".to_string(),
                 "2".to_string(),
@@ -52,25 +52,40 @@ fn create_test_csv_5_cols() -> Document {
                 "15".to_string(),
             ],
         ],
-        filename: "test.csv".to_string(),
-        is_dirty: false,
-    }
+        "test.csv".to_string(),
+    )
 }
 
-// ===== `:c` Command Tests =====
+// ===== Simplified Navigation Tests (Row jumps with <number>g) =====
 
 #[test]
-fn test_command_c_column_letter_uppercase() {
+fn test_uppercase_letter_no_longer_sets_pending() {
+    // Uppercase letters (except A, I, O, G) no longer start jump sequences
     let csv_data = create_test_csv_5_cols();
     let csv_files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
-    // Enter command mode with ':'
-    app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
+    // Press 'C' - should NOT set pending command anymore
+    app.handle_key(key_event(KeyCode::Char('C'))).unwrap();
 
-    // Type 'c C' to jump to column C
+    // Should have NO pending command (column jumps use :c command now)
+    assert!(
+        app.input_state.pending_command.is_none(),
+        "Expected no pending command after pressing 'C', got: {:?}",
+        app.input_state.pending_command
+    );
+}
+
+#[test]
+fn test_column_jump_removed_use_c_command() {
+    // Cg syntax is removed. Use :cC instead
+    let csv_data = create_test_csv_5_cols();
+    let csv_files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+    // Use :cC to jump to column C
+    app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('c'))).unwrap();
-    app.handle_key(key_event(KeyCode::Char(' '))).unwrap();
     app.handle_key(key_event(KeyCode::Char('C'))).unwrap();
     app.handle_key(key_event(KeyCode::Enter)).unwrap();
 
@@ -78,35 +93,31 @@ fn test_command_c_column_letter_uppercase() {
 }
 
 #[test]
-fn test_command_c_column_letter_lowercase() {
+fn test_column_jump_d_removed_use_c_command() {
+    // Dg syntax is removed. Use :cD instead
     let csv_data = create_test_csv_5_cols();
     let csv_files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
-    // Enter command mode with ':'
+    // Use :cD to jump to column D
     app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
-
-    // Type 'c d' (lowercase) to jump to column D
     app.handle_key(key_event(KeyCode::Char('c'))).unwrap();
-    app.handle_key(key_event(KeyCode::Char(' '))).unwrap();
-    app.handle_key(key_event(KeyCode::Char('d'))).unwrap();
+    app.handle_key(key_event(KeyCode::Char('D'))).unwrap();
     app.handle_key(key_event(KeyCode::Enter)).unwrap();
 
     assert_eq!(app.view_state.selected_column, ColIndex::new(3)); // D = index 3
 }
 
 #[test]
-fn test_command_c_column_number() {
+fn test_c_command_numeric_column() {
+    // Test :c4 to jump to column 4 (D)
     let csv_data = create_test_csv_5_cols();
     let csv_files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
-    // Enter command mode with ':'
+    // Use :c4 to jump to column 4 (D = index 3)
     app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
-
-    // Type 'c 4' to jump to column 4 (D)
     app.handle_key(key_event(KeyCode::Char('c'))).unwrap();
-    app.handle_key(key_event(KeyCode::Char(' '))).unwrap();
     app.handle_key(key_event(KeyCode::Char('4'))).unwrap();
     app.handle_key(key_event(KeyCode::Enter)).unwrap();
 
@@ -123,14 +134,8 @@ fn test_command_c_first_column() {
     app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
     assert_eq!(app.view_state.selected_column, ColIndex::new(4));
 
-    // Enter command mode with ':'
-    app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
-
-    // Type 'c A' to jump to first column
-    app.handle_key(key_event(KeyCode::Char('c'))).unwrap();
-    app.handle_key(key_event(KeyCode::Char(' '))).unwrap();
-    app.handle_key(key_event(KeyCode::Char('A'))).unwrap();
-    app.handle_key(key_event(KeyCode::Enter)).unwrap();
+    // Use '0' to jump to first column (existing command)
+    app.handle_key(key_event(KeyCode::Char('0'))).unwrap();
 
     assert_eq!(app.view_state.selected_column, ColIndex::new(0)); // A = index 0
 }
@@ -201,14 +206,11 @@ fn test_out_of_bounds_row_shows_error() {
     let csv_files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
-    // Enter command mode with ':'
-    app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
-
-    // Type '999' to try to jump to row 999
+    // Use '999g' to try to jump to row 999
     app.handle_key(key_event(KeyCode::Char('9'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('9'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('9'))).unwrap();
-    app.handle_key(key_event(KeyCode::Enter)).unwrap();
+    app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
 
     // Should have an error message about row not existing
     assert!(app.status_message.is_some());
@@ -226,12 +228,9 @@ fn test_out_of_bounds_column_shows_error() {
     let csv_files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
-    // Enter command mode with ':'
+    // Use ':cZ' to try to jump to column Z (only have A-E)
     app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
-
-    // Type 'c Z' to try to jump to column Z (only have A-E)
     app.handle_key(key_event(KeyCode::Char('c'))).unwrap();
-    app.handle_key(key_event(KeyCode::Char(' '))).unwrap();
     app.handle_key(key_event(KeyCode::Char('Z'))).unwrap();
     app.handle_key(key_event(KeyCode::Enter)).unwrap();
 
@@ -271,7 +270,8 @@ fn test_pending_g_command_no_timeout() {
 
     // Should have executed and cleared pending state
     assert_eq!(app.input_state.pending_command, None);
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(0)));
+    // With header_mode ON, gg goes to first data row (row 1)
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(1)));
 }
 
 #[test]
@@ -313,8 +313,8 @@ fn test_pending_count_no_timeout() {
 
     // Should have executed
     assert_eq!(app.input_state.command_count, None);
-    // With 3 rows (0,1,2), 5j from 0 goes to row 2
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(2)));
+    // App starts at row 1 (first data row). With 4 total rows (0=header, 1-3=data), 5j from row 1 saturates at row 3
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(3)));
 }
 
 // ===== Default Directory Tests =====
@@ -383,18 +383,11 @@ fn test_command_c_empty_argument() {
 
     let initial_column = app.view_state.selected_column;
 
-    // Enter command mode with ':'
-    app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
+    // Press an unbound uppercase letter followed by Esc to cancel
+    app.handle_key(key_event(KeyCode::Char('X'))).unwrap();
+    app.handle_key(key_event(KeyCode::Esc)).unwrap();
 
-    // Type 'c' with no argument, then enter
-    app.handle_key(key_event(KeyCode::Char('c'))).unwrap();
-    app.handle_key(key_event(KeyCode::Enter)).unwrap();
-
-    // Column should remain unchanged or show error
-    // (implementation may vary)
-    // Just verify app is stable and column didn't unexpectedly change
-    assert!(app.get_selected_row().is_some());
-    // Column should remain unchanged when given empty argument
+    // Column should remain unchanged
     assert_eq!(app.view_state.selected_column, initial_column);
 }
 
@@ -431,8 +424,7 @@ fn test_escape_cancels_command_mode() {
     app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
 
     // Type some characters
-    app.handle_key(key_event(KeyCode::Char('c'))).unwrap();
-    app.handle_key(key_event(KeyCode::Char(' '))).unwrap();
+    app.handle_key(key_event(KeyCode::Char('w'))).unwrap();
 
     // Press escape to cancel
     app.handle_key(key_event(KeyCode::Esc)).unwrap();
@@ -447,15 +439,12 @@ fn test_row_jump_with_command_mode() {
     let csv_files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
-    // Enter command mode with ':'
-    app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
-
-    // Type '2' to jump to row 2
+    // Use '2g' to jump to row 2 (new syntax)
     app.handle_key(key_event(KeyCode::Char('2'))).unwrap();
-    app.handle_key(key_event(KeyCode::Enter)).unwrap();
+    app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
 
-    // Should be at row 2 (index 1, since row numbers are 1-based in UI)
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(1)));
+    // Should be at row 2 (absolute row index 2, which is the second data row)
+    assert_eq!(app.get_selected_row(), Some(RowIndex::new(2)));
 }
 
 #[test]

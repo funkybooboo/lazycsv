@@ -15,8 +15,9 @@ fn test_delimiter_integration() {
 
     let app = App::from_cli(args).unwrap();
 
-    assert_eq!(app.document.headers, vec!["a", "b", "c"]);
-    assert_eq!(app.document.rows[0], vec!["1", "2", "3"]);
+    // rows[0] is header row
+    assert_eq!(app.document.rows[0], vec!["a", "b", "c"]);
+    assert_eq!(app.document.rows[1], vec!["1", "2", "3"]);
     assert_eq!(app.session.config().delimiter, Some(b';'));
 }
 
@@ -31,13 +32,14 @@ fn test_no_headers_integration() {
 
     let app = App::from_cli(args).unwrap();
 
+    // rows[0] is synthetic header row
     assert_eq!(
-        app.document.headers,
+        app.document.rows[0],
         vec!["Column 1", "Column 2", "Column 3"]
     );
-    assert_eq!(app.document.rows.len(), 2);
-    assert_eq!(app.document.rows[0], vec!["a", "b", "c"]);
-    assert_eq!(app.document.rows[1], vec!["1", "2", "3"]);
+    assert_eq!(app.document.rows.len(), 3); // header + 2 data rows
+    assert_eq!(app.document.rows[1], vec!["a", "b", "c"]);
+    assert_eq!(app.document.rows[2], vec!["1", "2", "3"]);
     assert!(app.session.config().no_headers);
 }
 
@@ -50,8 +52,9 @@ fn test_default_csv_loading_integration() {
     let args = CliArgs::try_parse_from(["lazycsv", file_path.to_str().unwrap()]).unwrap();
     let app = App::from_cli(args).unwrap();
 
-    assert_eq!(app.document.headers, vec!["header1", "header2"]);
-    assert_eq!(app.document.rows[0], vec!["val1", "val2"]);
+    // rows[0] is header row
+    assert_eq!(app.document.rows[0], vec!["header1", "header2"]);
+    assert_eq!(app.document.rows[1], vec!["val1", "val2"]);
     assert_eq!(app.session.config().delimiter, None);
     assert!(!app.session.config().no_headers);
 }
@@ -67,7 +70,8 @@ fn test_directory_path_integration() {
     let args = CliArgs::try_parse_from(["lazycsv", temp_dir.path().to_str().unwrap()]).unwrap();
     let app = App::from_cli(args).unwrap();
 
-    assert_eq!(app.document.headers, vec!["h1", "h2"]);
+    // rows[0] is header row
+    assert_eq!(app.document.rows[0], vec!["h1", "h2"]);
     assert_eq!(app.session.files().len(), 2);
     assert_eq!(app.session.active_file_index(), 0);
 }
@@ -103,8 +107,9 @@ fn test_encoding_integration() {
         lazycsv::Document::from_file(&file_path, None, false, Some("utf-16le".to_string()))
             .unwrap();
 
-    assert_eq!(csv_data.headers, vec!["h1", "h2"]);
-    assert_eq!(csv_data.rows[0], vec!["val1", "val2"]);
+    // rows[0] is header row
+    assert_eq!(csv_data.rows[0], vec!["h1", "h2"]);
+    assert_eq!(csv_data.rows[1], vec!["val1", "val2"]);
 }
 
 #[test]
@@ -143,10 +148,11 @@ fn test_delimiter_and_no_headers_integration() {
 
     let app = App::from_cli(args).unwrap();
 
-    assert_eq!(app.document.headers, vec!["Column 1", "Column 2"]);
-    assert_eq!(app.document.rows.len(), 2);
-    assert_eq!(app.document.rows[0], vec!["a", "b"]);
-    assert_eq!(app.document.rows[1], vec!["1", "2"]);
+    // rows[0] is synthetic header row
+    assert_eq!(app.document.rows[0], vec!["Column 1", "Column 2"]);
+    assert_eq!(app.document.rows.len(), 3); // header + 2 data rows
+    assert_eq!(app.document.rows[1], vec!["a", "b"]);
+    assert_eq!(app.document.rows[2], vec!["1", "2"]);
     assert!(app.session.config().no_headers);
     assert_eq!(app.session.config().delimiter, Some(b';'));
 }
@@ -172,7 +178,7 @@ fn test_invalid_utf8_bytes_error() {
     match result {
         Ok(doc) => {
             // Parsed with replacement characters - acceptable behavior
-            assert!(!doc.headers.is_empty());
+            assert!(!doc.rows.is_empty()); // Should have at least header row
         }
         Err(err) => {
             // Failed to parse - also acceptable
@@ -198,8 +204,8 @@ fn test_mixed_encoding_in_file() {
 
     match result {
         Ok(doc) => {
-            assert!(!doc.headers.is_empty());
-            // May contain replacement characters
+            assert!(!doc.rows.is_empty()); // Should have at least header row
+                                           // May contain replacement characters
         }
         Err(err) => {
             assert!(!err.to_string().is_empty());
