@@ -56,7 +56,8 @@ lazycsv data.csv --delimiter ';' --no-headers
 # hjkl or arrows  -> navigate
 # [ or ]          -> switch between CSV files
 # gg or G         -> jump to top/bottom
-# :B or :A5       -> jump to column B or cell A5
+# :cB or 5g       -> jump to column B or row 5
+# i or m          -> edit cell (quick or magnifier)
 # ?               -> show help
 # :q              -> quit
 ```
@@ -68,16 +69,54 @@ That's it! Press `?` in the app for full keybindings.
 | Key | Action |
 |-----|--------|
 | `hjkl` or arrows | Move around (with count: `5j`, `10h`) |
-| `gg` / `G` / `15G` | Jump to first/last/line 15 |
-| `:B` / `:A5` | Jump to column B or cell A5 |
+| `gg` / `G` / `5g` | Jump to first/last/row 5 |
+| `:cB` / `:cA` | Jump to column B or A |
 | `w` / `b` / `e` | Next/prev/last non-empty cell |
-| `:15` | Command mode: jump to row 15 |
+| `i` / `a` / `s` | Quick edit cell (Insert mode) |
+| `m` | Magnifier mode (full vim editor) |
+| `o` / `O` | Insert row below/above |
+| `dd` / `yy` / `p` | Delete/yank/paste row |
 | `zt` / `zz` / `zb` | Position row at top/center/bottom |
 | `[` / `]` | Switch CSV files |
 | `?` | Show help |
-| `:q` or `q` | Quit |
+| `:w` / `:q` | Save / Quit |
 
 **Vim users:** All your favorite motions work (`0`, `$`, count prefixes, etc.)
+
+## Editing Modes
+
+### Insert Mode (Quick Edits)
+Press `i`, `a`, or `s` for quick single-line cell editing. Perfect for fixing typos or updating values.
+
+```
+i     -> Edit cell (cursor at end)
+a     -> Edit cell (cursor at end)
+I     -> Edit cell (cursor at start)
+s     -> Replace cell (clear + edit)
+```
+
+Exit with `Enter` (save + move down), `Tab` (save + move right), or `Esc` (cancel).
+
+### Magnifier Mode (Complex Edits)
+Press `m` to open a full vim editor for complex multi-line cell editing. Perfect for JSON, descriptions, or any content that needs vim power.
+
+```
+m                  -> Open magnifier on current cell
+hjkl / w/b/e       -> Vim motions
+i/a/o/O            -> Enter insert mode
+dd / yy / p        -> Delete/yank/paste lines
+x / s              -> Delete/substitute character
+ZZ or :wq          -> Save and close
+:q!                -> Close without saving
+Ctrl+h/j/k/l       -> Navigate to adjacent cells
+```
+
+**Features:**
+- Full vim editing (motions, operators, count prefixes)
+- Multi-line content with proper CSV escaping
+- Line numbers and mode indicators
+- Centered popup overlay
+- Dirty tracking with save prompts
 
 ## Innovation: Multi-File Navigation
 
@@ -93,9 +132,9 @@ LazyCSV treats CSV files in the same directory like Excel sheets. Open one file,
 | **v0.3.1** | UI/UX polish - mode indicator, transient messages, help redesign |
 | **v0.3.2** | Pre-edit polish - minimal UI, vim-like status line |
 | **v0.4.0** | Insert mode - quick cell editing, row operations |
-| **v0.4.1** | Persistence - `:w`, `:W`, multi-file dirty tracking, command ranges |
-| **v0.5.0** | Column operations - `;o`, `;O`, `;dd`, `;yy`, `;p`, visual mode |
-| **v0.6.0** | Vim Magnifier - multi-line cell editing with full vim |
+| **v0.4.1** | Persistence - `:w`, `:W`, multi-file dirty tracking, command ranges ✅ |
+| **v0.5.0** | Column operations - `,o`, `,O`, `,dd`, `,yy`, `,p`, visual mode |
+| **v0.6.0** | Magnifier Mode - multi-line cell editing with full vim ✅ |
 | **v0.7.0** | Search - `/`, `n`, `N` fuzzy cell search |
 | **v0.8.0** | Undo/redo - `u`, `Ctrl+r`, `.` dot command |
 | **v0.9.0** | Transforms - `:sort`, `:filter`, data operations |

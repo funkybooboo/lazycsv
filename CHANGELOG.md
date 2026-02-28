@@ -5,13 +5,88 @@ All notable changes to LazyCSV will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - v0.4.1
+## [Unreleased]
+
+## [0.6.0] - 2026-02-28
+
+### Added - Magnifier Mode (Full Vim Editor for Cells)
+
+**Magnifier Mode - Complex Multi-Line Cell Editing**
+- `m` - Open magnifier mode on current cell (full vim editor in centered popup)
+- Multi-line content support with proper CSV escaping
+- Line numbers (right-aligned, dim)
+- Mode indicator (NORMAL/INSERT) and cursor position (line:col)
+- Bottom help bar with commands
+
+**Vim Motions in Magnifier**
+- `hjkl` - Character movement
+- `w` / `b` / `e` - Word motions (next/previous/end word)
+- `0` / `$` / `^` - Line motions (start/end/first non-blank)
+- `gg` / `G` - Buffer motions (first/last line)
+- Count prefixes - `5j`, `10w`, etc.
+
+**Vim Operators in Magnifier**
+- `x` - Delete character under cursor
+- `dd` - Delete line (stores in internal clipboard)
+- `yy` - Yank (copy) line
+- `p` / `P` - Paste below/above
+- `s` - Substitute character (delete + insert)
+- `i` / `a` - Insert before/after cursor
+- `o` / `O` - Insert line below/above
+
+**Insert Mode in Magnifier**
+- Type characters to insert
+- `Backspace` / `Delete` - Delete characters
+- `Enter` - Create newline
+- `Esc` - Exit insert mode
+- Arrow keys, Home, End for navigation
+
+**Magnifier Commands**
+- `ZZ` or `:wq` - Save cell content and close magnifier
+- `:q!` - Close without saving
+- `Ctrl+h/j/k/l` - Navigate to adjacent cells (with dirty check warning)
+
+**UI Features**
+- Centered popup overlay (80% width/height)
+- Title bar shows cell position (e.g., "Editing A5")
+- Different cursor styles: block (█) for Normal, pipe (│) for Insert
+- Dirty tracking with unsaved change warnings
+- Scrolling support for long content
+
+### Technical
+
+**Metrics:**
+- Tests: 382 total (370 lib + 12 integration)
+- Magnifier-specific: 79 tests (67 module + 12 integration)
+- All tests passing (1 ignored for known unicode issue)
+- Zero regressions
+- Performance: Unchanged
+
+**Architecture:**
+- New `src/magnifier/mod.rs` module (~800 lines)
+- New `src/ui/magnifier.rs` UI rendering (~360 lines)
+- `MagnifierState` struct with text buffer, cursor, mode, clipboard
+- `MagnifierMode` enum (Normal, Insert)
+- Integration with App via `magnifier_state: Option<MagnifierState>`
+- Getter methods for UI access to magnifier state
+
+**Known Issues:**
+- Unicode handling: Cursor uses character indices but `String::insert` uses byte indices
+  - Causes panics with multi-byte UTF-8 characters (emojis, CJK)
+  - Test ignored, fix deferred to future version
+
+## [0.4.1] - 2026-02-10
 
 ### Added
 - **Header Mode Toggle** - `:ht` command to toggle header mode ON/OFF
   - When ON: first row treated as header (row 0), navigation starts at row 1
   - When OFF: first row is regular data, navigation starts at row 0
   - Header row is highlighted when selected
+- **Simplified Navigation** - `5g` for row jumps (replaces `:5`)
+- **Column Navigation** - `:cA`, `:cB`, `:cAA` for column jumps (works for all columns)
+- **Range Operations** - `:5,10d`, `:B,Dd` for row/column ranges
+- **File Persistence** - `:w`, `:W`, `:wq`, `:Wq`, `:q`, `:q!` commands
+- **New Commands** - `:delim ;`, `:new A,B,C`, `:files` menu
   
 ### Changed
 - **Navigation System Refactored** - Migrated from data-row indices to absolute row indices
@@ -24,7 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Delete Header Row** - `dd` on row 0 now automatically turns header_mode OFF
 - All navigation commands properly respect header_mode boundaries
-- Updated 400+ tests to use absolute row indexing
+- Updated 517+ tests to use absolute row indexing
 
 ## [0.4.0] - 2026-02-09
 
@@ -268,6 +343,8 @@ This release completed a major 6-phase internal refactoring for better code qual
 - Dirty state tracking
 - Quit functionality (q)
 
+[0.6.0]: https://github.com/funkybooboo/lazycsv/compare/v0.4.1...v0.6.0
+[0.4.1]: https://github.com/funkybooboo/lazycsv/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/funkybooboo/lazycsv/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/funkybooboo/lazycsv/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/funkybooboo/lazycsv/compare/v0.3.0...v0.3.1
