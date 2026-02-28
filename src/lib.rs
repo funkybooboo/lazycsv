@@ -5,6 +5,7 @@ pub mod csv;
 pub mod domain;
 pub mod file_system;
 pub mod input;
+pub mod magnifier;
 pub mod navigation;
 pub mod query;
 pub mod session;
