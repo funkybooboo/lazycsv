@@ -1304,13 +1304,13 @@ NORMAL                                                          3,C
 - [x] Word motions: `move_next_word()` (w), `move_prev_word()` (b), `move_end_word()` (e)
 - [x] Count prefix support: add `count_prefix` field and apply to motions
 
-**Phase 3: Vim Operators (`src/magnifier/mod.rs`)**
-- [ ] Insert mode text: `insert_char()`, `delete_char_before()`, `delete_char_at()`, `newline()`
-- [ ] Normal mode operators: `delete_char()` (x), `delete_line()` (dd), `yank_line()` (yy)
-- [ ] Paste operators: `paste_below()` (p), `paste_above()` (P)
-- [ ] Enter insert variations: `insert_before()` (i), `insert_after()` (a), `insert_line_below()` (o), `insert_line_above()` (O)
-- [ ] Other operators: `substitute_char()` (s)
-- [ ] Internal clipboard for magnifier operations
+**Phase 3: Vim Operators (`src/magnifier/mod.rs`)** ✅ COMPLETE
+- [x] Insert mode text: `insert_char()`, `delete_char_before()`, `delete_char_at()`, `newline()`
+- [x] Normal mode operators: `delete_char()` (x), `delete_line()` (dd), `yank_line()` (yy)
+- [x] Paste operators: `paste_below()` (p), `paste_above()` (P)
+- [x] Enter insert variations: `insert_before()` (i), `insert_after()` (a), `insert_line_below()` (o), `insert_line_above()` (O)
+- [x] Other operators: `substitute_char()` (s)
+- [x] Internal clipboard for magnifier operations
 
 **Phase 4: App Integration (`src/app/mod.rs`)**
 - [ ] Add `magnifier_state: Option<MagnifierState>` field to App
