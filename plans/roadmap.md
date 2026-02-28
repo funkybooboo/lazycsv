@@ -15,7 +15,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 - **v0.3.1** - UI/UX Polish ✅ (Complete)
 - **v0.3.2** - Pre-Edit Polish ✅ (Complete)
 - **v0.4.0** - Insert Mode ✅ (Complete)
-- **v0.4.1** - Persistence & Edge Cases
+- **v0.4.1** - Persistence & Edge Cases ✅ (Complete)
 - **v0.5.0** - Column Operations & Visual Mode
 - **v0.6.0** - Magnifier Mode
 - **v0.7.0** - Search
@@ -1287,62 +1287,210 @@ NORMAL                                                          3,C
 
 ### Implementation Steps
 
-**File: `src/magnifier/mod.rs` (new file)**
-- [ ] Create magnifier module
-- [ ] Implement vim buffer state
-- [ ] Implement vim mode switching (Normal/Insert within magnifier)
-- [ ] Implement vim motions: `h/j/k/l`, `w/b/e`, `0/$`, `gg/G`
-- [ ] Implement vim operators: `dd`, `yy`, `p`, `i/a/o/O`, `x`, `s`
-- [ ] Implement line-based editing
-- [ ] Implement multi-line support
+**Phase 1: Magnifier Module Foundation (`src/magnifier/mod.rs`)**
+- [ ] Create module structure with public exports
+- [ ] Define `MagnifierState` struct (lines, mode, cursor, position, original, clipboard, dirty flag)
+- [ ] Define `MagnifierMode` enum (Normal, Insert)
+- [ ] Implement `MagnifierState::new(content, position)` constructor
+- [ ] Implement `get_content()` - join lines with newlines
+- [ ] Implement `is_dirty()` - compare current to original
+- [ ] Implement cursor helpers: `clamp_cursor()`, `current_line()`, `current_line_mut()`
+- [ ] Implement mode switching: `enter_insert_mode()`, `exit_insert_mode()`
 
-**File: `src/app/mod.rs`**
-- [ ] Add `magnifier_state: Option<MagnifierState>` field
-- [ ] Implement `open_magnifier(&mut self)` method
-- [ ] Implement `close_magnifier(&mut self, save: bool)` method
-- [ ] Handle `Ctrl+h/j/k/l` for cell navigation
+**Phase 2: Vim Motions (`src/magnifier/mod.rs`)**
+- [ ] Character motions: `move_left()`, `move_right()`, `move_up()`, `move_down()`
+- [ ] Line motions: `move_to_line_start()` (0), `move_to_line_end()` ($), `move_to_first_non_blank()` (^)
+- [ ] Buffer motions: `move_to_first_line()` (gg), `move_to_last_line()` (G), `move_to_line(n)`
+- [ ] Word motions: `move_next_word()` (w), `move_prev_word()` (b), `move_end_word()` (e)
+- [ ] Count prefix support: add `count_prefix` field and apply to motions
 
-**File: `src/input/handler.rs`**
-- [ ] Add `m` handler to open magnifier (not `Enter`)
-- [ ] Add `handle_magnifier_mode()` function
-- [ ] Handle Ctrl+h/j/k/l for cell navigation in magnifier
-- [ ] Handle `:w`, `:wq`, `:q!` commands in magnifier
-- [ ] Prompt to save if navigating with dirty buffer
+**Phase 3: Vim Operators (`src/magnifier/mod.rs`)**
+- [ ] Insert mode text: `insert_char()`, `delete_char_before()`, `delete_char_at()`, `newline()`
+- [ ] Normal mode operators: `delete_char()` (x), `delete_line()` (dd), `yank_line()` (yy)
+- [ ] Paste operators: `paste_below()` (p), `paste_above()` (P)
+- [ ] Enter insert variations: `insert_before()` (i), `insert_after()` (a), `insert_line_below()` (o), `insert_line_above()` (O)
+- [ ] Other operators: `substitute_char()` (s)
+- [ ] Internal clipboard for magnifier operations
 
-**File: `src/ui/magnifier.rs` (new file)**
-- [ ] Render magnifier overlay (centered, 80% width/height)
-- [ ] Show vim mode indicator (NORMAL/INSERT within magnifier)
-- [ ] Show cursor position
-- [ ] Show line numbers
-- [ ] Syntax highlighting for common formats (future enhancement)
+**Phase 4: App Integration (`src/app/mod.rs`)**
+- [ ] Add `magnifier_state: Option<MagnifierState>` field to App
+- [ ] Implement `open_magnifier(&mut self)` - create state from current cell
+- [ ] Implement `save_and_close_magnifier(&mut self)` - save to document and close
+- [ ] Implement `close_magnifier_discard(&mut self)` - close without saving
+- [ ] Implement `magnifier_is_dirty(&self)` - check for unsaved changes
 
-### Tests to Add
+**Phase 5: Input Handling (`src/input/handler.rs`)**
+- [ ] Add `m` key handler in Normal mode to open magnifier
+- [ ] Create `handle_magnifier_mode()` dispatcher function
+- [ ] Create `handle_magnifier_normal()` for Normal mode keys
+- [ ] Create `handle_magnifier_insert()` for Insert mode keys
+- [ ] Implement `:w` command (save to cell)
+- [ ] Implement `:wq` command (save and close)
+- [ ] Implement `:q!` command (discard and close)
+- [ ] Implement `ZZ` shortcut (save and close)
+- [ ] Implement Ctrl+h/j/k/l cell navigation
+- [ ] Create `prompt_save_before_navigate()` function with y/n/c options
 
+**Phase 6: UI Rendering (`src/ui/magnifier.rs`)**
+- [ ] Create new file `src/ui/magnifier.rs`
+- [ ] Implement `render_magnifier()` main function
+- [ ] Implement `centered_rect()` helper (80% width/height)
+- [ ] Render border and background
+- [ ] Render title bar with cell position (e.g., "Editing A5")
+- [ ] Render line numbers (right-aligned, dim color)
+- [ ] Render text content with cursor (block in Normal, pipe in Insert)
+- [ ] Render mode indicator (NORMAL/INSERT)
+- [ ] Render cursor position (line:col)
+- [ ] Render bottom help bar with commands
+- [ ] Add to `src/ui/mod.rs` exports
+
+**Phase 7: Testing (`tests/magnifier_test.rs`)**
+- [ ] Create test file `tests/magnifier_test.rs`
+- [ ] Basic operations tests (10 tests): open, close, initial state
+- [ ] Vim motions tests (20 tests): hjkl, w/b/e, 0/$, gg/G, count prefixes
+- [ ] Vim operators tests (25 tests): x, dd, yy, p, P, s, i/a/o/O
+- [ ] Insert mode tests (15 tests): typing, backspace, delete, enter, arrows
+- [ ] Commands tests (15 tests): :w, :wq, :q!, ZZ
+- [ ] Cell navigation tests (10 tests): Ctrl+hjkl with save prompt
+- [ ] Multi-line editing tests (10 tests): newlines, CSV escaping
+- [ ] Integration tests (15 tests): full workflows
+- [ ] Edge cases tests (10 tests): empty cells, long lines, unicode
+- [ ] Verify all 517+ existing tests still pass
+
+**Phase 8: Polish & Documentation**
+- [ ] Update `Cargo.toml` version to 0.6.0
+- [ ] Update `README.md` with magnifier features
+- [ ] Update `CHANGELOG.md` with v0.6.0 entry
+- [ ] Update `src/ui/help.rs` with magnifier keybindings
+- [ ] Run `cargo fmt`
+- [ ] Run `cargo clippy` and fix all warnings
+- [ ] Add module-level documentation
+- [ ] Manual QA testing checklist
+- [ ] Mark roadmap v0.6.0 as complete ✅
+
+### Tests to Add (~120 total)
+
+**Basic Operations (10 tests):**
 - [ ] `test_m_opens_magnifier`
-- [ ] `test_magnifier_vim_motions`
-- [ ] `test_magnifier_w_saves_cell_content`
-- [ ] `test_magnifier_wq_saves_and_closes`
-- [ ] `test_magnifier_q_bang_discards`
-- [ ] `test_magnifier_ctrl_hjkl_navigates_cells`
-- [ ] `test_magnifier_multiline_editing`
-- [ ] `test_magnifier_vim_operators`
-- [ ] `test_magnifier_dirty_prompt_on_navigation`
+- [ ] `test_magnifier_shows_cell_content`
+- [ ] `test_magnifier_initial_cursor_position`
+- [ ] `test_magnifier_mode_starts_normal`
+- [ ] `test_magnifier_escape_closes_if_clean`
+
+**Vim Motions (20 tests):**
+- [ ] `test_hjkl_movement`
+- [ ] `test_word_motions_w_b_e`
+- [ ] `test_line_motions_0_dollar_caret`
+- [ ] `test_buffer_motions_gg_G`
+- [ ] `test_count_prefix_5j_10w`
+- [ ] `test_motion_boundary_conditions`
+
+**Vim Operators (25 tests):**
+- [ ] `test_x_deletes_character`
+- [ ] `test_dd_deletes_line`
+- [ ] `test_yy_yanks_line`
+- [ ] `test_p_pastes_below`
+- [ ] `test_P_pastes_above`
+- [ ] `test_s_substitutes_character`
+- [ ] `test_i_a_o_O_enter_insert`
+
+**Insert Mode (15 tests):**
+- [ ] `test_insert_characters`
+- [ ] `test_backspace_deletes`
+- [ ] `test_enter_creates_newline`
+- [ ] `test_esc_exits_insert`
+
+**Commands (15 tests):**
+- [ ] `test_w_saves_cell_content`
+- [ ] `test_wq_saves_and_closes`
+- [ ] `test_q_bang_discards_changes`
+- [ ] `test_ZZ_saves_and_closes`
+- [ ] `test_w_marks_document_dirty`
+
+**Cell Navigation (10 tests):**
+- [ ] `test_ctrl_h_navigates_left`
+- [ ] `test_ctrl_j_navigates_down`
+- [ ] `test_ctrl_k_navigates_up`
+- [ ] `test_ctrl_l_navigates_right`
+- [ ] `test_ctrl_nav_prompts_if_dirty`
+
+**Multi-line (10 tests):**
+- [ ] `test_multiline_content_preserved`
+- [ ] `test_newline_insertion`
+- [ ] `test_multiline_csv_escaping`
+
+**Integration (15 tests):**
+- [ ] `test_open_edit_save_close_workflow`
+- [ ] `test_open_edit_discard_workflow`
+- [ ] `test_dirty_flag_integration`
+
+**Edge Cases (10 tests):**
+- [ ] `test_empty_cell_magnifier`
+- [ ] `test_very_long_lines`
+- [ ] `test_unicode_content`
 
 ### Acceptance Criteria
 
-- [ ] `m` opens magnifier for current cell (not `Enter`)
-- [ ] Vim motions work in magnifier (`hjkl`, `w/b/e`, `0/$`, `gg/G`)
-- [ ] Vim operators work (`dd`, `yy`, `p`, `x`, `s`, `i/a/o/O`)
-- [ ] `:w` saves cell content
-- [ ] `:wq` saves and closes
-- [ ] `:q!` discards changes
-- [ ] `Ctrl+h/j/k/l` navigate to adjacent cells
-- [ ] Prompt to save if navigating with dirty buffer
-- [ ] Multi-line editing works
-- [ ] Line numbers shown
-- [ ] Mode indicator shows NORMAL/INSERT within magnifier
-- [ ] All existing tests pass
-- [ ] No clippy warnings
+**Core Functionality:**
+- [ ] `m` key opens magnifier for current cell
+- [ ] Magnifier displays cell content correctly
+- [ ] Multi-line cell content works (newlines preserved)
+- [ ] CSV escaping works for multi-line cells (RFC 4180 compliant)
+
+**Vim Motions:**
+- [ ] Character motions work: `h`, `j`, `k`, `l`
+- [ ] Word motions work: `w`, `b`, `e`
+- [ ] Line motions work: `0`, `$`, `^`
+- [ ] Buffer motions work: `gg`, `G`, `<number>G`
+- [ ] Count prefixes work: `5j`, `10w`, etc.
+
+**Vim Operators:**
+- [ ] Delete works: `x` (char), `dd` (line)
+- [ ] Yank works: `yy` (line)
+- [ ] Paste works: `p` (below), `P` (above)
+- [ ] Insert mode entry works: `i`, `a`, `o`, `O`
+- [ ] Substitute works: `s`
+- [ ] Internal clipboard works for dd/yy/p
+
+**Commands:**
+- [ ] `:w` saves cell content to in-memory document
+- [ ] `:wq` saves and closes magnifier
+- [ ] `:q!` discards changes and closes
+- [ ] `ZZ` saves and closes (shortcut)
+- [ ] `:w` marks document as dirty
+
+**Cell Navigation:**
+- [ ] `Ctrl+h` navigates to left cell
+- [ ] `Ctrl+j` navigates to cell below
+- [ ] `Ctrl+k` navigates to cell above
+- [ ] `Ctrl+l` navigates to right cell
+- [ ] Save prompt appears if buffer is dirty
+- [ ] Save prompt options work: y (save), n (discard), c (cancel)
+
+**UI Rendering:**
+- [ ] Magnifier overlay renders centered (80% width/height)
+- [ ] Line numbers shown on left (right-aligned, dim color)
+- [ ] Cursor renders correctly (block in Normal, pipe in Insert)
+- [ ] Mode indicator shows NORMAL or INSERT
+- [ ] Cursor position shown (line:col format)
+- [ ] Title bar shows cell location (e.g., "Editing A5")
+- [ ] Help bar shows available commands
+- [ ] Colors match main table theme
+
+**Mode Transitions:**
+- [ ] Normal → Insert (via i/a/o/O)
+- [ ] Insert → Normal (via Esc)
+- [ ] Normal → closed (via :wq, :q!, ZZ)
+- [ ] Esc in Normal mode closes if clean, warns if dirty
+
+**Quality:**
+- [ ] All 517+ existing tests pass
+- [ ] 120+ new magnifier tests pass
+- [ ] Zero clippy warnings
+- [ ] Zero compiler warnings
+- [ ] Code formatted with `cargo fmt`
+- [ ] Documentation complete (README, CHANGELOG, help system)
+- [ ] Version bumped to 0.6.0
 
 ---
 
