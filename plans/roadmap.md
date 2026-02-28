@@ -1297,12 +1297,12 @@ NORMAL                                                          3,C
 - [x] Implement cursor helpers: `clamp_cursor()`, `current_line()`, `current_line_mut()`
 - [x] Implement mode switching: `enter_insert_mode()`, `exit_insert_mode()`
 
-**Phase 2: Vim Motions (`src/magnifier/mod.rs`)**
-- [ ] Character motions: `move_left()`, `move_right()`, `move_up()`, `move_down()`
-- [ ] Line motions: `move_to_line_start()` (0), `move_to_line_end()` ($), `move_to_first_non_blank()` (^)
-- [ ] Buffer motions: `move_to_first_line()` (gg), `move_to_last_line()` (G), `move_to_line(n)`
-- [ ] Word motions: `move_next_word()` (w), `move_prev_word()` (b), `move_end_word()` (e)
-- [ ] Count prefix support: add `count_prefix` field and apply to motions
+**Phase 2: Vim Motions (`src/magnifier/mod.rs`)** ✅ COMPLETE
+- [x] Character motions: `move_left()`, `move_right()`, `move_up()`, `move_down()`
+- [x] Line motions: `move_to_line_start()` (0), `move_to_line_end()` ($), `move_to_first_non_blank()` (^)
+- [x] Buffer motions: `move_to_first_line()` (gg), `move_to_last_line()` (G), `move_to_line(n)`
+- [x] Word motions: `move_next_word()` (w), `move_prev_word()` (b), `move_end_word()` (e)
+- [x] Count prefix support: add `count_prefix` field and apply to motions
 
 **Phase 3: Vim Operators (`src/magnifier/mod.rs`)**
 - [ ] Insert mode text: `insert_char()`, `delete_char_before()`, `delete_char_at()`, `newline()`
