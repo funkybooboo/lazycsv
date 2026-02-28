@@ -247,12 +247,14 @@ These commands always take priority:
 | `,O` | Insert column left |
 | `,dd` | Delete column (stores in column buffer) |
 | `,yy` | Yank column (includes header, stores in column buffer) |
-| `,p` | Paste column right (cursor moves to new column) |
-| `,P` | Paste column left (cursor moves to new column) |
+| `5,dd` | Delete 5 columns (count prefix) |
+| `5,yy` | Yank 5 columns (count prefix) |
+| `,p` | Paste column(s) right (cursor moves to new column) |
+| `,P` | Paste column(s) left (cursor moves to new column) |
 
 **Behavior:**
 - `,yy` yanks entire column including header (row 0)
-- `,p` pastes column, cursor moves to new column
+- `,p` pastes column(s), cursor moves to new column
 - `,o`/`,O` creates column with generic header (e.g., "Column D")
 - Comma leader waits silently for next key (standard vim behavior)
 
@@ -1068,12 +1070,14 @@ NORMAL                                                          3,C
 | `,O` | Insert column left |
 | `,dd` | Delete column (stores in column buffer) |
 | `,yy` | Yank column (includes header, stores in column buffer) |
-| `,p` | Paste column right (cursor moves to new column) |
-| `,P` | Paste column left (cursor moves to new column) |
+| `5,dd` | Delete 5 columns (count prefix) |
+| `5,yy` | Yank 5 columns (count prefix) |
+| `,p` | Paste column(s) right (cursor moves to new column) |
+| `,P` | Paste column(s) left (cursor moves to new column) |
 
 **Behavior:**
 - `,yy` yanks entire column including header (row 0)
-- `,p` pastes column, cursor moves to new column
+- `,p` pastes column(s), cursor moves to new column
 - `,o`/`,O` creates column with generic header (e.g., "Column D")
 - Comma leader is silent (no visual feedback, standard vim behavior)
 - No `,h` for header editing - just navigate to row 0 and use `i`
@@ -1115,6 +1119,8 @@ NORMAL                                                          3,C
 |-----|--------|
 | `5dd` | Delete 5 rows |
 | `5yy` | Yank 5 rows |
+| `5,dd` | Delete 5 columns |
+| `5,yy` | Yank 5 columns |
 | `P` | Paste above current row |
 | `cc` | Clear row and enter Insert mode |
 
@@ -1143,13 +1149,13 @@ NORMAL                                                          3,C
 **File: `src/input/handler.rs`**
 - [x] Add comma (`,`) handler to enter leader mode
 - [x] Add leader command handlers: `,o`, `,O`, `,dd`, `,yy`, `,p`, `,P`
-- [ ] Add count prefix support for `dd` and `yy`
+- [x] Add count prefix support for `dd`, `yy`, `,dd`, and `,yy`
 - [ ] Add `V` handler to enter Visual Line mode
 - [ ] Add `v` handler to enter Visual Block mode
 - [ ] Add `,v` handler to enter Visual Column mode
 - [ ] Add `handle_visual_mode()` function
 - [x] Add `P` handler for paste above
-- [ ] Add `cc` handler
+- [x] Add `cc` handler
 - [ ] Add `gv` handler for re-select
 - [x] Update `yy`, `dd` to store in row buffer
 - [x] Update `,yy`, `,dd` to store in column buffer
@@ -1161,8 +1167,8 @@ NORMAL                                                          3,C
 - [x] Add `delete_column(&mut self, at: ColIndex) -> Vec<String>` method
 - [x] Add `get_column(&self, col: ColIndex) -> Vec<String>` method (includes row 0 header)
 - [ ] Add `move_columns(&mut self, from: ColIndex, to: ColIndex, count: usize)` method
-- [ ] Add `delete_rows(&mut self, start: RowIndex, count: usize)` method
-- [ ] Add `get_rows(&self, start: RowIndex, count: usize)` method
+- [x] Add `delete_rows(&mut self, start: RowIndex, end: RowIndex)` method
+- [x] Add `get_rows(&self, start: RowIndex, end: RowIndex)` method
 
 **File: `src/app/mod.rs`**
 - [x] Replace `row_clipboard` with `DualClipboard` (row buffer + column buffer)
@@ -1213,11 +1219,11 @@ NORMAL                                                          3,C
 - [ ] `test_visual_p_overwrites_and_adds_if_needed`
 - [ ] `test_gv_reselects`
 
-**Count Prefixes (`tests/count_prefix_test.rs`):**
-- [ ] `test_5dd_deletes_5_rows`
-- [ ] `test_5yy_yanks_5_rows`
-- [ ] `test_P_pastes_above`
-- [ ] `test_cc_clears_row_enters_insert`
+**Count Prefixes (`tests/dual_clipboard_test.rs`):**
+- [x] `test_5dd_deletes_5_rows`
+- [x] `test_5yy_yanks_5_rows`
+- [x] `test_P_pastes_above` (via `test_capital_p_pastes_row_above`)
+- [x] `test_cc_clears_row_enters_insert` (via `test_cc_clears_row_enters_insert`)
 
 ### Acceptance Criteria
 
@@ -1227,14 +1233,14 @@ NORMAL                                                          3,C
 - [ ] `,p` pastes column, cursor moves to new column
 - [ ] `,o` inserts column with generic header
 - [ ] No `,h` keybinding exists (headers edited via row 0 with `i`)
-- [ ] `5dd` deletes exactly 5 rows
+- [x] `5dd` deletes exactly 5 rows
 - [ ] Visual modes work (`v`, `V`, `,v`) - 3 modes only
 - [ ] Visual block creates rectangular bounding box
 - [ ] Visual cell delete clears cells, preserves structure
 - [ ] Visual row/column delete removes rows/columns entirely
 - [ ] Visual operations work (`d`, `y`, `c`, `p`)
-- [ ] `P` pastes above
-- [ ] `cc` clears row, enters Insert
+- [x] `P` pastes above
+- [x] `cc` clears row, enters Insert
 - [ ] `gv` re-selects
 - [ ] Unified clipboard handles row/column/region
 - [ ] Transpose operations work (`yy`+`,p`, `,yy`+`p`)

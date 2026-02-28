@@ -236,6 +236,7 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         Some(crate::input::PendingCommand::GotoColumn(letters)) => format!("g{}", letters),
         Some(crate::input::PendingCommand::D) => "d".to_string(),
         Some(crate::input::PendingCommand::Y) => "y".to_string(),
+        Some(crate::input::PendingCommand::C) => "c".to_string(),
         Some(crate::input::PendingCommand::Comma) => ",".to_string(),
         Some(crate::input::PendingCommand::CommaD) => ",d".to_string(),
         Some(crate::input::PendingCommand::CommaY) => ",y".to_string(),

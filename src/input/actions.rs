@@ -92,6 +92,8 @@ pub enum PendingCommand {
     D,
     /// Waiting for second 'y' (for yy - yank row)
     Y,
+    /// Waiting for second 'c' (for cc - clear row)
+    C,
     /// Waiting for command after comma leader (,o, ,O, ,dd, ,yy, ,p, ,P, ,v)
     Comma,
     /// Waiting for second 'd' after comma (for ,dd - delete column)
@@ -108,6 +110,7 @@ impl PendingCommand {
             KeyCode::Char('z') => Some(Self::Z),
             KeyCode::Char('d') => Some(Self::D),
             KeyCode::Char('y') => Some(Self::Y),
+            KeyCode::Char('c') => Some(Self::C),
             KeyCode::Char(',') => Some(Self::Comma),
             _ => None,
         }

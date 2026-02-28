@@ -47,6 +47,7 @@ fn format_pending_command(cmd: &PendingCommand) -> String {
         PendingCommand::GotoColumn(letters) => format!("g{}", letters),
         PendingCommand::D => "d".to_string(),
         PendingCommand::Y => "y".to_string(),
+        PendingCommand::C => "c".to_string(),
         PendingCommand::Comma => ",".to_string(),
         PendingCommand::CommaD => ",d".to_string(),
         PendingCommand::CommaY => ",y".to_string(),
@@ -275,6 +276,12 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             return Ok(InputResult::Continue);
         }
 
+        // Start 'c' pending command (for cc - clear row)
+        KeyCode::Char('c') if is_navigation_allowed(app) => {
+            app.input_state.set_pending_command(PendingCommand::C);
+            return Ok(InputResult::Continue);
+        }
+
         // Insert mode: 'i' - edit cell, cursor at end
         KeyCode::Char('i') if is_navigation_allowed(app) => {
             enter_insert_mode(app, false, false);
@@ -330,47 +337,60 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             return Ok(InputResult::Continue);
         }
 
-        // Row operations: 'P' - paste row above
+        // Row operations: 'P' - paste row(s) above
         KeyCode::Char('P') if is_navigation_allowed(app) => {
-            if let Some(clipboard_row) = app.clipboard.as_row() {
+            if let Some(region) = app.clipboard.as_region() {
                 if let Some(row_idx) = app.get_selected_row() {
-                    app.document.insert_row(row_idx);
-                    // Copy clipboard content into the new row
-                    for (col_idx, value) in clipboard_row.iter().enumerate() {
-                        if col_idx < app.document.column_count() {
-                            app.document.set_cell(
-                                row_idx,
-                                crate::domain::position::ColIndex::new(col_idx),
-                                value.clone(),
-                            );
+                    let pasted_count = region.len();
+                    for (i, clipboard_row) in region.iter().enumerate() {
+                        let insert_idx = RowIndex::new(row_idx.get() + i);
+                        app.document.insert_row(insert_idx);
+                        for (col_idx, value) in clipboard_row.iter().enumerate() {
+                            if col_idx < app.document.column_count() {
+                                app.document.set_cell(
+                                    insert_idx,
+                                    ColIndex::new(col_idx),
+                                    value.clone(),
+                                );
+                            }
                         }
                     }
-                    // Selection stays at current index (which is now the pasted row)
-                    app.status_message = Some(StatusMessage::from("Pasted 1 row"));
+                    // Selection stays at current index (the first pasted row)
+                    app.status_message = Some(StatusMessage::new_owned(format!(
+                        "Pasted {} row(s)",
+                        pasted_count
+                    )));
                 }
             } else {
                 app.status_message = Some(StatusMessage::from("Nothing to paste"));
             }
         }
 
-        // Row operations: 'p' - paste row below
+        // Row operations: 'p' - paste row(s) below
         KeyCode::Char('p') if is_navigation_allowed(app) => {
-            if let Some(clipboard_row) = app.clipboard.as_row() {
+            if let Some(region) = app.clipboard.as_region() {
                 if let Some(row_idx) = app.get_selected_row() {
-                    let new_row_idx = RowIndex::new(row_idx.get() + 1);
-                    app.document.insert_row(new_row_idx);
-                    // Copy clipboard content into the new row
-                    for (col_idx, value) in clipboard_row.iter().enumerate() {
-                        if col_idx < app.document.column_count() {
-                            app.document.set_cell(
-                                new_row_idx,
-                                crate::domain::position::ColIndex::new(col_idx),
-                                value.clone(),
-                            );
+                    let pasted_count = region.len();
+                    for (i, clipboard_row) in region.iter().enumerate() {
+                        let insert_idx = RowIndex::new(row_idx.get() + 1 + i);
+                        app.document.insert_row(insert_idx);
+                        for (col_idx, value) in clipboard_row.iter().enumerate() {
+                            if col_idx < app.document.column_count() {
+                                app.document.set_cell(
+                                    insert_idx,
+                                    ColIndex::new(col_idx),
+                                    value.clone(),
+                                );
+                            }
                         }
                     }
-                    app.view_state.table_state.select(Some(new_row_idx.get()));
-                    app.status_message = Some(StatusMessage::from("Pasted 1 row"));
+                    // Move selection to last pasted row
+                    let last_pasted = row_idx.get() + pasted_count;
+                    app.view_state.table_state.select(Some(last_pasted));
+                    app.status_message = Some(StatusMessage::new_owned(format!(
+                        "Pasted {} row(s)",
+                        pasted_count
+                    )));
                 }
             } else {
                 app.status_message = Some(StatusMessage::from("Nothing to paste"));
@@ -495,47 +515,79 @@ fn handle_multi_key_command(
             app.status_message = Some(StatusMessage::from(messages::VIEW_BOTTOM));
         }
 
-        // dd - Delete row
+        // dd - Delete row(s) with optional count prefix
         (PendingCommand::D, KeyCode::Char('d')) => {
             app.input_state.clear_pending_command();
+            let count = app.input_state.command_count.take().map(|n| n.get()).unwrap_or(1);
             if let Some(row_idx) = app.get_selected_row() {
                 // If deleting row 0 (header), turn header_mode OFF
                 if row_idx.get() == 0 {
                     app.document.header_mode = false;
                     app.session.set_header_mode(false);
-                    app.status_message =
-                        Some(StatusMessage::from("Header row deleted, header mode OFF"));
                 }
 
-                if let Some(deleted) = app.document.delete_row(row_idx) {
-                    app.clipboard.yank_row(deleted);
+                let end_idx = RowIndex::new(row_idx.get() + count - 1);
+                let deleted = app.document.delete_rows(row_idx, end_idx);
+                let deleted_count = deleted.len();
+                if deleted_count > 0 {
+                    app.clipboard.yank_region(deleted);
                     // Adjust selection if needed
                     let row_count = app.document.row_count();
                     if row_count == 0 {
-                        // No rows left
                         app.view_state.table_state.select(None);
                     } else if row_idx.get() >= row_count {
-                        // Was at last row, move selection up
                         app.view_state.table_state.select(Some(row_count - 1));
                     }
-                    // Otherwise selection stays at same index (which is now the next row)
 
-                    if row_idx.get() != 0 {
-                        app.status_message = Some(StatusMessage::from("1 row deleted"));
+                    if row_idx.get() == 0 {
+                        app.status_message = Some(StatusMessage::from(
+                            "Header row deleted, header mode OFF",
+                        ));
+                    } else {
+                        app.status_message = Some(StatusMessage::new_owned(format!(
+                            "{} row(s) deleted",
+                            deleted_count
+                        )));
                     }
                 }
             }
         }
 
-        // yy - Yank (copy) row
+        // yy - Yank (copy) row(s) with optional count prefix
         (PendingCommand::Y, KeyCode::Char('y')) => {
             app.input_state.clear_pending_command();
+            let count = app.input_state.command_count.take().map(|n| n.get()).unwrap_or(1);
             if let Some(row_idx) = app.get_selected_row() {
-                // Direct access: row_idx is absolute (0=header, 1+=data)
-                if let Some(row) = app.document.rows.get(row_idx.get()) {
-                    app.clipboard.yank_row(row.clone());
-                    app.status_message = Some(StatusMessage::from("1 row yanked"));
+                let end_idx = RowIndex::new(
+                    (row_idx.get() + count - 1).min(app.document.row_count().saturating_sub(1)),
+                );
+                let rows = app.document.get_rows(row_idx, end_idx);
+                let yanked_count = rows.len();
+                if yanked_count > 0 {
+                    app.clipboard.yank_region(rows);
+                    app.status_message = Some(StatusMessage::new_owned(format!(
+                        "{} row(s) yanked",
+                        yanked_count
+                    )));
                 }
+            }
+        }
+
+        // cc - Clear row and enter insert mode
+        (PendingCommand::C, KeyCode::Char('c')) => {
+            app.input_state.clear_pending_command();
+            if let Some(row_idx) = app.get_selected_row() {
+                // Clear all cells in the row
+                let col_count = app.document.column_count();
+                for col in 0..col_count {
+                    app.document
+                        .set_cell(row_idx, ColIndex::new(col), String::new());
+                }
+                // Move cursor to first column
+                app.view_state.selected_column = ColIndex::new(0);
+                // Enter insert mode
+                enter_insert_mode(app, true, false);
+                app.status_message = Some(StatusMessage::from("Row cleared"));
             }
         }
 
@@ -551,28 +603,42 @@ fn handle_multi_key_command(
             return Ok(InputResult::Continue);
         }
 
-        // ,p - paste column to the right of current column
+        // ,p - paste column(s) to the right of current column
         (PendingCommand::Comma, KeyCode::Char('p')) => {
             app.input_state.clear_pending_command();
-            if let Some(col_data) = app.clipboard.as_column() {
+            if let Some(columns) = app.clipboard.as_columns() {
                 let col_idx = app.view_state.selected_column;
-                let insert_at = ColIndex::new(col_idx.get() + 1);
-                app.document.insert_column(insert_at, col_data);
-                app.view_state.selected_column = insert_at;
-                app.status_message = Some(StatusMessage::from("Pasted 1 column"));
+                let pasted_count = columns.len();
+                for (i, col_data) in columns.into_iter().enumerate() {
+                    let insert_at = ColIndex::new(col_idx.get() + 1 + i);
+                    app.document.insert_column(insert_at, col_data);
+                }
+                // Move selection to first pasted column
+                app.view_state.selected_column = ColIndex::new(col_idx.get() + 1);
+                app.status_message = Some(StatusMessage::new_owned(format!(
+                    "Pasted {} column(s)",
+                    pasted_count
+                )));
             } else {
                 app.status_message = Some(StatusMessage::from("Nothing to paste"));
             }
         }
 
-        // ,P - paste column to the left of current column
+        // ,P - paste column(s) to the left of current column
         (PendingCommand::Comma, KeyCode::Char('P')) => {
             app.input_state.clear_pending_command();
-            if let Some(col_data) = app.clipboard.as_column() {
+            if let Some(columns) = app.clipboard.as_columns() {
                 let col_idx = app.view_state.selected_column;
-                app.document.insert_column(col_idx, col_data);
-                // Selection stays at current index (which is now the pasted column)
-                app.status_message = Some(StatusMessage::from("Pasted 1 column"));
+                let pasted_count = columns.len();
+                for (i, col_data) in columns.into_iter().enumerate() {
+                    let insert_at = ColIndex::new(col_idx.get() + i);
+                    app.document.insert_column(insert_at, col_data);
+                }
+                // Selection stays at current index (first pasted column)
+                app.status_message = Some(StatusMessage::new_owned(format!(
+                    "Pasted {} column(s)",
+                    pasted_count
+                )));
             } else {
                 app.status_message = Some(StatusMessage::from("Nothing to paste"));
             }
@@ -596,13 +662,16 @@ fn handle_multi_key_command(
             app.status_message = Some(StatusMessage::from("Inserted empty column"));
         }
 
-        // ,dd - delete current column
+        // ,dd - delete column(s) with optional count prefix
         (PendingCommand::CommaD, KeyCode::Char('d')) => {
             app.input_state.clear_pending_command();
+            let count = app.input_state.command_count.take().map(|n| n.get()).unwrap_or(1);
             let col_idx = app.view_state.selected_column;
-            let deleted = app.document.delete_column(col_idx);
-            if !deleted.is_empty() {
-                app.clipboard.yank_column(deleted);
+            let end_idx = ColIndex::new(col_idx.get() + count - 1);
+            let deleted = app.document.delete_columns(col_idx, end_idx);
+            let deleted_count = deleted.len();
+            if deleted_count > 0 {
+                app.clipboard.yank_columns(deleted);
                 // Adjust selection if needed
                 let col_count = app.document.column_count();
                 if col_count == 0 {
@@ -610,18 +679,29 @@ fn handle_multi_key_command(
                 } else if col_idx.get() >= col_count {
                     app.view_state.selected_column = ColIndex::new(col_count - 1);
                 }
-                app.status_message = Some(StatusMessage::from("1 column deleted"));
+                app.status_message = Some(StatusMessage::new_owned(format!(
+                    "{} column(s) deleted",
+                    deleted_count
+                )));
             }
         }
 
-        // ,yy - yank current column
+        // ,yy - yank column(s) with optional count prefix
         (PendingCommand::CommaY, KeyCode::Char('y')) => {
             app.input_state.clear_pending_command();
+            let count = app.input_state.command_count.take().map(|n| n.get()).unwrap_or(1);
             let col_idx = app.view_state.selected_column;
-            let column = app.document.get_column(col_idx);
-            if !column.is_empty() {
-                app.clipboard.yank_column(column);
-                app.status_message = Some(StatusMessage::from("1 column yanked"));
+            let end_idx = ColIndex::new(
+                (col_idx.get() + count - 1).min(app.document.column_count().saturating_sub(1)),
+            );
+            let columns = app.document.get_columns(col_idx, end_idx);
+            let yanked_count = columns.len();
+            if yanked_count > 0 {
+                app.clipboard.yank_columns(columns);
+                app.status_message = Some(StatusMessage::new_owned(format!(
+                    "{} column(s) yanked",
+                    yanked_count
+                )));
             }
         }
 
