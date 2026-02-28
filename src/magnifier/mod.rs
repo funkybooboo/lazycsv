@@ -203,6 +203,258 @@ impl MagnifierState {
             self.cursor.1 = 0;
         }
     }
+
+    // ============================================================================
+    // Vim Motions (Phase 2)
+    // ============================================================================
+
+    /// Move cursor left (h)
+    pub fn move_left(&mut self) {
+        let count = self.take_count();
+        self.cursor.1 = self.cursor.1.saturating_sub(count);
+        self.clamp_cursor();
+    }
+
+    /// Move cursor right (l)
+    pub fn move_right(&mut self) {
+        let count = self.take_count();
+        self.cursor.1 = self.cursor.1.saturating_add(count);
+        self.clamp_cursor();
+    }
+
+    /// Move cursor up (k)
+    pub fn move_up(&mut self) {
+        let count = self.take_count();
+        self.cursor.0 = self.cursor.0.saturating_sub(count);
+        self.clamp_cursor();
+    }
+
+    /// Move cursor down (j)
+    pub fn move_down(&mut self) {
+        let count = self.take_count();
+        self.cursor.0 = self.cursor.0.saturating_add(count);
+        self.clamp_cursor();
+    }
+
+    /// Move to start of line (0)
+    pub fn move_to_line_start(&mut self) {
+        self.cursor.1 = 0;
+    }
+
+    /// Move to end of line ($)
+    pub fn move_to_line_end(&mut self) {
+        let line_len = self.current_line().len();
+        self.cursor.1 = if self.mode == MagnifierMode::Insert {
+            line_len
+        } else {
+            line_len.saturating_sub(1)
+        };
+        self.clamp_cursor();
+    }
+
+    /// Move to first non-blank character (^)
+    pub fn move_to_first_non_blank(&mut self) {
+        let line = self.current_line();
+        let first_non_blank = line.chars().position(|c| !c.is_whitespace()).unwrap_or(0);
+        self.cursor.1 = first_non_blank;
+        self.clamp_cursor();
+    }
+
+    /// Move to first line (gg)
+    pub fn move_to_first_line(&mut self) {
+        self.cursor.0 = 0;
+        self.clamp_cursor();
+    }
+
+    /// Move to last line (G)
+    pub fn move_to_last_line(&mut self) {
+        self.cursor.0 = self.lines.len().saturating_sub(1);
+        self.clamp_cursor();
+    }
+
+    /// Move to specific line number (1-indexed for user, converted to 0-indexed)
+    pub fn move_to_line(&mut self, line_number: usize) {
+        // Convert 1-indexed to 0-indexed
+        self.cursor.0 = line_number.saturating_sub(1);
+        self.clamp_cursor();
+    }
+
+    /// Move to next word (w)
+    pub fn move_next_word(&mut self) {
+        let count = self.take_count();
+        for _ in 0..count {
+            self.move_next_word_once();
+        }
+    }
+
+    /// Move to previous word (b)
+    pub fn move_prev_word(&mut self) {
+        let count = self.take_count();
+        for _ in 0..count {
+            self.move_prev_word_once();
+        }
+    }
+
+    /// Move to end of word (e)
+    pub fn move_end_word(&mut self) {
+        let count = self.take_count();
+        for _ in 0..count {
+            self.move_end_word_once();
+        }
+    }
+
+    /// Helper: Move to next word once
+    fn move_next_word_once(&mut self) {
+        let line = self.current_line().to_string();
+        let mut col = self.cursor.1;
+
+        if col >= line.len() {
+            // At end of line, move to next line
+            if self.cursor.0 < self.lines.len() - 1 {
+                self.cursor.0 += 1;
+                self.cursor.1 = 0;
+                let new_line = self.current_line().to_string();
+                // Skip leading whitespace
+                while self.cursor.1 < new_line.len()
+                    && Self::is_whitespace_at(&new_line, self.cursor.1)
+                {
+                    self.cursor.1 += 1;
+                }
+            }
+            self.clamp_cursor();
+            return;
+        }
+
+        // Skip current word (non-whitespace)
+        while col < line.len() && !Self::is_whitespace_at(&line, col) {
+            col += 1;
+        }
+
+        // Skip whitespace to next word
+        while col < line.len() && Self::is_whitespace_at(&line, col) {
+            col += 1;
+        }
+
+        // If we reached end of line, move to next line
+        if col >= line.len() && self.cursor.0 < self.lines.len() - 1 {
+            self.cursor.0 += 1;
+            self.cursor.1 = 0;
+            let new_line = self.current_line().to_string();
+            // Skip leading whitespace on new line
+            while self.cursor.1 < new_line.len() && Self::is_whitespace_at(&new_line, self.cursor.1)
+            {
+                self.cursor.1 += 1;
+            }
+        } else {
+            self.cursor.1 = col;
+        }
+
+        self.clamp_cursor();
+    }
+
+    /// Helper: Move to previous word once
+    fn move_prev_word_once(&mut self) {
+        let mut col = self.cursor.1;
+
+        // If at start of line, move to end of previous line
+        if col == 0 {
+            if self.cursor.0 > 0 {
+                self.cursor.0 -= 1;
+                let line = self.current_line().to_string();
+                self.cursor.1 = line.len().saturating_sub(1);
+            }
+            self.clamp_cursor();
+            return;
+        }
+
+        let line = self.current_line().to_string();
+
+        // Move back one position
+        col = col.saturating_sub(1);
+
+        // Skip whitespace backwards
+        while col > 0 && Self::is_whitespace_at(&line, col) {
+            col -= 1;
+        }
+
+        // Skip word backwards to find start
+        while col > 0 && !Self::is_whitespace_at(&line, col.saturating_sub(1)) {
+            col -= 1;
+        }
+
+        self.cursor.1 = col;
+        self.clamp_cursor();
+    }
+
+    /// Helper: Move to end of word once
+    fn move_end_word_once(&mut self) {
+        let line = self.current_line().to_string();
+        let mut col = self.cursor.1;
+
+        // Move forward at least one character
+        if col < line.len() {
+            col += 1;
+        }
+
+        // Skip whitespace
+        while col < line.len() && Self::is_whitespace_at(&line, col) {
+            col += 1;
+        }
+
+        // Move to end of word (find next whitespace or end)
+        while col < line.len() && !Self::is_whitespace_at(&line, col) {
+            col += 1;
+        }
+
+        // Position on last character of word (one before whitespace)
+        if col > 0 && col <= line.len() {
+            col -= 1;
+        }
+
+        self.cursor.1 = col;
+        self.clamp_cursor();
+    }
+
+    /// Check if position is at a word boundary
+    fn is_word_boundary(line: &str, pos: usize) -> bool {
+        if pos >= line.len() {
+            return true;
+        }
+
+        let chars: Vec<char> = line.chars().collect();
+        if pos >= chars.len() {
+            return true;
+        }
+
+        let current = chars[pos];
+
+        // Whitespace is always a boundary
+        if current.is_whitespace() {
+            return true;
+        }
+
+        // Check transition between word types
+        if pos > 0 {
+            let prev = chars[pos - 1];
+            let current_is_word = current.is_alphanumeric() || current == '_';
+            let prev_is_word = prev.is_alphanumeric() || prev == '_';
+
+            // Transition from word to non-word or vice versa
+            if current_is_word != prev_is_word {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Check if character at position is whitespace
+    fn is_whitespace_at(line: &str, pos: usize) -> bool {
+        line.chars()
+            .nth(pos)
+            .map(|c| c.is_whitespace())
+            .unwrap_or(false)
+    }
 }
 
 #[cfg(test)]
@@ -349,5 +601,343 @@ mod tests {
 
         // Should clamp to last line
         assert_eq!(state.cursor.0, 1);
+    }
+
+    // ============================================================================
+    // Phase 2: Vim Motions Tests
+    // ============================================================================
+
+    #[test]
+    fn test_move_left() {
+        let mut state = MagnifierState::new(
+            "Hello World".to_string(),
+            (RowIndex::new(0), ColIndex::new(0)),
+        );
+        state.cursor = (0, 5);
+
+        state.move_left();
+        assert_eq!(state.cursor.1, 4);
+    }
+
+    #[test]
+    fn test_move_left_with_count() {
+        let mut state = MagnifierState::new(
+            "Hello World".to_string(),
+            (RowIndex::new(0), ColIndex::new(0)),
+        );
+        state.cursor = (0, 5);
+        state.set_count_prefix(3);
+
+        state.move_left();
+        assert_eq!(state.cursor.1, 2);
+    }
+
+    #[test]
+    fn test_move_left_at_start() {
+        let mut state =
+            MagnifierState::new("Hello".to_string(), (RowIndex::new(0), ColIndex::new(0)));
+        state.cursor = (0, 0);
+
+        state.move_left();
+        assert_eq!(state.cursor.1, 0); // Should stay at 0
+    }
+
+    #[test]
+    fn test_move_right() {
+        let mut state = MagnifierState::new(
+            "Hello World".to_string(),
+            (RowIndex::new(0), ColIndex::new(0)),
+        );
+        state.cursor = (0, 0);
+
+        state.move_right();
+        assert_eq!(state.cursor.1, 1);
+    }
+
+    #[test]
+    fn test_move_right_with_count() {
+        let mut state = MagnifierState::new(
+            "Hello World".to_string(),
+            (RowIndex::new(0), ColIndex::new(0)),
+        );
+        state.cursor = (0, 0);
+        state.set_count_prefix(5);
+
+        state.move_right();
+        assert_eq!(state.cursor.1, 5);
+    }
+
+    #[test]
+    fn test_move_right_at_end() {
+        let mut state =
+            MagnifierState::new("Hello".to_string(), (RowIndex::new(0), ColIndex::new(0)));
+        state.cursor = (0, 4); // Last char
+
+        state.move_right();
+        assert_eq!(state.cursor.1, 4); // Should stay at last char in normal mode
+    }
+
+    #[test]
+    fn test_move_up() {
+        let mut state = MagnifierState::new(
+            "Line 1\nLine 2\nLine 3".to_string(),
+            (RowIndex::new(0), ColIndex::new(0)),
+        );
+        state.cursor = (2, 0);
+
+        state.move_up();
+        assert_eq!(state.cursor.0, 1);
+    }
+
+    #[test]
+    fn test_move_up_with_count() {
+        let mut state = MagnifierState::new(
+            "Line 1\nLine 2\nLine 3".to_string(),
+            (RowIndex::new(0), ColIndex::new(0)),
+        );
+        state.cursor = (2, 0);
+        state.set_count_prefix(2);
+
+        state.move_up();
+        assert_eq!(state.cursor.0, 0);
+    }
+
+    #[test]
+    fn test_move_up_at_first_line() {
+        let mut state = MagnifierState::new(
+            "Line 1\nLine 2".to_string(),
+            (RowIndex::new(0), ColIndex::new(0)),
+        );
+        state.cursor = (0, 0);
+
+        state.move_up();
+        assert_eq!(state.cursor.0, 0); // Should stay at 0
+    }
+
+    #[test]
+    fn test_move_down() {
+        let mut state = MagnifierState::new(
+            "Line 1\nLine 2\nLine 3".to_string(),
+            (RowIndex::new(0), ColIndex::new(0)),
+        );
+        state.cursor = (0, 0);
+
+        state.move_down();
+        assert_eq!(state.cursor.0, 1);
+    }
+
+    #[test]
+    fn test_move_down_with_count() {
+        let mut state = MagnifierState::new(
+            "Line 1\nLine 2\nLine 3".to_string(),
+            (RowIndex::new(0), ColIndex::new(0)),
+        );
+        state.cursor = (0, 0);
+        state.set_count_prefix(2);
+
+        state.move_down();
+        assert_eq!(state.cursor.0, 2);
+    }
+
+    #[test]
+    fn test_move_down_at_last_line() {
+        let mut state = MagnifierState::new(
+            "Line 1\nLine 2".to_string(),
+            (RowIndex::new(0), ColIndex::new(0)),
+        );
+        state.cursor = (1, 0);
+
+        state.move_down();
+        assert_eq!(state.cursor.0, 1); // Should stay at last line
+    }
+
+    #[test]
+    fn test_move_to_line_start() {
+        let mut state = MagnifierState::new(
+            "Hello World".to_string(),
+            (RowIndex::new(0), ColIndex::new(0)),
+        );
+        state.cursor = (0, 5);
+
+        state.move_to_line_start();
+        assert_eq!(state.cursor.1, 0);
+    }
+
+    #[test]
+    fn test_move_to_line_end() {
+        let mut state = MagnifierState::new(
+            "Hello World".to_string(),
+            (RowIndex::new(0), ColIndex::new(0)),
+        );
+        state.cursor = (0, 0);
+
+        state.move_to_line_end();
+        assert_eq!(state.cursor.1, 10); // "Hello World" is 11 chars, last index is 10
+    }
+
+    #[test]
+    fn test_move_to_line_end_insert_mode() {
+        let mut state =
+            MagnifierState::new("Hello".to_string(), (RowIndex::new(0), ColIndex::new(0)));
+        state.enter_insert_mode();
+        state.cursor = (0, 0);
+
+        state.move_to_line_end();
+        assert_eq!(state.cursor.1, 5); // Can be at position 5 in insert mode
+    }
+
+    #[test]
+    fn test_move_to_first_non_blank() {
+        let mut state =
+            MagnifierState::new("   Hello".to_string(), (RowIndex::new(0), ColIndex::new(0)));
+        state.cursor = (0, 0);
+
+        state.move_to_first_non_blank();
+        assert_eq!(state.cursor.1, 3); // First 'H' is at position 3
+    }
+
+    #[test]
+    fn test_move_to_first_non_blank_no_whitespace() {
+        let mut state =
+            MagnifierState::new("Hello".to_string(), (RowIndex::new(0), ColIndex::new(0)));
+        state.cursor = (0, 3);
+
+        state.move_to_first_non_blank();
+        assert_eq!(state.cursor.1, 0);
+    }
+
+    #[test]
+    fn test_move_to_first_line() {
+        let mut state = MagnifierState::new(
+            "Line 1\nLine 2\nLine 3".to_string(),
+            (RowIndex::new(0), ColIndex::new(0)),
+        );
+        state.cursor = (2, 0);
+
+        state.move_to_first_line();
+        assert_eq!(state.cursor.0, 0);
+    }
+
+    #[test]
+    fn test_move_to_last_line() {
+        let mut state = MagnifierState::new(
+            "Line 1\nLine 2\nLine 3".to_string(),
+            (RowIndex::new(0), ColIndex::new(0)),
+        );
+        state.cursor = (0, 0);
+
+        state.move_to_last_line();
+        assert_eq!(state.cursor.0, 2);
+    }
+
+    #[test]
+    fn test_move_to_line() {
+        let mut state = MagnifierState::new(
+            "Line 1\nLine 2\nLine 3\nLine 4".to_string(),
+            (RowIndex::new(0), ColIndex::new(0)),
+        );
+        state.cursor = (0, 0);
+
+        state.move_to_line(3); // 1-indexed, so line 3 = index 2
+        assert_eq!(state.cursor.0, 2);
+    }
+
+    #[test]
+    fn test_move_next_word() {
+        let mut state = MagnifierState::new(
+            "Hello World Test".to_string(),
+            (RowIndex::new(0), ColIndex::new(0)),
+        );
+        state.cursor = (0, 0);
+
+        state.move_next_word();
+        assert_eq!(state.cursor.1, 6); // Start of "World"
+    }
+
+    #[test]
+    fn test_move_next_word_with_count() {
+        let mut state = MagnifierState::new(
+            "Hello World Test".to_string(),
+            (RowIndex::new(0), ColIndex::new(0)),
+        );
+        state.cursor = (0, 0);
+        state.set_count_prefix(2);
+
+        state.move_next_word();
+        assert_eq!(state.cursor.1, 12); // Start of "Test"
+    }
+
+    #[test]
+    fn test_move_next_word_across_lines() {
+        let mut state = MagnifierState::new(
+            "Hello\nWorld".to_string(),
+            (RowIndex::new(0), ColIndex::new(0)),
+        );
+        state.cursor = (0, 0);
+
+        state.move_next_word();
+        assert_eq!(state.cursor, (1, 0)); // Should move to next line
+    }
+
+    #[test]
+    fn test_move_prev_word() {
+        let mut state = MagnifierState::new(
+            "Hello World Test".to_string(),
+            (RowIndex::new(0), ColIndex::new(0)),
+        );
+        state.cursor = (0, 12); // At "Test"
+
+        state.move_prev_word();
+        assert_eq!(state.cursor.1, 6); // Start of "World"
+    }
+
+    #[test]
+    fn test_move_prev_word_with_count() {
+        let mut state = MagnifierState::new(
+            "Hello World Test".to_string(),
+            (RowIndex::new(0), ColIndex::new(0)),
+        );
+        state.cursor = (0, 12);
+        state.set_count_prefix(2);
+
+        state.move_prev_word();
+        assert_eq!(state.cursor.1, 0); // Start of "Hello"
+    }
+
+    #[test]
+    fn test_move_prev_word_at_line_start() {
+        let mut state = MagnifierState::new(
+            "Hello\nWorld".to_string(),
+            (RowIndex::new(0), ColIndex::new(0)),
+        );
+        state.cursor = (1, 0);
+
+        state.move_prev_word();
+        assert_eq!(state.cursor.0, 0); // Should move to previous line
+    }
+
+    #[test]
+    fn test_move_end_word() {
+        let mut state = MagnifierState::new(
+            "Hello World".to_string(),
+            (RowIndex::new(0), ColIndex::new(0)),
+        );
+        state.cursor = (0, 0);
+
+        state.move_end_word();
+        assert_eq!(state.cursor.1, 4); // End of "Hello"
+    }
+
+    #[test]
+    fn test_move_end_word_with_count() {
+        let mut state = MagnifierState::new(
+            "Hello World Test".to_string(),
+            (RowIndex::new(0), ColIndex::new(0)),
+        );
+        state.cursor = (0, 0);
+        state.set_count_prefix(2);
+
+        state.move_end_word();
+        assert_eq!(state.cursor.1, 10); // End of "World"
     }
 }
