@@ -324,6 +324,35 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             }
         }
 
+        // Comma leader - start column command sequence
+        KeyCode::Char(',') if is_navigation_allowed(app) => {
+            app.input_state.set_pending_command(PendingCommand::Comma);
+            return Ok(InputResult::Continue);
+        }
+
+        // Row operations: 'P' - paste row above
+        KeyCode::Char('P') if is_navigation_allowed(app) => {
+            if let Some(clipboard_row) = app.clipboard.as_row() {
+                if let Some(row_idx) = app.get_selected_row() {
+                    app.document.insert_row(row_idx);
+                    // Copy clipboard content into the new row
+                    for (col_idx, value) in clipboard_row.iter().enumerate() {
+                        if col_idx < app.document.column_count() {
+                            app.document.set_cell(
+                                row_idx,
+                                crate::domain::position::ColIndex::new(col_idx),
+                                value.clone(),
+                            );
+                        }
+                    }
+                    // Selection stays at current index (which is now the pasted row)
+                    app.status_message = Some(StatusMessage::from("Pasted 1 row"));
+                }
+            } else {
+                app.status_message = Some(StatusMessage::from("Nothing to paste"));
+            }
+        }
+
         // Row operations: 'p' - paste row below
         KeyCode::Char('p') if is_navigation_allowed(app) => {
             if let Some(clipboard_row) = app.clipboard.as_row() {
@@ -507,6 +536,92 @@ fn handle_multi_key_command(
                     app.clipboard.yank_row(row.clone());
                     app.status_message = Some(StatusMessage::from("1 row yanked"));
                 }
+            }
+        }
+
+        // ,d - transition to CommaD (for ,dd)
+        (PendingCommand::Comma, KeyCode::Char('d')) => {
+            app.input_state.set_pending_command(PendingCommand::CommaD);
+            return Ok(InputResult::Continue);
+        }
+
+        // ,y - transition to CommaY (for ,yy)
+        (PendingCommand::Comma, KeyCode::Char('y')) => {
+            app.input_state.set_pending_command(PendingCommand::CommaY);
+            return Ok(InputResult::Continue);
+        }
+
+        // ,p - paste column to the right of current column
+        (PendingCommand::Comma, KeyCode::Char('p')) => {
+            app.input_state.clear_pending_command();
+            if let Some(col_data) = app.clipboard.as_column() {
+                let col_idx = app.view_state.selected_column;
+                let insert_at = ColIndex::new(col_idx.get() + 1);
+                app.document.insert_column(insert_at, col_data);
+                app.view_state.selected_column = insert_at;
+                app.status_message = Some(StatusMessage::from("Pasted 1 column"));
+            } else {
+                app.status_message = Some(StatusMessage::from("Nothing to paste"));
+            }
+        }
+
+        // ,P - paste column to the left of current column
+        (PendingCommand::Comma, KeyCode::Char('P')) => {
+            app.input_state.clear_pending_command();
+            if let Some(col_data) = app.clipboard.as_column() {
+                let col_idx = app.view_state.selected_column;
+                app.document.insert_column(col_idx, col_data);
+                // Selection stays at current index (which is now the pasted column)
+                app.status_message = Some(StatusMessage::from("Pasted 1 column"));
+            } else {
+                app.status_message = Some(StatusMessage::from("Nothing to paste"));
+            }
+        }
+
+        // ,o - insert empty column to the right
+        (PendingCommand::Comma, KeyCode::Char('o')) => {
+            app.input_state.clear_pending_command();
+            let col_idx = app.view_state.selected_column;
+            let insert_at = ColIndex::new(col_idx.get() + 1);
+            app.document.insert_empty_column(insert_at);
+            app.view_state.selected_column = insert_at;
+            app.status_message = Some(StatusMessage::from("Inserted empty column"));
+        }
+
+        // ,O - insert empty column to the left
+        (PendingCommand::Comma, KeyCode::Char('O')) => {
+            app.input_state.clear_pending_command();
+            let col_idx = app.view_state.selected_column;
+            app.document.insert_empty_column(col_idx);
+            app.status_message = Some(StatusMessage::from("Inserted empty column"));
+        }
+
+        // ,dd - delete current column
+        (PendingCommand::CommaD, KeyCode::Char('d')) => {
+            app.input_state.clear_pending_command();
+            let col_idx = app.view_state.selected_column;
+            let deleted = app.document.delete_column(col_idx);
+            if !deleted.is_empty() {
+                app.clipboard.yank_column(deleted);
+                // Adjust selection if needed
+                let col_count = app.document.column_count();
+                if col_count == 0 {
+                    // No columns left — nothing to select
+                } else if col_idx.get() >= col_count {
+                    app.view_state.selected_column = ColIndex::new(col_count - 1);
+                }
+                app.status_message = Some(StatusMessage::from("1 column deleted"));
+            }
+        }
+
+        // ,yy - yank current column
+        (PendingCommand::CommaY, KeyCode::Char('y')) => {
+            app.input_state.clear_pending_command();
+            let col_idx = app.view_state.selected_column;
+            let column = app.document.get_column(col_idx);
+            if !column.is_empty() {
+                app.clipboard.yank_column(column);
+                app.status_message = Some(StatusMessage::from("1 column yanked"));
             }
         }
 

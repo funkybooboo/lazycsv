@@ -1,167 +1,131 @@
-//! Unified clipboard system for LazyCSV.
+//! Dual clipboard system for LazyCSV.
 //!
-//! This module implements a smart clipboard that can store different types of data
-//! (rows, columns, cells, regions) and adapts paste behavior based on context.
-//!
-//! ## Design Philosophy
-//!
-//! - One clipboard for all operations
-//! - Type metadata tracks what was yanked
-//! - Paste operations adapt intelligently based on clipboard type and context
-//! - Support transpose operations (row→column, column→row)
-//!
-//! ## Examples
-//!
-//! ```ignore
-//! // Yank a row, paste as row
-//! yy → p  // Normal row paste
-//!
-//! // Yank a column, paste as column
-//! ,yy → ,p  // Normal column paste
-//!
-//! // Transpose operations
-//! yy → ,p  // Paste row as column (transpose)
-//! ,yy → p  // Paste column as row (transpose)
-//! ```
+//! Two independent buffers — a row buffer and a column buffer — with no
+//! cross-buffer pasting. Row operations (yy/dd/p/P/o/O) use the row buffer;
+//! column operations (,yy/,dd/,p/,P/,o/,O) use the column buffer.
 
-/// Type of data stored in the clipboard
-#[derive(Debug, Clone, PartialEq)]
-pub enum ClipboardType {
-    /// Single row of data (Vec<String> for cells)
-    Row,
-    /// Single column of data (Vec<String> including header)
-    Column,
-    /// Single cell value
-    Cell,
-    /// Rectangular region (rows × columns)
-    Region { rows: usize, cols: usize },
-}
-
-/// Unified clipboard that stores various types of CSV data
+/// Internal buffer shared by both row and column clipboards
 #[derive(Debug, Clone)]
-pub struct Clipboard {
-    /// Type of data stored
-    clipboard_type: ClipboardType,
-    /// Raw data stored as 2D vector (rows × columns)
-    /// For Row: Single row with N cells
-    /// For Column: N rows with 1 cell each
-    /// For Cell: Single row with 1 cell
-    /// For Region: M rows with N cells each
+struct ClipboardBuffer {
     data: Vec<Vec<String>>,
 }
 
-impl Clipboard {
-    /// Create a new empty clipboard
-    pub fn new() -> Self {
-        Self {
-            clipboard_type: ClipboardType::Cell,
-            data: vec![],
-        }
+impl ClipboardBuffer {
+    fn new() -> Self {
+        Self { data: vec![] }
     }
 
-    /// Store a row in the clipboard
-    pub fn yank_row(&mut self, row: Vec<String>) {
-        self.clipboard_type = ClipboardType::Row;
-        self.data = vec![row];
-    }
-
-    /// Store a column in the clipboard (includes header at index 0)
-    pub fn yank_column(&mut self, column: Vec<String>) {
-        self.clipboard_type = ClipboardType::Column;
-        // Convert column to 2D format: each cell becomes its own row
-        self.data = column.into_iter().map(|cell| vec![cell]).collect();
-    }
-
-    /// Store a single cell in the clipboard
-    pub fn yank_cell(&mut self, cell: String) {
-        self.clipboard_type = ClipboardType::Cell;
-        self.data = vec![vec![cell]];
-    }
-
-    /// Store a rectangular region in the clipboard
-    pub fn yank_region(&mut self, region: Vec<Vec<String>>) {
-        let rows = region.len();
-        let cols = region.first().map(|r| r.len()).unwrap_or(0);
-        self.clipboard_type = ClipboardType::Region { rows, cols };
-        self.data = region;
-    }
-
-    /// Get the clipboard type
-    pub fn clipboard_type(&self) -> &ClipboardType {
-        &self.clipboard_type
-    }
-
-    /// Check if clipboard is empty
-    pub fn is_empty(&self) -> bool {
+    fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
 
-    /// Get data as a row (for paste as row)
-    /// Returns None if clipboard is empty
-    pub fn as_row(&self) -> Option<Vec<String>> {
-        match &self.clipboard_type {
-            ClipboardType::Row => self.data.first().cloned(),
-            ClipboardType::Column => {
-                // Transpose: column becomes row
-                Some(self.data.iter().map(|row| row[0].clone()).collect())
-            }
-            ClipboardType::Cell => self.data.first().cloned(),
-            ClipboardType::Region { .. } => {
-                // Return first row of region
-                self.data.first().cloned()
-            }
-        }
+    fn store(&mut self, data: Vec<Vec<String>>) {
+        self.data = data;
     }
 
-    /// Get data as a column (for paste as column)
-    /// Returns None if clipboard is empty
-    pub fn as_column(&self) -> Option<Vec<String>> {
-        match &self.clipboard_type {
-            ClipboardType::Column => {
-                // Normal column paste
-                Some(self.data.iter().map(|row| row[0].clone()).collect())
-            }
-            ClipboardType::Row => {
-                // Transpose: row becomes column
-                self.data.first().map(|row| row.iter().cloned().collect())
-            }
-            ClipboardType::Cell => self
-                .data
-                .first()
-                .and_then(|row| row.first())
-                .map(|cell| vec![cell.clone()]),
-            ClipboardType::Region { .. } => {
-                // Return first column of region
-                Some(self.data.iter().map(|row| row[0].clone()).collect())
-            }
-        }
-    }
-
-    /// Get data as a rectangular region (for paste as region)
-    /// Returns None if clipboard is empty
-    pub fn as_region(&self) -> Option<Vec<Vec<String>>> {
+    fn get(&self) -> Option<&Vec<Vec<String>>> {
         if self.data.is_empty() {
             None
         } else {
-            Some(self.data.clone())
+            Some(&self.data)
         }
     }
 
-    /// Get dimensions of clipboard data (rows, cols)
-    pub fn dimensions(&self) -> (usize, usize) {
-        let rows = self.data.len();
-        let cols = self.data.first().map(|r| r.len()).unwrap_or(0);
-        (rows, cols)
-    }
-
-    /// Clear the clipboard
-    pub fn clear(&mut self) {
-        self.clipboard_type = ClipboardType::Cell;
+    fn clear(&mut self) {
         self.data.clear();
     }
 }
 
-impl Default for Clipboard {
+/// Dual clipboard with independent row and column buffers
+#[derive(Debug, Clone)]
+pub struct DualClipboard {
+    row_buffer: ClipboardBuffer,
+    column_buffer: ClipboardBuffer,
+}
+
+impl DualClipboard {
+    /// Create a new empty dual clipboard
+    pub fn new() -> Self {
+        Self {
+            row_buffer: ClipboardBuffer::new(),
+            column_buffer: ClipboardBuffer::new(),
+        }
+    }
+
+    // ── Row buffer methods ──
+
+    /// Store a single row in the row buffer
+    pub fn yank_row(&mut self, row: Vec<String>) {
+        self.row_buffer.store(vec![row]);
+    }
+
+    /// Store a single cell in the row buffer (treated as a 1-cell row)
+    pub fn yank_cell(&mut self, cell: String) {
+        self.row_buffer.store(vec![vec![cell]]);
+    }
+
+    /// Store a rectangular region in the row buffer
+    pub fn yank_region(&mut self, region: Vec<Vec<String>>) {
+        self.row_buffer.store(region);
+    }
+
+    /// Get the first row from the row buffer
+    pub fn as_row(&self) -> Option<Vec<String>> {
+        self.row_buffer.get().and_then(|d| d.first().cloned())
+    }
+
+    /// Get all rows from the row buffer (for region paste)
+    pub fn as_region(&self) -> Option<Vec<Vec<String>>> {
+        self.row_buffer.get().cloned()
+    }
+
+    /// Check if the row buffer is empty
+    pub fn row_buffer_empty(&self) -> bool {
+        self.row_buffer.is_empty()
+    }
+
+    // ── Column buffer methods ──
+
+    /// Store a single column in the column buffer
+    pub fn yank_column(&mut self, column: Vec<String>) {
+        self.column_buffer.store(vec![column]);
+    }
+
+    /// Store multiple columns in the column buffer
+    pub fn yank_columns(&mut self, columns: Vec<Vec<String>>) {
+        self.column_buffer.store(columns);
+    }
+
+    /// Get the first column from the column buffer
+    pub fn as_column(&self) -> Option<Vec<String>> {
+        self.column_buffer.get().and_then(|d| d.first().cloned())
+    }
+
+    /// Get all columns from the column buffer
+    pub fn as_columns(&self) -> Option<Vec<Vec<String>>> {
+        self.column_buffer.get().cloned()
+    }
+
+    /// Check if the column buffer is empty
+    pub fn column_buffer_empty(&self) -> bool {
+        self.column_buffer.is_empty()
+    }
+
+    // ── General methods ──
+
+    /// Check if both buffers are empty
+    pub fn is_empty(&self) -> bool {
+        self.row_buffer.is_empty() && self.column_buffer.is_empty()
+    }
+
+    /// Clear both buffers
+    pub fn clear(&mut self) {
+        self.row_buffer.clear();
+        self.column_buffer.clear();
+    }
+}
+
+impl Default for DualClipboard {
     fn default() -> Self {
         Self::new()
     }
@@ -172,147 +136,127 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_clipboard_new() {
-        let clipboard = Clipboard::new();
-        assert!(clipboard.is_empty());
-        assert_eq!(*clipboard.clipboard_type(), ClipboardType::Cell);
+    fn test_new_clipboard_is_empty() {
+        let cb = DualClipboard::new();
+        assert!(cb.is_empty());
+        assert!(cb.row_buffer_empty());
+        assert!(cb.column_buffer_empty());
     }
 
     #[test]
     fn test_yank_row() {
-        let mut clipboard = Clipboard::new();
-        let row = vec!["A".to_string(), "B".to_string(), "C".to_string()];
+        let mut cb = DualClipboard::new();
+        cb.yank_row(vec!["A".into(), "B".into(), "C".into()]);
 
-        clipboard.yank_row(row.clone());
-
-        assert_eq!(*clipboard.clipboard_type(), ClipboardType::Row);
-        assert_eq!(clipboard.as_row(), Some(row));
-        assert_eq!(clipboard.dimensions(), (1, 3));
+        assert!(!cb.row_buffer_empty());
+        assert_eq!(
+            cb.as_row(),
+            Some(vec!["A".into(), "B".into(), "C".into()])
+        );
+        // Column buffer untouched
+        assert!(cb.column_buffer_empty());
+        assert_eq!(cb.as_column(), None);
     }
 
     #[test]
     fn test_yank_column() {
-        let mut clipboard = Clipboard::new();
-        let column = vec!["Header".to_string(), "A".to_string(), "B".to_string()];
+        let mut cb = DualClipboard::new();
+        cb.yank_column(vec!["Header".into(), "1".into(), "2".into()]);
 
-        clipboard.yank_column(column.clone());
+        assert!(!cb.column_buffer_empty());
+        assert_eq!(
+            cb.as_column(),
+            Some(vec!["Header".into(), "1".into(), "2".into()])
+        );
+        // Row buffer untouched
+        assert!(cb.row_buffer_empty());
+        assert_eq!(cb.as_row(), None);
+    }
 
-        assert_eq!(*clipboard.clipboard_type(), ClipboardType::Column);
-        assert_eq!(clipboard.as_column(), Some(column));
-        assert_eq!(clipboard.dimensions(), (3, 1));
+    #[test]
+    fn test_buffers_are_independent() {
+        let mut cb = DualClipboard::new();
+        cb.yank_row(vec!["row".into()]);
+        cb.yank_column(vec!["col".into()]);
+
+        assert_eq!(cb.as_row(), Some(vec!["row".into()]));
+        assert_eq!(cb.as_column(), Some(vec!["col".into()]));
+        assert!(!cb.is_empty());
     }
 
     #[test]
     fn test_yank_cell() {
-        let mut clipboard = Clipboard::new();
-        let cell = "Test".to_string();
+        let mut cb = DualClipboard::new();
+        cb.yank_cell("hello".into());
 
-        clipboard.yank_cell(cell.clone());
-
-        assert_eq!(*clipboard.clipboard_type(), ClipboardType::Cell);
-        assert_eq!(clipboard.as_row(), Some(vec![cell.clone()]));
-        assert_eq!(clipboard.dimensions(), (1, 1));
+        assert_eq!(cb.as_row(), Some(vec!["hello".into()]));
+        assert!(cb.column_buffer_empty());
     }
 
     #[test]
     fn test_yank_region() {
-        let mut clipboard = Clipboard::new();
+        let mut cb = DualClipboard::new();
         let region = vec![
-            vec!["A1".to_string(), "B1".to_string()],
-            vec!["A2".to_string(), "B2".to_string()],
-            vec!["A3".to_string(), "B3".to_string()],
+            vec!["A1".into(), "B1".into()],
+            vec!["A2".into(), "B2".into()],
         ];
+        cb.yank_region(region.clone());
 
-        clipboard.yank_region(region.clone());
-
-        assert_eq!(
-            *clipboard.clipboard_type(),
-            ClipboardType::Region { rows: 3, cols: 2 }
-        );
-        assert_eq!(clipboard.as_region(), Some(region));
-        assert_eq!(clipboard.dimensions(), (3, 2));
+        assert_eq!(cb.as_region(), Some(region));
+        assert!(cb.column_buffer_empty());
     }
 
     #[test]
-    fn test_transpose_row_to_column() {
-        let mut clipboard = Clipboard::new();
-        let row = vec!["A".to_string(), "B".to_string(), "C".to_string()];
+    fn test_yank_columns() {
+        let mut cb = DualClipboard::new();
+        let cols = vec![vec!["H1".into(), "1".into()], vec!["H2".into(), "2".into()]];
+        cb.yank_columns(cols.clone());
 
-        clipboard.yank_row(row.clone());
-
-        // Paste row as column (transpose)
-        let column = clipboard.as_column();
-        assert_eq!(column, Some(row));
+        assert_eq!(cb.as_columns(), Some(cols));
+        assert!(cb.row_buffer_empty());
     }
 
     #[test]
-    fn test_transpose_column_to_row() {
-        let mut clipboard = Clipboard::new();
-        let column = vec!["A".to_string(), "B".to_string(), "C".to_string()];
+    fn test_overwrite_row_buffer() {
+        let mut cb = DualClipboard::new();
+        cb.yank_row(vec!["first".into()]);
+        cb.yank_row(vec!["second".into()]);
 
-        clipboard.yank_column(column.clone());
+        assert_eq!(cb.as_row(), Some(vec!["second".into()]));
+    }
 
-        // Paste column as row (transpose)
-        let row = clipboard.as_row();
-        assert_eq!(row, Some(column));
+    #[test]
+    fn test_overwrite_column_buffer() {
+        let mut cb = DualClipboard::new();
+        cb.yank_column(vec!["first".into()]);
+        cb.yank_column(vec!["second".into()]);
+
+        assert_eq!(cb.as_column(), Some(vec!["second".into()]));
     }
 
     #[test]
     fn test_clear() {
-        let mut clipboard = Clipboard::new();
-        clipboard.yank_row(vec!["A".to_string(), "B".to_string()]);
+        let mut cb = DualClipboard::new();
+        cb.yank_row(vec!["row".into()]);
+        cb.yank_column(vec!["col".into()]);
 
-        assert!(!clipboard.is_empty());
-
-        clipboard.clear();
-
-        assert!(clipboard.is_empty());
-        assert_eq!(*clipboard.clipboard_type(), ClipboardType::Cell);
+        cb.clear();
+        assert!(cb.is_empty());
+        assert!(cb.row_buffer_empty());
+        assert!(cb.column_buffer_empty());
     }
 
     #[test]
-    fn test_empty_clipboard_as_row() {
-        let clipboard = Clipboard::new();
-        assert_eq!(clipboard.as_row(), None);
+    fn test_empty_row_buffer_returns_none() {
+        let cb = DualClipboard::new();
+        assert_eq!(cb.as_row(), None);
+        assert_eq!(cb.as_region(), None);
     }
 
     #[test]
-    fn test_empty_clipboard_as_column() {
-        let clipboard = Clipboard::new();
-        assert_eq!(clipboard.as_column(), None);
-    }
-
-    #[test]
-    fn test_region_as_row() {
-        let mut clipboard = Clipboard::new();
-        let region = vec![
-            vec!["A1".to_string(), "B1".to_string()],
-            vec!["A2".to_string(), "B2".to_string()],
-        ];
-
-        clipboard.yank_region(region.clone());
-
-        // Should return first row
-        assert_eq!(
-            clipboard.as_row(),
-            Some(vec!["A1".to_string(), "B1".to_string()])
-        );
-    }
-
-    #[test]
-    fn test_region_as_column() {
-        let mut clipboard = Clipboard::new();
-        let region = vec![
-            vec!["A1".to_string(), "B1".to_string()],
-            vec!["A2".to_string(), "B2".to_string()],
-        ];
-
-        clipboard.yank_region(region.clone());
-
-        // Should return first column
-        assert_eq!(
-            clipboard.as_column(),
-            Some(vec!["A1".to_string(), "A2".to_string()])
-        );
+    fn test_empty_column_buffer_returns_none() {
+        let cb = DualClipboard::new();
+        assert_eq!(cb.as_column(), None);
+        assert_eq!(cb.as_columns(), None);
     }
 }

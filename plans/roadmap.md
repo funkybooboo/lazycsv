@@ -39,7 +39,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 - **Simplified Navigation:** Use `g` suffix for jumps: `5g` (row 5), `Bg` (column B), `A4g` (cell A4). Reserve `:` for operations only.
 - **Header Toggle System:** Header row is always row 0. Toggle header mode with `:ht` to freeze/style row 0. When ON, `gg` goes to row 1 (first data row).
 - **Command Ranges:** Standardized ranges: `:5,10d` for rows, `:B,Dd` for columns. Don't overcomplicate.
-- **Unified Clipboard:** One clipboard with type metadata. `yy`+`p` for rows, `,yy`+`,p` for columns, `yy`+`,p` transposes row as column.
+- **Dual Clipboard Buffers:** Separate row and column buffers. `yy`+`p` for rows, `,yy`+`,p` for columns. No cross-buffer pasting — mismatched paste shows "Nothing to paste".
 - **Ephemeral Edits:** No changes saved to file until explicit `:w`. All edits update in-memory representation first.
 - **Minimal UI Chrome:** No heavy borders. Use subtle separators. Maximum content, minimum decoration. Status line shows mode + row + column only.
 - **In-Memory Only:** All CSV files loaded entirely into RAM for maximum performance.
@@ -229,8 +229,8 @@ These commands always take priority:
 |-----|--------|
 | `o` | Insert row below, enter Insert mode |
 | `O` | Insert row above, enter Insert mode |
-| `dd` | Delete row (stores in unified clipboard) |
-| `yy` | Yank row (stores in unified clipboard) |
+| `dd` | Delete row (stores in row buffer) |
+| `yy` | Yank row (stores in row buffer) |
 | `p` | Paste row below |
 | `P` | Paste row above |
 | `cc` | Clear row and enter Insert mode |
@@ -245,8 +245,8 @@ These commands always take priority:
 |-----|--------|
 | `,o` | Insert column right |
 | `,O` | Insert column left |
-| `,dd` | Delete column (stores in unified clipboard) |
-| `,yy` | Yank column (includes header, stores in unified clipboard) |
+| `,dd` | Delete column (stores in column buffer) |
+| `,yy` | Yank column (includes header, stores in column buffer) |
 | `,p` | Paste column right (cursor moves to new column) |
 | `,P` | Paste column left (cursor moves to new column) |
 
@@ -258,19 +258,19 @@ These commands always take priority:
 
 **No `,h` for header editing:** Header row is just row 0. Navigate to row 0 with `k` from row 1 (or `gg` when header mode OFF) and use `i` to edit like any other cell.
 
-### Unified Clipboard System
+### Dual Clipboard Buffers
 
-One clipboard that adapts based on what was yanked and how you paste:
+Two separate buffers — one for rows, one for columns. Each buffer only responds to its own paste command:
 
-| Operation | Clipboard Type | Paste Behavior |
-|-----------|----------------|----------------|
-| `yy` then `p` | Row | Paste as row |
-| `,yy` then `,p` | Column | Paste as column |
-| `yy` then `,p` | Row → Column | Transpose row as column |
-| `,yy` then `p` | Column → Row | Transpose column as row |
-| Visual selection `y` then `p` | Region | Paste rectangular region |
+| Operation | Buffer Used | Result |
+|-----------|-------------|--------|
+| `yy` then `p` | Row buffer | Paste row below |
+| `,yy` then `,p` | Column buffer | Paste column |
+| `yy` then `,p` | Column buffer (empty) | Message: "Nothing to paste" |
+| `,yy` then `p` | Row buffer (empty) | Message: "Nothing to paste" |
+| Visual selection `y` then `p` | Row buffer | Paste rectangular region |
 
-**Silent adaptation:** No indicator shown for clipboard type. Paste operation adapts intelligently.
+**No cross-buffer pasting:** `p` always uses the row buffer, `,p` always uses the column buffer. If the target buffer is empty, a transient message "Nothing to paste" is shown.
 
 ### Visual Mode
 
@@ -283,7 +283,7 @@ One clipboard that adapts based on what was yanked and how you paste:
 **In Visual Mode:**
 - `h` `j` `k` `l` - expand/contract selection
 - `d` - delete selection (clears cells for regions, removes rows/columns for line modes)
-- `y` - yank selection (stores in unified clipboard)
+- `y` - yank selection (stores in row buffer for `V`/`v`, column buffer for `,v`)
 - `c` - change selection (clear + insert)
 - `p` - paste over selection (overwrites existing, adds rows/cols if needed)
 - `Esc` - exit visual mode
@@ -1048,9 +1048,6 @@ NORMAL                                                          3,C
 - [x] `:new Name,Age` creates new CSV with those headers ✅
 - [x] `:files` shows file menu with cursor navigation ✅
 
-**Still TODO for v0.4.1:**
-- **NONE** - v0.4.1 is feature complete! ✅
-
 **Ready for release:**
 - ✅ 517 tests passing
 - ✅ Zero compiler warnings  
@@ -1061,7 +1058,7 @@ NORMAL                                                          3,C
 
 ## v0.5.0 - Column Operations & Visual Mode
 
-*Full column manipulation with comma leader, visual selections, unified clipboard*
+*Full column manipulation with comma leader, visual selections, dual clipboard buffers*
 
 ### Column Operations (Comma Leader)
 
@@ -1069,8 +1066,8 @@ NORMAL                                                          3,C
 |-----|--------|
 | `,o` | Insert column right |
 | `,O` | Insert column left |
-| `,dd` | Delete column (stores in unified clipboard) |
-| `,yy` | Yank column (includes header, stores in unified clipboard) |
+| `,dd` | Delete column (stores in column buffer) |
+| `,yy` | Yank column (includes header, stores in column buffer) |
 | `,p` | Paste column right (cursor moves to new column) |
 | `,P` | Paste column left (cursor moves to new column) |
 
@@ -1091,7 +1088,7 @@ NORMAL                                                          3,C
 
 **Operations in Visual mode:**
 - `d` - delete selection (clears cells for regions, removes rows/columns for line modes)
-- `y` - yank selection (stores in unified clipboard)
+- `y` - yank selection (stores in row buffer for `V`, column buffer for `,v`, row buffer for `v`)
 - `c` - change selection (clear + insert)
 - `p` - paste over selection (overwrites existing, adds rows/cols if needed)
 - `Esc` - exit Visual mode
@@ -1103,16 +1100,14 @@ NORMAL                                                          3,C
 - Delete cell region clears cells, preserves structure
 - Delete whole rows/columns removes them entirely
 
-### Unified Clipboard System
+### Dual Clipboard Buffers
 
-**One clipboard with type metadata:**
-- Stores whatever you yank (row, column, cell, region)
-- Paste operation adapts based on clipboard type and paste context
-- Silent adaptation (no indicator shown)
-
-**Transpose operations:**
-- `yy` (yank row) then `,p` (paste column) = transpose row as column
-- `,yy` (yank column) then `p` (paste row) = transpose column as row
+**Two separate buffers — row buffer and column buffer:**
+- `yy`, `dd`, `V`+`y`, `v`+`y` store in the **row buffer**
+- `,yy`, `,dd`, `,v`+`y` store in the **column buffer**
+- `p`/`P` always paste from the **row buffer** — if empty, shows "Nothing to paste"
+- `,p`/`,P` always paste from the **column buffer** — if empty, shows "Nothing to paste"
+- No cross-buffer pasting or transposing
 
 ### Count Prefixes
 
@@ -1133,40 +1128,44 @@ NORMAL                                                          3,C
 ### Implementation Steps
 
 **File: `src/clipboard/mod.rs` (new file)**
-- [ ] Create unified clipboard module
-- [ ] Define `ClipboardType` enum: Row, Column, Cell, Region
-- [ ] Define `Clipboard` struct with type metadata
-- [ ] Implement `paste_adapting_to_context()` method
-- [ ] Implement transpose logic (row↔column)
+- [x] Create clipboard module with dual buffers
+- [x] Define `RowBuffer` struct (stores row data: `Vec<Vec<String>>`)
+- [x] Define `ColumnBuffer` struct (stores column data including header: `Vec<Vec<String>>`)
+- [x] Define `DualClipboard` struct containing both buffers
+- [x] Implement `has_row_data()` and `has_column_data()` methods
+- [x] No transpose or cross-buffer logic
 
 **File: `src/input/actions.rs`**
-- [ ] Add `LeaderCommand` enum for comma sequences
-- [ ] Track comma leader state in InputState
-- [ ] Remove semicolon leader references
+- [x] Add `LeaderCommand` enum for comma sequences
+- [x] Track comma leader state in InputState
+- [x] Remove semicolon leader references
 
 **File: `src/input/handler.rs`**
-- [ ] Add comma (`,`) handler to enter leader mode
-- [ ] Add leader command handlers: `,o`, `,O`, `,dd`, `,yy`, `,p`, `,P`
+- [x] Add comma (`,`) handler to enter leader mode
+- [x] Add leader command handlers: `,o`, `,O`, `,dd`, `,yy`, `,p`, `,P`
 - [ ] Add count prefix support for `dd` and `yy`
 - [ ] Add `V` handler to enter Visual Line mode
 - [ ] Add `v` handler to enter Visual Block mode
 - [ ] Add `,v` handler to enter Visual Column mode
 - [ ] Add `handle_visual_mode()` function
-- [ ] Add `P` handler for paste above
+- [x] Add `P` handler for paste above
 - [ ] Add `cc` handler
 - [ ] Add `gv` handler for re-select
-- [ ] Update `yy`, `dd`, `,yy`, `,dd` to use unified clipboard
+- [x] Update `yy`, `dd` to store in row buffer
+- [x] Update `,yy`, `,dd` to store in column buffer
+- [x] `p`/`P` paste from row buffer only (show "Nothing to paste" if empty)
+- [x] `,p`/`,P` paste from column buffer only (show "Nothing to paste" if empty)
 
 **File: `src/csv/document.rs`**
-- [ ] Add `insert_column(&mut self, at: ColIndex, header: String)` method
-- [ ] Add `delete_column(&mut self, at: ColIndex) -> Vec<String>` method
-- [ ] Add `get_column(&self, col: ColIndex) -> Vec<String>` method (includes row 0 header)
+- [x] Add `insert_column(&mut self, at: ColIndex, header: String)` method
+- [x] Add `delete_column(&mut self, at: ColIndex) -> Vec<String>` method
+- [x] Add `get_column(&self, col: ColIndex) -> Vec<String>` method (includes row 0 header)
 - [ ] Add `move_columns(&mut self, from: ColIndex, to: ColIndex, count: usize)` method
 - [ ] Add `delete_rows(&mut self, start: RowIndex, count: usize)` method
 - [ ] Add `get_rows(&self, start: RowIndex, count: usize)` method
 
 **File: `src/app/mod.rs`**
-- [ ] Replace `row_clipboard` with `unified_clipboard: Clipboard`
+- [x] Replace `row_clipboard` with `DualClipboard` (row buffer + column buffer)
 - [ ] Add `visual_anchor: Option<(RowIndex, ColIndex)>` field
 - [ ] Add `visual_mode: Option<VisualMode>` field (Block, Line, Column)
 - [ ] Add `last_visual_selection: Option<VisualSelection>` field
@@ -1181,26 +1180,27 @@ NORMAL                                                          3,C
 
 ### Tests to Add
 
-**Comma Leader (`tests/column_operations_test.rs`):**
-- [ ] `test_comma_leader_detection`
-- [ ] `test_comma_o_inserts_column_right`
-- [ ] `test_comma_O_inserts_column_left`
-- [ ] `test_comma_dd_deletes_column`
-- [ ] `test_comma_yy_yanks_column_with_header`
-- [ ] `test_comma_p_pastes_column_right`
-- [ ] `test_comma_P_pastes_column_left`
+**Comma Leader (`tests/dual_clipboard_test.rs`):**
+- [x] `test_comma_leader_detection` (via `test_comma_cancelled_with_esc`)
+- [x] `test_comma_o_inserts_column_right`
+- [x] `test_comma_O_inserts_column_left`
+- [x] `test_comma_dd_deletes_column`
+- [x] `test_comma_yy_yanks_column_with_header`
+- [x] `test_comma_p_pastes_column_right`
+- [x] `test_comma_P_pastes_column_left`
 - [ ] `test_column_reorder_command`
 - [ ] `test_move_column_to_beginning`
 - [ ] `test_move_column_to_end`
 - [ ] `test_no_comma_h_keybinding` (verify ,h doesn't exist)
 
-**Unified Clipboard (`tests/clipboard_test.rs`):**
-- [ ] `test_yy_then_p_pastes_row`
-- [ ] `test_comma_yy_then_comma_p_pastes_column`
-- [ ] `test_yy_then_comma_p_transposes_row_to_column`
-- [ ] `test_comma_yy_then_p_transposes_column_to_row`
-- [ ] `test_visual_yank_then_paste_region`
-- [ ] `test_clipboard_type_metadata`
+**Dual Clipboard (`tests/dual_clipboard_test.rs`):**
+- [x] `test_yy_then_p_pastes_row_from_row_buffer` (via existing insert_mode_test + `test_dd_then_capital_p_round_trip`)
+- [x] `test_comma_yy_then_comma_p_pastes_column_from_column_buffer` (via `test_comma_dd_then_comma_p_round_trip`)
+- [x] `test_yy_then_comma_p_shows_nothing_to_paste` (column buffer empty)
+- [x] `test_comma_yy_then_p_shows_nothing_to_paste` (row buffer empty)
+- [x] `test_row_and_column_buffers_independent` (both can hold data simultaneously)
+- [x] `test_dd_stores_in_row_buffer`
+- [x] `test_comma_dd_stores_in_column_buffer`
 
 **Visual Mode (`tests/visual_mode_test.rs`):**
 - [ ] `test_v_enters_visual_block`
@@ -1573,7 +1573,7 @@ NORMAL                                                          3,C
 **Feature Verification:**
 - [ ] All navigation features work (hjkl, gg, G, 5g, Bg, A4g, w/b/e, zt/zz/zb)
 - [ ] All editing features work (Insert mode, Magnifier mode)
-- [ ] All column operations work (,dd, ,yy, ,p, ,o, ,O)
+- [x] All column operations work (,dd, ,yy, ,p, ,o, ,O)
 - [ ] All visual mode features work (v, V, ,v)
 - [ ] Search works (/pattern, n, N, *, :noh)
 - [ ] Undo/redo works (u, Ctrl+r, .)
@@ -1581,7 +1581,7 @@ NORMAL                                                          3,C
 - [ ] Multi-file workflow works ([, ], :files)
 - [ ] Save/quit protection works (:w, :Wq, :q, :q!)
 - [ ] Header toggle system works (:ht)
-- [ ] Unified clipboard works (yy+p, ,yy+,p, transpose)
+- [x] Dual clipboard buffers work (yy+p for rows, ,yy+,p for columns, cross-buffer shows "Nothing to paste")
 - [ ] Range operations work (:5,10d, :B,Dd)
 - [ ] System clipboard works ("+yy, "+,yy, "+p)
 
@@ -1672,7 +1672,7 @@ This roadmap reflects extensive design refinement. Key decisions:
 2. **Simplified Navigation** - `5g`, `Bg`, `A4g` instead of `:5`, `:B`, `:A5`. Reserve `:` for operations.
 3. **Comma Leader** - Use `,` for column operations (not `;`). More vim-like, doesn't conflict with vim's `;`.
 4. **3 Visual Modes** - Simplified from 4 to 3: `v` (block), `V` (line), `,v` (column). Cleaner, less complex.
-5. **Unified Clipboard** - One clipboard with type metadata. Smart paste adaptation. Transpose support.
+5. **Dual Clipboard Buffers** - Separate row and column buffers. `p` uses row buffer, `,p` uses column buffer. No cross-buffer pasting.
 6. **Magnifier via `m`** - Use `m` for Magnifier (not `Enter`). Clear distinction from Insert mode.
 7. **Truly Hybrid** - Balance vim power with spreadsheet familiarity. Support both paradigms.
 8. **Zero Config Default** - Works perfectly out of the box. Optional `~/.config/lazycsv/config.toml` for power users.

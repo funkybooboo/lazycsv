@@ -1,6 +1,6 @@
 pub mod messages;
 
-use crate::clipboard::Clipboard;
+use crate::clipboard::DualClipboard;
 use crate::domain::position::{ColIndex, RowIndex};
 use crate::input::{InputResult, InputState, StatusMessage};
 use crate::session::Session;
@@ -67,8 +67,8 @@ pub struct App {
     /// Last edited cell position (for `gi` command)
     pub last_edit_position: Option<(RowIndex, ColIndex)>,
 
-    /// Unified clipboard for yy/p operations (rows, columns, cells, regions)
-    pub clipboard: Clipboard,
+    /// Dual clipboard: row buffer for yy/dd/p and column buffer for ,yy/,dd/,p
+    pub clipboard: DualClipboard,
 
     /// Flag to quit application
     pub should_quit: bool,
@@ -152,7 +152,7 @@ impl App {
             status_message: None,
             edit_buffer: None,
             last_edit_position: None,
-            clipboard: Clipboard::new(),
+            clipboard: DualClipboard::new(),
             should_quit: false,
         }
     }
