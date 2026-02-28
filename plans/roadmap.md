@@ -1312,12 +1312,12 @@ NORMAL                                                          3,C
 - [x] Other operators: `substitute_char()` (s)
 - [x] Internal clipboard for magnifier operations
 
-**Phase 4: App Integration (`src/app/mod.rs`)**
-- [ ] Add `magnifier_state: Option<MagnifierState>` field to App
-- [ ] Implement `open_magnifier(&mut self)` - create state from current cell
-- [ ] Implement `save_and_close_magnifier(&mut self)` - save to document and close
-- [ ] Implement `close_magnifier_discard(&mut self)` - close without saving
-- [ ] Implement `magnifier_is_dirty(&self)` - check for unsaved changes
+**Phase 4: App Integration (`src/app/mod.rs`)** ✅ COMPLETE
+- [x] Add `magnifier_state: Option<MagnifierState>` field to App
+- [x] Implement `open_magnifier(&mut self)` - create state from current cell
+- [x] Implement `save_and_close_magnifier(&mut self)` - save to document and close
+- [x] Implement `close_magnifier_discard(&mut self)` - close without saving
+- [x] Implement `magnifier_is_dirty(&self)` - check for unsaved changes
 
 **Phase 5: Input Handling (`src/input/handler.rs`)**
 - [ ] Add `m` key handler in Normal mode to open magnifier
