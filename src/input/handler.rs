@@ -1057,8 +1057,99 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                 }
             }
         }
-        // Check for column range: B,Dd or A,Ey
+        // Check for column range: B,Dd or A,Ey or B,D m A
         else if rest.chars().last().is_some() {
+            // Check for move command: "D m A" or "D m 0"
+            if start_str.chars().all(|c| c.is_ascii_alphabetic()) {
+                let words: Vec<&str> = rest.split_whitespace().collect();
+                if words.len() == 3 && words[1] == "m" {
+                    use crate::ui::utils::excel_letter_to_column;
+
+                    let end_col_str = words[0];
+                    let dest_str = words[2];
+
+                    if !end_col_str.chars().all(|c| c.is_ascii_alphabetic()) {
+                        app.status_message = Some(StatusMessage::from(
+                            "Invalid end column in move command",
+                        ));
+                        return Some(Ok(()));
+                    }
+
+                    let start_col = match excel_letter_to_column(&start_str.to_uppercase()) {
+                        Ok(c) => c,
+                        Err(e) => {
+                            app.status_message = Some(StatusMessage::from(e));
+                            return Some(Ok(()));
+                        }
+                    };
+                    let end_col = match excel_letter_to_column(&end_col_str.to_uppercase()) {
+                        Ok(c) => c,
+                        Err(e) => {
+                            app.status_message = Some(StatusMessage::from(e));
+                            return Some(Ok(()));
+                        }
+                    };
+
+                    if start_col > end_col {
+                        app.status_message = Some(StatusMessage::from(
+                            "Invalid range: start column must be <= end column",
+                        ));
+                        return Some(Ok(()));
+                    }
+
+                    let max_col = app.document.column_count();
+                    if start_col >= max_col {
+                        app.status_message = Some(StatusMessage::from(format!(
+                            "Column {} does not exist (max: {})",
+                            start_str.to_uppercase(),
+                            crate::ui::utils::column_to_excel_letter(max_col.saturating_sub(1))
+                        )));
+                        return Some(Ok(()));
+                    }
+
+                    // Parse destination
+                    let to_before = if dest_str == "0" {
+                        0usize
+                    } else if dest_str.chars().all(|c| c.is_ascii_alphabetic()) {
+                        match excel_letter_to_column(&dest_str.to_uppercase()) {
+                            Ok(dest_col) => dest_col + 1, // "after" that column
+                            Err(e) => {
+                                app.status_message = Some(StatusMessage::from(e));
+                                return Some(Ok(()));
+                            }
+                        }
+                    } else {
+                        app.status_message = Some(StatusMessage::from(
+                            "Invalid destination: use a column letter or 0",
+                        ));
+                        return Some(Ok(()));
+                    };
+
+                    // Check if destination is inside source range (no-op)
+                    if to_before >= start_col && to_before <= end_col + 1 {
+                        app.status_message = Some(StatusMessage::from(
+                            "Columns already in position (destination inside source range)",
+                        ));
+                        return Some(Ok(()));
+                    }
+
+                    let count = end_col - start_col + 1;
+                    let result = app.document.move_columns(
+                        ColIndex::new(start_col),
+                        ColIndex::new(end_col),
+                        to_before,
+                    );
+
+                    app.view_state.selected_column = ColIndex::new(result);
+                    app.status_message = Some(StatusMessage::from(format!(
+                        "Moved {} column(s)",
+                        count
+                    )));
+
+                    return Some(Ok(()));
+                }
+            }
+
             let last_char = rest.chars().last().unwrap();
             let operation = last_char;
             let end_str = &rest[0..rest.len() - 1];

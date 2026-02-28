@@ -232,3 +232,145 @@ fn test_incomplete_column_range_shows_error() {
     // No columns should be deleted
     assert_eq!(app.document.column_count(), 5);
 }
+
+// ===== Move column tests =====
+
+#[test]
+fn test_move_columns_d_e_after_a() {
+    let doc = create_test_doc();
+    let files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(doc, files, 0, FileConfig::new());
+
+    // :D,E m A → A D E B C
+    send_command(&mut app, "D,E m A");
+
+    assert_eq!(app.document.column_count(), 5);
+    assert_eq!(app.document.rows[0], vec!["A", "D", "E", "B", "C"]);
+}
+
+#[test]
+fn test_move_column_to_end() {
+    let doc = create_test_doc();
+    let files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(doc, files, 0, FileConfig::new());
+
+    // :A,A m E → B C D E A
+    send_command(&mut app, "A,A m E");
+
+    assert_eq!(app.document.column_count(), 5);
+    assert_eq!(app.document.rows[0], vec!["B", "C", "D", "E", "A"]);
+}
+
+#[test]
+fn test_move_column_to_beginning() {
+    let doc = create_test_doc();
+    let files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(doc, files, 0, FileConfig::new());
+
+    // :E,E m 0 → E A B C D
+    send_command(&mut app, "E,E m 0");
+
+    assert_eq!(app.document.column_count(), 5);
+    assert_eq!(app.document.rows[0], vec!["E", "A", "B", "C", "D"]);
+}
+
+#[test]
+fn test_move_range_to_middle() {
+    let doc = create_test_doc();
+    let files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(doc, files, 0, FileConfig::new());
+
+    // :D,E m B → A B D E C
+    send_command(&mut app, "D,E m B");
+
+    assert_eq!(app.document.column_count(), 5);
+    assert_eq!(app.document.rows[0], vec!["A", "B", "D", "E", "C"]);
+}
+
+#[test]
+fn test_move_noop_already_in_place() {
+    let doc = create_test_doc();
+    let files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(doc, files, 0, FileConfig::new());
+
+    // :B,D m A → columns B-D are already after A, so no-op
+    send_command(&mut app, "B,D m A");
+
+    assert_eq!(app.document.column_count(), 5);
+    assert_eq!(app.document.rows[0], vec!["A", "B", "C", "D", "E"]);
+    let msg = app.status_message.as_ref().unwrap().as_str();
+    assert!(msg.contains("already in position"));
+}
+
+#[test]
+fn test_move_invalid_range_start_after_end() {
+    let doc = create_test_doc();
+    let files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(doc, files, 0, FileConfig::new());
+
+    // :D,B m A → invalid (D > B)
+    send_command(&mut app, "D,B m A");
+
+    assert_eq!(app.document.column_count(), 5);
+    let msg = app.status_message.as_ref().unwrap().as_str();
+    assert!(msg.contains("Invalid") || msg.contains("start"));
+}
+
+#[test]
+fn test_move_dest_inside_source_is_noop() {
+    let doc = create_test_doc();
+    let files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(doc, files, 0, FileConfig::new());
+
+    // :B,D m C → destination C is inside source range B-D, no-op
+    send_command(&mut app, "B,D m C");
+
+    assert_eq!(app.document.column_count(), 5);
+    assert_eq!(app.document.rows[0], vec!["A", "B", "C", "D", "E"]);
+    let msg = app.status_message.as_ref().unwrap().as_str();
+    assert!(msg.contains("already in position"));
+}
+
+#[test]
+fn test_move_cursor_follows_moved_columns() {
+    let doc = create_test_doc();
+    let files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(doc, files, 0, FileConfig::new());
+
+    // :D,E m A → A D E B C, cursor should be at index 1 (first moved column D)
+    send_command(&mut app, "D,E m A");
+
+    assert_eq!(app.view_state.selected_column.get(), 1);
+}
+
+#[test]
+fn test_move_sets_dirty() {
+    let doc = create_test_doc();
+    let files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(doc, files, 0, FileConfig::new());
+
+    assert!(!app.document.is_dirty);
+
+    send_command(&mut app, "D,E m A");
+
+    assert!(app.document.is_dirty);
+}
+
+#[test]
+fn test_move_preserves_data_rows() {
+    let doc = create_test_doc();
+    let files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(doc, files, 0, FileConfig::new());
+
+    // :D,E m A → A D E B C (with data)
+    send_command(&mut app, "D,E m A");
+
+    // Headers
+    assert_eq!(app.document.rows[0], vec!["A", "D", "E", "B", "C"]);
+    // Data row 1
+    assert_eq!(app.document.rows[1], vec!["A1", "D1", "E1", "B1", "C1"]);
+    // Data row 2
+    assert_eq!(app.document.rows[2], vec!["A2", "D2", "E2", "B2", "C2"]);
+    // Data row 3
+    assert_eq!(app.document.rows[3], vec!["A3", "D3", "E3", "B3", "C3"]);
+}

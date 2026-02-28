@@ -1166,7 +1166,7 @@ NORMAL                                                          3,C
 - [x] Add `insert_column(&mut self, at: ColIndex, header: String)` method
 - [x] Add `delete_column(&mut self, at: ColIndex) -> Vec<String>` method
 - [x] Add `get_column(&self, col: ColIndex) -> Vec<String>` method (includes row 0 header)
-- [ ] Add `move_columns(&mut self, from: ColIndex, to: ColIndex, count: usize)` method
+- [x] Add `move_columns(&mut self, from_start: ColIndex, from_end: ColIndex, to_before: usize)` method
 - [x] Add `delete_rows(&mut self, start: RowIndex, end: RowIndex)` method
 - [x] Add `get_rows(&self, start: RowIndex, end: RowIndex)` method
 
@@ -1194,9 +1194,9 @@ NORMAL                                                          3,C
 - [x] `test_comma_yy_yanks_column_with_header`
 - [x] `test_comma_p_pastes_column_right`
 - [x] `test_comma_P_pastes_column_left`
-- [ ] `test_column_reorder_command`
-- [ ] `test_move_column_to_beginning`
-- [ ] `test_move_column_to_end`
+- [x] `test_column_reorder_command`
+- [x] `test_move_column_to_beginning`
+- [x] `test_move_column_to_end`
 - [ ] `test_no_comma_h_keybinding` (verify ,h doesn't exist)
 
 **Dual Clipboard (`tests/dual_clipboard_test.rs`):**
@@ -1244,7 +1244,7 @@ NORMAL                                                          3,C
 - [ ] `gv` re-selects
 - [ ] Unified clipboard handles row/column/region
 - [ ] Transpose operations work (`yy`+`,p`, `,yy`+`p`)
-- [ ] Column reordering works (`:B,D m A`)
+- [x] Column reordering works (`:B,D m A`)
 - [ ] All existing tests pass
 - [ ] No clippy warnings
 

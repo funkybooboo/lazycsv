@@ -318,6 +318,32 @@ impl Document {
         columns
     }
 
+    /// Move columns from source range to a new position.
+    /// `from_start`/`from_end`: inclusive source range (original indices).
+    /// `to_before`: insertion point in original indices (0 = beginning, N = before original column N).
+    /// For "after column A" (index 0), pass to_before=1. For "before all", pass to_before=0.
+    /// Returns the new 0-based column index of the first moved column.
+    pub fn move_columns(&mut self, from_start: ColIndex, from_end: ColIndex, to_before: usize) -> usize {
+        let columns = self.get_columns(from_start, from_end);
+        let src_start = from_start.get();
+        let count = columns.len();
+
+        self.delete_columns(from_start, from_end);
+
+        let insert_at = if to_before <= src_start {
+            to_before
+        } else {
+            to_before - count
+        };
+
+        for (i, col_data) in columns.into_iter().enumerate() {
+            self.insert_column(ColIndex::new(insert_at + i), col_data);
+        }
+
+        // is_dirty already set by delete_columns and insert_column
+        insert_at
+    }
+
     /// Get a single column (including header at index 0)
     /// Returns empty vec if column doesn't exist
     pub fn get_column(&self, col: ColIndex) -> Vec<String> {
