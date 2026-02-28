@@ -1319,17 +1319,18 @@ NORMAL                                                          3,C
 - [x] Implement `close_magnifier_discard(&mut self)` - close without saving
 - [x] Implement `magnifier_is_dirty(&self)` - check for unsaved changes
 
-**Phase 5: Input Handling (`src/input/handler.rs`)**
-- [ ] Add `m` key handler in Normal mode to open magnifier
-- [ ] Create `handle_magnifier_mode()` dispatcher function
-- [ ] Create `handle_magnifier_normal()` for Normal mode keys
-- [ ] Create `handle_magnifier_insert()` for Insert mode keys
-- [ ] Implement `:w` command (save to cell)
-- [ ] Implement `:wq` command (save and close)
-- [ ] Implement `:q!` command (discard and close)
-- [ ] Implement `ZZ` shortcut (save and close)
-- [ ] Implement Ctrl+h/j/k/l cell navigation
-- [ ] Create `prompt_save_before_navigate()` function with y/n/c options
+**Phase 5: Input Handling (`src/input/handler.rs`)** ✅ COMPLETE
+- [x] Add `m` key handler in Normal mode to open magnifier
+- [x] Create `handle_magnifier_mode()` dispatcher function
+- [x] Create `handle_magnifier_normal()` for Normal mode keys
+- [x] Create `handle_magnifier_insert()` for Insert mode keys
+- [x] Implement `ZZ` shortcut (save and close)
+- [x] Implement Ctrl+h/j/k/l cell navigation
+- [x] Dirty check warning for navigation
+- [ ] Implement `:w` command (save to cell) - deferred to command mode integration
+- [ ] Implement `:wq` command (save and close) - deferred to command mode integration
+- [ ] Implement `:q!` command (discard and close) - deferred to command mode integration
+- [ ] Create `prompt_save_before_navigate()` dialog - deferred to UI phase
 
 **Phase 6: UI Rendering (`src/ui/magnifier.rs`)**
 - [ ] Create new file `src/ui/magnifier.rs`
