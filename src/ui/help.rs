@@ -22,7 +22,7 @@ const HELP_OVERLAY_HEIGHT_PERCENT: u16 = 80;
 fn build_help_text() -> Vec<Line<'static>> {
     vec![
         Line::from(Span::styled(
-            "LazyCSV v0.4.1 - Keyboard Shortcuts",
+            "LazyCSV v0.6.0 - Keyboard Shortcuts",
             Style::default().add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
@@ -95,6 +95,19 @@ fn build_help_text() -> Vec<Line<'static>> {
         Line::from("  Backspace          Delete char before cursor"),
         Line::from("  Ctrl+w             Delete word backward"),
         Line::from("  Ctrl+u             Delete to start"),
+        Line::from(""),
+        Line::from(Span::styled(
+            "MAGNIFIER MODE",
+            Style::default().add_modifier(Modifier::BOLD),
+        )),
+        Line::from("  m                  Open magnifier (full vim editor)"),
+        Line::from("  ZZ / :wq           Save and close magnifier"),
+        Line::from("  :q!                Close without saving"),
+        Line::from("  Ctrl+h/j/k/l       Navigate to adjacent cells"),
+        Line::from("  i/a/o/O            Enter insert mode"),
+        Line::from("  hjkl / w/b/e       Vim motions"),
+        Line::from("  dd / yy / p        Delete/yank/paste lines"),
+        Line::from("  x / s              Delete/substitute char"),
         Line::from(""),
         Line::from(Span::styled(
             "ROW OPERATIONS",
