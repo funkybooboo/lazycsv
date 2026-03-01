@@ -62,8 +62,9 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         Mode::Insert => handle_insert_mode(app, key),
         Mode::FileList => handle_file_list_mode(app, key),
         Mode::SqlEditor => handle_sql_editor_mode(app, key),
-        // TODO: Implement handlers for new modes in v0.5.0+
-        Mode::Magnifier | Mode::HeaderEdit | Mode::Visual => {
+        Mode::Magnifier => handle_magnifier_mode(app, key),
+        // TODO: Implement handlers for new modes in future versions
+        Mode::HeaderEdit | Mode::Visual => {
             // For now, Esc returns to Normal mode
             if key.code == KeyCode::Esc {
                 app.mode = Mode::Normal;
@@ -304,6 +305,11 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         // Insert mode: F2 - edit cell (same as 'i')
         KeyCode::F(2) if is_navigation_allowed(app) => {
             enter_insert_mode(app, false, false);
+        }
+
+        // Magnifier mode: 'm' - open magnifier for complex cell editing
+        KeyCode::Char('m') if is_navigation_allowed(app) => {
+            app.open_magnifier();
         }
 
         // Row operations: 'o' - add row below and enter Insert mode
@@ -1872,6 +1878,7 @@ fn handle_insert_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     Ok(InputResult::Continue)
 }
 
+<<<<<<< HEAD
 /// Generate a unique output filename that doesn't conflict with existing session files.
 /// Returns "output.csv", "output1.csv", "output2.csv", etc.
 fn generate_output_filename(app: &App) -> String {
@@ -2133,6 +2140,246 @@ fn handle_sql_editor_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             }
             app.sql_cursor = pos;
         }
+||||||| parent of 66c2c33 (feat(magnifier): Phase 5 - Implement input handling and commands)
+=======
+// ============================================================================
+// Magnifier Mode Handler (Phase 5)
+// ============================================================================
+
+/// Handle keyboard input in Magnifier mode
+fn handle_magnifier_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
+    use crate::magnifier::MagnifierMode;
+
+    let mag = match app.magnifier_state.as_mut() {
+        Some(m) => m,
+        None => {
+            // No magnifier state - return to normal mode
+            app.mode = Mode::Normal;
+            return Ok(InputResult::Continue);
+        }
+    };
+
+    // Check for Ctrl+hjkl navigation (works in both Normal and Insert modes within magnifier)
+    if key.modifiers.contains(KeyModifiers::CONTROL) {
+        match key.code {
+            KeyCode::Char('h') => {
+                return handle_magnifier_navigate(app, Direction::Left);
+            }
+            KeyCode::Char('j') => {
+                return handle_magnifier_navigate(app, Direction::Down);
+            }
+            KeyCode::Char('k') => {
+                return handle_magnifier_navigate(app, Direction::Up);
+            }
+            KeyCode::Char('l') => {
+                return handle_magnifier_navigate(app, Direction::Right);
+            }
+            _ => {}
+        }
+    }
+
+    match mag.mode() {
+        MagnifierMode::Normal => handle_magnifier_normal(app, key),
+        MagnifierMode::Insert => handle_magnifier_insert(app, key),
+    }
+}
+
+/// Direction for cell navigation in magnifier
+enum Direction {
+    Left,
+    Right,
+    Up,
+    Down,
+}
+
+/// Handle navigation to adjacent cells from magnifier
+fn handle_magnifier_navigate(app: &mut App, direction: Direction) -> Result<InputResult> {
+    // Check if magnifier has unsaved changes
+    if app.magnifier_is_dirty() {
+        // TODO: Show save prompt dialog
+        // For now, just show a message and don't navigate
+        app.status_message = Some(StatusMessage::from(
+            "Unsaved changes! Use :w to save, :q! to discard",
+        ));
+        return Ok(InputResult::Continue);
+    }
+
+    // Close magnifier without saving (it's clean)
+    app.close_magnifier_discard();
+
+    // Navigate to adjacent cell
+    match direction {
+        Direction::Left => {
+            if app.view_state.selected_column.get() > 0 {
+                app.view_state.selected_column =
+                    ColIndex::new(app.view_state.selected_column.get() - 1);
+            }
+        }
+        Direction::Right => {
+            if app.view_state.selected_column.get() < app.document.column_count().saturating_sub(1)
+            {
+                app.view_state.selected_column =
+                    ColIndex::new(app.view_state.selected_column.get() + 1);
+            }
+        }
+        Direction::Up => {
+            if let Some(current_row) = app.view_state.table_state.selected() {
+                if current_row > 0 {
+                    app.view_state.table_state.select(Some(current_row - 1));
+                }
+            }
+        }
+        Direction::Down => {
+            if let Some(current_row) = app.view_state.table_state.selected() {
+                if current_row < app.document.row_count().saturating_sub(1) {
+                    app.view_state.table_state.select(Some(current_row + 1));
+                }
+            }
+        }
+    }
+
+    // Reopen magnifier on new cell
+    app.open_magnifier();
+
+    Ok(InputResult::Continue)
+}
+
+/// Handle keys in magnifier Normal mode
+fn handle_magnifier_normal(app: &mut App, key: KeyEvent) -> Result<InputResult> {
+    let mag = match app.magnifier_state.as_mut() {
+        Some(m) => m,
+        None => return Ok(InputResult::Continue),
+    };
+
+    match key.code {
+        // Vim motions
+        KeyCode::Char('h') | KeyCode::Left => mag.move_left(),
+        KeyCode::Char('j') | KeyCode::Down => mag.move_down(),
+        KeyCode::Char('k') | KeyCode::Up => mag.move_up(),
+        KeyCode::Char('l') | KeyCode::Right => mag.move_right(),
+
+        // Line motions
+        KeyCode::Char('0') => mag.move_to_line_start(),
+        KeyCode::Char('$') => mag.move_to_line_end(),
+        KeyCode::Char('^') => mag.move_to_first_non_blank(),
+
+        // Word motions
+        KeyCode::Char('w') => mag.move_next_word(),
+        KeyCode::Char('b') => mag.move_prev_word(),
+        KeyCode::Char('e') => mag.move_end_word(),
+
+        // Buffer motions
+        KeyCode::Char('G') => mag.move_to_last_line(),
+
+        // Operators
+        KeyCode::Char('x') => mag.delete_char(),
+        KeyCode::Char('p') => mag.paste_below(),
+        KeyCode::Char('P') => mag.paste_above(),
+
+        // Enter insert mode
+        KeyCode::Char('i') => mag.insert_before(),
+        KeyCode::Char('a') => mag.insert_after(),
+        KeyCode::Char('o') => mag.insert_line_below(),
+        KeyCode::Char('O') => mag.insert_line_above(),
+        KeyCode::Char('s') => mag.substitute_char(),
+
+        // Multi-key commands
+        KeyCode::Char('g') => {
+            // Handle gg for first line
+            // For now, just go to first line
+            mag.move_to_first_line();
+        }
+        KeyCode::Char('d') => {
+            // Handle dd for delete line
+            mag.delete_line();
+        }
+        KeyCode::Char('y') => {
+            // Handle yy for yank line
+            mag.yank_line();
+        }
+        KeyCode::Char('Z') => {
+            // Handle ZZ for save and quit
+            // Check for second Z (for now, just treat single Z as ZZ)
+            app.save_and_close_magnifier();
+        }
+
+        // Command mode
+        KeyCode::Char(':') => {
+            // Enter command mode within magnifier
+            // For now, we'll handle commands directly
+            // This is a simplified approach - full implementation would use command buffer
+            return Ok(InputResult::Continue);
+        }
+
+        // Escape - close if clean, warn if dirty
+        KeyCode::Esc => {
+            if app.magnifier_is_dirty() {
+                app.status_message = Some(StatusMessage::from(
+                    "Unsaved changes! Use :w to save, :q! to discard, or ZZ to save and quit",
+                ));
+            } else {
+                app.close_magnifier_discard();
+            }
+        }
+
+        // Count prefix
+        KeyCode::Char(c) if c.is_numeric() => {
+            if let Some(digit) = c.to_digit(10) {
+                // For now, simple count handling
+                // Full implementation would accumulate count like normal mode
+                mag.set_count_prefix(digit as usize);
+            }
+        }
+
+        _ => {}
+    }
+
+    Ok(InputResult::Continue)
+}
+
+/// Handle keys in magnifier Insert mode
+fn handle_magnifier_insert(app: &mut App, key: KeyEvent) -> Result<InputResult> {
+    let mag = match app.magnifier_state.as_mut() {
+        Some(m) => m,
+        None => return Ok(InputResult::Continue),
+    };
+
+    match key.code {
+        // Exit insert mode
+        KeyCode::Esc => {
+            mag.exit_insert_mode();
+        }
+
+        // Text input
+        KeyCode::Char(c) => {
+            mag.insert_char(c);
+        }
+
+        // Backspace
+        KeyCode::Backspace => {
+            mag.delete_char_before();
+        }
+
+        // Delete
+        KeyCode::Delete => {
+            mag.delete_char_at();
+        }
+
+        // Enter - newline
+        KeyCode::Enter => {
+            mag.newline();
+        }
+
+        // Arrow keys for navigation in insert mode
+        KeyCode::Left => mag.move_left(),
+        KeyCode::Right => mag.move_right(),
+        KeyCode::Up => mag.move_up(),
+        KeyCode::Down => mag.move_down(),
+
+        // Home/End
+        KeyCode::Home => mag.move_to_line_start(),
+        KeyCode::End => mag.move_to_line_end(),
+>>>>>>> 66c2c33 (feat(magnifier): Phase 5 - Implement input handling and commands)
 
         _ => {}
     }
