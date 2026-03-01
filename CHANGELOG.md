@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **BREAKING:** Magnifier cell navigation changed from `Ctrl+hjkl` to `Alt+hjkl` or `Alt+arrows` to avoid terminal control code conflicts (Ctrl+j is often mapped to linefeed)
+
 ## [0.6.0] - 2026-02-28
 
 ### Added - Magnifier Mode (Full Vim Editor for Cells)
@@ -44,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **Magnifier Commands**
 - `ZZ` or `:wq` - Save cell content and close magnifier
 - `:q!` - Close without saving
-- `Ctrl+h/j/k/l` - Navigate to adjacent cells (with dirty check warning)
+- `Alt+hjkl` or `Alt+arrows` - Navigate to adjacent cells (with dirty check warning)
 
 **UI Features**
 - Centered popup overlay (80% width/height)

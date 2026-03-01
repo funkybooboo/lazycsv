@@ -2174,19 +2174,19 @@ fn handle_magnifier_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         }
     };
 
-    // Check for Ctrl+hjkl navigation (works in both Normal and Insert modes within magnifier)
-    if key.modifiers.contains(KeyModifiers::CONTROL) {
+    // Check for Alt+hjkl and Alt+arrows navigation (works in both Normal and Insert modes within magnifier)
+    if key.modifiers.contains(KeyModifiers::ALT) {
         match key.code {
-            KeyCode::Char('h') => {
+            KeyCode::Char('h') | KeyCode::Left => {
                 return handle_magnifier_navigate(app, Direction::Left);
             }
-            KeyCode::Char('j') => {
+            KeyCode::Char('j') | KeyCode::Down => {
                 return handle_magnifier_navigate(app, Direction::Down);
             }
-            KeyCode::Char('k') => {
+            KeyCode::Char('k') | KeyCode::Up => {
                 return handle_magnifier_navigate(app, Direction::Up);
             }
-            KeyCode::Char('l') => {
+            KeyCode::Char('l') | KeyCode::Right => {
                 return handle_magnifier_navigate(app, Direction::Right);
             }
             _ => {}
@@ -2209,12 +2209,10 @@ enum Direction {
     Down,
 }
 
-/// Handle navigation to adjacent cells from magnifier
+/// Handle navigation to adjacent cells from magnifier (Alt+hjkl or Alt+arrows)
 fn handle_magnifier_navigate(app: &mut App, direction: Direction) -> Result<InputResult> {
     // Check if magnifier has unsaved changes
     if app.magnifier_is_dirty() {
-        // TODO: Show save prompt dialog
-        // For now, just show a message and don't navigate
         app.status_message = Some(StatusMessage::from(
             "Unsaved changes! Use :w to save, :q! to discard",
         ));

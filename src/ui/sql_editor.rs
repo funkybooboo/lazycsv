@@ -5,7 +5,7 @@
 
 use ratatui::{
     layout::{Constraint, Direction, Layout},
-    style::{Color, Modifier, Style},
+    style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
@@ -87,7 +87,7 @@ pub fn render_sql_editor_overlay(
     let before_lines: Vec<&str> = before.split('\n').collect();
     let after_lines: Vec<&str> = after.split('\n').collect();
 
-    let cursor_style = Style::default().add_modifier(Modifier::REVERSED);
+    let cursor_style = Style::default().bg(Color::White).fg(Color::Black);
     let normal_style = Style::default();
 
     let mut lines: Vec<Line> = Vec::new();

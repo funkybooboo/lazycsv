@@ -127,7 +127,7 @@ The following features are on the roadmap and are **not yet implemented**.
 - 📋 `:w` - Save cell content
 - 📋 `:wq` or `ZZ` - Save and close
 - 📋 `:q!` - Close without saving
-- 📋 `Ctrl+h/j/k/l` - Navigate to adjacent cells (prompts if dirty)
+- 📋 `Alt+hjkl` or `Alt+arrows` - Navigate to adjacent cells (prompts if dirty)
 
 **Use Cases:**
 - Editing JSON data in cells

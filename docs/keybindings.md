@@ -453,10 +453,10 @@ The Magnifier embeds a comprehensive vim editor for editing cells with complex c
 **Cell Navigation (while in Magnifier):**
 | Key | Action |
 |-----|--------|
-| `Ctrl+h` | Move to cell left (prompts to save if dirty) |
-| `Ctrl+j` | Move to cell below (prompts to save if dirty) |
-| `Ctrl+k` | Move to cell above (prompts to save if dirty) |
-| `Ctrl+l` | Move to cell right (prompts to save if dirty) |
+| `Alt+h` or `Alt+Left` | Move to cell left (prompts to save if dirty) |
+| `Alt+j` or `Alt+Down` | Move to cell below (prompts to save if dirty) |
+| `Alt+k` or `Alt+Up` | Move to cell above (prompts to save if dirty) |
+| `Alt+l` or `Alt+Right` | Move to cell right (prompts to save if dirty) |
 
 **Important Notes:**
 - Magnifier vim commands are **separate** from table vim commands

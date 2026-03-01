@@ -1,12 +1,12 @@
 //! Magnifier mode UI rendering
 //!
-//! Renders a centered popup overlay for the magnifier mode, which provides
-//! a full vim-like text editor for complex multi-line cell editing.
+//! Provides a centered popup overlay with a full vim-like text editor
+//! for complex multi-line cell editing.
 
 use crate::App;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
@@ -34,36 +34,17 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
 }
 
 /// Render the magnifier mode overlay
-///
-/// Displays a centered popup with:
-/// - Title bar showing cell position and mode
-/// - Line numbers (right-aligned, dim)
-/// - Text content with cursor
-/// - Bottom help bar with commands
 pub fn render_magnifier(frame: &mut Frame, app: &App, area: Rect) {
     let magnifier = match &app.magnifier_state {
         Some(m) => m,
-        None => return, // No magnifier active
+        None => return,
     };
 
-    // Create centered popup (80% width, 80% height)
-    let popup_area = centered_rect(80, 80, area);
-
-    // Clear the area behind the popup
+    // Create centered popup (70% width, 60% height)
+    let popup_area = centered_rect(70, 60, area);
     frame.render_widget(Clear, popup_area);
 
-    // Split popup into title bar, content area, mode indicator, and command/help bar
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(1), // Title bar
-            Constraint::Min(0),    // Content area
-            Constraint::Length(1), // Mode indicator bar
-            Constraint::Length(1), // Command/help bar
-        ])
-        .split(popup_area);
-
-    // Title bar: vim-style filename display
+    // Build title with cell position and helpful hints
     let (row, col) = magnifier.cell_position();
     let cell_name = format!(
         "{}{}",
@@ -71,21 +52,29 @@ pub fn render_magnifier(frame: &mut Frame, app: &App, area: Rect) {
         row.get()
     );
 
-    // Vim-style title: "cell_A5" [+] or "cell_A5"
-    let modified_flag = if magnifier.is_dirty() { " [+]" } else { "" };
-    let title_text = format!(" \"{}\"{}", cell_name, modified_flag);
+    let title = if magnifier.is_dirty() {
+        format!(" {} [modified] (:wq save, :q! discard) ", cell_name)
+    } else {
+        format!(" {} (:wq save, :q! discard, Esc cancel) ", cell_name)
+    };
 
-    let title_bar = Paragraph::new(title_text).style(Style::default()).block(
-        Block::default()
-            .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
-            .border_style(Style::default()),
-    );
-    frame.render_widget(title_bar, chunks[0]);
+    let main_block = Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_style(Style::default());
 
-    // Content area: line numbers + text
-    render_content(frame, magnifier, chunks[1]);
+    let inner = main_block.inner(popup_area);
+    frame.render_widget(main_block, popup_area);
 
-    // Vim-style status line (mode + position + stats)
+    // Split inner area: content + status bar
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(0), Constraint::Length(1)])
+        .split(inner);
+
+    render_content(frame, magnifier, chunks[0]);
+
+    // Build status bar
     let (cursor_line, cursor_col) = magnifier.cursor();
     let line_count = magnifier.lines().len();
     let line_percent = if line_count > 0 {
@@ -94,101 +83,60 @@ pub fn render_magnifier(frame: &mut Frame, app: &App, area: Rect) {
         100
     };
 
-    let mode_and_pending = match magnifier.mode() {
-        crate::magnifier::MagnifierMode::Normal => {
-            if let Some(pending) = magnifier.pending_display() {
-                pending.to_string()
-            } else {
-                String::new()
+    let left_text = if magnifier.mode() == crate::magnifier::MagnifierMode::Command {
+        format!(":{}", magnifier.command_buffer())
+    } else {
+        match magnifier.mode() {
+            crate::magnifier::MagnifierMode::Insert => "-- INSERT --".to_string(),
+            crate::magnifier::MagnifierMode::Visual => "-- VISUAL --".to_string(),
+            crate::magnifier::MagnifierMode::VisualLine => "-- VISUAL LINE --".to_string(),
+            crate::magnifier::MagnifierMode::Normal => {
+                magnifier.pending_display().unwrap_or("").to_string()
             }
+            _ => String::new(),
         }
-        crate::magnifier::MagnifierMode::Insert => "-- INSERT --".to_string(),
-        crate::magnifier::MagnifierMode::Command => String::new(), // Command shown in bottom bar
-        crate::magnifier::MagnifierMode::Visual => "-- VISUAL --".to_string(),
-        crate::magnifier::MagnifierMode::VisualLine => "-- VISUAL LINE --".to_string(),
     };
 
-    // Right side: position info (vim shows: line,col percentage%)
-    let position_info = format!("{},{} {}%", cursor_line + 1, cursor_col + 1, line_percent);
+    let right_text = format!("{},{} {}%", cursor_line + 1, cursor_col + 1, line_percent);
 
-    // Add search info if active
-    let search_info = if let Some(pattern) = magnifier.search_pattern() {
+    let middle_text = if let Some(pattern) = magnifier.search_pattern() {
         let matches = magnifier.search_matches();
         let current = magnifier.current_match_index();
         if matches.is_empty() {
-            format!(" /{} [0/0]", pattern)
+            format!("/{} [0/0]", pattern)
         } else if let Some(idx) = current {
-            format!(" /{} [{}/{}]", pattern, idx + 1, matches.len())
+            format!("/{} [{}/{}]", pattern, idx + 1, matches.len())
         } else {
-            format!(" /{} [?/{}]", pattern, matches.len())
+            format!("/{} [?/{}]", pattern, matches.len())
         }
     } else {
         String::new()
     };
 
-    // Build status line: mode on left, search in middle, position on right
-    let status_left = mode_and_pending;
-    let status_middle = search_info;
-    let status_right = position_info;
-
-    // Calculate available width (account for borders)
-    let status_block = Block::default()
-        .borders(Borders::LEFT | Borders::RIGHT)
-        .border_style(Style::default());
-    let inner_area = status_block.inner(chunks[2]);
-    let available_width = inner_area.width as usize;
-
-    let left_len = status_left.len();
-    let middle_len = status_middle.len();
-    let right_len = status_right.len();
-
+    let available_width = chunks[1].width as usize;
     let padding_total = available_width
-        .saturating_sub(left_len)
-        .saturating_sub(middle_len)
-        .saturating_sub(right_len);
+        .saturating_sub(left_text.len())
+        .saturating_sub(middle_text.len())
+        .saturating_sub(right_text.len());
     let padding_left = padding_total / 2;
     let padding_right = padding_total - padding_left;
 
     let status_text = format!(
         "{}{}{}{}{}",
-        status_left,
+        left_text,
         " ".repeat(padding_left),
-        status_middle,
+        middle_text,
         " ".repeat(padding_right),
-        status_right
+        right_text
     );
 
-    // Render status bar with reversed style (vim-like) - fills entire width
-    let status_bar =
-        Paragraph::new(status_text).style(Style::default().add_modifier(Modifier::REVERSED));
+    let status_bar = Paragraph::new(status_text).style(Style::default());
 
-    frame.render_widget(status_block, chunks[2]);
-    frame.render_widget(status_bar, inner_area);
-
-    // Command line (vim-style)
-    let command_line = if magnifier.mode() == crate::magnifier::MagnifierMode::Command {
-        // Show command line input (vim shows : commands here)
-        format!(":{}", magnifier.command_buffer())
-    } else {
-        // Empty in normal/insert/visual modes (vim doesn't show help here)
-        String::new()
-    };
-
-    // Render command line
-    let cmd_block = Block::default()
-        .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT)
-        .border_style(Style::default());
-
-    let cmd_inner = cmd_block.inner(chunks[3]);
-    let cmd_paragraph = Paragraph::new(command_line).style(Style::default());
-
-    frame.render_widget(cmd_block, chunks[3]);
-    frame.render_widget(cmd_paragraph, cmd_inner);
+    frame.render_widget(status_bar, chunks[1]);
 }
 
-/// Render the content area with line numbers and text
+/// Render content area with line numbers and text
 fn render_content(frame: &mut Frame, magnifier: &crate::magnifier::MagnifierState, area: Rect) {
-    // Calculate line number column width (max 4 digits)
     let line_count = magnifier.lines().len();
     let line_num_width = if line_count == 0 {
         2
@@ -196,23 +144,16 @@ fn render_content(frame: &mut Frame, magnifier: &crate::magnifier::MagnifierStat
         (line_count.to_string().len() as u16).clamp(2, 4)
     };
 
-    // Split into line numbers and text content
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Length(line_num_width + 2), // +2 for padding and separator
-            Constraint::Min(0),
-        ])
+        .constraints([Constraint::Length(line_num_width + 2), Constraint::Min(0)])
         .split(area);
 
-    // Render line numbers
     render_line_numbers(frame, magnifier, chunks[0], line_num_width);
-
-    // Render text content with cursor
     render_text_content(frame, magnifier, chunks[1]);
 }
 
-/// Render line numbers (right-aligned, dim, with cursor line highlighted)
+/// Render line numbers
 fn render_line_numbers(
     frame: &mut Frame,
     magnifier: &crate::magnifier::MagnifierState,
@@ -221,9 +162,8 @@ fn render_line_numbers(
 ) {
     let line_count = magnifier.lines().len();
     let visible_height = area.height as usize;
-
-    // Calculate scroll offset to keep cursor visible
     let (cursor_line, _) = magnifier.cursor();
+
     let scroll_offset = if cursor_line < visible_height / 2 {
         0
     } else if cursor_line >= line_count.saturating_sub(visible_height / 2) {
@@ -234,29 +174,18 @@ fn render_line_numbers(
 
     let end_line = (scroll_offset + visible_height).min(line_count);
 
-    // Build styled line numbers
     let mut lines: Vec<Line> = Vec::new();
     for i in scroll_offset..end_line {
-        let line_num_text = format!("{:>width$} │", i + 1, width = width as usize);
-
+        let line_num_text = format!("{:>width$}  ", i + 1, width = width as usize);
         let style = if i == cursor_line {
-            // Highlight current line number with bold
             Style::default().add_modifier(Modifier::BOLD)
         } else {
-            // Dim other line numbers
             Style::default().add_modifier(Modifier::DIM)
         };
-
         lines.push(Line::from(Span::styled(line_num_text, style)));
     }
 
-    let line_num_widget = Paragraph::new(lines).block(
-        Block::default()
-            .borders(Borders::LEFT)
-            .border_style(Style::default()),
-    );
-
-    frame.render_widget(line_num_widget, area);
+    frame.render_widget(Paragraph::new(lines), area);
 }
 
 /// Render text content with cursor, selection, and search highlighting
@@ -267,10 +196,9 @@ fn render_text_content(
 ) {
     let line_count = magnifier.lines().len();
     let visible_height = area.height as usize;
-    let visible_width = area.width.saturating_sub(1) as usize; // -1 for right border
-
-    // Calculate scroll offset to keep cursor visible
+    let visible_width = area.width as usize;
     let (cursor_line, cursor_col) = magnifier.cursor();
+
     let scroll_offset = if cursor_line < visible_height / 2 {
         0
     } else if cursor_line >= line_count.saturating_sub(visible_height / 2) {
@@ -279,7 +207,6 @@ fn render_text_content(
         cursor_line.saturating_sub(visible_height / 2)
     };
 
-    // Calculate horizontal scroll to keep cursor visible
     let h_scroll = if cursor_col < visible_width / 2 {
         0
     } else if cursor_col >= visible_width {
@@ -289,24 +216,14 @@ fn render_text_content(
     };
 
     let end_line = (scroll_offset + visible_height).min(line_count);
-
-    // Get visual selection if active
     let selection = magnifier.get_visual_selection();
-
-    // Get search matches
     let search_matches = magnifier.search_matches();
     let current_match = magnifier.current_match_index();
 
-    // Build styled text lines
     let mut lines: Vec<Line> = Vec::new();
 
     for i in scroll_offset..end_line {
-        let line_text = magnifier
-            .lines()
-            .get(i)
-            .map(|s: &String| s.as_str())
-            .unwrap_or("");
-
+        let line_text = magnifier.lines().get(i).map(|s| s.as_str()).unwrap_or("");
         let styled_line = render_line_with_highlights(
             line_text,
             i,
@@ -319,23 +236,15 @@ fn render_text_content(
             current_match,
             magnifier.mode(),
         );
-
         lines.push(styled_line);
     }
 
-    // If buffer is empty, show cursor on empty line
     if line_count == 0 {
-        let cursor_span = Span::styled(" ", Style::default().add_modifier(Modifier::REVERSED));
+        let cursor_span = Span::styled(" ", Style::default().bg(Color::White).fg(Color::Black));
         lines.push(Line::from(vec![cursor_span]));
     }
 
-    let text_widget = Paragraph::new(lines).block(
-        Block::default()
-            .borders(Borders::RIGHT)
-            .border_style(Style::default()),
-    );
-
-    frame.render_widget(text_widget, area);
+    frame.render_widget(Paragraph::new(lines), area);
 }
 
 /// Render a single line with all highlighting (cursor, selection, search)
@@ -378,11 +287,11 @@ fn render_line_with_highlights(
         let search_highlight = get_search_highlight(line_idx, col, search_matches, current_match);
 
         let style = if is_cursor {
-            // Cursor takes priority - use REVERSED for visibility
-            Style::default().add_modifier(Modifier::REVERSED)
+            // Cursor takes priority - use explicit colors for visibility
+            Style::default().bg(Color::White).fg(Color::Black)
         } else if is_selected {
-            // Visual selection - use REVERSED
-            Style::default().add_modifier(Modifier::REVERSED)
+            // Visual selection - use explicit colors
+            Style::default().bg(Color::White).fg(Color::Black)
         } else {
             // Search match or normal text
             search_highlight.unwrap_or_default()
@@ -398,7 +307,7 @@ fn render_line_with_highlights(
         && cursor_col >= start_col
         && cursor_col < end_col + 1
     {
-        let cursor_style = Style::default().add_modifier(Modifier::REVERSED);
+        let cursor_style = Style::default().bg(Color::White).fg(Color::Black);
         spans.push(Span::styled(" ", cursor_style));
     }
 

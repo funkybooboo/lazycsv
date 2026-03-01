@@ -221,7 +221,7 @@ These commands always take priority:
 - `:w` - save cell content
 - `:wq` or `ZZ` - save and close
 - `:q!` - close without saving
-- `Ctrl+h/j/k/l` - navigate to adjacent cells (prompts to save if dirty)
+- `Alt+hjkl` or `Alt+arrows` - navigate to adjacent cells (prompts to save if dirty)
 
 ### Row Operators
 
@@ -1308,7 +1308,7 @@ NORMAL                                                          3,C
 - `s` - Substitute character
 
 **Navigation:**
-- `Ctrl+h/j/k/l` - Navigate to adjacent cells (prompts to save if dirty)
+- `Alt+hjkl` or `Alt+arrows` - Navigate to adjacent cells (prompts to save if dirty)
 
 ### Use Cases
 - Editing JSON data in cells
@@ -1370,7 +1370,7 @@ NORMAL                                                          3,C
 - [x] Create `handle_magnifier_command()` for Command mode (ex commands)
 - [x] Create `handle_magnifier_visual()` for Visual mode operations
 - [x] Implement `ZZ` shortcut (save and close)
-- [x] Implement Ctrl+h/j/k/l cell navigation
+- [x] Implement Alt+hjkl/arrows cell navigation (changed from Ctrl to avoid terminal conflicts)
 - [x] Dirty check warning for navigation
 - [x] Implement `:w` command (save to cell)
 - [x] Implement `:wq` command (save and close)
@@ -1537,10 +1537,10 @@ NORMAL                                                          3,C
 - [ ] `:w` marks document as dirty
 
 **Cell Navigation:**
-- [ ] `Ctrl+h` navigates to left cell
-- [ ] `Ctrl+j` navigates to cell below
-- [ ] `Ctrl+k` navigates to cell above
-- [ ] `Ctrl+l` navigates to right cell
+- [ ] `Alt+h` or `Alt+Left` navigates to left cell
+- [ ] `Alt+j` or `Alt+Down` navigates to cell below
+- [ ] `Alt+k` or `Alt+Up` navigates to cell above
+- [ ] `Alt+l` or `Alt+Right` navigates to right cell
 - [ ] Save prompt appears if buffer is dirty
 - [ ] Save prompt options work: y (save), n (discard), c (cancel)
 

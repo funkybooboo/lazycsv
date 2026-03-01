@@ -108,7 +108,7 @@ dd / yy / p        -> Delete/yank/paste lines
 x / s              -> Delete/substitute character
 ZZ or :wq          -> Save and close
 :q!                -> Close without saving
-Ctrl+h/j/k/l       -> Navigate to adjacent cells
+Alt+hjkl/arrows    -> Navigate to adjacent cells
 ```
 
 **Features:**
