@@ -4,7 +4,8 @@
 //! against loaded CSV tables.
 
 use ratatui::{
-    style::{Modifier, Style},
+    layout::{Constraint, Direction, Layout},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
@@ -20,7 +21,12 @@ const SQL_EDITOR_HEIGHT_PERCENT: u16 = 50;
 ///
 /// Displays a centered modal window where the user types SQL queries.
 /// The cursor is shown as a reversed-color character.
-pub fn render_sql_editor_overlay(frame: &mut Frame, sql_buffer: &str, sql_cursor: usize) {
+pub fn render_sql_editor_overlay(
+    frame: &mut Frame,
+    sql_buffer: &str,
+    sql_cursor: usize,
+    sql_error: Option<&str>,
+) {
     let area = super::help::centered_rect(
         SQL_EDITOR_WIDTH_PERCENT,
         SQL_EDITOR_HEIGHT_PERCENT,
@@ -36,6 +42,22 @@ pub fn render_sql_editor_overlay(frame: &mut Frame, sql_buffer: &str, sql_cursor
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
+
+    // Split inner area: query text on top, error line at bottom (if error present)
+    let has_error = sql_error.is_some();
+    let chunks = if has_error {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(1), Constraint::Length(1)])
+            .split(inner)
+    } else {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(1), Constraint::Length(0)])
+            .split(inner)
+    };
+    let query_area = chunks[0];
+    let error_area = chunks[1];
 
     // Build text with cursor highlight
     let chars: Vec<char> = sql_buffer.chars().collect();
@@ -109,5 +131,13 @@ pub fn render_sql_editor_overlay(frame: &mut Frame, sql_buffer: &str, sql_cursor
     }
 
     let paragraph = Paragraph::new(lines);
-    frame.render_widget(paragraph, inner);
+    frame.render_widget(paragraph, query_area);
+
+    // Render error message at the bottom if present
+    if let Some(err) = sql_error {
+        let error_style = Style::default().fg(Color::Red);
+        let error_line = Line::from(Span::styled(err.to_string(), error_style));
+        let error_paragraph = Paragraph::new(vec![error_line]);
+        frame.render_widget(error_paragraph, error_area);
+    }
 }

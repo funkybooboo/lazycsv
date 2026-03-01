@@ -93,7 +93,9 @@ pub fn execute_query_to_document(
     query: &str,
     output_filename: String,
 ) -> Result<Document> {
-    let mut stmt = conn.prepare(query).context("Failed to prepare SQL query")?;
+    let mut stmt = conn
+        .prepare(query)
+        .map_err(|e| anyhow::anyhow!("{}", e))?;
     let col_count = stmt.column_count();
     let col_names: Vec<String> = (0..col_count)
         .map(|i| stmt.column_name(i).unwrap_or("?").to_string())
@@ -115,7 +117,7 @@ pub fn execute_query_to_document(
                 .collect();
             Ok(values)
         })
-        .context("Failed to execute query")?;
+        .map_err(|e| anyhow::anyhow!("{}", e))?;
 
     let mut data_rows = Vec::new();
     for row_result in rows {
@@ -152,7 +154,9 @@ pub fn execute_query(path: &Path, query: &str, config: &FileConfig) -> Result<()
     }
 
     // Execute user query
-    let mut stmt = conn.prepare(query).context("Failed to prepare SQL query")?;
+    let mut stmt = conn
+        .prepare(query)
+        .map_err(|e| anyhow::anyhow!("{}", e))?;
     let col_count = stmt.column_count();
     let col_names: Vec<String> = (0..col_count)
         .map(|i| stmt.column_name(i).unwrap_or("?").to_string())
@@ -174,7 +178,7 @@ pub fn execute_query(path: &Path, query: &str, config: &FileConfig) -> Result<()
                 .collect();
             Ok(values)
         })
-        .context("Failed to execute query")?;
+        .map_err(|e| anyhow::anyhow!("{}", e))?;
 
     // Write CSV to stdout
     let stdout = std::io::stdout();
@@ -339,5 +343,30 @@ mod tests {
             })
             .unwrap();
         assert_eq!(val, "");
+    }
+
+    #[test]
+    fn test_misspelled_column_shows_useful_error() {
+        let conn = Connection::open_in_memory().unwrap();
+        let doc = Document {
+            rows: vec![
+                vec!["Company".into(), "Contact".into()],
+                vec!["Acme".into(), "John".into()],
+            ],
+            filename: "customers.csv".into(),
+            is_dirty: false,
+            header_mode: true,
+            delimiter: ',',
+        };
+        load_csv_into_sqlite(&conn, &doc, "customers").unwrap();
+
+        let result =
+            execute_query_to_document(&conn, "SELECT Company, Contect FROM customers", "out.csv".into());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("no such column: Contect"),
+            "Error should mention the bad column name, got: {}",
+            err_msg
+        );
     }
 }

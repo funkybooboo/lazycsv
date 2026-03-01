@@ -291,7 +291,12 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             )
         }
         crate::app::Mode::SqlEditor => {
-            build_status_line("SQL EDITOR", &right_side, area.width as usize)
+            let left = if let Some(ref err) = app.sql_error {
+                err.clone()
+            } else {
+                "SQL EDITOR".to_string()
+            };
+            build_status_line(&left, &right_side, area.width as usize)
         }
         crate::app::Mode::FileList => {
             // Show file list with cursor indicator and filter

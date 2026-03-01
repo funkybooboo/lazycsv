@@ -24,6 +24,10 @@ pub struct CliArgs {
         help = "File encoding (e.g., 'utf-8', 'latin1', 'utf-16le')"
     )]
     pub encoding: Option<String>,
+
+    /// SQL query to execute against CSV file(s) (non-interactive mode).
+    #[arg(short = 'q', long = "query", help = "SQL query to execute against CSV file(s) (non-interactive mode)")]
+    pub query: Option<String>,
 }
 
 fn parse_delimiter(s: &str) -> Result<u8, String> {
@@ -141,5 +145,40 @@ mod tests {
         assert!(args.is_ok());
         let args = args.unwrap();
         assert_eq!(args.encoding, Some("latin1".to_string()));
+    }
+
+    #[test]
+    fn test_cli_with_query_short() {
+        let args = CliArgs::try_parse_from(["lazycsv", "data.csv", "-q", "SELECT * FROM data"]);
+        assert!(args.is_ok());
+        let args = args.unwrap();
+        assert_eq!(args.query, Some("SELECT * FROM data".to_string()));
+    }
+
+    #[test]
+    fn test_cli_with_query_long() {
+        let args = CliArgs::try_parse_from(["lazycsv", "--query", "SELECT 1"]);
+        assert!(args.is_ok());
+        let args = args.unwrap();
+        assert_eq!(args.query, Some("SELECT 1".to_string()));
+    }
+
+    #[test]
+    fn test_cli_default_query_is_none() {
+        let args = CliArgs::try_parse_from(["lazycsv"]);
+        assert!(args.is_ok());
+        assert_eq!(args.unwrap().query, None);
+    }
+
+    #[test]
+    fn test_cli_query_with_path_and_delimiter() {
+        let args = CliArgs::try_parse_from([
+            "lazycsv", "data.csv", "-d", ";", "-q", "SELECT * FROM data",
+        ]);
+        assert!(args.is_ok());
+        let args = args.unwrap();
+        assert_eq!(args.path, Some(PathBuf::from("data.csv")));
+        assert_eq!(args.delimiter, Some(b';'));
+        assert_eq!(args.query, Some("SELECT * FROM data".to_string()));
     }
 }

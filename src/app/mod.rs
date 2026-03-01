@@ -78,6 +78,9 @@ pub struct App {
     /// SQL editor cursor position (character index)
     pub sql_cursor: usize,
 
+    /// SQL error message from last failed query (shown in editor overlay)
+    pub sql_error: Option<String>,
+
     /// Flag to quit application
     pub should_quit: bool,
 }
@@ -163,6 +166,7 @@ impl App {
             clipboard: DualClipboard::new(),
             sql_buffer: String::new(),
             sql_cursor: 0,
+            sql_error: None,
             should_quit: false,
         }
     }
@@ -239,6 +243,8 @@ impl App {
         self.document.is_dirty = false;
         self.session.mark_clean(&file_path);
         self.session.remove_from_cache(&file_path);
+        // No longer a virtual query output once saved to disk
+        self.session.unmark_query_output(&file_path);
 
         Ok(file_path)
     }
@@ -1572,4 +1578,90 @@ mod tests {
     // Note: Most runtime error tests (file deletion, permission changes, etc.)
     // are in tests/error_handling_test.rs as integration tests since they
     // require file system operations with tempfile.
+
+    #[test]
+    fn test_f_command_shows_current_filename() {
+        let csv_data = create_test_csv_data();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        // :f with no argument shows current filename
+        app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
+        app.handle_key(key_event(KeyCode::Char('f'))).unwrap();
+        app.handle_key(key_event(KeyCode::Enter)).unwrap();
+
+        assert_eq!(app.mode, Mode::Normal);
+        let msg = app.status_message.as_ref().unwrap().as_str();
+        assert!(msg.contains("test.csv"), "Expected filename in status, got: {}", msg);
+    }
+
+    #[test]
+    fn test_f_command_renames_file() {
+        let csv_data = create_test_csv_data();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        // :f newname.csv
+        app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
+        app.handle_key(key_event(KeyCode::Char('f'))).unwrap();
+        app.handle_key(key_event(KeyCode::Char(' '))).unwrap();
+        for c in "newname.csv".chars() {
+            app.handle_key(key_event(KeyCode::Char(c))).unwrap();
+        }
+        app.handle_key(key_event(KeyCode::Enter)).unwrap();
+
+        assert_eq!(app.mode, Mode::Normal);
+        assert_eq!(app.document.filename, "newname.csv");
+        assert_eq!(app.get_current_file(), &PathBuf::from("newname.csv"));
+        assert!(app.document.is_dirty);
+
+        let msg = app.status_message.as_ref().unwrap().as_str();
+        assert!(msg.contains("newname.csv"), "Expected rename confirmation, got: {}", msg);
+    }
+
+    #[test]
+    fn test_f_command_rename_marks_session_dirty() {
+        let csv_data = create_test_csv_data();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        assert!(!app.session.is_current_file_dirty());
+
+        // :f renamed.csv
+        app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
+        app.handle_key(key_event(KeyCode::Char('f'))).unwrap();
+        app.handle_key(key_event(KeyCode::Char(' '))).unwrap();
+        for c in "renamed.csv".chars() {
+            app.handle_key(key_event(KeyCode::Char(c))).unwrap();
+        }
+        app.handle_key(key_event(KeyCode::Enter)).unwrap();
+
+        assert!(app.session.is_current_file_dirty());
+    }
+
+    #[test]
+    fn test_f_command_rename_preserves_query_output_status() {
+        let csv_data = create_test_csv_data();
+        let csv_files = vec![PathBuf::from("output.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        // Mark as query output (simulating what happens after SQL execution)
+        let path = app.get_current_file().clone();
+        app.session.mark_query_output(&path);
+
+        // :f results.csv
+        app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
+        app.handle_key(key_event(KeyCode::Char('f'))).unwrap();
+        app.handle_key(key_event(KeyCode::Char(' '))).unwrap();
+        for c in "results.csv".chars() {
+            app.handle_key(key_event(KeyCode::Char(c))).unwrap();
+        }
+        app.handle_key(key_event(KeyCode::Enter)).unwrap();
+
+        // Query output status should follow the renamed file
+        let new_path = app.get_current_file().clone();
+        assert_eq!(new_path, PathBuf::from("results.csv"));
+        assert!(app.session.is_query_output(&new_path));
+        assert!(!app.session.is_query_output(&PathBuf::from("output.csv")));
+    }
 }

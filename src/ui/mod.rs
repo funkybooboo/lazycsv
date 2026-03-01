@@ -44,7 +44,12 @@ pub fn render(frame: &mut Frame, app: &mut App) {
 
     // Render SQL editor overlay if active
     if app.mode == crate::app::Mode::SqlEditor {
-        sql_editor::render_sql_editor_overlay(frame, &app.sql_buffer, app.sql_cursor);
+        sql_editor::render_sql_editor_overlay(
+            frame,
+            &app.sql_buffer,
+            app.sql_cursor,
+            app.sql_error.as_deref(),
+        );
     }
 }
 

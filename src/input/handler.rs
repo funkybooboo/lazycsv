@@ -1527,6 +1527,28 @@ fn execute_command(app: &mut App) -> Result<()> {
             }
             return Ok(());
         }
+        "f" => {
+            // :f (no arg) shows current filename, :f <name> renames
+            if let Some(arg) = _arg {
+                let new_name = arg.to_string();
+                app.document.filename = new_name.clone();
+                let new_path = std::path::PathBuf::from(&new_name);
+                app.session.rename_current_file(new_path.clone());
+                app.document.is_dirty = true;
+                app.session.mark_dirty(&new_path);
+                app.status_message = Some(StatusMessage::from(format!(
+                    "Renamed to \"{}\"",
+                    new_name
+                )));
+            } else {
+                let current = app.document.filename.clone();
+                app.status_message = Some(StatusMessage::from(format!(
+                    "\"{}\"",
+                    current
+                )));
+            }
+            return Ok(());
+        }
         "files" => {
             // Enter FileList mode to show file picker
             app.mode = Mode::FileList;
@@ -2002,28 +2024,22 @@ fn handle_sql_editor_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             {
                 Ok(mut doc) => {
                     // Determine output filename using reuse logic:
-                    // Look for an existing unsaved output sheet
-                    let mut reuse_name = None;
-                    for path in app.session.files() {
-                        let name = path
-                            .file_name()
+                    // Look for an existing query output sheet (may have been renamed)
+                    let reuse_name = app.session.find_query_output_file().and_then(|p| {
+                        p.file_name()
                             .and_then(|n| n.to_str())
-                            .unwrap_or("");
-                        if name.starts_with("output") && name.ends_with(".csv") && !path.exists() {
-                            reuse_name = Some(name.to_string());
-                            break;
-                        }
-                    }
+                            .map(|s| s.to_string())
+                    });
 
                     let output_name = reuse_name.unwrap_or_else(|| generate_output_filename(app));
                     doc.filename = output_name;
 
+                    app.sql_error = None;
                     app.mode = Mode::Normal;
                     return Ok(InputResult::SwitchToDocument(doc));
                 }
                 Err(e) => {
-                    app.status_message =
-                        Some(StatusMessage::new_owned(format!("SQL error: {}", e)));
+                    app.sql_error = Some(format!("SQL error: {}", e));
                     // Stay in SqlEditor mode so user can fix the query
                 }
             }
@@ -2031,6 +2047,7 @@ fn handle_sql_editor_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
 
         // Type character
         (KeyCode::Char(c), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
+            app.sql_error = None;
             let byte_pos = app
                 .sql_buffer
                 .char_indices()

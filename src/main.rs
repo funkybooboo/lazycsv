@@ -105,6 +105,10 @@ fn run(
                                 app.session.set_active_file_index(idx);
                             }
 
+                            // Mark as query output so re-running SQL replaces this sheet
+                            let current_path = app.get_current_file().clone();
+                            app.session.mark_query_output(&current_path);
+
                             app.document = doc;
 
                             // Reset view state

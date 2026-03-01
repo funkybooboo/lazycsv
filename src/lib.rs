@@ -6,6 +6,7 @@ pub mod domain;
 pub mod file_system;
 pub mod input;
 pub mod navigation;
+pub mod query;
 pub mod session;
 pub mod ui;
 

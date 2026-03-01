@@ -69,6 +69,9 @@ pub struct Session {
 
     /// Cache of dirty documents (avoids reloading from disk when switching files)
     document_cache: HashMap<PathBuf, Document>,
+
+    /// Files that are SQL query output sheets (should be reused on next query)
+    query_output_files: HashSet<PathBuf>,
 }
 
 impl Session {
@@ -82,6 +85,7 @@ impl Session {
             delimiters: HashMap::new(),
             dirty_files: HashSet::new(),
             document_cache: HashMap::new(),
+            query_output_files: HashSet::new(),
         }
     }
 
@@ -224,6 +228,51 @@ impl Session {
     /// Set the active file index
     pub fn set_active_file_index(&mut self, index: usize) {
         self.active_file_index = index;
+    }
+
+    /// Rename the current file (updates path in session and migrates all associated state)
+    pub fn rename_current_file(&mut self, new_path: PathBuf) {
+        let old_path = self.files[self.active_file_index].clone();
+        self.files[self.active_file_index] = new_path.clone();
+        // Migrate dirty tracking
+        if self.dirty_files.remove(&old_path) {
+            self.dirty_files.insert(new_path.clone());
+        }
+        // Migrate cached document
+        if let Some(doc) = self.document_cache.remove(&old_path) {
+            self.document_cache.insert(new_path.clone(), doc);
+        }
+        // Migrate header mode and delimiter settings
+        if let Some(mode) = self.header_modes.remove(&old_path) {
+            self.header_modes.insert(new_path.clone(), mode);
+        }
+        if let Some(delim) = self.delimiters.remove(&old_path) {
+            self.delimiters.insert(new_path.clone(), delim);
+        }
+        // Migrate query output tracking
+        if self.query_output_files.remove(&old_path) {
+            self.query_output_files.insert(new_path);
+        }
+    }
+
+    /// Mark a file as a SQL query output sheet
+    pub fn mark_query_output(&mut self, path: &PathBuf) {
+        self.query_output_files.insert(path.clone());
+    }
+
+    /// Unmark a file as a SQL query output sheet (e.g., after saving)
+    pub fn unmark_query_output(&mut self, path: &PathBuf) {
+        self.query_output_files.remove(path);
+    }
+
+    /// Check if a file is a SQL query output sheet
+    pub fn is_query_output(&self, path: &PathBuf) -> bool {
+        self.query_output_files.contains(path)
+    }
+
+    /// Find the first unsaved query output file in the session
+    pub fn find_query_output_file(&self) -> Option<&PathBuf> {
+        self.files.iter().find(|p| self.query_output_files.contains(*p))
     }
 }
 
@@ -394,5 +443,110 @@ mod tests {
         session.clear_cache();
         assert!(session.get_cached_document(&files[0]).is_none());
         assert!(session.get_cached_document(&files[1]).is_none());
+    }
+
+    #[test]
+    fn test_rename_current_file_updates_path() {
+        let files = test_files();
+        let config = FileConfig::new();
+        let mut session = Session::new(files.clone(), 0, config);
+
+        let new_path = PathBuf::from("renamed.csv");
+        session.rename_current_file(new_path.clone());
+
+        assert_eq!(session.get_current_file(), &new_path);
+        assert_eq!(session.files()[0], new_path);
+        // Other files unchanged
+        assert_eq!(session.files()[1], files[1]);
+    }
+
+    #[test]
+    fn test_rename_migrates_dirty_tracking() {
+        let files = test_files();
+        let config = FileConfig::new();
+        let mut session = Session::new(files.clone(), 0, config);
+
+        session.mark_dirty(&files[0]);
+        assert!(session.is_dirty(&files[0]));
+
+        let new_path = PathBuf::from("renamed.csv");
+        session.rename_current_file(new_path.clone());
+
+        assert!(!session.is_dirty(&files[0]));
+        assert!(session.is_dirty(&new_path));
+    }
+
+    #[test]
+    fn test_rename_migrates_cached_document() {
+        let files = test_files();
+        let config = FileConfig::new();
+        let mut session = Session::new(files.clone(), 0, config);
+
+        let doc = crate::Document::new(
+            vec!["A".to_string()],
+            vec![vec!["1".to_string()]],
+            "test.csv".to_string(),
+        );
+        session.cache_document(files[0].clone(), doc);
+
+        let new_path = PathBuf::from("renamed.csv");
+        session.rename_current_file(new_path.clone());
+
+        assert!(session.get_cached_document(&files[0]).is_none());
+        assert!(session.get_cached_document(&new_path).is_some());
+    }
+
+    #[test]
+    fn test_rename_migrates_header_mode_and_delimiter() {
+        let files = test_files();
+        let config = FileConfig::new();
+        let mut session = Session::new(files.clone(), 0, config);
+
+        session.set_header_mode(false);
+        session.set_delimiter(files[0].clone(), ';');
+
+        let new_path = PathBuf::from("renamed.csv");
+        session.rename_current_file(new_path.clone());
+
+        assert_eq!(session.get_header_mode(), false);
+        assert_eq!(session.get_delimiter(&new_path), ';');
+    }
+
+    #[test]
+    fn test_rename_migrates_query_output_tracking() {
+        let files = test_files();
+        let config = FileConfig::new();
+        let mut session = Session::new(files.clone(), 0, config);
+
+        session.mark_query_output(&files[0]);
+        assert!(session.is_query_output(&files[0]));
+
+        let new_path = PathBuf::from("results.csv");
+        session.rename_current_file(new_path.clone());
+
+        assert!(!session.is_query_output(&files[0]));
+        assert!(session.is_query_output(&new_path));
+        assert_eq!(session.find_query_output_file(), Some(&new_path));
+    }
+
+    #[test]
+    fn test_query_output_tracking() {
+        let files = test_files();
+        let config = FileConfig::new();
+        let mut session = Session::new(files.clone(), 0, config);
+
+        // Initially no query outputs
+        assert!(!session.is_query_output(&files[0]));
+        assert!(session.find_query_output_file().is_none());
+
+        // Mark as query output
+        session.mark_query_output(&files[0]);
+        assert!(session.is_query_output(&files[0]));
+        assert_eq!(session.find_query_output_file(), Some(&files[0]));
+
+        // Unmark
+        session.unmark_query_output(&files[0]);
+        assert!(!session.is_query_output(&files[0]));
+        assert!(session.find_query_output_file().is_none());
     }
 }
