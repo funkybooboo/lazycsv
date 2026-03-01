@@ -81,6 +81,9 @@ pub struct App {
     /// SQL error message from last failed query (shown in editor overlay)
     pub sql_error: Option<String>,
 
+    /// Magnifier state for complex cell editing (None when not in magnifier mode)
+    pub magnifier_state: Option<crate::magnifier::MagnifierState>,
+
     /// Flag to quit application
     pub should_quit: bool,
 }
@@ -167,6 +170,7 @@ impl App {
             sql_buffer: String::new(),
             sql_cursor: 0,
             sql_error: None,
+            magnifier_state: None,
             should_quit: false,
         }
     }
@@ -285,6 +289,74 @@ impl App {
         }
 
         Ok(saved_files)
+    }
+
+    // ============================================================================
+    // Magnifier Mode Methods (Phase 4)
+    // ============================================================================
+
+    /// Open magnifier for the current cell
+    pub fn open_magnifier(&mut self) {
+        let row = self
+            .view_state
+            .table_state
+            .selected()
+            .map(RowIndex::new)
+            .unwrap_or(RowIndex::new(0));
+        let col = self.view_state.selected_column;
+
+        // Get cell content
+        let cell_content = self.document.get_cell(row, col).to_string();
+
+        // Create magnifier state
+        self.magnifier_state = Some(crate::magnifier::MagnifierState::new(
+            cell_content,
+            (row, col),
+        ));
+
+        // Switch to magnifier mode
+        self.mode = Mode::Magnifier;
+    }
+
+    /// Save magnifier content to cell and close magnifier
+    pub fn save_and_close_magnifier(&mut self) {
+        if let Some(mag) = self.magnifier_state.take() {
+            let content = mag.get_content();
+            let (row, col) = mag.cell_position();
+
+            // Update cell content
+            self.document.set_cell(row, col, content);
+            self.document.is_dirty = true;
+
+            // Mark file as dirty in session
+            let file_path = self.get_current_file().clone();
+            self.session.mark_dirty(&file_path);
+
+            // Update last edit position
+            self.last_edit_position = Some((row, col));
+
+            // Return to normal mode
+            self.mode = Mode::Normal;
+        }
+    }
+
+    /// Close magnifier without saving changes
+    pub fn close_magnifier_discard(&mut self) {
+        self.magnifier_state = None;
+        self.mode = Mode::Normal;
+    }
+
+    /// Check if magnifier has unsaved changes
+    pub fn magnifier_is_dirty(&self) -> bool {
+        self.magnifier_state
+            .as_ref()
+            .map(|m| m.is_dirty())
+            .unwrap_or(false)
+    }
+
+    /// Get mutable reference to magnifier state (for input handling)
+    pub fn magnifier_state_mut(&mut self) -> Option<&mut crate::magnifier::MagnifierState> {
+        self.magnifier_state.as_mut()
     }
 }
 
@@ -1592,7 +1664,11 @@ mod tests {
 
         assert_eq!(app.mode, Mode::Normal);
         let msg = app.status_message.as_ref().unwrap().as_str();
-        assert!(msg.contains("test.csv"), "Expected filename in status, got: {}", msg);
+        assert!(
+            msg.contains("test.csv"),
+            "Expected filename in status, got: {}",
+            msg
+        );
     }
 
     #[test]
@@ -1616,7 +1692,11 @@ mod tests {
         assert!(app.document.is_dirty);
 
         let msg = app.status_message.as_ref().unwrap().as_str();
-        assert!(msg.contains("newname.csv"), "Expected rename confirmation, got: {}", msg);
+        assert!(
+            msg.contains("newname.csv"),
+            "Expected rename confirmation, got: {}",
+            msg
+        );
     }
 
     #[test]
@@ -1663,5 +1743,158 @@ mod tests {
         assert_eq!(new_path, PathBuf::from("results.csv"));
         assert!(app.session.is_query_output(&new_path));
         assert!(!app.session.is_query_output(&PathBuf::from("output.csv")));
+    }
+
+    // ============================================================================
+    // Phase 4: Magnifier Integration Tests
+    // ============================================================================
+
+    #[test]
+    fn test_open_magnifier() {
+        let csv_data = create_test_csv_data();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        // Position cursor at a cell with content
+        app.view_state.table_state.select(Some(1));
+        app.view_state.selected_column = ColIndex::new(0);
+
+        app.open_magnifier();
+
+        assert!(app.magnifier_state.is_some());
+        assert_eq!(app.mode, Mode::Magnifier);
+
+        let mag = app.magnifier_state.as_ref().unwrap();
+        assert_eq!(mag.cell_position(), (RowIndex::new(1), ColIndex::new(0)));
+    }
+
+    #[test]
+    fn test_save_and_close_magnifier() {
+        let csv_data = create_test_csv_data();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        // Open magnifier
+        app.view_state.table_state.select(Some(1));
+        app.view_state.selected_column = ColIndex::new(0);
+        app.open_magnifier();
+
+        // Edit content
+        if let Some(mag) = app.magnifier_state.as_mut() {
+            mag.enter_insert_mode();
+            mag.insert_char('X');
+        }
+
+        // Save and close
+        app.save_and_close_magnifier();
+
+        assert!(app.magnifier_state.is_none());
+        assert_eq!(app.mode, Mode::Normal);
+        assert!(app.document.is_dirty);
+
+        // Check that content was updated
+        let cell = app.document.get_cell(RowIndex::new(1), ColIndex::new(0));
+        assert!(cell.starts_with('X'));
+    }
+
+    #[test]
+    fn test_close_magnifier_discard() {
+        let csv_data = create_test_csv_data();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        // Open magnifier and edit
+        app.view_state.table_state.select(Some(1));
+        app.view_state.selected_column = ColIndex::new(0);
+        app.open_magnifier();
+
+        let original_content = app
+            .document
+            .get_cell(RowIndex::new(1), ColIndex::new(0))
+            .to_string();
+
+        if let Some(mag) = app.magnifier_state.as_mut() {
+            mag.enter_insert_mode();
+            mag.insert_char('X');
+        }
+
+        // Discard changes
+        app.close_magnifier_discard();
+
+        assert!(app.magnifier_state.is_none());
+        assert_eq!(app.mode, Mode::Normal);
+        assert!(!app.document.is_dirty);
+
+        // Check that content was NOT updated
+        let cell = app.document.get_cell(RowIndex::new(1), ColIndex::new(0));
+        assert_eq!(cell, original_content);
+    }
+
+    #[test]
+    fn test_magnifier_is_dirty() {
+        let csv_data = create_test_csv_data();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        // Initially not dirty
+        assert!(!app.magnifier_is_dirty());
+
+        // Open magnifier
+        app.open_magnifier();
+        assert!(!app.magnifier_is_dirty());
+
+        // Edit content
+        if let Some(mag) = app.magnifier_state.as_mut() {
+            mag.enter_insert_mode();
+            mag.insert_char('X');
+        }
+
+        // Now it should be dirty
+        assert!(app.magnifier_is_dirty());
+    }
+
+    #[test]
+    fn test_magnifier_with_empty_cell() {
+        let csv_data = create_test_csv_data();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        // Position at an empty cell (beyond data)
+        app.view_state.table_state.select(Some(10));
+        app.view_state.selected_column = ColIndex::new(0);
+
+        app.open_magnifier();
+
+        assert!(app.magnifier_state.is_some());
+        let mag = app.magnifier_state.as_ref().unwrap();
+        assert_eq!(mag.get_content(), "");
+    }
+
+    #[test]
+    fn test_magnifier_multiline_content() {
+        let csv_data = create_test_csv_data();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        app.open_magnifier();
+
+        // Clear existing content and add multiline content
+        if let Some(mag) = app.magnifier_state.as_mut() {
+            // Delete existing content
+            mag.delete_line();
+            // Add new multiline content
+            mag.enter_insert_mode();
+            mag.insert_char('L');
+            mag.insert_char('1');
+            mag.newline();
+            mag.insert_char('L');
+            mag.insert_char('2');
+        }
+
+        app.save_and_close_magnifier();
+
+        // Check that multiline content was saved
+        let cell = app.document.get_cell(RowIndex::new(1), ColIndex::new(0));
+        assert_eq!(cell, "L1\nL2");
     }
 }
