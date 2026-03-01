@@ -434,7 +434,7 @@ impl Document {
 
         // Build column data with header and empty cells
         let column_data = std::iter::once(header)
-            .chain(std::iter::repeat(String::new()).take(self.rows.len() - 1))
+            .chain(std::iter::repeat_n(String::new(), self.rows.len() - 1))
             .collect();
 
         self.insert_column(at, column_data);

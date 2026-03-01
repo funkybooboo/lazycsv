@@ -5,7 +5,7 @@
 
 use crate::Document;
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Configuration for CSV file parsing
 #[derive(Debug, Clone)]
@@ -170,17 +170,17 @@ impl Session {
     }
 
     /// Mark a file as dirty (modified)
-    pub fn mark_dirty(&mut self, path: &PathBuf) {
-        self.dirty_files.insert(path.clone());
+    pub fn mark_dirty(&mut self, path: &Path) {
+        self.dirty_files.insert(path.to_path_buf());
     }
 
     /// Mark a file as clean (saved)
-    pub fn mark_clean(&mut self, path: &PathBuf) {
+    pub fn mark_clean(&mut self, path: &Path) {
         self.dirty_files.remove(path);
     }
 
     /// Check if a file is dirty
-    pub fn is_dirty(&self, path: &PathBuf) -> bool {
+    pub fn is_dirty(&self, path: &Path) -> bool {
         self.dirty_files.contains(path)
     }
 
@@ -256,17 +256,17 @@ impl Session {
     }
 
     /// Mark a file as a SQL query output sheet
-    pub fn mark_query_output(&mut self, path: &PathBuf) {
-        self.query_output_files.insert(path.clone());
+    pub fn mark_query_output(&mut self, path: &Path) {
+        self.query_output_files.insert(path.to_path_buf());
     }
 
     /// Unmark a file as a SQL query output sheet (e.g., after saving)
-    pub fn unmark_query_output(&mut self, path: &PathBuf) {
+    pub fn unmark_query_output(&mut self, path: &Path) {
         self.query_output_files.remove(path);
     }
 
     /// Check if a file is a SQL query output sheet
-    pub fn is_query_output(&self, path: &PathBuf) -> bool {
+    pub fn is_query_output(&self, path: &Path) -> bool {
         self.query_output_files.contains(path)
     }
 
