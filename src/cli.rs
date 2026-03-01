@@ -26,7 +26,11 @@ pub struct CliArgs {
     pub encoding: Option<String>,
 
     /// SQL query to execute against CSV file(s) (non-interactive mode).
-    #[arg(short = 'q', long = "query", help = "SQL query to execute against CSV file(s) (non-interactive mode)")]
+    #[arg(
+        short = 'q',
+        long = "query",
+        help = "SQL query to execute against CSV file(s) (non-interactive mode)"
+    )]
     pub query: Option<String>,
 }
 
@@ -172,9 +176,8 @@ mod tests {
 
     #[test]
     fn test_cli_query_with_path_and_delimiter() {
-        let args = CliArgs::try_parse_from([
-            "lazycsv", "data.csv", "-d", ";", "-q", "SELECT * FROM data",
-        ]);
+        let args =
+            CliArgs::try_parse_from(["lazycsv", "data.csv", "-d", ";", "-q", "SELECT * FROM data"]);
         assert!(args.is_ok());
         let args = args.unwrap();
         assert_eq!(args.path, Some(PathBuf::from("data.csv")));

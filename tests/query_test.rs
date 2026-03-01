@@ -23,7 +23,11 @@ fn test_query_select_all() {
         .output()
         .unwrap();
 
-    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8(output.stdout).unwrap();
     let lines: Vec<&str> = stdout.trim().lines().collect();
     assert_eq!(lines.len(), 3); // header + 2 data rows
@@ -35,7 +39,11 @@ fn test_query_select_all() {
 #[test]
 fn test_query_where_clause() {
     let dir = TempDir::new().unwrap();
-    let file = write_csv(dir.path(), "people.csv", "name,age\nAlice,30\nBob,25\nCharlie,35\n");
+    let file = write_csv(
+        dir.path(),
+        "people.csv",
+        "name,age\nAlice,30\nBob,25\nCharlie,35\n",
+    );
 
     let output = lazycsv_bin()
         .arg(file.to_str().unwrap())
@@ -44,7 +52,11 @@ fn test_query_where_clause() {
         .output()
         .unwrap();
 
-    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8(output.stdout).unwrap();
     let lines: Vec<&str> = stdout.trim().lines().collect();
     assert_eq!(lines.len(), 3); // header + Alice(30) + Charlie(35)
@@ -56,8 +68,16 @@ fn test_query_where_clause() {
 #[test]
 fn test_query_join_two_files() {
     let dir = TempDir::new().unwrap();
-    write_csv(dir.path(), "orders.csv", "id,customer_id,product\n1,101,Widget\n2,102,Gadget\n");
-    write_csv(dir.path(), "customers.csv", "customer_id,name\n101,Alice\n102,Bob\n");
+    write_csv(
+        dir.path(),
+        "orders.csv",
+        "id,customer_id,product\n1,101,Widget\n2,102,Gadget\n",
+    );
+    write_csv(
+        dir.path(),
+        "customers.csv",
+        "customer_id,name\n101,Alice\n102,Bob\n",
+    );
 
     // Use directory path to load all CSVs
     let output = lazycsv_bin()
@@ -67,7 +87,11 @@ fn test_query_join_two_files() {
         .output()
         .unwrap();
 
-    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8(output.stdout).unwrap();
     let lines: Vec<&str> = stdout.trim().lines().collect();
     assert_eq!(lines.len(), 3);
@@ -90,7 +114,11 @@ fn test_query_directory_loads_all_csvs() {
         .output()
         .unwrap();
 
-    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(stdout.contains("1"));
 }
@@ -141,7 +169,11 @@ fn test_query_with_delimiter() {
         .output()
         .unwrap();
 
-    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8(output.stdout).unwrap();
     let lines: Vec<&str> = stdout.trim().lines().collect();
     assert_eq!(lines.len(), 3);
@@ -163,7 +195,11 @@ fn test_query_no_headers() {
         .output()
         .unwrap();
 
-    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8(output.stdout).unwrap();
     let lines: Vec<&str> = stdout.trim().lines().collect();
     assert_eq!(lines.len(), 3); // header + 2 data rows
@@ -187,7 +223,11 @@ fn test_query_aggregation_count() {
         .output()
         .unwrap();
 
-    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8(output.stdout).unwrap();
     let lines: Vec<&str> = stdout.trim().lines().collect();
     assert_eq!(lines.len(), 3); // header + LA + NY
@@ -210,7 +250,11 @@ fn test_query_file_path_also_loads_siblings() {
         .output()
         .unwrap();
 
-    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(stdout.contains("b"));
 }

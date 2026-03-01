@@ -272,7 +272,9 @@ impl Session {
 
     /// Find the first unsaved query output file in the session
     pub fn find_query_output_file(&self) -> Option<&PathBuf> {
-        self.files.iter().find(|p| self.query_output_files.contains(*p))
+        self.files
+            .iter()
+            .find(|p| self.query_output_files.contains(*p))
     }
 }
 

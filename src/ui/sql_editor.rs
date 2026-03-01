@@ -125,9 +125,7 @@ pub fn render_sql_editor_overlay(
 
     // If buffer is empty, show placeholder
     if sql_buffer.is_empty() {
-        lines = vec![Line::from(vec![
-            Span::styled(" ", cursor_style),
-        ])];
+        lines = vec![Line::from(vec![Span::styled(" ", cursor_style)])];
     }
 
     let paragraph = Paragraph::new(lines);

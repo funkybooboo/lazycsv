@@ -84,16 +84,12 @@ fn run(
 
                             // Check if doc.filename matches an existing session file
                             let doc_filename = doc.filename.clone();
-                            let existing_idx = app
-                                .session
-                                .files()
-                                .iter()
-                                .position(|p| {
-                                    p.file_name()
-                                        .and_then(|n| n.to_str())
-                                        .map(|s| s == doc_filename)
-                                        .unwrap_or(false)
-                                });
+                            let existing_idx = app.session.files().iter().position(|p| {
+                                p.file_name()
+                                    .and_then(|n| n.to_str())
+                                    .map(|s| s == doc_filename)
+                                    .unwrap_or(false)
+                            });
 
                             if let Some(idx) = existing_idx {
                                 // Replace at that index

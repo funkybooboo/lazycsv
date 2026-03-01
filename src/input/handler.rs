@@ -1558,16 +1558,11 @@ fn execute_command(app: &mut App) -> Result<()> {
                 app.session.rename_current_file(new_path.clone());
                 app.document.is_dirty = true;
                 app.session.mark_dirty(&new_path);
-                app.status_message = Some(StatusMessage::from(format!(
-                    "Renamed to \"{}\"",
-                    new_name
-                )));
+                app.status_message =
+                    Some(StatusMessage::from(format!("Renamed to \"{}\"", new_name)));
             } else {
                 let current = app.document.filename.clone();
-                app.status_message = Some(StatusMessage::from(format!(
-                    "\"{}\"",
-                    current
-                )));
+                app.status_message = Some(StatusMessage::from(format!("\"{}\"", current)));
             }
             return Ok(());
         }
@@ -1894,7 +1889,6 @@ fn handle_insert_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     Ok(InputResult::Continue)
 }
 
-<<<<<<< HEAD
 /// Generate a unique output filename that doesn't conflict with existing session files.
 /// Returns "output.csv", "output1.csv", "output2.csv", etc.
 fn generate_output_filename(app: &App) -> String {
@@ -1902,7 +1896,11 @@ fn generate_output_filename(app: &App) -> String {
         .session
         .files()
         .iter()
-        .filter_map(|p| p.file_name().and_then(|n| n.to_str()).map(|s| s.to_string()))
+        .filter_map(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .map(|s| s.to_string())
+        })
         .collect();
 
     let base = "output.csv".to_string();
@@ -2007,10 +2005,7 @@ fn handle_sql_editor_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                 let table_name = crate::query::table_name_from_path(&file_path);
 
                 // Check if this is the current document
-                let filename = file_path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("");
+                let filename = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
                 let doc = if filename == app.document.filename {
                     // Use current in-memory document (may have unsaved edits)
                     app.document.clone()
@@ -2043,8 +2038,7 @@ fn handle_sql_editor_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             }
 
             // Execute query
-            match crate::query::execute_query_to_document(&conn, &query, "output.csv".to_string())
-            {
+            match crate::query::execute_query_to_document(&conn, &query, "output.csv".to_string()) {
                 Ok(mut doc) => {
                     // Determine output filename using reuse logic:
                     // Look for an existing query output sheet (may have been renamed)
@@ -2156,8 +2150,13 @@ fn handle_sql_editor_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             }
             app.sql_cursor = pos;
         }
-||||||| parent of 66c2c33 (feat(magnifier): Phase 5 - Implement input handling and commands)
-=======
+
+        _ => {}
+    }
+
+    Ok(InputResult::Continue)
+}
+
 // ============================================================================
 // Magnifier Mode Handler (Phase 5)
 // ============================================================================
@@ -2460,7 +2459,6 @@ fn handle_magnifier_insert(app: &mut App, key: KeyEvent) -> Result<InputResult> 
         // Home/End
         KeyCode::Home => mag.move_to_line_start(),
         KeyCode::End => mag.move_to_line_end(),
->>>>>>> 66c2c33 (feat(magnifier): Phase 5 - Implement input handling and commands)
 
         _ => {}
     }

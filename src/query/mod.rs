@@ -10,13 +10,16 @@ use std::path::{Path, PathBuf};
 /// Derive a SQLite table name from a file path.
 /// Strips the `.csv` extension and replaces non-alphanumeric characters with `_`.
 pub fn table_name_from_path(path: &Path) -> String {
-    let stem = path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("table");
+    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("table");
 
     stem.chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect()
 }
 
@@ -93,9 +96,7 @@ pub fn execute_query_to_document(
     query: &str,
     output_filename: String,
 ) -> Result<Document> {
-    let mut stmt = conn
-        .prepare(query)
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
+    let mut stmt = conn.prepare(query).map_err(|e| anyhow::anyhow!("{}", e))?;
     let col_count = stmt.column_count();
     let col_names: Vec<String> = (0..col_count)
         .map(|i| stmt.column_name(i).unwrap_or("?").to_string())
@@ -154,9 +155,7 @@ pub fn execute_query(path: &Path, query: &str, config: &FileConfig) -> Result<()
     }
 
     // Execute user query
-    let mut stmt = conn
-        .prepare(query)
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
+    let mut stmt = conn.prepare(query).map_err(|e| anyhow::anyhow!("{}", e))?;
     let col_count = stmt.column_count();
     let col_names: Vec<String> = (0..col_count)
         .map(|i| stmt.column_name(i).unwrap_or("?").to_string())
@@ -250,7 +249,9 @@ mod tests {
 
         load_csv_into_sqlite(&conn, &doc, "people").unwrap();
 
-        let mut stmt = conn.prepare("SELECT name, age FROM people ORDER BY name").unwrap();
+        let mut stmt = conn
+            .prepare("SELECT name, age FROM people ORDER BY name")
+            .unwrap();
         let rows: Vec<(String, String)> = stmt
             .query_map([], |row| {
                 Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
@@ -360,8 +361,11 @@ mod tests {
         };
         load_csv_into_sqlite(&conn, &doc, "customers").unwrap();
 
-        let result =
-            execute_query_to_document(&conn, "SELECT Company, Contect FROM customers", "out.csv".into());
+        let result = execute_query_to_document(
+            &conn,
+            "SELECT Company, Contect FROM customers",
+            "out.csv".into(),
+        );
         let err_msg = result.unwrap_err().to_string();
         assert!(
             err_msg.contains("no such column: Contect"),
