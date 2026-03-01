@@ -1,0 +1,121 @@
+[env]
+DEFAULT_CSV = "sample.csv"
+
+#----------------#
+# Build Commands #
+#----------------#
+[tasks.build]
+description = "Build the project in debug mode"
+run = "cargo build"
+
+[tasks.build-release]
+description = "Build the project in release mode (optimized)"
+run = "cargo build --release"
+
+#----------------#
+# Run Commands   #
+#----------------#
+[tasks.run]
+description = "Run the application with a given CSV file (default: sample.csv)"
+run = "cargo run -- ${file:-$DEFAULT_CSV}"
+
+[tasks.run-release]
+description = "Run the release build with a given CSV file (default: sample.csv)"
+run = "cargo run --release -- ${file:-$DEFAULT_CSV}"
+
+[tasks.dev]
+description = "Run in dev mode (rebuild on changes)"
+run = "cargo watch -x 'run -- ${file:-$DEFAULT_CSV}'"
+
+#----------------#
+# Test Commands  #
+#----------------#
+[tasks.test]
+description = "Run all tests"
+run = "cargo test"
+
+[tasks.test-verbose]
+description = "Run tests with verbose output"
+run = "cargo test -- --nocapture"
+
+[tasks.bench]
+description = "Run benchmarks (if any)"
+run = "cargo bench"
+
+#------------------#
+# Quality Checks   #
+#------------------#
+[tasks.format]
+description = "Format code with rustfmt"
+run = "cargo fmt"
+
+[tasks.format-check]
+description = "Check if code is formatted correctly"
+run = "cargo fmt -- --check"
+
+[tasks.lint]
+description = "Run clippy linter"
+run = "cargo clippy -- -D warnings"
+
+[tasks.check]
+description = "Check the project for errors without building"
+run = "cargo check"
+
+[tasks.quality]
+description = "Run all quality checks (format, lint)"
+depends = ["format", "lint"]
+
+#------------------#
+# Project Commands #
+#------------------#
+[tasks.clean]
+description = "Clean build artifacts"
+run = "cargo clean"
+
+[tasks.install]
+description = "Install lazycsv to ~/.cargo/bin"
+run = "cargo install --path ."
+
+[tasks.uninstall]
+description = "Uninstall lazycsv from ~/.cargo/bin"
+run = "cargo uninstall lazycsv"
+
+[tasks.docs]
+description = "Open project documentation"
+run = "cargo doc --open"
+
+[tasks.sample]
+description = "Create sample CSV files for testing"
+run = """
+cat > sample.csv << 'EOF'
+ID,Name,Email,Age,City,Score
+1,Alice Johnson,alice@example.com,30,New York,95
+2,Bob Smith,bob@example.com,25,Los Angeles,87
+3,Charlie Brown,charlie@example.com,35,Chicago,92
+4,Diana Prince,diana@example.com,28,Houston,88
+5,Eve Davis,eve@example.com,32,Phoenix,91
+6,Frank Miller,frank@example.com,29,Philadelphia,85
+7,Grace Lee,grace@example.com,27,San Antonio,89
+8,Henry Wilson,henry@example.com,31,San Diego,90
+9,Iris Moore,iris@example.com,26,Dallas,86
+10,Jack Taylor,jack@example.com,33,San Jose,93
+EOF
+
+cat > customers.csv << 'EOF'
+CustomerID,Company,Contact,Country,Phone
+101,Acme Corp,John Doe,USA,555-0001
+102,TechStart Inc,Jane Smith,Canada,555-0002
+103,Global Solutions,Mike Johnson,UK,555-0003
+104,DataDrive LLC,Sarah Wilson,USA,555-0004
+105,CloudNet Systems,Tom Brown,Australia,555-0005
+EOF
+
+echo "Sample CSV files created: sample.csv, customers.csv"
+"""
+
+#------------------#
+# CI Commands      #
+#------------------#
+[tasks.ci]
+description = "Run CI checks (format-check, lint, test, build-release)"
+depends = ["format-check", "lint", "test", "build-release"]

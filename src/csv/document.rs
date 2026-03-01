@@ -323,7 +323,12 @@ impl Document {
     /// `to_before`: insertion point in original indices (0 = beginning, N = before original column N).
     /// For "after column A" (index 0), pass to_before=1. For "before all", pass to_before=0.
     /// Returns the new 0-based column index of the first moved column.
-    pub fn move_columns(&mut self, from_start: ColIndex, from_end: ColIndex, to_before: usize) -> usize {
+    pub fn move_columns(
+        &mut self,
+        from_start: ColIndex,
+        from_end: ColIndex,
+        to_before: usize,
+    ) -> usize {
         let columns = self.get_columns(from_start, from_end);
         let src_start = from_start.get();
         let count = columns.len();

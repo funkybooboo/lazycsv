@@ -179,8 +179,8 @@ pub struct EditBuffer {
 ## Code Style
 
 ### Rust Conventions
-- Format with `rustfmt` (run `task fmt`)
-- Lint with `clippy` (run `task clippy`)
+- Format with `rustfmt` (run `mise run format`)
+- Lint with `clippy` (run `mise run lint`)
 - Document public APIs with `///` doc comments
 - Use `anyhow::Result` for error handling
 - Clear variable names (no abbreviations)
@@ -200,8 +200,8 @@ pub struct EditBuffer {
 
 Run tests with:
 ```bash
-task test          # All tests
-task test-verbose  # With output
+mise run test          # All tests
+mise run test-verbose  # With output
 ```
 
 ### Test Coverage
@@ -227,9 +227,9 @@ See [Cargo.toml](../Cargo.toml) for full list.
 ## Building
 
 ```bash
-task build           # Debug build
-task build-release   # Optimized build
-task check           # Check without building
+mise run build           # Debug build
+mise run build-release   # Optimized build
+mise run check           # Check without building
 ```
 
 ## Performance
@@ -254,7 +254,7 @@ The following are key areas for future development:
 See [docs/development.md](../docs/development.md) for contribution guidelines.
 
 **Before submitting:**
-1. Run `task all` (format + lint + test)
+1. Run `mise run ci` (format + lint + test)
 2. Add tests for new features
 3. Update documentation
 4. Keep modules focused and small

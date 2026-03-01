@@ -247,10 +247,10 @@ cargo test --test integration_workflows_test -- --nocapture
 cargo test --quiet
 ```
 
-### Run with Task
+### Run with mise
 ```bash
-task test              # Run all tests
-task test-verbose      # Run with full output
+mise run test              # Run all tests
+mise run test-verbose      # Run with full output
 ```
 
 ## Test Coverage

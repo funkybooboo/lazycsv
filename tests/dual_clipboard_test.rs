@@ -33,9 +33,27 @@ fn create_test_app() -> App {
     let doc = Document::new(
         vec!["A".into(), "B".into(), "C".into(), "D".into(), "E".into()],
         vec![
-            vec!["A1".into(), "B1".into(), "C1".into(), "D1".into(), "E1".into()],
-            vec!["A2".into(), "B2".into(), "C2".into(), "D2".into(), "E2".into()],
-            vec!["A3".into(), "B3".into(), "C3".into(), "D3".into(), "E3".into()],
+            vec![
+                "A1".into(),
+                "B1".into(),
+                "C1".into(),
+                "D1".into(),
+                "E1".into(),
+            ],
+            vec![
+                "A2".into(),
+                "B2".into(),
+                "C2".into(),
+                "D2".into(),
+                "E2".into(),
+            ],
+            vec![
+                "A3".into(),
+                "B3".into(),
+                "C3".into(),
+                "D3".into(),
+                "E3".into(),
+            ],
         ],
         "test.csv".to_string(),
     );
@@ -585,13 +603,7 @@ fn test_dd_then_capital_p_round_trip() {
 fn create_large_test_app() -> App {
     let headers = vec!["H1".into(), "H2".into(), "H3".into()];
     let data_rows: Vec<Vec<String>> = (1..=10)
-        .map(|i| {
-            vec![
-                format!("R{}A", i),
-                format!("R{}B", i),
-                format!("R{}C", i),
-            ]
-        })
+        .map(|i| vec![format!("R{}A", i), format!("R{}B", i), format!("R{}C", i)])
         .collect();
     let doc = Document::new(headers, data_rows, "test.csv".to_string());
     let files = vec![std::path::PathBuf::from("test.csv")];
@@ -614,7 +626,7 @@ fn test_5dd_deletes_5_rows() {
     app.handle_key(key(KeyCode::Char('d'))).unwrap();
 
     assert_eq!(app.document.row_count(), 6); // header + 5 remaining
-    // Row 1 should now be R6A (previously row 6)
+                                             // Row 1 should now be R6A (previously row 6)
     assert_eq!(app.document.rows[1][0], "R6A");
     assert!(app
         .status_message
@@ -740,7 +752,7 @@ fn test_5yy_then_p_pastes_5_rows() {
     app.handle_key(key(KeyCode::Char('p'))).unwrap();
 
     assert_eq!(app.document.row_count(), 16); // 11 + 5 pasted
-    // Rows 9-13 should be R1A..R5A
+                                              // Rows 9-13 should be R1A..R5A
     assert_eq!(app.document.rows[9][0], "R1A");
     assert_eq!(app.document.rows[13][0], "R5A");
     // Selection should be on last pasted row (13)
@@ -771,7 +783,7 @@ fn test_5yy_then_capital_p_pastes_5_rows_above() {
     app.handle_key(key(KeyCode::Char('P'))).unwrap();
 
     assert_eq!(app.document.row_count(), 16); // 11 + 5 pasted
-    // Rows 8-12 should be R1A..R5A
+                                              // Rows 8-12 should be R1A..R5A
     assert_eq!(app.document.rows[8][0], "R1A");
     assert_eq!(app.document.rows[12][0], "R5A");
     // Selection stays at row 8 (first pasted row)
@@ -800,10 +812,7 @@ fn test_cc_clears_row_enters_insert() {
     app.handle_key(key(KeyCode::Char('c'))).unwrap();
 
     // All cells cleared
-    assert_eq!(
-        app.document.rows[1],
-        vec!["", "", "", "", ""]
-    );
+    assert_eq!(app.document.rows[1], vec!["", "", "", "", ""]);
     // Should be in insert mode
     assert_eq!(app.mode, Mode::Insert);
     // Cursor at first column
@@ -927,7 +936,7 @@ fn test_comma_dd_adjusts_selection_when_count_removes_last_columns() {
     app.handle_key(key(KeyCode::Char('d'))).unwrap();
 
     assert_eq!(app.document.column_count(), 2); // A B remain
-    // Selection should adjust to new last column (index 1)
+                                                // Selection should adjust to new last column (index 1)
     assert_eq!(app.view_state.selected_column.get(), 1);
 }
 
@@ -1012,7 +1021,7 @@ fn test_3_comma_yy_then_comma_p_pastes_3_columns() {
     app.handle_key(key(KeyCode::Char('p'))).unwrap();
 
     assert_eq!(app.document.column_count(), 8); // 5 + 3 pasted
-    // Columns 5, 6, 7 should be A, B, C copies
+                                                // Columns 5, 6, 7 should be A, B, C copies
     assert_eq!(app.document.rows[0][5], "A");
     assert_eq!(app.document.rows[0][6], "B");
     assert_eq!(app.document.rows[0][7], "C");
@@ -1047,7 +1056,7 @@ fn test_3_comma_yy_then_comma_capital_p_pastes_3_columns_left() {
     app.handle_key(key(KeyCode::Char('P'))).unwrap();
 
     assert_eq!(app.document.column_count(), 8); // 5 + 3 pasted
-    // Columns 4, 5, 6 should be A, B, C copies; original E pushed to 7
+                                                // Columns 4, 5, 6 should be A, B, C copies; original E pushed to 7
     assert_eq!(app.document.rows[0][4], "A");
     assert_eq!(app.document.rows[0][5], "B");
     assert_eq!(app.document.rows[0][6], "C");
@@ -1082,7 +1091,7 @@ fn test_3_comma_dd_then_comma_p_round_trip() {
     app.handle_key(key(KeyCode::Char('p'))).unwrap();
 
     assert_eq!(app.document.column_count(), 5); // A E B C D
-    // Verify B, C, D are pasted back
+                                                // Verify B, C, D are pasted back
     let paste_start = app.view_state.selected_column.get();
     assert_eq!(app.document.rows[0][paste_start], "B");
     assert_eq!(app.document.rows[1][paste_start], "B1");

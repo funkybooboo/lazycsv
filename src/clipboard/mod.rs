@@ -149,10 +149,7 @@ mod tests {
         cb.yank_row(vec!["A".into(), "B".into(), "C".into()]);
 
         assert!(!cb.row_buffer_empty());
-        assert_eq!(
-            cb.as_row(),
-            Some(vec!["A".into(), "B".into(), "C".into()])
-        );
+        assert_eq!(cb.as_row(), Some(vec!["A".into(), "B".into(), "C".into()]));
         // Column buffer untouched
         assert!(cb.column_buffer_empty());
         assert_eq!(cb.as_column(), None);

@@ -7,7 +7,7 @@ Guide for contributing to LazyCSV.
 ### Prerequisites
 
 - **Rust**: 1.70+ (install from https://rustup.rs/)
-- **Task**: Optional but recommended (install from https://taskfile.dev/)
+- **mise**: Optional but recommended (install from https://mise.jdx.dev/)
 - **Git**: For version control
 
 ### Clone and Build
@@ -18,15 +18,15 @@ git clone https://github.com/funkybooboo/lazycsv.git
 cd lazycsv
 
 # Build
-task build
+mise run build
 # Or: cargo build
 
 # Run
-task run
+mise run run
 # Or: cargo run -- sample.csv
 
 # Run tests
-task test
+mise run test
 # Or: cargo test
 ```
 
@@ -90,7 +90,7 @@ lazycsv/
 │   └── roadmap.md       - Development checklist
 │
 ├── Cargo.toml        - Dependencies
-├── Taskfile.yml      - Task runner config
+├── .mise.toml        - Task runner config
 └── README.md         - Project readme
 ```
 
@@ -197,10 +197,12 @@ Once your test is passing and the feature is working:
 Ensure your code adheres to our quality standards by running:
 ```bash
 # Format code
-cargo fmt
+mise run format
+# Or: cargo fmt
 
 # Run clippy
-cargo clippy -- -D warnings
+mise run lint
+# Or: cargo clippy -- -D warnings
 ```
 Our pre-commit hooks should handle this, but it's good practice to run it manually as well.
 
@@ -248,7 +250,7 @@ pub fn ld_f(p: &Path) -> Document {
 Use `rustfmt`:
 
 ```bash
-task fmt
+mise run format
 # Or: cargo fmt
 ```
 
@@ -263,7 +265,7 @@ max_width = 100
 Use `clippy`:
 
 ```bash
-task clippy
+mise run lint
 # Or: cargo clippy -- -D warnings
 ```
 
@@ -322,8 +324,8 @@ mod tests {
 
 Run tests:
 ```bash
-task test
-task test-verbose   # With output
+mise run test
+mise run test-verbose   # With output
 ```
 
 ### Integration Tests
@@ -346,7 +348,7 @@ Create test CSV files:
 
 ```bash
 # Generate sample files
-task sample
+mise run sample
 
 # Test with custom data
 echo "A,B,C\n1,2,3" > test.csv
@@ -455,10 +457,10 @@ cargo bench
 
 ```bash
 # Generate and open docs
-cargo doc --open
+mise run docs
 
 # Or
-task docs
+cargo doc --open
 ```
 
 ### Update Docs
@@ -483,7 +485,7 @@ When adding features:
 
 ```bash
 # Build optimized binary
-task build-release
+mise run build-release
 
 # Strip debug symbols
 strip target/release/lazycsv

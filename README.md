@@ -159,10 +159,10 @@ See [plans/roadmap.md](plans/roadmap.md) for the complete detailed roadmap.
 ## Development
 
 ```bash
-# Using Task (recommended)
-task run        # run with sample.csv
-task test       # run tests
-task all        # format, lint, test
+# Using mise (recommended)
+mise run run        # run with sample.csv
+mise run test       # run tests
+mise run ci         # format, lint, test
 
 # Or with Cargo
 cargo run -- sample.csv

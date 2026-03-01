@@ -905,11 +905,7 @@ mod tests {
                 "Russian".to_string(),
             ],
             vec![
-                vec![
-                    "Hello".to_string(),
-                    "🎊😀".to_string(),
-                    "World".to_string(),
-                ],
+                vec!["Hello".to_string(), "🎊😀".to_string(), "World".to_string()],
                 vec!["Test".to_string(), "".to_string(), "Data".to_string()],
             ],
             "unicode.csv".to_string(),
