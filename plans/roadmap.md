@@ -1332,18 +1332,18 @@ NORMAL                                                          3,C
 - [ ] Implement `:q!` command (discard and close) - deferred to command mode integration
 - [ ] Create `prompt_save_before_navigate()` dialog - deferred to UI phase
 
-**Phase 6: UI Rendering (`src/ui/magnifier.rs`)**
-- [ ] Create new file `src/ui/magnifier.rs`
-- [ ] Implement `render_magnifier()` main function
-- [ ] Implement `centered_rect()` helper (80% width/height)
-- [ ] Render border and background
-- [ ] Render title bar with cell position (e.g., "Editing A5")
-- [ ] Render line numbers (right-aligned, dim color)
-- [ ] Render text content with cursor (block in Normal, pipe in Insert)
-- [ ] Render mode indicator (NORMAL/INSERT)
-- [ ] Render cursor position (line:col)
-- [ ] Render bottom help bar with commands
-- [ ] Add to `src/ui/mod.rs` exports
+**Phase 6: UI Rendering (`src/ui/magnifier.rs`)** ✅ COMPLETE
+- [x] Create new file `src/ui/magnifier.rs` ✅
+- [x] Implement `render_magnifier()` main function ✅
+- [x] Implement `centered_rect()` helper (80% width/height) ✅
+- [x] Render border and background ✅
+- [x] Render title bar with cell position (e.g., "Editing A5") ✅
+- [x] Render line numbers (right-aligned, dim color) ✅
+- [x] Render text content with cursor (block in Normal, pipe in Insert) ✅
+- [x] Render mode indicator (NORMAL/INSERT) ✅
+- [x] Render cursor position (line:col) ✅
+- [x] Render bottom help bar with commands ✅
+- [x] Add to `src/ui/mod.rs` exports ✅
 
 **Phase 7: Testing (`tests/magnifier_test.rs`)**
 - [ ] Create test file `tests/magnifier_test.rs`

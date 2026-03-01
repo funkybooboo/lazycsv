@@ -100,7 +100,7 @@ impl MagnifierState {
         self.lines.join("\n")
     }
 
-    /// Check if the buffer has been modified
+    /// Check if content has been modified
     pub fn is_dirty(&self) -> bool {
         self.get_content() != self.original_content
     }
@@ -110,7 +110,7 @@ impl MagnifierState {
         self.mode
     }
 
-    /// Get the cursor position (line, column)
+    /// Get the current cursor position (line, column)
     pub fn cursor(&self) -> (usize, usize) {
         self.cursor
     }

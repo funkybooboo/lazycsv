@@ -1,4 +1,5 @@
 mod help;
+pub mod magnifier;
 mod sql_editor;
 mod status;
 mod table;
@@ -50,6 +51,11 @@ pub fn render(frame: &mut Frame, app: &mut App) {
             app.sql_cursor,
             app.sql_error.as_deref(),
         );
+    }
+
+    // Render magnifier overlay if active
+    if app.magnifier_state.is_some() {
+        magnifier::render_magnifier(frame, app, frame.area());
     }
 }
 
