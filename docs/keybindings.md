@@ -378,28 +378,77 @@ The semicolon `;` key acts as a leader for all column-level operations, followin
 |-----|--------|
 | `Enter` | Open Magnifier for current cell (multi-line editing) |
 
-### In Magnifier Mode (Full Vim)
+### In Magnifier Mode (Comprehensive Vim Editor)
 
-The Magnifier embeds a complete vim-like editor for editing cells with lots of text (e.g., JSON, multi-line descriptions):
+The Magnifier embeds a comprehensive vim editor for editing cells with complex content (JSON, multi-line text, etc.):
 
-**Normal Mode Commands:**
-- `i`, `a`, `A`, `I` - Enter Insert mode
-- `o`, `O` - Open new line
-- `dd` - Delete line
-- `yy` - Yank (copy) line
-- `p`, `P` - Paste
-- `hjkl` - Navigate
-- `w`, `b` - Word navigation
-- `0`, `$` - Line start/end
-- `gg`, `G` - File start/end
+**Motions:**
+| Key | Action |
+|-----|--------|
+| `hjkl`, arrows | Character movement |
+| `w`, `b`, `e` | Word navigation (next, back, end) |
+| `0`, `$` | Line start/end |
+| `^` | First non-blank character |
+| `gg`, `G` | First/last line |
+| `f{char}`, `F{char}` | Find character forward/backward |
+| `t{char}`, `T{char}` | Till character forward/backward |
+| `;`, `,` | Repeat find forward/backward |
 
-**Commands:**
+**Operators:**
+| Key | Action |
+|-----|--------|
+| `x` | Delete character |
+| `dd` | Delete line |
+| `yy` | Yank (copy) line |
+| `p`, `P` | Paste below/above |
+| `cc` | Change line (delete and enter insert) |
+| `C` | Change to end of line |
+| `c{motion}` | Change operator (e.g., `cw` change word) |
+| `r{char}` | Replace single character |
+| `J` | Join current line with next |
+| `>>`, `<<` | Indent/dedent line |
+
+**Insert Mode Entry:**
+| Key | Action |
+|-----|--------|
+| `i`, `a` | Insert before/after cursor |
+| `I`, `A` | Insert at line start/end |
+| `o`, `O` | Open line below/above |
+| `s` | Substitute character (delete and insert) |
+
+**Visual Mode:**
+| Key | Action |
+|-----|--------|
+| `v` | Character-wise visual selection |
+| `V` | Line-wise visual selection |
+| `d` | Delete selection |
+| `y` | Yank selection |
+| `c` | Change selection |
+| `Esc` | Exit visual mode |
+
+**Search:**
+| Key | Action |
+|-----|--------|
+| `/pattern` | Search forward (case-sensitive) |
+| `n` | Jump to next match |
+| `N` | Jump to previous match |
+| `*` | Search for word under cursor |
+| `:noh` | Clear search highlighting |
+
+**Undo/Redo:**
+| Key | Action |
+|-----|--------|
+| `u` | Undo (unlimited history) |
+| `Ctrl+r` | Redo |
+
+**Ex Commands:**
 | Command | Action |
 |---------|--------|
-| `:w` | Save to cell (updates CSV in memory) |
-| `:q` | Close magnifier, discard changes |
+| `:w` | Save to cell (updates in-memory document) |
+| `:q` | Quit (warns if unsaved changes) |
 | `:wq` or `ZZ` | Save to cell and close |
-| `:q!` | Force close without saving |
+| `:q!` | Force quit without saving |
+| `:noh` | Clear search highlighting |
 
 **Cell Navigation (while in Magnifier):**
 | Key | Action |
@@ -409,10 +458,18 @@ The Magnifier embeds a complete vim-like editor for editing cells with lots of t
 | `Ctrl+k` | Move to cell above (prompts to save if dirty) |
 | `Ctrl+l` | Move to cell right (prompts to save if dirty) |
 
+**Important Notes:**
+- Magnifier vim commands are **separate** from table vim commands
+- `:w` saves to in-memory document, NOT to file (use table `:w` to save file)
+- Search is case-sensitive by default
+- Undo history is unlimited
+- Visual mode supports both character-wise and line-wise selection
+
 **Use Cases:**
 - Editing JSON data in cells
 - Multi-line text fields (descriptions, notes)
-- Complex cell content that needs vim power
+- Complex cell content that needs full vim power
+- Large text content (>100 characters)
 
 ---
 

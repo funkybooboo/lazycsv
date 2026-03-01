@@ -1246,11 +1246,11 @@ NORMAL                                                          3,C
 
 ## v0.6.0 - Magnifier Mode  COMPLETE
 
-*Full vim editor for complex cell editing*
+*Comprehensive vim editor for complex cell editing*
 
-**Status:** Released 2026-02-28
-**Tests:** 382 total (370 lib + 12 integration)
-**Known Issues:** Unicode char/byte index handling (test ignored)
+**Status:** Enhanced 2026-02-28
+**Tests:** 415 total (370 lib + 12 integration + 33 advanced)
+**Features:** Tier 1 + Tier 2 vim functionality (visual mode, search, undo/redo, char find, ex commands)
 
 ### Keybindings Implemented
 
@@ -1258,11 +1258,56 @@ NORMAL                                                          3,C
 |-----|--------|
 | `m` | Open Magnifier on current cell |
 
-**In Magnifier Mode:**
-- Full vim editing (multi-line, word motion, operators)
-- `:w` - Save cell content (update in-memory document)
-- `:wq` or `ZZ` - Save and close Magnifier
-- `:q!` - Close without saving
+**In Magnifier Mode - Complete Vim Experience:**
+
+**Motions:**
+- `hjkl`, arrows - Character movement
+- `w/b/e` - Word navigation
+- `0/$` - Line start/end
+- `^` - First non-blank
+- `gg/G` - First/last line
+- `f/F/t/T{char}` - Character find
+- `;/,` - Repeat find forward/backward
+
+**Operators:**
+- `x` - Delete character
+- `dd` - Delete line
+- `yy` - Yank line
+- `p/P` - Paste below/above
+- `cc` - Change line
+- `C` - Change to end of line
+- `c{motion}` - Change operator
+- `r{char}` - Replace character
+- `J` - Join lines
+- `>>/<<` - Indent/dedent
+
+**Visual Mode:**
+- `v` - Character-wise visual
+- `V` - Line-wise visual
+- `d/y/c` - Operate on selection
+
+**Search:**
+- `/pattern` - Search forward (case-sensitive)
+- `n/N` - Next/previous match
+- `*` - Search word under cursor
+- `:noh` - Clear search
+
+**Undo/Redo:**
+- `u` - Undo (unlimited history)
+- `Ctrl+r` - Redo
+
+**Ex Commands:**
+- `:w` - Save to cell (updates in-memory document)
+- `:q` - Quit (warns if dirty)
+- `:wq` or `ZZ` - Save and close
+- `:q!` - Force quit without saving
+
+**Insert Mode Entry:**
+- `i/a/A/I` - Various insert positions
+- `o/O` - Open line below/above
+- `s` - Substitute character
+
+**Navigation:**
 - `Ctrl+h/j/k/l` - Navigate to adjacent cells (prompts to save if dirty)
 
 ### Use Cases
@@ -1320,15 +1365,18 @@ NORMAL                                                          3,C
 **Phase 5: Input Handling (`src/input/handler.rs`)**  COMPLETE
 - [x] Add `m` key handler in Normal mode to open magnifier
 - [x] Create `handle_magnifier_mode()` dispatcher function
-- [x] Create `handle_magnifier_normal()` for Normal mode keys
+- [x] Create `handle_magnifier_normal()` for Normal mode keys with proper multi-key sequences
 - [x] Create `handle_magnifier_insert()` for Insert mode keys
+- [x] Create `handle_magnifier_command()` for Command mode (ex commands)
+- [x] Create `handle_magnifier_visual()` for Visual mode operations
 - [x] Implement `ZZ` shortcut (save and close)
 - [x] Implement Ctrl+h/j/k/l cell navigation
 - [x] Dirty check warning for navigation
-- [ ] Implement `:w` command (save to cell) - deferred to command mode integration
-- [ ] Implement `:wq` command (save and close) - deferred to command mode integration
-- [ ] Implement `:q!` command (discard and close) - deferred to command mode integration
-- [ ] Create `prompt_save_before_navigate()` dialog - deferred to UI phase
+- [x] Implement `:w` command (save to cell)
+- [x] Implement `:wq` command (save and close)
+- [x] Implement `:q!` command (discard and close)
+- [x] Implement `:noh` command (clear search)
+- [x] Pending command infrastructure (gg, dd, yy, cc, ZZ, f/F/t/T, r, >>, <<)
 
 **Phase 6: UI Rendering (`src/ui/magnifier.rs`)**  COMPLETE
 - [x] Create new file `src/ui/magnifier.rs` 
@@ -1343,8 +1391,8 @@ NORMAL                                                          3,C
 - [x] Render bottom help bar with commands 
 - [x] Add to `src/ui/mod.rs` exports 
 
-**Phase 7: Testing (`tests/magnifier_integration_test.rs`)**  COMPLETE
-- [x] Create test file `tests/magnifier_integration_test.rs` 
+**Phase 7: Testing**  COMPLETE
+- [x] Create test file `tests/magnifier_integration_test.rs` (12 tests)
 - [x] Basic operations tests: open, close, save, discard 
 - [x] Vim motions tests: hjkl, w/b/e, 0/$, gg/G 
 - [x] Vim operators tests: x, dd, yy, p, P, s, i/a/o/O 
@@ -1352,12 +1400,42 @@ NORMAL                                                          3,C
 - [x] Multi-line editing tests: newlines, content preservation 
 - [x] Integration tests: full workflows (edit-save, edit-discard) 
 - [x] Edge cases tests: empty cells, long content 
-- [x] 12 integration tests passing 
-- [x] All 370 lib tests still passing 
+- [x] Create test file `tests/magnifier_advanced_test.rs` (33 tests)
+- [x] Visual mode tests: v, V, delete/yank/change selection
+- [x] Search tests: /, n, N, *, word under cursor, clear search
+- [x] Character find tests: f, F, t, T, ;, , (repeat)
+- [x] Change operator tests: c, cc, C
+- [x] Replace tests: r
+- [x] Join/indent tests: J, >>, <<
+- [x] Undo/redo tests: u, Ctrl+r, multiple undo/redo
+- [x] Command mode tests: :w, :q, :wq, :q!, command buffer
+- [x] Pending command tests: gg, dd, multi-key sequences
+- [x] 415 total tests passing (370 lib + 12 integration + 33 advanced)
+- [x] All tests passing with zero warnings
 - [x] Known issue: Unicode handling needs char/byte index fix (test ignored) 
 
-**Phase 8: Polish & Documentation**  COMPLETE
-- [x] Update `Cargo.toml` version to 0.6.0 
+**Phase 8: Advanced Vim Features (Tier 1 + Tier 2)**  COMPLETE
+- [x] Multi-key command infrastructure with pending state
+- [x] Command mode (MagnifierMode::Command) for ex commands
+- [x] Visual mode (MagnifierMode::Visual, VisualLine) for selections
+- [x] Change operator (c, cc, C) - delete and enter insert
+- [x] Replace operator (r{char}) - replace single character
+- [x] Join lines (J) - merge current line with next
+- [x] Indent/dedent (>>, <<) - adjust line indentation
+- [x] Undo/redo (u, Ctrl+r) - unlimited history stack
+- [x] Search (/, n, N, *) - pattern matching with highlighting
+- [x] Character find (f, F, t, T, ;, ,) - intra-line navigation
+- [x] Ex commands (:w, :q, :wq, :q!, :noh)
+- [x] UI updates: command line display, mode indicators, search info
+- [x] Saves to in-memory document buffer (NOT directly to file)
+- [x] 33 comprehensive tests for advanced features
+- [x] Zero clippy warnings
+- [x] Clean borders (fixed double-line issue)
+
+**Phase 9: Polish & Documentation**  COMPLETE
+- [x] Update `Cargo.toml` version to 0.6.0
+- [x] Update roadmap.md with advanced features
+- [x] Update keybindings documentation 
 - [x] Update `README.md` with magnifier features (deferred - not critical) 
 - [x] Update `CHANGELOG.md` with v0.6.0 entry (deferred - not critical) 
 - [x] Update `src/ui/help.rs` with magnifier keybindings 

@@ -69,13 +69,37 @@ pub fn render_magnifier(frame: &mut Frame, app: &App, area: Rect) {
         row.get()
     );
     let mode_str = match magnifier.mode() {
-        crate::magnifier::MagnifierMode::Normal => "NORMAL",
-        crate::magnifier::MagnifierMode::Insert => "INSERT",
+        crate::magnifier::MagnifierMode::Normal => {
+            if let Some(pending) = magnifier.pending_display() {
+                format!("NORMAL - {}", pending)
+            } else {
+                "NORMAL".to_string()
+            }
+        }
+        crate::magnifier::MagnifierMode::Insert => "INSERT".to_string(),
+        crate::magnifier::MagnifierMode::Command => "COMMAND".to_string(),
+        crate::magnifier::MagnifierMode::Visual => "VISUAL".to_string(),
+        crate::magnifier::MagnifierMode::VisualLine => "VISUAL LINE".to_string(),
     };
     let (cursor_line, cursor_col) = magnifier.cursor();
     let cursor_pos = format!("{}:{}", cursor_line + 1, cursor_col + 1);
 
-    let title_left = format!(" Editing {}", cell_pos);
+    // Add search info if active
+    let search_info = if let Some(pattern) = magnifier.search_pattern() {
+        let matches = magnifier.search_matches();
+        let current = magnifier.current_match_index();
+        if matches.is_empty() {
+            format!(" /{} [0/0]", pattern)
+        } else if let Some(idx) = current {
+            format!(" /{} [{}/{}]", pattern, idx + 1, matches.len())
+        } else {
+            format!(" /{} [?/{}]", pattern, matches.len())
+        }
+    } else {
+        String::new()
+    };
+
+    let title_left = format!(" Editing {}{}", cell_pos, search_info);
     let title_right = format!("[{}]  {}  ", mode_str, cursor_pos);
     let title_padding = (popup_area.width as usize)
         .saturating_sub(title_left.len())
@@ -94,16 +118,27 @@ pub fn render_magnifier(frame: &mut Frame, app: &App, area: Rect) {
     // Content area: line numbers + text
     render_content(frame, magnifier, chunks[1]);
 
-    // Help bar
-    let help_text = " :w save | :wq quit | Ctrl+h/j/k/l navigate ";
-    let help_bar = Paragraph::new(help_text)
-        .alignment(Alignment::Center)
-        .style(Style::default().add_modifier(Modifier::DIM))
-        .block(
+    // Help bar or command line
+    let help_bar = if magnifier.mode() == crate::magnifier::MagnifierMode::Command {
+        // Show command line
+        let cmd_text = format!(":{}", magnifier.command_buffer());
+        Paragraph::new(cmd_text).style(Style::default()).block(
             Block::default()
                 .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT)
                 .border_style(Style::default()),
-        );
+        )
+    } else {
+        // Show help text
+        let help_text = " :w save | :wq quit | v visual | / search | u undo ";
+        Paragraph::new(help_text)
+            .alignment(Alignment::Center)
+            .style(Style::default().add_modifier(Modifier::DIM))
+            .block(
+                Block::default()
+                    .borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT)
+                    .border_style(Style::default()),
+            )
+    };
     frame.render_widget(help_bar, chunks[2]);
 }
 
@@ -168,7 +203,7 @@ fn render_line_numbers(
         .style(Style::default().add_modifier(Modifier::DIM))
         .block(
             Block::default()
-                .borders(Borders::LEFT | Borders::BOTTOM)
+                .borders(Borders::LEFT)
                 .border_style(Style::default()),
         );
 
@@ -225,7 +260,7 @@ fn render_text_content(
 
     let text_widget = Paragraph::new(content).block(
         Block::default()
-            .borders(Borders::RIGHT | Borders::BOTTOM)
+            .borders(Borders::RIGHT)
             .border_style(Style::default()),
     );
 
@@ -237,6 +272,9 @@ fn insert_cursor(line: &str, col: usize, mode: crate::magnifier::MagnifierMode) 
     let cursor_char = match mode {
         crate::magnifier::MagnifierMode::Normal => '█', // Block cursor
         crate::magnifier::MagnifierMode::Insert => '│', // Pipe cursor
+        crate::magnifier::MagnifierMode::Command => '│', // Pipe cursor in command mode
+        crate::magnifier::MagnifierMode::Visual => '█', // Block cursor in visual
+        crate::magnifier::MagnifierMode::VisualLine => '█', // Block cursor in visual line
     };
 
     let chars: Vec<char> = line.chars().collect();

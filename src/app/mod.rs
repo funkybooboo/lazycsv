@@ -318,13 +318,37 @@ impl App {
         self.mode = Mode::Magnifier;
     }
 
+    /// Save magnifier content to cell (keep magnifier open)
+    pub fn save_magnifier_content(&mut self) {
+        if let Some(mag) = &self.magnifier_state {
+            let content = mag.get_content();
+            let (row, col) = mag.cell_position();
+
+            // Update cell content in document (in-memory buffer)
+            self.document.set_cell(row, col, content.clone());
+            self.document.is_dirty = true;
+
+            // Mark file as dirty in session
+            let file_path = self.get_current_file().clone();
+            self.session.mark_dirty(&file_path);
+
+            // Update last edit position
+            self.last_edit_position = Some((row, col));
+
+            // Update magnifier's original content so it's no longer dirty
+            if let Some(mag) = &mut self.magnifier_state {
+                mag.mark_clean_with_content(content);
+            }
+        }
+    }
+
     /// Save magnifier content to cell and close magnifier
     pub fn save_and_close_magnifier(&mut self) {
         if let Some(mag) = self.magnifier_state.take() {
             let content = mag.get_content();
             let (row, col) = mag.cell_position();
 
-            // Update cell content
+            // Update cell content in document (in-memory buffer)
             self.document.set_cell(row, col, content);
             self.document.is_dirty = true;
 

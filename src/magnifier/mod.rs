@@ -28,6 +28,70 @@ pub enum MagnifierMode {
     Normal,
     /// Insert mode - text input
     Insert,
+    /// Command mode - ex commands (:w, :q, etc)
+    Command,
+    /// Visual mode - character-wise selection
+    Visual,
+    /// Visual Line mode - line-wise selection
+    VisualLine,
+}
+
+/// Pending command for multi-key sequences
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PendingCommand {
+    /// Waiting for second 'g' (gg)
+    G,
+    /// Waiting for second 'd' (dd)
+    D,
+    /// Waiting for second 'y' (yy)
+    Y,
+    /// Waiting for second 'c' (cc)
+    C,
+    /// Waiting for second 'Z' (ZZ)
+    Z,
+    /// Waiting for character after 'f'
+    FindForward,
+    /// Waiting for character after 'F'
+    FindBackward,
+    /// Waiting for character after 't'
+    TillForward,
+    /// Waiting for character after 'T'
+    TillBackward,
+    /// Waiting for character to replace with 'r'
+    Replace,
+    /// Waiting for second '>' (>>)
+    IndentRight,
+    /// Waiting for second '<' (<<)
+    IndentLeft,
+}
+
+/// Last find command for repeating with ; and ,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FindCommand {
+    Forward(char),
+    Backward(char),
+    TillForward(char),
+    TillBackward(char),
+}
+
+/// Undo snapshot
+#[derive(Debug, Clone)]
+struct UndoSnapshot {
+    lines: Vec<String>,
+    cursor: (usize, usize),
+}
+
+/// Selection range for visual mode
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Selection {
+    CharWise {
+        start: (usize, usize),
+        end: (usize, usize),
+    },
+    LineWise {
+        start_line: usize,
+        end_line: usize,
+    },
 }
 
 /// State for magnifier mode editing
@@ -55,6 +119,33 @@ pub struct MagnifierState {
 
     /// Count prefix for vim commands (e.g., 5j means count_prefix = 5)
     count_prefix: Option<usize>,
+
+    /// Pending command for multi-key sequences
+    pending_command: Option<PendingCommand>,
+
+    /// Command buffer for ex mode
+    command_buffer: String,
+
+    /// Visual mode anchor point (where selection started)
+    visual_anchor: Option<(usize, usize)>,
+
+    /// Undo history stack
+    undo_stack: Vec<UndoSnapshot>,
+
+    /// Redo history stack
+    redo_stack: Vec<UndoSnapshot>,
+
+    /// Search pattern
+    search_pattern: Option<String>,
+
+    /// Search match positions (line, col)
+    search_matches: Vec<(usize, usize)>,
+
+    /// Current match index
+    current_match: Option<usize>,
+
+    /// Last find command for ; and ,
+    last_find: Option<FindCommand>,
 }
 
 impl MagnifierState {
@@ -93,6 +184,15 @@ impl MagnifierState {
             original_content: content,
             clipboard: Vec::new(),
             count_prefix: None,
+            pending_command: None,
+            command_buffer: String::new(),
+            visual_anchor: None,
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            search_pattern: None,
+            search_matches: Vec::new(),
+            current_match: None,
+            last_find: None,
         }
     }
 
@@ -106,6 +206,11 @@ impl MagnifierState {
         self.get_content() != self.original_content
     }
 
+    /// Mark content as clean (after saving to document)
+    pub fn mark_clean_with_content(&mut self, content: String) {
+        self.original_content = content;
+    }
+
     /// Get the current mode
     pub fn mode(&self) -> MagnifierMode {
         self.mode
@@ -114,6 +219,12 @@ impl MagnifierState {
     /// Get the current cursor position (line, column)
     pub fn cursor(&self) -> (usize, usize) {
         self.cursor
+    }
+
+    /// Set cursor position (for testing)
+    pub fn set_cursor_for_test(&mut self, line: usize, col: usize) {
+        self.cursor = (line, col);
+        self.clamp_cursor();
     }
 
     /// Get the cell position in the CSV
@@ -155,6 +266,131 @@ impl MagnifierState {
     /// Get and clear count prefix (returns 1 if no prefix set)
     pub fn take_count(&mut self) -> usize {
         self.count_prefix.take().unwrap_or(1)
+    }
+
+    // ============================================================================
+    // Pending Command Management
+    // ============================================================================
+
+    /// Set pending command
+    pub fn set_pending(&mut self, cmd: PendingCommand) {
+        self.pending_command = Some(cmd);
+    }
+
+    /// Take and clear pending command
+    pub fn take_pending(&mut self) -> Option<PendingCommand> {
+        self.pending_command.take()
+    }
+
+    /// Check if there's a pending command
+    pub fn has_pending(&self) -> bool {
+        self.pending_command.is_some()
+    }
+
+    /// Get pending command display string
+    pub fn pending_display(&self) -> Option<&str> {
+        self.pending_command.as_ref().map(|cmd| match cmd {
+            PendingCommand::G => "g",
+            PendingCommand::D => "d",
+            PendingCommand::Y => "y",
+            PendingCommand::C => "c",
+            PendingCommand::Z => "Z",
+            PendingCommand::FindForward => "f",
+            PendingCommand::FindBackward => "F",
+            PendingCommand::TillForward => "t",
+            PendingCommand::TillBackward => "T",
+            PendingCommand::Replace => "r",
+            PendingCommand::IndentRight => ">",
+            PendingCommand::IndentLeft => "<",
+        })
+    }
+
+    // ============================================================================
+    // Command Mode
+    // ============================================================================
+
+    /// Enter command mode
+    pub fn enter_command_mode(&mut self) {
+        self.mode = MagnifierMode::Command;
+        self.command_buffer.clear();
+    }
+
+    /// Enter command mode with prefix (for search)
+    pub fn enter_command_mode_with(&mut self, prefix: &str) {
+        self.mode = MagnifierMode::Command;
+        self.command_buffer = prefix.to_string();
+    }
+
+    /// Exit command mode
+    pub fn exit_command_mode(&mut self) {
+        self.mode = MagnifierMode::Normal;
+        self.command_buffer.clear();
+    }
+
+    /// Get command buffer
+    pub fn command_buffer(&self) -> &str {
+        &self.command_buffer
+    }
+
+    /// Insert character in command buffer
+    pub fn command_insert_char(&mut self, c: char) {
+        self.command_buffer.push(c);
+    }
+
+    /// Backspace in command buffer
+    pub fn command_backspace(&mut self) {
+        self.command_buffer.pop();
+    }
+
+    // ============================================================================
+    // Visual Mode
+    // ============================================================================
+
+    /// Enter visual mode (character-wise)
+    pub fn enter_visual_mode(&mut self) {
+        self.mode = MagnifierMode::Visual;
+        self.visual_anchor = Some(self.cursor);
+    }
+
+    /// Enter visual line mode
+    pub fn enter_visual_line_mode(&mut self) {
+        self.mode = MagnifierMode::VisualLine;
+        self.visual_anchor = Some((self.cursor.0, 0));
+    }
+
+    /// Exit visual mode
+    pub fn exit_visual_mode(&mut self) {
+        self.mode = MagnifierMode::Normal;
+        self.visual_anchor = None;
+    }
+
+    /// Get visual selection
+    pub fn get_visual_selection(&self) -> Option<Selection> {
+        let anchor = self.visual_anchor?;
+        let cursor = self.cursor;
+
+        match self.mode {
+            MagnifierMode::Visual => {
+                let (start, end) = if anchor <= cursor {
+                    (anchor, cursor)
+                } else {
+                    (cursor, anchor)
+                };
+                Some(Selection::CharWise { start, end })
+            }
+            MagnifierMode::VisualLine => {
+                let (start_line, end_line) = if anchor.0 <= cursor.0 {
+                    (anchor.0, cursor.0)
+                } else {
+                    (cursor.0, anchor.0)
+                };
+                Some(Selection::LineWise {
+                    start_line,
+                    end_line,
+                })
+            }
+            _ => None,
+        }
     }
 
     /// Get current line text
@@ -416,7 +652,6 @@ impl MagnifierState {
         self.clamp_cursor();
     }
 
-
     /// Check if character at position is whitespace
     fn is_whitespace_at(line: &str, pos: usize) -> bool {
         line.chars()
@@ -595,6 +830,422 @@ impl MagnifierState {
         self.lines.insert(self.cursor.0, String::new());
         self.cursor.1 = 0;
         self.enter_insert_mode();
+    }
+
+    // ============================================================================
+    // Advanced Operators (Tier 1)
+    // ============================================================================
+
+    /// Change operator - delete and enter insert (c)
+    pub fn change_char(&mut self) {
+        self.push_undo();
+        self.delete_char();
+        self.enter_insert_mode();
+    }
+
+    /// Change entire line (cc)
+    pub fn change_line(&mut self) {
+        self.push_undo();
+        let line = self.current_line_mut();
+        line.clear();
+        self.cursor.1 = 0;
+        self.enter_insert_mode();
+    }
+
+    /// Change to end of line (C)
+    pub fn change_to_eol(&mut self) {
+        self.push_undo();
+        let cursor_col = self.cursor.1;
+        let line = self.current_line_mut();
+        line.truncate(cursor_col);
+        self.enter_insert_mode();
+    }
+
+    /// Replace single character (r)
+    pub fn replace_char(&mut self, c: char) {
+        self.push_undo();
+        let cursor_col = self.cursor.1;
+        let line = self.current_line_mut();
+        let chars: Vec<char> = line.chars().collect();
+        if cursor_col < chars.len() {
+            let mut new_chars = chars;
+            new_chars[cursor_col] = c;
+            *line = new_chars.into_iter().collect();
+        }
+    }
+
+    /// Join current line with next (J)
+    pub fn join_lines(&mut self) {
+        self.push_undo();
+        let line_idx = self.cursor.0;
+        if line_idx + 1 < self.lines.len() {
+            let next_line = self.lines.remove(line_idx + 1);
+            let current = self.current_line_mut();
+            if !current.is_empty() && !next_line.is_empty() {
+                current.push(' ');
+            }
+            current.push_str(&next_line);
+        }
+    }
+
+    /// Indent line (>>)
+    pub fn indent_line(&mut self) {
+        self.push_undo();
+        self.current_line_mut().insert_str(0, "  ");
+        self.cursor.1 += 2;
+    }
+
+    /// Dedent line (<<)
+    pub fn dedent_line(&mut self) {
+        self.push_undo();
+        let line = self.current_line_mut();
+        if line.starts_with("  ") {
+            line.drain(0..2);
+            self.cursor.1 = self.cursor.1.saturating_sub(2);
+        } else if line.starts_with('\t') {
+            line.remove(0);
+            self.cursor.1 = self.cursor.1.saturating_sub(1);
+        }
+    }
+
+    // ============================================================================
+    // Undo/Redo (Tier 1)
+    // ============================================================================
+
+    /// Push current state to undo stack
+    pub fn push_undo(&mut self) {
+        let snapshot = UndoSnapshot {
+            lines: self.lines.clone(),
+            cursor: self.cursor,
+        };
+        self.undo_stack.push(snapshot);
+        self.redo_stack.clear(); // Clear redo on new edit
+    }
+
+    /// Undo last change (u)
+    pub fn undo(&mut self) {
+        if let Some(snapshot) = self.undo_stack.pop() {
+            // Save current state to redo
+            let current = UndoSnapshot {
+                lines: self.lines.clone(),
+                cursor: self.cursor,
+            };
+            self.redo_stack.push(current);
+
+            // Restore snapshot
+            self.lines = snapshot.lines;
+            self.cursor = snapshot.cursor;
+            self.clamp_cursor();
+        }
+    }
+
+    /// Redo last undone change (Ctrl+r)
+    pub fn redo(&mut self) {
+        if let Some(snapshot) = self.redo_stack.pop() {
+            // Save current state to undo
+            let current = UndoSnapshot {
+                lines: self.lines.clone(),
+                cursor: self.cursor,
+            };
+            self.undo_stack.push(current);
+
+            // Restore snapshot
+            self.lines = snapshot.lines;
+            self.cursor = snapshot.cursor;
+            self.clamp_cursor();
+        }
+    }
+
+    // ============================================================================
+    // Visual Mode Operations (Tier 2)
+    // ============================================================================
+
+    /// Delete visual selection
+    pub fn delete_selection(&mut self) {
+        if let Some(selection) = self.get_visual_selection() {
+            self.push_undo();
+            match selection {
+                Selection::CharWise { start, end } => {
+                    // Delete characters from start to end
+                    if start.0 == end.0 {
+                        // Single line selection
+                        let line = &mut self.lines[start.0];
+                        let chars: Vec<char> = line.chars().collect();
+                        let start_col = start.1.min(chars.len());
+                        let end_col = (end.1 + 1).min(chars.len());
+                        let new_line: String = chars
+                            .iter()
+                            .enumerate()
+                            .filter(|(i, _)| *i < start_col || *i >= end_col)
+                            .map(|(_, c)| c)
+                            .collect();
+                        *line = new_line;
+                        self.cursor = start;
+                    } else {
+                        // Multi-line selection - delete from start to end
+                        // For simplicity, delete entire lines between start and end
+                        self.lines.drain(start.0..=end.0);
+                        if self.lines.is_empty() {
+                            self.lines.push(String::new());
+                        }
+                        self.cursor = (start.0.min(self.lines.len() - 1), 0);
+                    }
+                }
+                Selection::LineWise {
+                    start_line,
+                    end_line,
+                } => {
+                    // Delete entire lines
+                    let deleted: Vec<String> = self.lines.drain(start_line..=end_line).collect();
+                    self.clipboard = deleted;
+                    if self.lines.is_empty() {
+                        self.lines.push(String::new());
+                    }
+                    self.cursor = (start_line.min(self.lines.len() - 1), 0);
+                }
+            }
+            self.exit_visual_mode();
+            self.clamp_cursor();
+        }
+    }
+
+    /// Yank visual selection
+    pub fn yank_selection(&mut self) {
+        if let Some(selection) = self.get_visual_selection() {
+            match selection {
+                Selection::CharWise { start, end } => {
+                    if start.0 == end.0 {
+                        // Single line - yank substring
+                        let line = &self.lines[start.0];
+                        let chars: Vec<char> = line.chars().collect();
+                        let start_col = start.1.min(chars.len());
+                        let end_col = (end.1 + 1).min(chars.len());
+                        let yanked: String = chars[start_col..end_col].iter().collect();
+                        self.clipboard = vec![yanked];
+                    } else {
+                        // Multi-line - yank entire lines
+                        self.clipboard = self.lines[start.0..=end.0].to_vec();
+                    }
+                }
+                Selection::LineWise {
+                    start_line,
+                    end_line,
+                } => {
+                    self.clipboard = self.lines[start_line..=end_line].to_vec();
+                }
+            }
+            self.exit_visual_mode();
+        }
+    }
+
+    /// Change visual selection (delete and enter insert)
+    pub fn change_selection(&mut self) {
+        self.delete_selection();
+        self.enter_insert_mode();
+    }
+
+    // ============================================================================
+    // Search (Tier 2)
+    // ============================================================================
+
+    /// Search forward for pattern
+    pub fn search_forward(&mut self, pattern: String) {
+        self.search_pattern = Some(pattern);
+        self.find_all_matches();
+        self.jump_to_next_match();
+    }
+
+    /// Find all matches of current search pattern
+    fn find_all_matches(&mut self) {
+        self.search_matches.clear();
+        self.current_match = None;
+
+        if let Some(pattern) = &self.search_pattern {
+            for (line_idx, line) in self.lines.iter().enumerate() {
+                let mut col = 0;
+                while let Some(pos) = line[col..].find(pattern) {
+                    self.search_matches.push((line_idx, col + pos));
+                    col += pos + 1;
+                }
+            }
+        }
+    }
+
+    /// Jump to next search match (n)
+    pub fn jump_to_next_match(&mut self) {
+        if self.search_matches.is_empty() {
+            return;
+        }
+
+        // Find next match after cursor
+        let current_pos = self.cursor;
+        let next_idx = self
+            .search_matches
+            .iter()
+            .position(|&pos| pos > current_pos)
+            .unwrap_or(0); // Wrap to first match
+
+        self.current_match = Some(next_idx);
+        let (line, col) = self.search_matches[next_idx];
+        self.cursor = (line, col);
+        self.clamp_cursor();
+    }
+
+    /// Jump to previous search match (N)
+    pub fn jump_to_prev_match(&mut self) {
+        if self.search_matches.is_empty() {
+            return;
+        }
+
+        // Find previous match before cursor
+        let current_pos = self.cursor;
+        let prev_idx = self
+            .search_matches
+            .iter()
+            .rposition(|&pos| pos < current_pos)
+            .unwrap_or(self.search_matches.len() - 1); // Wrap to last match
+
+        self.current_match = Some(prev_idx);
+        let (line, col) = self.search_matches[prev_idx];
+        self.cursor = (line, col);
+        self.clamp_cursor();
+    }
+
+    /// Clear search
+    pub fn clear_search(&mut self) {
+        self.search_pattern = None;
+        self.search_matches.clear();
+        self.current_match = None;
+    }
+
+    /// Get word under cursor for * search
+    pub fn get_word_under_cursor(&self) -> Option<String> {
+        let line = self.current_line();
+        let chars: Vec<char> = line.chars().collect();
+        if self.cursor.1 >= chars.len() {
+            return None;
+        }
+
+        // Find word boundaries
+        let mut start = self.cursor.1;
+        let mut end = self.cursor.1;
+
+        // Expand left
+        while start > 0 && (chars[start - 1].is_alphanumeric() || chars[start - 1] == '_') {
+            start -= 1;
+        }
+
+        // Expand right
+        while end < chars.len() && (chars[end].is_alphanumeric() || chars[end] == '_') {
+            end += 1;
+        }
+
+        if start < end {
+            Some(chars[start..end].iter().collect())
+        } else {
+            None
+        }
+    }
+
+    /// Get search matches for UI highlighting
+    pub fn search_matches(&self) -> &[(usize, usize)] {
+        &self.search_matches
+    }
+
+    /// Get current match index
+    pub fn current_match_index(&self) -> Option<usize> {
+        self.current_match
+    }
+
+    /// Get search pattern
+    pub fn search_pattern(&self) -> Option<&str> {
+        self.search_pattern.as_deref()
+    }
+
+    // ============================================================================
+    // Character Find (Tier 2)
+    // ============================================================================
+
+    /// Find character forward (f)
+    pub fn find_char_forward(&mut self, ch: char) {
+        let line = self.current_line();
+        let chars: Vec<char> = line.chars().collect();
+        let start = self.cursor.1 + 1;
+
+        for (i, &c) in chars.iter().enumerate().skip(start) {
+            if c == ch {
+                self.cursor.1 = i;
+                self.last_find = Some(FindCommand::Forward(ch));
+                return;
+            }
+        }
+    }
+
+    /// Find character backward (F)
+    pub fn find_char_backward(&mut self, ch: char) {
+        let line = self.current_line();
+        let chars: Vec<char> = line.chars().collect();
+
+        for i in (0..self.cursor.1).rev() {
+            if chars[i] == ch {
+                self.cursor.1 = i;
+                self.last_find = Some(FindCommand::Backward(ch));
+                return;
+            }
+        }
+    }
+
+    /// Till character forward (t)
+    pub fn till_char_forward(&mut self, ch: char) {
+        let line = self.current_line();
+        let chars: Vec<char> = line.chars().collect();
+        let start = self.cursor.1 + 1;
+
+        for (i, &c) in chars.iter().enumerate().skip(start) {
+            if c == ch {
+                self.cursor.1 = i.saturating_sub(1);
+                self.last_find = Some(FindCommand::TillForward(ch));
+                return;
+            }
+        }
+    }
+
+    /// Till character backward (T)
+    pub fn till_char_backward(&mut self, ch: char) {
+        let line = self.current_line();
+        let chars: Vec<char> = line.chars().collect();
+
+        for i in (0..self.cursor.1).rev() {
+            if chars[i] == ch {
+                self.cursor.1 = (i + 1).min(chars.len().saturating_sub(1));
+                self.last_find = Some(FindCommand::TillBackward(ch));
+                return;
+            }
+        }
+    }
+
+    /// Repeat last find (;)
+    pub fn repeat_find(&mut self) {
+        if let Some(find) = self.last_find {
+            match find {
+                FindCommand::Forward(ch) => self.find_char_forward(ch),
+                FindCommand::Backward(ch) => self.find_char_backward(ch),
+                FindCommand::TillForward(ch) => self.till_char_forward(ch),
+                FindCommand::TillBackward(ch) => self.till_char_backward(ch),
+            }
+        }
+    }
+
+    /// Repeat last find in reverse (,)
+    pub fn repeat_find_reverse(&mut self) {
+        if let Some(find) = self.last_find {
+            match find {
+                FindCommand::Forward(ch) => self.find_char_backward(ch),
+                FindCommand::Backward(ch) => self.find_char_forward(ch),
+                FindCommand::TillForward(ch) => self.till_char_backward(ch),
+                FindCommand::TillBackward(ch) => self.till_char_forward(ch),
+            }
+        }
     }
 }
 

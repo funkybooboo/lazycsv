@@ -518,7 +518,12 @@ fn handle_multi_key_command(
         // dd - Delete row(s) with optional count prefix
         (PendingCommand::D, KeyCode::Char('d')) => {
             app.input_state.clear_pending_command();
-            let count = app.input_state.command_count.take().map(|n| n.get()).unwrap_or(1);
+            let count = app
+                .input_state
+                .command_count
+                .take()
+                .map(|n| n.get())
+                .unwrap_or(1);
             if let Some(row_idx) = app.get_selected_row() {
                 // If deleting row 0 (header), turn header_mode OFF
                 if row_idx.get() == 0 {
@@ -540,9 +545,8 @@ fn handle_multi_key_command(
                     }
 
                     if row_idx.get() == 0 {
-                        app.status_message = Some(StatusMessage::from(
-                            "Header row deleted, header mode OFF",
-                        ));
+                        app.status_message =
+                            Some(StatusMessage::from("Header row deleted, header mode OFF"));
                     } else {
                         app.status_message = Some(StatusMessage::new_owned(format!(
                             "{} row(s) deleted",
@@ -556,7 +560,12 @@ fn handle_multi_key_command(
         // yy - Yank (copy) row(s) with optional count prefix
         (PendingCommand::Y, KeyCode::Char('y')) => {
             app.input_state.clear_pending_command();
-            let count = app.input_state.command_count.take().map(|n| n.get()).unwrap_or(1);
+            let count = app
+                .input_state
+                .command_count
+                .take()
+                .map(|n| n.get())
+                .unwrap_or(1);
             if let Some(row_idx) = app.get_selected_row() {
                 let end_idx = RowIndex::new(
                     (row_idx.get() + count - 1).min(app.document.row_count().saturating_sub(1)),
@@ -665,7 +674,12 @@ fn handle_multi_key_command(
         // ,dd - delete column(s) with optional count prefix
         (PendingCommand::CommaD, KeyCode::Char('d')) => {
             app.input_state.clear_pending_command();
-            let count = app.input_state.command_count.take().map(|n| n.get()).unwrap_or(1);
+            let count = app
+                .input_state
+                .command_count
+                .take()
+                .map(|n| n.get())
+                .unwrap_or(1);
             let col_idx = app.view_state.selected_column;
             let end_idx = ColIndex::new(col_idx.get() + count - 1);
             let deleted = app.document.delete_columns(col_idx, end_idx);
@@ -689,7 +703,12 @@ fn handle_multi_key_command(
         // ,yy - yank column(s) with optional count prefix
         (PendingCommand::CommaY, KeyCode::Char('y')) => {
             app.input_state.clear_pending_command();
-            let count = app.input_state.command_count.take().map(|n| n.get()).unwrap_or(1);
+            let count = app
+                .input_state
+                .command_count
+                .take()
+                .map(|n| n.get())
+                .unwrap_or(1);
             let col_idx = app.view_state.selected_column;
             let end_idx = ColIndex::new(
                 (col_idx.get() + count - 1).min(app.document.column_count().saturating_sub(1)),
@@ -1069,9 +1088,8 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                     let dest_str = words[2];
 
                     if !end_col_str.chars().all(|c| c.is_ascii_alphabetic()) {
-                        app.status_message = Some(StatusMessage::from(
-                            "Invalid end column in move command",
-                        ));
+                        app.status_message =
+                            Some(StatusMessage::from("Invalid end column in move command"));
                         return Some(Ok(()));
                     }
 
@@ -1141,10 +1159,8 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                     );
 
                     app.view_state.selected_column = ColIndex::new(result);
-                    app.status_message = Some(StatusMessage::from(format!(
-                        "Moved {} column(s)",
-                        count
-                    )));
+                    app.status_message =
+                        Some(StatusMessage::from(format!("Moved {} column(s)", count)));
 
                     return Some(Ok(()));
                 }
@@ -2181,6 +2197,8 @@ fn handle_magnifier_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     match mag.mode() {
         MagnifierMode::Normal => handle_magnifier_normal(app, key),
         MagnifierMode::Insert => handle_magnifier_insert(app, key),
+        MagnifierMode::Command => handle_magnifier_command(app, key),
+        MagnifierMode::Visual | MagnifierMode::VisualLine => handle_magnifier_visual(app, key),
     }
 }
 
@@ -2246,13 +2264,55 @@ fn handle_magnifier_navigate(app: &mut App, direction: Direction) -> Result<Inpu
 
 /// Handle keys in magnifier Normal mode
 fn handle_magnifier_normal(app: &mut App, key: KeyEvent) -> Result<InputResult> {
+    use crate::magnifier::PendingCommand;
+
     let mag = match app.magnifier_state.as_mut() {
         Some(m) => m,
         None => return Ok(InputResult::Continue),
     };
 
+    // Handle pending commands first
+    if let Some(pending) = mag.take_pending() {
+        match (pending, key.code) {
+            // Multi-key sequences
+            (PendingCommand::G, KeyCode::Char('g')) => mag.move_to_first_line(),
+            (PendingCommand::D, KeyCode::Char('d')) => {
+                mag.push_undo();
+                mag.delete_line();
+            }
+            (PendingCommand::Y, KeyCode::Char('y')) => mag.yank_line(),
+            (PendingCommand::C, KeyCode::Char('c')) => mag.change_line(),
+            (PendingCommand::Z, KeyCode::Char('Z')) => {
+                app.save_and_close_magnifier();
+                return Ok(InputResult::Continue);
+            }
+            (PendingCommand::IndentRight, KeyCode::Char('>')) => mag.indent_line(),
+            (PendingCommand::IndentLeft, KeyCode::Char('<')) => mag.dedent_line(),
+
+            // Character find commands
+            (PendingCommand::FindForward, KeyCode::Char(c)) => mag.find_char_forward(c),
+            (PendingCommand::FindBackward, KeyCode::Char(c)) => mag.find_char_backward(c),
+            (PendingCommand::TillForward, KeyCode::Char(c)) => mag.till_char_forward(c),
+            (PendingCommand::TillBackward, KeyCode::Char(c)) => mag.till_char_backward(c),
+            (PendingCommand::Replace, KeyCode::Char(c)) => mag.replace_char(c),
+
+            _ => {
+                // Invalid sequence, clear pending
+            }
+        }
+        return Ok(InputResult::Continue);
+    }
+
+    // Handle Ctrl+r for redo
+    if key.modifiers.contains(KeyModifiers::CONTROL) {
+        if let KeyCode::Char('r') = key.code {
+            mag.redo();
+            return Ok(InputResult::Continue);
+        }
+    }
+
     match key.code {
-        // Vim motions
+        // Basic motions
         KeyCode::Char('h') | KeyCode::Left => mag.move_left(),
         KeyCode::Char('j') | KeyCode::Down => mag.move_down(),
         KeyCode::Char('k') | KeyCode::Up => mag.move_up(),
@@ -2271,51 +2331,74 @@ fn handle_magnifier_normal(app: &mut App, key: KeyEvent) -> Result<InputResult> 
         // Buffer motions
         KeyCode::Char('G') => mag.move_to_last_line(),
 
-        // Operators
-        KeyCode::Char('x') => mag.delete_char(),
+        // Simple operators
+        KeyCode::Char('x') => {
+            mag.push_undo();
+            mag.delete_char();
+        }
         KeyCode::Char('p') => mag.paste_below(),
         KeyCode::Char('P') => mag.paste_above(),
+        KeyCode::Char('J') => mag.join_lines(),
+
+        // Undo/redo
+        KeyCode::Char('u') => mag.undo(),
 
         // Enter insert mode
         KeyCode::Char('i') => mag.insert_before(),
         KeyCode::Char('a') => mag.insert_after(),
+        KeyCode::Char('A') => {
+            mag.move_to_line_end();
+            mag.insert_after();
+        }
+        KeyCode::Char('I') => {
+            mag.move_to_first_non_blank();
+            mag.insert_before();
+        }
         KeyCode::Char('o') => mag.insert_line_below(),
         KeyCode::Char('O') => mag.insert_line_above(),
         KeyCode::Char('s') => mag.substitute_char(),
+        KeyCode::Char('C') => mag.change_to_eol(),
 
-        // Multi-key commands
-        KeyCode::Char('g') => {
-            // Handle gg for first line
-            // For now, just go to first line
-            mag.move_to_first_line();
+        // Visual mode
+        KeyCode::Char('v') => mag.enter_visual_mode(),
+        KeyCode::Char('V') => mag.enter_visual_line_mode(),
+
+        // Search
+        KeyCode::Char('/') => mag.enter_command_mode_with("/"),
+        KeyCode::Char('n') => mag.jump_to_next_match(),
+        KeyCode::Char('N') => mag.jump_to_prev_match(),
+        KeyCode::Char('*') => {
+            if let Some(word) = mag.get_word_under_cursor() {
+                mag.search_forward(word);
+            }
         }
-        KeyCode::Char('d') => {
-            // Handle dd for delete line
-            mag.delete_line();
-        }
-        KeyCode::Char('y') => {
-            // Handle yy for yank line
-            mag.yank_line();
-        }
-        KeyCode::Char('Z') => {
-            // Handle ZZ for save and quit
-            // Check for second Z (for now, just treat single Z as ZZ)
-            app.save_and_close_magnifier();
-        }
+
+        // Multi-key command initiators
+        KeyCode::Char('g') => mag.set_pending(PendingCommand::G),
+        KeyCode::Char('d') => mag.set_pending(PendingCommand::D),
+        KeyCode::Char('y') => mag.set_pending(PendingCommand::Y),
+        KeyCode::Char('c') => mag.set_pending(PendingCommand::C),
+        KeyCode::Char('Z') => mag.set_pending(PendingCommand::Z),
+        KeyCode::Char('f') => mag.set_pending(PendingCommand::FindForward),
+        KeyCode::Char('F') => mag.set_pending(PendingCommand::FindBackward),
+        KeyCode::Char('t') => mag.set_pending(PendingCommand::TillForward),
+        KeyCode::Char('T') => mag.set_pending(PendingCommand::TillBackward),
+        KeyCode::Char('r') => mag.set_pending(PendingCommand::Replace),
+        KeyCode::Char('>') => mag.set_pending(PendingCommand::IndentRight),
+        KeyCode::Char('<') => mag.set_pending(PendingCommand::IndentLeft),
+
+        // Repeat find
+        KeyCode::Char(';') => mag.repeat_find(),
+        KeyCode::Char(',') => mag.repeat_find_reverse(),
 
         // Command mode
-        KeyCode::Char(':') => {
-            // Enter command mode within magnifier
-            // For now, we'll handle commands directly
-            // This is a simplified approach - full implementation would use command buffer
-            return Ok(InputResult::Continue);
-        }
+        KeyCode::Char(':') => mag.enter_command_mode(),
 
         // Escape - close if clean, warn if dirty
         KeyCode::Esc => {
             if app.magnifier_is_dirty() {
                 app.status_message = Some(StatusMessage::from(
-                    "Unsaved changes! Use :w to save, :q! to discard, or ZZ to save and quit",
+                    "Unsaved changes! Use :wq to save, :q! to discard",
                 ));
             } else {
                 app.close_magnifier_discard();
@@ -2325,8 +2408,6 @@ fn handle_magnifier_normal(app: &mut App, key: KeyEvent) -> Result<InputResult> 
         // Count prefix
         KeyCode::Char(c) if c.is_numeric() => {
             if let Some(digit) = c.to_digit(10) {
-                // For now, simple count handling
-                // Full implementation would accumulate count like normal mode
                 mag.set_count_prefix(digit as usize);
             }
         }
@@ -2380,6 +2461,118 @@ fn handle_magnifier_insert(app: &mut App, key: KeyEvent) -> Result<InputResult> 
         KeyCode::Home => mag.move_to_line_start(),
         KeyCode::End => mag.move_to_line_end(),
 >>>>>>> 66c2c33 (feat(magnifier): Phase 5 - Implement input handling and commands)
+
+        _ => {}
+    }
+
+    Ok(InputResult::Continue)
+}
+
+/// Handle keys in magnifier Command mode
+fn handle_magnifier_command(app: &mut App, key: KeyEvent) -> Result<InputResult> {
+    let mag = match app.magnifier_state.as_mut() {
+        Some(m) => m,
+        None => return Ok(InputResult::Continue),
+    };
+
+    match key.code {
+        KeyCode::Esc => {
+            mag.exit_command_mode();
+        }
+        KeyCode::Enter => {
+            let cmd = mag.command_buffer().to_string();
+            mag.exit_command_mode();
+
+            // Handle search
+            if let Some(pattern) = cmd.strip_prefix('/') {
+                mag.search_forward(pattern.to_string());
+                return Ok(InputResult::Continue);
+            }
+
+            // Handle ex commands
+            match cmd.as_str() {
+                "w" => {
+                    // Save to cell
+                    app.save_magnifier_content();
+                    app.status_message = Some(StatusMessage::from("Saved"));
+                }
+                "q" => {
+                    if app.magnifier_is_dirty() {
+                        app.status_message = Some(StatusMessage::from(
+                            "Unsaved changes! Use :wq to save, :q! to discard",
+                        ));
+                    } else {
+                        app.close_magnifier_discard();
+                    }
+                }
+                "wq" => {
+                    app.save_and_close_magnifier();
+                }
+                "q!" => {
+                    app.close_magnifier_discard();
+                }
+                "noh" => {
+                    if let Some(m) = app.magnifier_state.as_mut() {
+                        m.clear_search();
+                    }
+                }
+                _ => {
+                    app.status_message =
+                        Some(StatusMessage::from(format!("Unknown command: {}", cmd)));
+                }
+            }
+        }
+        KeyCode::Char(c) => {
+            mag.command_insert_char(c);
+        }
+        KeyCode::Backspace => {
+            mag.command_backspace();
+            // If buffer is empty, exit command mode
+            if mag.command_buffer().is_empty() {
+                mag.exit_command_mode();
+            }
+        }
+        _ => {}
+    }
+
+    Ok(InputResult::Continue)
+}
+
+/// Handle keys in magnifier Visual mode
+fn handle_magnifier_visual(app: &mut App, key: KeyEvent) -> Result<InputResult> {
+    let mag = match app.magnifier_state.as_mut() {
+        Some(m) => m,
+        None => return Ok(InputResult::Continue),
+    };
+
+    match key.code {
+        // Motions extend selection
+        KeyCode::Char('h') | KeyCode::Left => mag.move_left(),
+        KeyCode::Char('j') | KeyCode::Down => mag.move_down(),
+        KeyCode::Char('k') | KeyCode::Up => mag.move_up(),
+        KeyCode::Char('l') | KeyCode::Right => mag.move_right(),
+
+        // Word motions
+        KeyCode::Char('w') => mag.move_next_word(),
+        KeyCode::Char('b') => mag.move_prev_word(),
+        KeyCode::Char('e') => mag.move_end_word(),
+
+        // Line motions
+        KeyCode::Char('0') => mag.move_to_line_start(),
+        KeyCode::Char('$') => mag.move_to_line_end(),
+        KeyCode::Char('^') => mag.move_to_first_non_blank(),
+
+        // Buffer motions
+        KeyCode::Char('g') => mag.move_to_first_line(),
+        KeyCode::Char('G') => mag.move_to_last_line(),
+
+        // Operators on selection
+        KeyCode::Char('d') => mag.delete_selection(),
+        KeyCode::Char('y') => mag.yank_selection(),
+        KeyCode::Char('c') => mag.change_selection(),
+
+        // Exit visual mode
+        KeyCode::Esc => mag.exit_visual_mode(),
 
         _ => {}
     }
