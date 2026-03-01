@@ -65,7 +65,7 @@ The current mode is always shown in the status bar:
 
 ---
 
-## v0.3.0 - Advanced Navigation (✅ Complete)
+## v0.3.0 - Advanced Navigation ( Complete)
 
 ### Enhanced Movement
 
@@ -123,7 +123,7 @@ The current mode is always shown in the status bar:
 
 ---
 
-## v0.3.1 - UI/UX Polish (✅ Complete)
+## v0.3.1 - UI/UX Polish ( Complete)
 
 *User interface improvements - no new keybindings*
 
@@ -136,7 +136,7 @@ The current mode is always shown in the status bar:
 
 ---
 
-## v0.3.2 - Pre-Edit Polish (✅ Complete)
+## v0.3.2 - Pre-Edit Polish ( Complete)
 
 *Minimal vim-like UI, command mode improvements*
 
@@ -185,7 +185,7 @@ Commands show clear error messages instead of silently clamping:
 
 ---
 
-## v0.4.0 - Insert Mode (✅ Complete)
+## v0.4.0 - Insert Mode ( Complete)
 
 ### Entering Insert Mode
 
@@ -499,10 +499,10 @@ The following features were removed from the roadmap to maintain simplicity:
 - Old `:c` command - Replaced with direct `:B`, `:A5` syntax
 
 **Kept (Essential Features):**
-- ✅ **Visual mode** (`v`, `V`, `;v`, `;V`) - Essential for selecting regions to copy/paste/delete
-- ✅ **HeaderEdit mode** (`gh`) - Essential for editing column header names
-- ✅ **Magnifier mode** (`Enter`) - Essential for multi-line cell editing (JSON, descriptions)
-- ✅ **Command ranges** (`:5,10d`, `:B,D`, `:B,D@5,10`) - Essential for batch operations
+-  **Visual mode** (`v`, `V`, `;v`, `;V`) - Essential for selecting regions to copy/paste/delete
+-  **HeaderEdit mode** (`gh`) - Essential for editing column header names
+-  **Magnifier mode** (`Enter`) - Essential for multi-line cell editing (JSON, descriptions)
+-  **Command ranges** (`:5,10d`, `:B,D`, `:B,D@5,10`) - Essential for batch operations
 
 **Note:** `Ctrl+v` (block visual) was skipped as redundant - regular `v` already provides rectangular cell selection.
 
@@ -539,11 +539,11 @@ status_bar = "blue"
 
 | Version | Features Added |
 |---------|----------------|
-| v0.1.0 | ✅ Foundation - viewing, basic navigation |
-| v0.2.0 | ✅ Type safety refactor (internal) |
-| v0.3.0 | ✅ Advanced navigation (column jumps, command mode, word motion) |
-| v0.3.1 | ✅ UI/UX polish (mode indicator, transient messages, help redesign) |
-| v0.3.2 | ✅ Pre-edit polish (minimal UI, `:c` command, pending display) |
+| v0.1.0 |  Foundation - viewing, basic navigation |
+| v0.2.0 |  Type safety refactor (internal) |
+| v0.3.0 |  Advanced navigation (column jumps, command mode, word motion) |
+| v0.3.1 |  UI/UX polish (mode indicator, transient messages, help redesign) |
+| v0.3.2 |  Pre-edit polish (minimal UI, `:c` command, pending display) |
 | v0.4.0 | Quick editing (Insert mode) |
 | v0.5.0 | Vim magnifier (power editing) |
 | v0.6.0 | Save/quit guards |

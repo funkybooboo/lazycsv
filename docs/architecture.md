@@ -98,9 +98,9 @@ row.to_line_number()              // Convert to 1-based NonZeroUsize
 ```
 
 **Type Safety Benefits:**
-- ✅ Compiler prevents swapping row/column parameters
-- ✅ Self-documenting APIs (clear which parameter is which)
-- ✅ Zero runtime cost (newtypes are compile-time only)
+-  Compiler prevents swapping row/column parameters
+-  Self-documenting APIs (clear which parameter is which)
+-  Zero runtime cost (newtypes are compile-time only)
 
 ### 3. Input Actions (`input/` module) **NEW in v0.2.0**
 
@@ -131,8 +131,8 @@ pub enum PendingCommand {
 ```
 
 **Improvements Over Old Design:**
-- ❌ Old: `handle_key() -> Result<bool>`  (unclear what `true` means)
-- ✅ New: `handle_key() -> Result<InputResult>` (semantic, self-documenting)
+-  Old: `handle_key() -> Result<bool>`  (unclear what `true` means)
+-  New: `handle_key() -> Result<InputResult>` (semantic, self-documenting)
 
 ### 4. Application State (`app/` module)
 
@@ -265,8 +265,8 @@ Document::from_file(path) -> Result<Document>
 // Querying (type-safe in v0.2.0)
 .row_count() -> usize
 .column_count() -> usize
-.get_cell(row: RowIndex, col: ColIndex) -> &str  // ✅ Type-safe!
-.get_header(col: ColIndex) -> &str                // ✅ Type-safe!
+.get_cell(row: RowIndex, col: ColIndex) -> &str  //  Type-safe!
+.get_header(col: ColIndex) -> &str                //  Type-safe!
 
 // Future (v0.4.0+)
 .set_cell(row: RowIndex, col: ColIndex, value: String)
@@ -278,8 +278,8 @@ Document::from_file(path) -> Result<Document>
 ```
 
 **Trade-offs:**
-- ✅ **Simple & Fast**: The in-memory model is simple to implement and provides very fast O(1) access for navigation.
-- ❌ **High Memory Usage**: This approach is not "lazy" and is unsuitable for CSV files that are too large to fit into RAM.
+-  **Simple & Fast**: The in-memory model is simple to implement and provides very fast O(1) access for navigation.
+-  **High Memory Usage**: This approach is not "lazy" and is unsuitable for CSV files that are too large to fit into RAM.
 - **Future Work**: A top priority is to refactor this to a true lazy-loading model that reads from disk on demand.
 
 **Future Optimizations** (if needed):
@@ -619,7 +619,7 @@ anyhow displays: "Failed to load file.csv: No such file or directory"
 
 ### Performance Targets
 
-✅ Achieved in v0.1.0:
+ Achieved in v0.1.0:
 - File loading: < 100ms for 10K rows
 - Frame rendering: < 16ms (60 FPS)
 - Navigation: < 10ms response
@@ -638,10 +638,10 @@ Main Thread:
 ```
 
 **Why single-threaded?**
-- ✅ Simpler (no sync primitives needed)
-- ✅ Sufficient for keyboard input (low latency)
-- ✅ CSV loading is fast enough
-- ✅ Rendering is fast enough
+-  Simpler (no sync primitives needed)
+-  Sufficient for keyboard input (low latency)
+-  CSV loading is fast enough
+-  Rendering is fast enough
 
 **Future: Multi-threaded (if needed)**
 
@@ -689,7 +689,7 @@ fn test_load_and_navigate() {
 
 ### Version 0.2.0: Type System & State Refactoring
 
-**v0.2.1 ✅ COMPLETED:**
+**v0.2.1  COMPLETED:**
 ```rust
 // Type-safe position types
 pub struct RowIndex(usize);
@@ -712,7 +712,7 @@ command_count: Option<NonZeroUsize>  // Was: Option<String>
 status_message: Option<StatusMessage> // Was: Option<Cow<'static, str>>
 ```
 
-**v0.2.2-v0.2.6 ✅ COMPLETED:**
+**v0.2.2-v0.2.6  COMPLETED:**
 ```rust
 // v0.2.2: Separation of Concerns
 pub struct InputState {

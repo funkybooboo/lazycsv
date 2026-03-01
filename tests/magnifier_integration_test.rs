@@ -289,14 +289,14 @@ fn test_magnifier_unicode_content() {
     magnifier.enter_insert_mode();
     magnifier.move_to_line_end();
     // Insert as a string to avoid char boundary issues
-    for ch in " 🎉 日本".chars() {
+    for ch in "  日本".chars() {
         magnifier.insert_char(ch);
     }
     magnifier.exit_insert_mode();
 
     // Verify unicode preserved
     let content = magnifier.get_content();
-    assert!(content.contains('🎉'));
+    assert!(content.contains(''));
     assert!(content.contains('日'));
     assert!(content.contains('本'));
 
@@ -306,7 +306,7 @@ fn test_magnifier_unicode_content() {
         app.get_selected_row().unwrap(),
         app.view_state.selected_column,
     );
-    assert!(cell_content.contains('🎉'));
+    assert!(cell_content.contains(''));
     assert!(cell_content.contains('日'));
 }
 

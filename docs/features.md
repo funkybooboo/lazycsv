@@ -19,56 +19,56 @@ LazyCSV is designed around these core principles:
 This section details all features currently available in the application.
 
 ### File Loading & Handling
-- ✅ Load CSV files from the command line (`lazycsv file.csv`).
-- ✅ Discover and load files from a directory (`lazycsv .`).
-- ✅ Support for custom delimiters, encodings, and files with no headers.
-- ✅ Graceful error handling for invalid files or paths.
+-  Load CSV files from the command line (`lazycsv file.csv`).
+-  Discover and load files from a directory (`lazycsv .`).
+-  Support for custom delimiters, encodings, and files with no headers.
+-  Graceful error handling for invalid files or paths.
 
 ### Table Display
-- ✅ **Standard View**: Row numbers, column letters (A, B...), and headers.
-- ✅ **Highlighting**: The current row and cell are clearly indicated.
-- ✅ **Scrolling**: Both vertical and horizontal scrolling are supported.
-- ✅ **Text Truncation**: Long cell content is truncated with `...`.
+-  **Standard View**: Row numbers, column letters (A, B...), and headers.
+-  **Highlighting**: The current row and cell are clearly indicated.
+-  **Scrolling**: Both vertical and horizontal scrolling are supported.
+-  **Text Truncation**: Long cell content is truncated with `...`.
 
 ### Vim-Style Navigation
 All navigation is keyboard-driven with vim-inspired keys.
 
 **Basic Movement:**
-- ✅ `h` / `←` - Move left
-- ✅ `j` / `↓` - Move down
-- ✅ `k` / `↑` - Move up
-- ✅ `l` / `→` - Move right
+-  `h` / `←` - Move left
+-  `j` / `↓` - Move down
+-  `k` / `↑` - Move up
+-  `l` / `→` - Move right
 
 **Advanced Movement & Jumps:**
-- ✅ `gg` / `Home` - Jump to the first row.
-- ✅ `G` / `End` - Jump to the last row.
-- ✅ `0` - Jump to the first column.
-- ✅ `$` - Jump to the last column.
-- ✅ `w`, `b`, `e` - Word-style motion to jump between non-empty cells.
-- ✅ `PageUp` / `PageDown` - Page up or down.
+-  `gg` / `Home` - Jump to the first row.
+-  `G` / `End` - Jump to the last row.
+-  `0` - Jump to the first column.
+-  `$` - Jump to the last column.
+-  `w`, `b`, `e` - Word-style motion to jump between non-empty cells.
+-  `PageUp` / `PageDown` - Page up or down.
 
 **Count Prefixes:**
-- ✅ Use numbers before commands to repeat them (e.g., `5j` moves down 5 rows).
+-  Use numbers before commands to repeat them (e.g., `5j` moves down 5 rows).
 
 ### Command Mode
-- ✅ Press `:` to enter Command mode for direct jumps.
-- ✅ Jump to a specific line (e.g., `:15`).
-- ✅ Jump to a specific column by letter (e.g., `:B`, `:BC`).
+-  Press `:` to enter Command mode for direct jumps.
+-  Jump to a specific line (e.g., `:15`).
+-  Jump to a specific column by letter (e.g., `:B`, `:BC`).
 
 ### Viewport Control
-- ✅ `zt` - Position the current row at the **t**op of the viewport.
-- ✅ `zz` - Position the current row at the **c**enter of the viewport.
-- ✅ `zb` - Position the current row at the **b**ottom of the viewport.
+-  `zt` - Position the current row at the **t**op of the viewport.
+-  `zz` - Position the current row at the **c**enter of the viewport.
+-  `zb` - Position the current row at the **b**ottom of the viewport.
 
 ### Multi-File Management
-- ✅ **Auto-discovery**: Automatically finds all `.csv` files in the same directory.
-- ✅ **File Switcher**: A persistent panel at the bottom shows all available files.
-- ✅ **Quick Switching**: Use `[` and `]` to cycle between files.
+-  **Auto-discovery**: Automatically finds all `.csv` files in the same directory.
+-  **File Switcher**: A persistent panel at the bottom shows all available files.
+-  **Quick Switching**: Use `[` and `]` to cycle between files.
 
 ### Application Features
-- ✅ **Help System**: A toggleable overlay (`?`) shows available keybindings.
-- ✅ **Status Bar**: Provides contextual information about the file, position, and mode.
-- ✅ **Quit Protection**: Warns on quit if there are unsaved changes (partial implementation of v0.6.0). Note: Editing is not yet implemented, so the `is_dirty` flag can only be set for testing purposes.
+-  **Help System**: A toggleable overlay (`?`) shows available keybindings.
+-  **Status Bar**: Provides contextual information about the file, position, and mode.
+-  **Quit Protection**: Warns on quit if there are unsaved changes (partial implementation of v0.6.0). Note: Editing is not yet implemented, so the `is_dirty` flag can only be set for testing purposes.
 
 ## Planned Features
 
@@ -186,9 +186,9 @@ LazyCSV is designed for speed:
 
 | Operation | Target | Status |
 |-----------|--------|--------|
-| File loading | < 100ms for 10K rows | ✅ Achieved |
-| Render frame | < 16ms (60 FPS) | ✅ Achieved |
-| Navigation | < 10ms response | ✅ Achieved |
+| File loading | < 100ms for 10K rows |  Achieved |
+| Render frame | < 16ms (60 FPS) |  Achieved |
+| Navigation | < 10ms response |  Achieved |
 | Search | < 200ms for 10K rows | 📋 v1.1.0 |
 | Sort | < 500ms for 10K rows | 📋 v1.2.0 |
 | Save | < 200ms for 10K rows | 📋 v0.6.0 |
@@ -299,13 +299,13 @@ LazyCSV is designed for speed:
 
 | Feature | LazyCSV | Excel | less/cat | visidata |
 |---------|---------|-------|----------|----------|
-| Keyboard-first | ✅ | ❌ | ✅ | ✅ |
-| Vim navigation | ✅ | ❌ | Partial | ✅ |
-| Fast (10K+ rows) | ✅ | ❌ | ✅ | ✅ |
-| In-place editing | v0.4.0 | ✅ | ❌ | ✅ |
-| Multi-file nav | ✅ | ❌ | ❌ | ❌ |
-| Clean UI | ✅ | ❌ | ✅ | ❌ |
-| Built-in help | ✅ | ✅ | ❌ | ✅ |
+| Keyboard-first |  |  |  |  |
+| Vim navigation |  |  | Partial |  |
+| Fast (10K+ rows) |  |  |  |  |
+| In-place editing | v0.4.0 |  |  |  |
+| Multi-file nav |  |  |  |  |
+| Clean UI |  |  |  |  |
+| Built-in help |  |  |  |  |
 
 **LazyCSV's Niche:**
 - Faster than Excel for viewing

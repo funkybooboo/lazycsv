@@ -235,9 +235,9 @@ task check           # Check without building
 ## Performance
 
 Target performance (v0.1.0):
-- Load 10K rows: < 100ms ✅
-- Render frame: < 16ms (60 FPS) ✅
-- Navigation: < 10ms response ✅
+- Load 10K rows: < 100ms 
+- Render frame: < 16ms (60 FPS) 
+- Navigation: < 10ms response 
 
 ## Future Development
 

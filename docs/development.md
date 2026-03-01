@@ -588,18 +588,18 @@ Be respectful and inclusive:
 ### PR Guidelines
 
 Good PRs:
-- ✅ Focus on one thing
-- ✅ Include tests
-- ✅ Update documentation
-- ✅ Pass all checks (fmt, clippy, test)
-- ✅ Have clear description
+-  Focus on one thing
+-  Include tests
+-  Update documentation
+-  Pass all checks (fmt, clippy, test)
+-  Have clear description
 
 Bad PRs:
-- ❌ Mix unrelated changes
-- ❌ No tests
-- ❌ Don't update docs
-- ❌ Have warnings/errors
-- ❌ No description
+-  Mix unrelated changes
+-  No tests
+-  Don't update docs
+-  Have warnings/errors
+-  No description
 
 ### Commit Messages
 

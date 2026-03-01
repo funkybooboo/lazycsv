@@ -132,9 +132,9 @@ LazyCSV treats CSV files in the same directory like Excel sheets. Open one file,
 | **v0.3.1** | UI/UX polish - mode indicator, transient messages, help redesign |
 | **v0.3.2** | Pre-edit polish - minimal UI, vim-like status line |
 | **v0.4.0** | Insert mode - quick cell editing, row operations |
-| **v0.4.1** | Persistence - `:w`, `:W`, multi-file dirty tracking, command ranges ✅ |
+| **v0.4.1** | Persistence - `:w`, `:W`, multi-file dirty tracking, command ranges  |
 | **v0.5.0** | Column operations - `,o`, `,O`, `,dd`, `,yy`, `,p`, visual mode |
-| **v0.6.0** | Magnifier Mode - multi-line cell editing with full vim ✅ |
+| **v0.6.0** | Magnifier Mode - multi-line cell editing with full vim  |
 | **v0.7.0** | Search - `/`, `n`, `N` fuzzy cell search |
 | **v0.8.0** | Undo/redo - `u`, `Ctrl+r`, `.` dot command |
 | **v0.9.0** | Transforms - `:sort`, `:filter`, data operations |

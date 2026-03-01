@@ -32,14 +32,14 @@ This documentation is structured to guide you from high-level concepts to low-le
 
 ## Project Status
 
-### v0.1.0 - Foundation ✅ Complete
+### v0.1.0 - Foundation  Complete
 - Fast CSV loading and display (in-memory)
 - Vim-style navigation
 - Multi-file switching
 - Comprehensive test suite
 
-### v0.2.0 - Type Safety Refactor ✅ Complete (v0.2.1 - v0.2.6)
-- ✅ **v0.2.1 - v0.2.6**: Type safety refactor COMPLETE
+### v0.2.0 - Type Safety Refactor  Complete (v0.2.1 - v0.2.6)
+-  **v0.2.1 - v0.2.6**: Type safety refactor COMPLETE
   - v0.2.1: Type safety foundation
   - v0.2.2: Separation of concerns
   - v0.2.3: Better naming & consistency
@@ -48,7 +48,7 @@ This documentation is structured to guide you from high-level concepts to low-le
   - v0.2.6: Testing & validation
 
 ### Roadmap to v1.0
-- **v0.2.0** - Type safety refactor ✅ Complete (All 6 phases)
+- **v0.2.0** - Type safety refactor  Complete (All 6 phases)
 - **v0.3.0** - Advanced navigation (gg, G, counts, column jumps)
 - **v0.4.0** - Quick editing (Insert mode)
 - **v0.5.0** - **Vim magnifier** (full vim editor embedded)

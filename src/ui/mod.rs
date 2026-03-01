@@ -743,7 +743,7 @@ mod tests {
         let csv_data = Document::new(
             vec!["Name".to_string(), "Status".to_string()],
             vec![
-                vec!["Alice".to_string(), "🎉 Happy".to_string()],
+                vec!["Alice".to_string(), " Happy".to_string()],
                 vec!["Bob".to_string(), "😀 Smile".to_string()],
             ],
             "emoji.csv".to_string(),
@@ -907,10 +907,10 @@ mod tests {
             vec![
                 vec![
                     "Hello".to_string(),
-                    "🎉🎊😀".to_string(),
+                    "🎊😀".to_string(),
                     "World".to_string(),
                 ],
-                vec!["Test".to_string(), "🔥💯".to_string(), "Data".to_string()],
+                vec!["Test".to_string(), "".to_string(), "Data".to_string()],
             ],
             "unicode.csv".to_string(),
         );

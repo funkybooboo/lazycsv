@@ -531,7 +531,7 @@ mod tests {
         let mut file = NamedTempFile::new().unwrap();
         writeln!(file, "Name,Description").unwrap();
         writeln!(file, "Test,日本語テキスト").unwrap(); // Japanese
-        writeln!(file, "Test2,🎉 Emoji").unwrap(); // Emoji
+        writeln!(file, "Test2, Emoji").unwrap(); // Emoji
         writeln!(file, "Test3,ñóëü").unwrap(); // Accented chars
 
         let result = Document::from_file(file.path(), None, false, None);
@@ -540,7 +540,7 @@ mod tests {
         let csv_data = result.unwrap();
         // rows[0] is header, rows[1..] are data
         assert_eq!(csv_data.rows[1][1], "日本語テキスト");
-        assert_eq!(csv_data.rows[2][1], "🎉 Emoji");
+        assert_eq!(csv_data.rows[2][1], " Emoji");
         assert_eq!(csv_data.rows[3][1], "ñóëü");
     }
 

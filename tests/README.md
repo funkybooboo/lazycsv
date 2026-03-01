@@ -7,7 +7,7 @@ Comprehensive testing for the LazyCSV TUI application.
 - **Total Tests:** 257 (v0.2.0)
 - **Breakdown:** 229 unit + 7 CLI integration + 21 workflow integration
 - **Coverage:** All v0.2.0 features including type safety, navigation, and architecture
-- **Status:** ✅ All Passing
+- **Status:**  All Passing
 
 ## Test Organization
 
@@ -50,14 +50,14 @@ v0.2.0 expanded the test suite from 133 to 257 tests (+124 new tests):
 
 Tests core application state and behavior:
 
-- ✅ App initialization
-- ✅ Navigation (up/down/left/right)
-- ✅ Vim keybindings (hjkl, gg, G, 0, $)
-- ✅ Help toggle
-- ✅ Quit functionality
-- ✅ File switching ([ and ])
-- ✅ Dirty state warnings
-- ✅ Navigation blocking when help is shown
+-  App initialization
+-  Navigation (up/down/left/right)
+-  Vim keybindings (hjkl, gg, G, 0, $)
+-  Help toggle
+-  Quit functionality
+-  File switching ([ and ])
+-  Dirty state warnings
+-  Navigation blocking when help is shown
 
 **Key Features Tested:**
 - All vim-style navigation works correctly
@@ -79,28 +79,28 @@ Tests command-line argument parsing - file and directory paths, error handling, 
 
 Tests basic CSV loading:
 
-- ✅ Valid CSV loading
-- ✅ Empty CSV (headers only)
-- ✅ Out of bounds access
-- ✅ Cell and header retrieval
+-  Valid CSV loading
+-  Empty CSV (headers only)
+-  Out of bounds access
+-  Cell and header retrieval
 
 ### 4. CSV Edge Cases (`csv_edge_cases_test.rs`)
 
 Tests challenging CSV scenarios:
 
-- ✅ Single row/column CSVs
-- ✅ Empty cells
-- ✅ Quoted fields with commas
-- ✅ Escaped quotes
-- ✅ Whitespace preservation
-- ✅ Special characters (Unicode, emoji)
-- ✅ Long text (1000+ chars)
-- ✅ Numbers and scientific notation
-- ✅ Large files (10K rows)
-- ✅ Wide files (100 columns)
-- ✅ Mixed row lengths (error handling)
-- ✅ Commas within quotes
-- ✅ Filename extraction
+-  Single row/column CSVs
+-  Empty cells
+-  Quoted fields with commas
+-  Escaped quotes
+-  Whitespace preservation
+-  Special characters (Unicode, emoji)
+-  Long text (1000+ chars)
+-  Numbers and scientific notation
+-  Large files (10K rows)
+-  Wide files (100 columns)
+-  Mixed row lengths (error handling)
+-  Commas within quotes
+-  Filename extraction
 
 **Edge Cases:**
 - Empty cells → "" (empty string)
@@ -131,14 +131,14 @@ Tests directory CSV discovery - scanning, filtering, sorting, path handling.
 
 Tests complex navigation patterns:
 
-- ✅ Navigate to all four corners
-- ✅ Page navigation (20 rows at a time)
-- ✅ Horizontal scrolling (wide CSVs)
-- ✅ Vim-style hjkl navigation
-- ✅ Boundary testing
-- ✅ Mixed navigation keys
-- ✅ Traversing entire dataset
-- ✅ Rapid direction changes
+-  Navigate to all four corners
+-  Page navigation (20 rows at a time)
+-  Horizontal scrolling (wide CSVs)
+-  Vim-style hjkl navigation
+-  Boundary testing
+-  Mixed navigation keys
+-  Traversing entire dataset
+-  Rapid direction changes
 
 **Workflows Tested:**
 - Top-left → Bottom-right → Top-left
@@ -151,18 +151,18 @@ Tests complex navigation patterns:
 
 Tests end-to-end user scenarios:
 
-- ✅ Complete navigation workflow
-- ✅ Help workflow (open/close/blocked navigation)
-- ✅ Quit with clean/dirty state
-- ✅ File switching workflow
-- ✅ Help + quit interaction
-- ✅ Navigate + switch file
-- ✅ Rapid key sequences
-- ✅ Zigzag navigation
-- ✅ Multiple help toggles
-- ✅ Boundary navigation
-- ✅ Current file tracking
-- ✅ Status message lifecycle
+-  Complete navigation workflow
+-  Help workflow (open/close/blocked navigation)
+-  Quit with clean/dirty state
+-  File switching workflow
+-  Help + quit interaction
+-  Navigate + switch file
+-  Rapid key sequences
+-  Zigzag navigation
+-  Multiple help toggles
+-  Boundary navigation
+-  Current file tracking
+-  Status message lifecycle
 
 **User Scenarios:**
 - Opening help blocks navigation until closed
@@ -174,12 +174,12 @@ Tests end-to-end user scenarios:
 
 Tests TUI output with TestBackend:
 
-- ✅ Table rendering
-- ✅ Help overlay rendering
-- ✅ Multi-file switcher
-- ✅ Status bar
-- ✅ Column letters (A, B, C...)
-- ✅ Dirty indicator (*)
+-  Table rendering
+-  Help overlay rendering
+-  Multi-file switcher
+-  Status bar
+-  Column letters (A, B, C...)
+-  Dirty indicator (*)
 
 **Rendering Verified:**
 - All UI components appear
@@ -191,18 +191,18 @@ Tests TUI output with TestBackend:
 
 Tests UI with different data states:
 
-- ✅ Empty data rendering
-- ✅ Single cell CSV
-- ✅ Small terminal (20x10)
-- ✅ Large terminal (200x100)
-- ✅ Navigation state updates
-- ✅ Help toggle transitions
-- ✅ Status bar updates
-- ✅ File switcher (single/multiple)
-- ✅ Dirty indicator
-- ✅ Column letters display
-- ✅ Row numbers display
-- ✅ Selection highlighting
+-  Empty data rendering
+-  Single cell CSV
+-  Small terminal (20x10)
+-  Large terminal (200x100)
+-  Navigation state updates
+-  Help toggle transitions
+-  Status bar updates
+-  File switcher (single/multiple)
+-  Dirty indicator
+-  Column letters display
+-  Row numbers display
+-  Selection highlighting
 
 **State Transitions:**
 - Clean → Dirty updates UI
@@ -214,7 +214,7 @@ Tests UI with different data states:
 
 Tests utility functions:
 
-- ✅ Column index to letter conversion (0→A, 25→Z, 26→AA)
+-  Column index to letter conversion (0→A, 25→Z, 26→AA)
 
 ## Running Tests
 
@@ -258,19 +258,19 @@ task test-verbose      # Run with full output
 ### Features Covered
 
 **v0.1.0 MVP (100% Coverage):**
-- ✅ CSV loading and parsing
-- ✅ Vim navigation (hjkl, gg, G, 0, $)
-- ✅ Arrow key navigation
-- ✅ Page up/down
-- ✅ Multi-file switching ([, ])
-- ✅ Help overlay (?)
-- ✅ Quit (q)
-- ✅ Row/column numbers
-- ✅ Cell highlighting
-- ✅ Horizontal scrolling
-- ✅ Status bar
-- ✅ File switcher UI
-- ✅ Dirty state tracking
+-  CSV loading and parsing
+-  Vim navigation (hjkl, gg, G, 0, $)
+-  Arrow key navigation
+-  Page up/down
+-  Multi-file switching ([, ])
+-  Help overlay (?)
+-  Quit (q)
+-  Row/column numbers
+-  Cell highlighting
+-  Horizontal scrolling
+-  Status bar
+-  File switcher UI
+-  Dirty state tracking
 
 ### Edge Cases Covered
 
@@ -340,9 +340,9 @@ fn test_your_feature() {
 ## CI Integration
 
 Tests run automatically via GitHub Actions:
-- ✅ On every push
-- ✅ On pull requests
-- ✅ Before merging
+-  On every push
+-  On pull requests
+-  Before merging
 
 See `.github/workflows/ci.yml` for configuration.
 
@@ -406,6 +406,6 @@ When adding features:
 
 ---
 
-**Test Coverage:** v0.1.0 Complete ✅
-**Status:** All 257 tests passing 🎉 (v0.2.0)
+**Test Coverage:** v0.1.0 Complete 
+**Status:** All 257 tests passing  (v0.2.0)
 **Quality:** Production-ready
