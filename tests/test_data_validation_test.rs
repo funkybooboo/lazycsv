@@ -294,7 +294,11 @@ fn test_very_wide_csv() {
 fn test_customers_csv() {
     let doc = load_test_csv("customers.csv");
     assert_eq!(doc.column_count(), 5, "customers.csv should have 5 columns");
-    assert_eq!(doc.row_count(), 6, "customers.csv should have 5 rows");
+    assert_eq!(
+        doc.row_count(),
+        5,
+        "customers.csv should have 5 rows (1 header + 4 data)"
+    );
 
     // Verify headers
     assert_eq!(doc.get_header(ColIndex::new(0)), "CustomerID");
