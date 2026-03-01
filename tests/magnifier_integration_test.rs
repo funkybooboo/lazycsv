@@ -296,9 +296,9 @@ fn test_magnifier_unicode_content() {
 
     // Verify unicode preserved
     let content = magnifier.get_content();
-    assert!(content.contains(''));
-    assert!(content.contains('日'));
-    assert!(content.contains('本'));
+    assert!(content.contains("🎉"));
+    assert!(content.contains("日"));
+    assert!(content.contains("本"));
 
     // Save and verify
     app.save_and_close_magnifier();
@@ -306,7 +306,8 @@ fn test_magnifier_unicode_content() {
         app.get_selected_row().unwrap(),
         app.view_state.selected_column,
     );
-    assert!(cell_content.contains(''));
+    assert!(cell_content.contains("🎉"));
+    assert!(cell_content.contains("日"));
     assert!(cell_content.contains('日'));
 }
 
