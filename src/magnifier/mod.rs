@@ -13,17 +13,11 @@
 //!
 //! ## Usage
 //!
-//! ```ignore
-//! // Open magnifier on current cell
-//! let state = MagnifierState::new("cell content".to_string(), (row, col));
+//! Open magnifier on current cell, edit with vim commands, and get the result:
 //!
-//! // Edit content with vim commands
-//! state.move_down();
-//! state.delete_line();
-//!
-//! // Get edited content
-//! let content = state.get_content();
-//! ```
+//! 1. Create state: `MagnifierState::new(content, position)`
+//! 2. Edit: `move_down()`, `delete_line()`, etc.
+//! 3. Get result: `get_content()`
 
 use crate::domain::position::{ColIndex, RowIndex};
 
@@ -73,8 +67,15 @@ impl MagnifierState {
     ///
     /// # Examples
     ///
-    /// ```ignore
-    /// let state = MagnifierState::new("Hello\nWorld".to_string(), (RowIndex(5), ColIndex(2)));
+    /// ```
+    /// use lazycsv::magnifier::MagnifierState;
+    /// use lazycsv::domain::position::{RowIndex, ColIndex};
+    ///
+    /// let state = MagnifierState::new(
+    ///     "Hello\nWorld".to_string(),
+    ///     (RowIndex::new(5), ColIndex::new(2))
+    /// );
+    /// assert_eq!(state.lines().len(), 2);
     /// ```
     pub fn new(content: String, position: (RowIndex, ColIndex)) -> Self {
         // Split content into lines, preserving empty lines
@@ -415,38 +416,6 @@ impl MagnifierState {
         self.clamp_cursor();
     }
 
-    /// Check if position is at a word boundary
-    fn is_word_boundary(line: &str, pos: usize) -> bool {
-        if pos >= line.len() {
-            return true;
-        }
-
-        let chars: Vec<char> = line.chars().collect();
-        if pos >= chars.len() {
-            return true;
-        }
-
-        let current = chars[pos];
-
-        // Whitespace is always a boundary
-        if current.is_whitespace() {
-            return true;
-        }
-
-        // Check transition between word types
-        if pos > 0 {
-            let prev = chars[pos - 1];
-            let current_is_word = current.is_alphanumeric() || current == '_';
-            let prev_is_word = prev.is_alphanumeric() || prev == '_';
-
-            // Transition from word to non-word or vice versa
-            if current_is_word != prev_is_word {
-                return true;
-            }
-        }
-
-        false
-    }
 
     /// Check if character at position is whitespace
     fn is_whitespace_at(line: &str, pos: usize) -> bool {

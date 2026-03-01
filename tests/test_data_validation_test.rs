@@ -31,7 +31,7 @@ fn test_all_test_data_files_load() {
 
     for entry in std::fs::read_dir(&test_data_path).expect("Failed to read test_data directory") {
         let path = entry.expect("Failed to read entry").path();
-        if path.extension().map_or(false, |e| e == "csv") {
+        if path.extension().is_some_and(|e| e == "csv") {
             let filename = path.file_name().unwrap().to_str().unwrap();
 
             // Skip empty files (0 bytes) - they're expected to fail
