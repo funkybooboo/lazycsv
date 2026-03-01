@@ -214,6 +214,17 @@ impl Session {
     pub fn clear_cache(&mut self) {
         self.document_cache.clear();
     }
+
+    /// Add a file to the session and return its index
+    pub fn add_file(&mut self, path: PathBuf) -> usize {
+        self.files.push(path);
+        self.files.len() - 1
+    }
+
+    /// Set the active file index
+    pub fn set_active_file_index(&mut self, index: usize) {
+        self.active_file_index = index;
+    }
 }
 
 #[cfg(test)]

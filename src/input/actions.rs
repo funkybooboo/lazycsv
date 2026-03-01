@@ -10,6 +10,8 @@ pub enum InputResult {
     ReloadFile,
     /// Quit the application
     Quit,
+    /// Switch to a new document (from SQL query results)
+    SwitchToDocument(crate::csv::Document),
 }
 
 /// High-level user actions that can be performed

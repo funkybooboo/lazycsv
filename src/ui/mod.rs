@@ -1,4 +1,5 @@
 mod help;
+mod sql_editor;
 mod status;
 mod table;
 pub mod utils;
@@ -39,6 +40,11 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     // Render help overlay if active
     if app.view_state.help_overlay_visible {
         help::render_help_overlay(frame, app.view_state.help_scroll_offset);
+    }
+
+    // Render SQL editor overlay if active
+    if app.mode == crate::app::Mode::SqlEditor {
+        sql_editor::render_sql_editor_overlay(frame, &app.sql_buffer, app.sql_cursor);
     }
 }
 

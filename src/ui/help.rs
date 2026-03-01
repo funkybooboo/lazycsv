@@ -113,9 +113,20 @@ fn build_help_text() -> Vec<Line<'static>> {
         Line::from("  [ / ]              Previous/next file"),
         Line::from(""),
         Line::from(Span::styled(
+            "SQL EDITOR",
+            Style::default().add_modifier(Modifier::BOLD),
+        )),
+        Line::from("  q                  Open SQL query editor"),
+        Line::from("  Enter              Execute query (results in output.csv)"),
+        Line::from("  Shift+Enter        Insert newline in query"),
+        Line::from("  Esc                Close editor without executing"),
+        Line::from("  Ctrl+u             Clear query buffer"),
+        Line::from(""),
+        Line::from(Span::styled(
             "GLOBAL",
             Style::default().add_modifier(Modifier::BOLD),
         )),
+        Line::from("  :q / :q!           Quit (force quit)"),
         Line::from("  ?                  Toggle this help (j/k to scroll)"),
         Line::from(""),
     ]
@@ -171,7 +182,7 @@ pub fn render_help_overlay(frame: &mut Frame, scroll_offset: u16) {
 }
 
 /// Helper to create centered rectangle
-fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+pub(super) fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     let popup_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([

@@ -27,6 +27,8 @@ pub enum Mode {
     Command,
     /// File list picker (entered via :files)
     FileList,
+    /// SQL query editor (entered via q)
+    SqlEditor,
 }
 
 /// Edit buffer for cell editing
@@ -69,6 +71,12 @@ pub struct App {
 
     /// Dual clipboard: row buffer for yy/dd/p and column buffer for ,yy/,dd/,p
     pub clipboard: DualClipboard,
+
+    /// SQL editor buffer (persists between opens)
+    pub sql_buffer: String,
+
+    /// SQL editor cursor position (character index)
+    pub sql_cursor: usize,
 
     /// Flag to quit application
     pub should_quit: bool,
@@ -153,6 +161,8 @@ impl App {
             edit_buffer: None,
             last_edit_position: None,
             clipboard: DualClipboard::new(),
+            sql_buffer: String::new(),
+            sql_cursor: 0,
             should_quit: false,
         }
     }
@@ -411,14 +421,30 @@ mod tests {
     }
 
     #[test]
-    fn test_quit_functionality() {
+    fn test_q_opens_sql_editor() {
+        let csv_data = create_test_csv_data();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        assert_eq!(app.mode, Mode::Normal);
+
+        app.handle_key(key_event(KeyCode::Char('q'))).unwrap();
+        assert_eq!(app.mode, Mode::SqlEditor);
+        assert!(!app.should_quit);
+    }
+
+    #[test]
+    fn test_quit_via_command_mode() {
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         assert!(!app.should_quit);
 
+        // Enter command mode and type :q
+        app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('q'))).unwrap();
+        app.handle_key(key_event(KeyCode::Enter)).unwrap();
         assert!(app.should_quit);
     }
 
@@ -431,7 +457,10 @@ mod tests {
 
         assert!(!app.should_quit);
 
+        // Try :q with unsaved changes
+        app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('q'))).unwrap();
+        app.handle_key(key_event(KeyCode::Enter)).unwrap();
         assert!(!app.should_quit); // Should not quit
         assert!(app.status_message.is_some()); // Should show warning
     }

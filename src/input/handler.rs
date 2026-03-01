@@ -61,6 +61,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         Mode::Command => handle_command_mode(app, key),
         Mode::Insert => handle_insert_mode(app, key),
         Mode::FileList => handle_file_list_mode(app, key),
+        Mode::SqlEditor => handle_sql_editor_mode(app, key),
         // TODO: Implement handlers for new modes in v0.5.0+
         Mode::Magnifier | Mode::HeaderEdit | Mode::Visual => {
             // For now, Esc returns to Normal mode
@@ -76,15 +77,6 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Result<InputResult> {
 /// Returns true if navigation commands are allowed (help overlay is closed)
 fn is_navigation_allowed(app: &App) -> bool {
     !app.view_state.help_overlay_visible
-}
-
-/// Handle quit command with unsaved changes check
-fn handle_quit(app: &mut App) {
-    if app.document.is_dirty {
-        app.status_message = Some(StatusMessage::from(messages::UNSAVED_CHANGES));
-    } else {
-        app.should_quit = true;
-    }
 }
 
 /// Toggle help overlay visibility
@@ -182,9 +174,11 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     }
 
     match key.code {
-        // Quit command
+        // Open SQL query editor
         KeyCode::Char('q') if is_navigation_allowed(app) => {
-            handle_quit(app);
+            app.sql_cursor = app.sql_buffer.chars().count();
+            app.mode = Mode::SqlEditor;
+            return Ok(InputResult::Continue);
         }
 
         // Toggle help overlay
@@ -1848,6 +1842,279 @@ fn handle_insert_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                 buffer.content = buffer.content[byte_pos..].to_string();
                 buffer.cursor = 0;
             }
+        }
+
+        _ => {}
+    }
+
+    Ok(InputResult::Continue)
+}
+
+/// Generate a unique output filename that doesn't conflict with existing session files.
+/// Returns "output.csv", "output1.csv", "output2.csv", etc.
+fn generate_output_filename(app: &App) -> String {
+    let existing: std::collections::HashSet<String> = app
+        .session
+        .files()
+        .iter()
+        .filter_map(|p| p.file_name().and_then(|n| n.to_str()).map(|s| s.to_string()))
+        .collect();
+
+    let base = "output.csv".to_string();
+    if !existing.contains(&base) {
+        return base;
+    }
+    let mut i = 1;
+    loop {
+        let name = format!("output{}.csv", i);
+        if !existing.contains(&name) {
+            return name;
+        }
+        i += 1;
+    }
+}
+
+/// Move the SQL cursor up one line within the sql_buffer.
+fn move_sql_cursor_up(buffer: &str, cursor: usize) -> usize {
+    let chars: Vec<char> = buffer.chars().collect();
+    // Find position of start of current line
+    let mut line_start = cursor;
+    while line_start > 0 && chars[line_start - 1] != '\n' {
+        line_start -= 1;
+    }
+    if line_start == 0 {
+        return cursor; // Already on first line
+    }
+    let col = cursor - line_start;
+    // Find start of previous line
+    let prev_line_end = line_start - 1; // the '\n' char
+    let mut prev_line_start = prev_line_end;
+    while prev_line_start > 0 && chars[prev_line_start - 1] != '\n' {
+        prev_line_start -= 1;
+    }
+    let prev_line_len = prev_line_end - prev_line_start;
+    prev_line_start + col.min(prev_line_len)
+}
+
+/// Move the SQL cursor down one line within the sql_buffer.
+fn move_sql_cursor_down(buffer: &str, cursor: usize) -> usize {
+    let chars: Vec<char> = buffer.chars().collect();
+    let total = chars.len();
+    // Find start of current line
+    let mut line_start = cursor;
+    while line_start > 0 && chars[line_start - 1] != '\n' {
+        line_start -= 1;
+    }
+    let col = cursor - line_start;
+    // Find end of current line
+    let mut line_end = cursor;
+    while line_end < total && chars[line_end] != '\n' {
+        line_end += 1;
+    }
+    if line_end >= total {
+        return cursor; // Already on last line
+    }
+    let next_line_start = line_end + 1;
+    // Find end of next line
+    let mut next_line_end = next_line_start;
+    while next_line_end < total && chars[next_line_end] != '\n' {
+        next_line_end += 1;
+    }
+    let next_line_len = next_line_end - next_line_start;
+    next_line_start + col.min(next_line_len)
+}
+
+/// Handle keyboard input in SQL editor mode
+fn handle_sql_editor_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
+    match (key.code, key.modifiers) {
+        // Escape → return to Normal mode
+        (KeyCode::Esc, _) => {
+            app.mode = Mode::Normal;
+        }
+
+        // Shift+Enter → insert newline
+        (KeyCode::Enter, KeyModifiers::SHIFT) => {
+            let byte_pos = app
+                .sql_buffer
+                .char_indices()
+                .nth(app.sql_cursor)
+                .map(|(i, _)| i)
+                .unwrap_or(app.sql_buffer.len());
+            app.sql_buffer.insert(byte_pos, '\n');
+            app.sql_cursor += 1;
+        }
+
+        // Enter → execute query
+        (KeyCode::Enter, KeyModifiers::NONE) => {
+            let query = app.sql_buffer.trim().to_string();
+            if query.is_empty() {
+                app.status_message = Some(StatusMessage::new_owned("Empty query".to_string()));
+                app.mode = Mode::Normal;
+                return Ok(InputResult::Continue);
+            }
+
+            // Build SQLite connection and load all session CSVs
+            let conn = rusqlite::Connection::open_in_memory()
+                .map_err(|e| anyhow::anyhow!("Failed to open SQLite: {}", e))?;
+
+            // Load each session file into SQLite
+            for file_path in app.session.files().to_vec() {
+                let table_name = crate::query::table_name_from_path(&file_path);
+
+                // Check if this is the current document
+                let filename = file_path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("");
+                let doc = if filename == app.document.filename {
+                    // Use current in-memory document (may have unsaved edits)
+                    app.document.clone()
+                } else if let Some(cached) = app.session.get_cached_document(&file_path) {
+                    // Use cached (dirty) document
+                    cached.clone()
+                } else if file_path.exists() {
+                    // Load from disk
+                    let config = app.session.config();
+                    match crate::csv::Document::from_file(
+                        &file_path,
+                        config.delimiter,
+                        config.no_headers,
+                        config.encoding.clone(),
+                    ) {
+                        Ok(d) => d,
+                        Err(_) => continue,
+                    }
+                } else {
+                    continue; // Skip virtual files that don't exist on disk
+                };
+
+                if doc.rows.is_empty() || doc.rows[0].is_empty() {
+                    continue;
+                }
+
+                if crate::query::load_csv_into_sqlite(&conn, &doc, &table_name).is_err() {
+                    continue; // Skip files that fail to load
+                }
+            }
+
+            // Execute query
+            match crate::query::execute_query_to_document(&conn, &query, "output.csv".to_string())
+            {
+                Ok(mut doc) => {
+                    // Determine output filename using reuse logic:
+                    // Look for an existing unsaved output sheet
+                    let mut reuse_name = None;
+                    for path in app.session.files() {
+                        let name = path
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("");
+                        if name.starts_with("output") && name.ends_with(".csv") && !path.exists() {
+                            reuse_name = Some(name.to_string());
+                            break;
+                        }
+                    }
+
+                    let output_name = reuse_name.unwrap_or_else(|| generate_output_filename(app));
+                    doc.filename = output_name;
+
+                    app.mode = Mode::Normal;
+                    return Ok(InputResult::SwitchToDocument(doc));
+                }
+                Err(e) => {
+                    app.status_message =
+                        Some(StatusMessage::new_owned(format!("SQL error: {}", e)));
+                    // Stay in SqlEditor mode so user can fix the query
+                }
+            }
+        }
+
+        // Type character
+        (KeyCode::Char(c), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
+            let byte_pos = app
+                .sql_buffer
+                .char_indices()
+                .nth(app.sql_cursor)
+                .map(|(i, _)| i)
+                .unwrap_or(app.sql_buffer.len());
+            app.sql_buffer.insert(byte_pos, c);
+            app.sql_cursor += 1;
+        }
+
+        // Backspace
+        (KeyCode::Backspace, _) => {
+            if app.sql_cursor > 0 {
+                app.sql_cursor -= 1;
+                let byte_pos = app
+                    .sql_buffer
+                    .char_indices()
+                    .nth(app.sql_cursor)
+                    .map(|(i, _)| i)
+                    .unwrap_or(0);
+                app.sql_buffer.remove(byte_pos);
+            }
+        }
+
+        // Delete
+        (KeyCode::Delete, _) => {
+            let char_count = app.sql_buffer.chars().count();
+            if app.sql_cursor < char_count {
+                let byte_pos = app
+                    .sql_buffer
+                    .char_indices()
+                    .nth(app.sql_cursor)
+                    .map(|(i, _)| i)
+                    .unwrap_or(0);
+                app.sql_buffer.remove(byte_pos);
+            }
+        }
+
+        // Ctrl+u → clear buffer
+        (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
+            app.sql_buffer.clear();
+            app.sql_cursor = 0;
+        }
+
+        // Left arrow
+        (KeyCode::Left, _) => {
+            app.sql_cursor = app.sql_cursor.saturating_sub(1);
+        }
+
+        // Right arrow
+        (KeyCode::Right, _) => {
+            let char_count = app.sql_buffer.chars().count();
+            app.sql_cursor = (app.sql_cursor + 1).min(char_count);
+        }
+
+        // Up arrow → move cursor up one line
+        (KeyCode::Up, _) => {
+            app.sql_cursor = move_sql_cursor_up(&app.sql_buffer, app.sql_cursor);
+        }
+
+        // Down arrow → move cursor down one line
+        (KeyCode::Down, _) => {
+            app.sql_cursor = move_sql_cursor_down(&app.sql_buffer, app.sql_cursor);
+        }
+
+        // Home → start of current line
+        (KeyCode::Home, _) => {
+            let chars: Vec<char> = app.sql_buffer.chars().collect();
+            let mut pos = app.sql_cursor;
+            while pos > 0 && chars[pos - 1] != '\n' {
+                pos -= 1;
+            }
+            app.sql_cursor = pos;
+        }
+
+        // End → end of current line
+        (KeyCode::End, _) => {
+            let chars: Vec<char> = app.sql_buffer.chars().collect();
+            let total = chars.len();
+            let mut pos = app.sql_cursor;
+            while pos < total && chars[pos] != '\n' {
+                pos += 1;
+            }
+            app.sql_cursor = pos;
         }
 
         _ => {}

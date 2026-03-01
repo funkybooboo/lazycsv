@@ -8,7 +8,7 @@ use std::fs;
 use std::path::Path;
 
 /// Holds parsed CSV document in memory
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Document {
     /// All rows including header (row 0 = header, rest = data)
     pub rows: Vec<Vec<String>>,

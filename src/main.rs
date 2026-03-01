@@ -1,11 +1,25 @@
 use anyhow::{Context, Result};
 use crossterm::event::{self, Event, KeyEventKind};
-use lazycsv::{cli, ui, App, InputResult};
+use lazycsv::{cli, ui, App, FileConfig, InputResult};
+use std::path::PathBuf;
 use std::time::Duration;
 
 fn main() -> Result<()> {
-    // Parse CLI args and create App
-    let app = App::from_cli(cli::parse_args())?;
+    let cli_args = cli::parse_args();
+
+    // Non-interactive query mode: execute SQL and exit
+    if let Some(ref query) = cli_args.query {
+        let path = cli_args.path.clone().unwrap_or_else(|| PathBuf::from("."));
+        let config = FileConfig::with_options(
+            cli_args.delimiter,
+            cli_args.no_headers,
+            cli_args.encoding.clone(),
+        );
+        return lazycsv::query::execute_query(&path, query, &config);
+    }
+
+    // Interactive TUI mode
+    let app = App::from_cli(cli_args)?;
 
     // Initialize terminal
     let mut terminal = ratatui::init();
@@ -56,6 +70,52 @@ fn run(
                         }
                         InputResult::Quit => {
                             app.should_quit = true;
+                        }
+                        InputResult::SwitchToDocument(doc) => {
+                            terminal.clear().context("Failed to clear terminal")?;
+
+                            // Cache current document if dirty
+                            if app.document.is_dirty {
+                                let current_path = app.get_current_file().clone();
+                                app.session.mark_dirty(&current_path);
+                                app.session
+                                    .cache_document(current_path, app.document.clone());
+                            }
+
+                            // Check if doc.filename matches an existing session file
+                            let doc_filename = doc.filename.clone();
+                            let existing_idx = app
+                                .session
+                                .files()
+                                .iter()
+                                .position(|p| {
+                                    p.file_name()
+                                        .and_then(|n| n.to_str())
+                                        .map(|s| s == doc_filename)
+                                        .unwrap_or(false)
+                                });
+
+                            if let Some(idx) = existing_idx {
+                                // Replace at that index
+                                app.session.set_active_file_index(idx);
+                            } else {
+                                // Add as new file
+                                let path = std::path::PathBuf::from(&doc_filename);
+                                let idx = app.session.add_file(path);
+                                app.session.set_active_file_index(idx);
+                            }
+
+                            app.document = doc;
+
+                            // Reset view state
+                            app.view_state = lazycsv::ui::ViewState::default();
+                            let initial_row =
+                                if app.document.header_mode && app.document.row_count() > 1 {
+                                    1
+                                } else {
+                                    0
+                                };
+                            app.view_state.table_state.select(Some(initial_row));
                         }
                         InputResult::Continue => {
                             // Normal operation, continue

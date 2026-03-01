@@ -75,7 +75,10 @@ fn test_quit_workflow_clean_state() {
 
     assert!(!app.should_quit);
 
+    // Quit via :q command
+    app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('q'))).unwrap();
+    app.handle_key(key_event(KeyCode::Enter)).unwrap();
     assert!(app.should_quit);
 }
 
@@ -88,8 +91,10 @@ fn test_quit_workflow_dirty_state() {
 
     assert!(!app.should_quit);
 
-    // First quit attempt should warn
+    // First quit attempt via :q should warn
+    app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('q'))).unwrap();
+    app.handle_key(key_event(KeyCode::Enter)).unwrap();
     assert!(!app.should_quit);
     assert!(app.status_message.is_some());
 }
@@ -137,16 +142,23 @@ fn test_help_and_quit_workflow() {
     app.handle_key(key_event(KeyCode::Char('?'))).unwrap();
     assert!(app.view_state.help_overlay_visible);
 
-    // Try to quit while help is open (should not work)
+    // Try to open sql editor while help is open (should not work - navigation blocked)
     app.handle_key(key_event(KeyCode::Char('q'))).unwrap();
-    assert!(!app.should_quit); // q is blocked when help is shown
+    assert_eq!(app.mode, lazycsv::app::Mode::Normal); // q is blocked when help is shown
 
     // Close help
     app.handle_key(key_event(KeyCode::Char('?'))).unwrap();
     assert!(!app.view_state.help_overlay_visible);
 
-    // Now quit should work
+    // Now q opens SQL editor
     app.handle_key(key_event(KeyCode::Char('q'))).unwrap();
+    assert_eq!(app.mode, lazycsv::app::Mode::SqlEditor);
+
+    // Escape back, then quit via :q
+    app.handle_key(key_event(KeyCode::Esc)).unwrap();
+    app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
+    app.handle_key(key_event(KeyCode::Char('q'))).unwrap();
+    app.handle_key(key_event(KeyCode::Enter)).unwrap();
     assert!(app.should_quit);
 }
 
@@ -271,9 +283,11 @@ fn test_status_message_lifecycle() {
     // Initially no status message
     assert!(app.status_message.is_none());
 
-    // Make data dirty and try to quit
+    // Make data dirty and try to quit via :q
     app.document.is_dirty = true;
+    app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('q'))).unwrap();
+    app.handle_key(key_event(KeyCode::Enter)).unwrap();
 
     // Should have status message
     assert!(app.status_message.is_some());

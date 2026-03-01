@@ -290,6 +290,9 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
                 area.width as usize,
             )
         }
+        crate::app::Mode::SqlEditor => {
+            build_status_line("SQL EDITOR", &right_side, area.width as usize)
+        }
         crate::app::Mode::FileList => {
             // Show file list with cursor indicator and filter
             let files = app.session.files();
