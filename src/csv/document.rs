@@ -445,6 +445,32 @@ impl Document {
         self.insert_column(at, column_data);
     }
 
+    /// Sort data rows by the given column indices.
+    /// Row 0 (header) stays fixed; only rows[1..] are sorted.
+    /// Tries numeric comparison first, falls back to string comparison.
+    pub fn sort_by_columns(&mut self, col_indices: &[usize], ascending: bool) {
+        if self.rows.len() <= 2 {
+            return; // 0 or 1 data rows — nothing to sort
+        }
+        let data = &mut self.rows[1..];
+        data.sort_by(|a, b| {
+            for &col in col_indices {
+                let va = a.get(col).map(|s| s.as_str()).unwrap_or("");
+                let vb = b.get(col).map(|s| s.as_str()).unwrap_or("");
+                let ord = match (va.parse::<f64>(), vb.parse::<f64>()) {
+                    (Ok(na), Ok(nb)) => na.partial_cmp(&nb).unwrap_or(std::cmp::Ordering::Equal),
+                    _ => va.cmp(vb),
+                };
+                let ord = if ascending { ord } else { ord.reverse() };
+                if ord != std::cmp::Ordering::Equal {
+                    return ord;
+                }
+            }
+            std::cmp::Ordering::Equal
+        });
+        self.is_dirty = true;
+    }
+
     /// Toggle header mode
     pub fn toggle_header_mode(&mut self) {
         self.header_mode = !self.header_mode;

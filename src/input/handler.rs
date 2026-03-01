@@ -1575,6 +1575,55 @@ fn execute_command(app: &mut App) -> Result<()> {
             ));
             return Ok(());
         }
+        "sort" | "sort!" => {
+            let ascending = cmd_name_lower == "sort";
+            if let Some(arg) = _arg {
+                let specs: Vec<&str> = arg.split(',').map(|s| s.trim()).collect();
+                let mut col_indices = Vec::new();
+                for spec in &specs {
+                    if let Ok(num) = spec.parse::<usize>() {
+                        if num == 0 || num > app.document.column_count() {
+                            app.status_message = Some(StatusMessage::from(format!(
+                                "Column {} out of range (1-{})",
+                                num,
+                                app.document.column_count()
+                            )));
+                            return Ok(());
+                        }
+                        col_indices.push(num - 1);
+                    } else {
+                        match app
+                            .document
+                            .rows
+                            .first()
+                            .and_then(|h| h.iter().position(|name| name.eq_ignore_ascii_case(spec)))
+                        {
+                            Some(idx) => col_indices.push(idx),
+                            None => {
+                                app.status_message = Some(StatusMessage::from(format!(
+                                    "Column \"{}\" not found",
+                                    spec
+                                )));
+                                return Ok(());
+                            }
+                        }
+                    }
+                }
+                app.document.sort_by_columns(&col_indices, ascending);
+                let current_file = app.get_current_file().clone();
+                app.session.mark_dirty(&current_file);
+                let direction = if ascending { "ascending" } else { "descending" };
+                app.status_message = Some(StatusMessage::from(format!(
+                    "Sorted by {} {}",
+                    arg, direction
+                )));
+            } else {
+                app.status_message = Some(StatusMessage::from(
+                    "Usage: :sort <col,...> or :sort! <col,...> (e.g., :sort 1 or :sort! Name,Age)",
+                ));
+            }
+            return Ok(());
+        }
         _ => {}
     }
 

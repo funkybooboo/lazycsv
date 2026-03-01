@@ -1883,8 +1883,8 @@ Future enhancements for post-1.0 releases:
 
 **Advanced Filtering:**
 - `:filter column=value` - show only matching rows
-- `:sort column` - sort by column
-- `:sort -r column` - reverse sort
+- ~~`:sort column` - sort by column~~ ✅ Implemented as `:sort <col,...>`
+- ~~`:sort -r column` - reverse sort~~ ✅ Implemented as `:sort! <col,...>`
 
 **Deferred because:** Complex features, less critical for v1.0. Better to stabilize core first.
 

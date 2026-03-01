@@ -59,6 +59,8 @@ fn build_help_text() -> Vec<Line<'static>> {
         Line::from("  :delim ;           Set delimiter to semicolon"),
         Line::from("  :new A,B,C         Create new CSV with headers"),
         Line::from("  :f <name>          Rename current file"),
+        Line::from("  :sort <col,...>    Sort ascending by column(s)"),
+        Line::from("  :sort! <col,...>   Sort descending by column(s)"),
         Line::from("  :files             Show file menu"),
         Line::from("  Esc                Cancel command"),
         Line::from(""),
