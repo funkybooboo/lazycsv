@@ -9,6 +9,7 @@ use crate::ui::ViewState;
 use crate::Document;
 use anyhow::{Context, Result};
 use crossterm::event::KeyEvent;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 
@@ -42,6 +43,84 @@ pub struct EditBuffer {
     pub cursor: usize,
     /// Original content (for cancel/undo)
     pub original: String,
+}
+
+/// Cached in-memory SQLite connection with generation tracking.
+/// Keeps loaded tables across query executions so unchanged data isn't reloaded.
+pub struct SqliteCache {
+    conn: rusqlite::Connection,
+    /// Map from file path -> Document generation loaded in that table.
+    loaded_generations: HashMap<PathBuf, u64>,
+}
+
+impl std::fmt::Debug for SqliteCache {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SqliteCache")
+            .field("loaded_generations", &self.loaded_generations)
+            .finish_non_exhaustive()
+    }
+}
+
+impl SqliteCache {
+    /// Create a new in-memory SQLite connection with performance pragmas.
+    fn new() -> Self {
+        let conn = rusqlite::Connection::open_in_memory()
+            .expect("Failed to open in-memory SQLite");
+        conn.execute_batch(
+            "PRAGMA journal_mode=OFF;
+             PRAGMA synchronous=OFF;
+             PRAGMA temp_store=MEMORY;
+             PRAGMA cache_size=-64000;",
+        )
+        .expect("Failed to set SQLite pragmas");
+        SqliteCache {
+            conn,
+            loaded_generations: HashMap::new(),
+        }
+    }
+
+    /// Check whether the table for `path` needs to be reloaded.
+    fn needs_reload(&self, path: &Path, generation: u64) -> bool {
+        match self.loaded_generations.get(path) {
+            Some(&cached_gen) => cached_gen != generation,
+            None => true,
+        }
+    }
+
+    /// Drop and reload a single table. Tracks the new generation on success.
+    fn reload_table(
+        &mut self,
+        path: &Path,
+        table_name: &str,
+        doc: &Document,
+        generation: u64,
+        cancelled: &AtomicBool,
+    ) -> std::result::Result<(), anyhow::Error> {
+        // Drop existing table (ignore error if it doesn't exist)
+        let _ = self.conn.execute(
+            &format!("DROP TABLE IF EXISTS \"{}\"", table_name.replace('"', "\"\"")),
+            [],
+        );
+        self.loaded_generations.remove(path);
+
+        crate::query::load_csv_into_sqlite_cancellable(&self.conn, doc, table_name, cancelled)?;
+        self.loaded_generations.insert(path.to_path_buf(), generation);
+        Ok(())
+    }
+
+    /// Remove a single table from the cache.
+    fn remove_table(&mut self, path: &Path, table_name: &str) {
+        let _ = self.conn.execute(
+            &format!("DROP TABLE IF EXISTS \"{}\"", table_name.replace('"', "\"\"")),
+            [],
+        );
+        self.loaded_generations.remove(path);
+    }
+
+    /// Get a reference to the underlying connection.
+    fn conn(&self) -> &rusqlite::Connection {
+        &self.conn
+    }
 }
 
 /// Main application state (v0.2.0 Phase 2: Refactored for separation of concerns)
@@ -88,6 +167,9 @@ pub struct App {
 
     /// Flag to quit application
     pub should_quit: bool,
+
+    /// Cached SQLite connection for repeated SQL queries
+    pub sqlite_cache: Option<SqliteCache>,
 }
 
 impl App {
@@ -200,6 +282,7 @@ impl App {
             sql_error: None,
             magnifier_state: None,
             should_quit: false,
+            sqlite_cache: None,
         }
     }
 
@@ -411,87 +494,18 @@ impl App {
         self.magnifier_state.as_mut()
     }
 
-    /// Execute a SQL query against session CSVs and return the result document.
-    /// On success, also updates app state (clears sql_error, sets mode to Normal).
-    /// On failure, sets sql_error and returns None (stays in SqlEditor mode).
-    pub fn execute_sql_query(&mut self, query: &str) -> Option<Document> {
-        let conn = match rusqlite::Connection::open_in_memory() {
-            Ok(c) => c,
-            Err(e) => {
-                self.sql_error = Some(format!("Failed to open SQLite: {}", e));
-                return None;
-            }
-        };
-
-        // Optimize SQLite for bulk loading (safe for in-memory databases)
-        if conn
-            .execute_batch(
-                "PRAGMA journal_mode=OFF;
-                 PRAGMA synchronous=OFF;
-                 PRAGMA temp_store=MEMORY;
-                 PRAGMA cache_size=-64000;",
-            )
-            .is_err()
-        {
-            self.sql_error = Some("Failed to set SQLite pragmas".to_string());
-            return None;
+    /// Invalidate the SQLite cache entry for a specific file path.
+    /// Called after file reloads from disk to force re-import on next query.
+    pub fn invalidate_sqlite_cache_for(&mut self, path: &Path) {
+        if let Some(cache) = &mut self.sqlite_cache {
+            let table_name = crate::query::table_name_from_path(path);
+            cache.remove_table(path, &table_name);
         }
+    }
 
-        // Load each session file into SQLite
-        for file_path in self.session.files().to_vec() {
-            let table_name = crate::query::table_name_from_path(&file_path);
-
-            let filename = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            let doc = if filename == self.document.filename {
-                self.document.clone()
-            } else if let Some(cached) = self.session.get_cached_document(&file_path) {
-                cached.clone()
-            } else if file_path.exists() {
-                let config = self.session.config();
-                match crate::csv::Document::from_file(
-                    &file_path,
-                    config.delimiter,
-                    config.no_headers,
-                    config.encoding.clone(),
-                ) {
-                    Ok(d) => d,
-                    Err(_) => continue,
-                }
-            } else {
-                continue;
-            };
-
-            if doc.rows.is_empty() || doc.rows[0].is_empty() {
-                continue;
-            }
-
-            if crate::query::load_csv_into_sqlite(&conn, &doc, &table_name).is_err() {
-                continue;
-            }
-        }
-
-        // Execute query
-        match crate::query::execute_query_to_document(&conn, query, "result.csv".to_string()) {
-            Ok(mut doc) => {
-                // Determine output filename using reuse logic
-                let reuse_name = self.session.find_query_output_file().and_then(|p| {
-                    p.file_name()
-                        .and_then(|n| n.to_str())
-                        .map(|s| s.to_string())
-                });
-
-                let output_name = reuse_name.unwrap_or_else(|| self.generate_output_filename());
-                doc.filename = output_name;
-
-                self.sql_error = None;
-                self.mode = Mode::Normal;
-                Some(doc)
-            }
-            Err(e) => {
-                self.sql_error = Some(format!("SQL error: {}", e));
-                None
-            }
-        }
+    /// Drop the entire SQLite cache (e.g. when session structure changes drastically).
+    pub fn invalidate_sqlite_cache(&mut self) {
+        self.sqlite_cache = None;
     }
 
     /// Load a CSV file with cancellation support.
@@ -556,6 +570,8 @@ impl App {
                 let old_rows = std::mem::take(&mut self.document.rows);
                 std::thread::spawn(move || drop(old_rows));
                 self.document = doc;
+                // Invalidate SQLite cache for this file (generation reset to 0)
+                self.invalidate_sqlite_cache_for(&file_path);
                 self.view_state = ViewState::default();
                 let initial_row = if self.document.header_mode && self.document.row_count() > 1 {
                     1
@@ -578,37 +594,41 @@ impl App {
     /// Execute a SQL query with cancellation support.
     /// Returns (Some(doc), false) on success, (None, true) if cancelled,
     /// (None, false) on query error.
+    ///
+    /// Uses a cached SQLite connection so that unchanged documents are not
+    /// re-imported on subsequent queries.
     pub fn execute_sql_query_cancellable(
         &mut self,
         query: &str,
         cancelled: &AtomicBool,
     ) -> (Option<Document>, bool) {
-        let conn = match rusqlite::Connection::open_in_memory() {
-            Ok(c) => c,
-            Err(e) => {
-                self.sql_error = Some(format!("Failed to open SQLite: {}", e));
-                return (None, false);
-            }
-        };
+        // Take the cache out of self so we can borrow self.document / self.session
+        // independently.  We'll put it back on every exit path.
+        let mut cache = self.sqlite_cache.take().unwrap_or_else(SqliteCache::new);
 
-        if conn
-            .execute_batch(
-                "PRAGMA journal_mode=OFF;
-                 PRAGMA synchronous=OFF;
-                 PRAGMA temp_store=MEMORY;
-                 PRAGMA cache_size=-64000;",
-            )
-            .is_err()
-        {
-            self.sql_error = Some("Failed to set SQLite pragmas".to_string());
-            return (None, false);
+        // ------------------------------------------------------------------
+        // 1. Remove stale tables (files no longer in the session)
+        // ------------------------------------------------------------------
+        let session_paths: std::collections::HashSet<PathBuf> =
+            self.session.files().iter().cloned().collect();
+        let stale: Vec<PathBuf> = cache
+            .loaded_generations
+            .keys()
+            .filter(|p| !session_paths.contains(p.as_path()))
+            .cloned()
+            .collect();
+        for path in stale {
+            let table_name = crate::query::table_name_from_path(&path);
+            cache.remove_table(&path, &table_name);
         }
 
-        // Load each session file into SQLite.
-        // Avoid cloning the current document (can be huge) — pass references instead.
+        // ------------------------------------------------------------------
+        // 2. Load / reload each session file into SQLite
+        // ------------------------------------------------------------------
         for file_path in self.session.files().to_vec() {
             // Check cancellation between files
             if cancel::check_esc(cancelled) {
+                self.sqlite_cache = Some(cache);
                 return (None, true);
             }
 
@@ -617,18 +637,23 @@ impl App {
 
             // Current document — use reference directly (no clone)
             if filename == self.document.filename {
+                if !cache.needs_reload(&file_path, self.document.generation) {
+                    continue;
+                }
                 if self.document.rows.is_empty() || self.document.rows[0].is_empty() {
                     continue;
                 }
-                match crate::query::load_csv_into_sqlite_cancellable(
-                    &conn,
-                    &self.document,
+                match cache.reload_table(
+                    &file_path,
                     &table_name,
+                    &self.document,
+                    self.document.generation,
                     cancelled,
                 ) {
                     Ok(()) => {}
                     Err(e) => {
                         if e.downcast_ref::<cancel::CancelledError>().is_some() {
+                            self.sqlite_cache = Some(cache);
                             return (None, true);
                         }
                         continue;
@@ -638,19 +663,25 @@ impl App {
             }
 
             // Cached document — use reference directly (no clone)
-            if let Some(cached) = self.session.get_cached_document(&file_path) {
-                if cached.rows.is_empty() || cached.rows[0].is_empty() {
+            if let Some(cached_doc) = self.session.get_cached_document(&file_path) {
+                if !cache.needs_reload(&file_path, cached_doc.generation) {
                     continue;
                 }
-                match crate::query::load_csv_into_sqlite_cancellable(
-                    &conn,
-                    cached,
+                if cached_doc.rows.is_empty() || cached_doc.rows[0].is_empty() {
+                    continue;
+                }
+                let gen = cached_doc.generation;
+                match cache.reload_table(
+                    &file_path,
                     &table_name,
+                    cached_doc,
+                    gen,
                     cancelled,
                 ) {
                     Ok(()) => {}
                     Err(e) => {
                         if e.downcast_ref::<cancel::CancelledError>().is_some() {
+                            self.sqlite_cache = Some(cache);
                             return (None, true);
                         }
                         continue;
@@ -661,6 +692,11 @@ impl App {
 
             // Load from file with cancellation
             if file_path.exists() {
+                // If the cache already has this path and generation 0, skip reload
+                // (files loaded from disk always start at generation 0)
+                if !cache.needs_reload(&file_path, 0) {
+                    continue;
+                }
                 let config = self.session.config();
                 match crate::csv::Document::from_file_cancellable(
                     &file_path,
@@ -673,15 +709,17 @@ impl App {
                         if d.rows.is_empty() || d.rows[0].is_empty() {
                             continue;
                         }
-                        match crate::query::load_csv_into_sqlite_cancellable(
-                            &conn,
-                            &d,
+                        match cache.reload_table(
+                            &file_path,
                             &table_name,
+                            &d,
+                            d.generation,
                             cancelled,
                         ) {
                             Ok(()) => {}
                             Err(e) => {
                                 if e.downcast_ref::<cancel::CancelledError>().is_some() {
+                                    self.sqlite_cache = Some(cache);
                                     return (None, true);
                                 }
                                 continue;
@@ -690,6 +728,7 @@ impl App {
                     }
                     Err(e) => {
                         if e.downcast_ref::<cancel::CancelledError>().is_some() {
+                            self.sqlite_cache = Some(cache);
                             return (None, true);
                         }
                         continue;
@@ -698,9 +737,11 @@ impl App {
             }
         }
 
-        // Execute query
-        match crate::query::execute_query_to_document_cancellable(
-            &conn,
+        // ------------------------------------------------------------------
+        // 3. Execute query
+        // ------------------------------------------------------------------
+        let result = match crate::query::execute_query_to_document_cancellable(
+            cache.conn(),
             query,
             "result.csv".to_string(),
             cancelled,
@@ -721,12 +762,16 @@ impl App {
             }
             Err(e) => {
                 if e.downcast_ref::<cancel::CancelledError>().is_some() {
+                    self.sqlite_cache = Some(cache);
                     return (None, true);
                 }
                 self.sql_error = Some(format!("SQL error: {}", e));
                 (None, false)
             }
-        }
+        };
+
+        self.sqlite_cache = Some(cache);
+        result
     }
 
     /// Generate a unique output filename for SQL query results

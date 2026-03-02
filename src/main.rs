@@ -129,7 +129,9 @@ fn run(
 
                             match reload_result {
                                 Ok(true) => {
-                                    // Successfully loaded
+                                    // Successfully loaded — invalidate SQLite cache for this file
+                                    let current_path = app.get_current_file().clone();
+                                    app.invalidate_sqlite_cache_for(&current_path);
                                     app.status_message = None;
                                     terminal
                                         .clear()

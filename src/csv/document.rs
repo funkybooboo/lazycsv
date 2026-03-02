@@ -26,6 +26,10 @@ pub struct Document {
 
     /// Delimiter character for this file
     pub delimiter: char,
+
+    /// Monotonically increasing counter bumped on every mutation.
+    /// Used by SQLite cache to detect when a table needs reloading.
+    pub generation: u64,
 }
 
 impl Document {
@@ -59,6 +63,7 @@ impl Document {
             is_dirty: false,
             header_mode: true, // Default to header mode ON
             delimiter: delimiter.map(|d| d as char).unwrap_or(','),
+            generation: 0,
         })
     }
 
@@ -142,6 +147,7 @@ impl Document {
             is_dirty: false,
             header_mode: true,
             delimiter: delimiter.map(|d| d as char).unwrap_or(','),
+            generation: 0,
         })
     }
 
@@ -237,6 +243,7 @@ impl Document {
         if let Some(row) = self.rows.get_mut(row_idx.get()) {
             if let Some(cell) = row.get_mut(col_idx.get()) {
                 self.is_dirty = true;
+                self.generation += 1;
                 let old = std::mem::replace(cell, value);
                 return Some(old);
             }
@@ -253,6 +260,7 @@ impl Document {
         let actual_insert = at.get().min(self.rows.len());
         self.rows.insert(actual_insert, empty_row);
         self.is_dirty = true;
+        self.generation += 1;
     }
 
     /// Delete a row at the specified index (absolute row index)
@@ -261,6 +269,7 @@ impl Document {
     pub fn delete_row(&mut self, at: RowIndex) -> Option<Vec<String>> {
         if at.get() < self.rows.len() {
             self.is_dirty = true;
+            self.generation += 1;
             Some(self.rows.remove(at.get()))
         } else {
             None
@@ -284,6 +293,7 @@ impl Document {
         let count = actual_end - start_idx + 1;
 
         self.is_dirty = true;
+        self.generation += 1;
 
         // Remove rows one by one and collect them
         let mut deleted = Vec::new();
@@ -357,6 +367,7 @@ impl Document {
         }
 
         self.is_dirty = true;
+        self.generation += 1;
         deleted_columns
     }
 
@@ -474,6 +485,7 @@ impl Document {
         }
 
         self.is_dirty = true;
+        self.generation += 1;
         deleted_column
     }
 
@@ -497,6 +509,7 @@ impl Document {
         }
 
         self.is_dirty = true;
+        self.generation += 1;
     }
 
     /// Insert a new empty column at the given position with a generated header
@@ -546,6 +559,7 @@ impl Document {
             std::cmp::Ordering::Equal
         });
         self.is_dirty = true;
+        self.generation += 1;
     }
 
     /// Toggle header mode
@@ -564,6 +578,7 @@ impl Document {
             is_dirty: false,
             header_mode: true,
             delimiter: ',',
+            generation: 0,
         }
     }
 
@@ -577,6 +592,7 @@ impl Document {
             is_dirty: false,
             header_mode: true,
             delimiter: ',',
+            generation: 0,
         }
     }
 }

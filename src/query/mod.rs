@@ -439,6 +439,7 @@ mod tests {
             is_dirty: false,
             header_mode: true,
             delimiter: ',',
+            generation: 0,
         };
 
         load_csv_into_sqlite(&conn, &doc, "people").unwrap();
@@ -468,6 +469,7 @@ mod tests {
             is_dirty: false,
             header_mode: true,
             delimiter: ',',
+            generation: 0,
         };
 
         let result = load_csv_into_sqlite(&conn, &doc, "empty");
@@ -483,6 +485,7 @@ mod tests {
             is_dirty: false,
             header_mode: true,
             delimiter: ',',
+            generation: 0,
         };
 
         load_csv_into_sqlite(&conn, &doc, "headers_only").unwrap();
@@ -505,6 +508,7 @@ mod tests {
             is_dirty: false,
             header_mode: true,
             delimiter: ',',
+            generation: 0,
         };
 
         // Should not fail even with SQL reserved words as column names
@@ -528,6 +532,7 @@ mod tests {
             is_dirty: false,
             header_mode: true,
             delimiter: ',',
+            generation: 0,
         };
 
         load_csv_into_sqlite(&conn, &doc, "sparse").unwrap();
@@ -552,6 +557,7 @@ mod tests {
             is_dirty: false,
             header_mode: true,
             delimiter: ',',
+            generation: 0,
         };
         load_csv_into_sqlite(&conn, &doc, "customers").unwrap();
 
