@@ -170,6 +170,9 @@ pub struct App {
 
     /// Cached SQLite connection for repeated SQL queries
     pub sqlite_cache: Option<SqliteCache>,
+
+    /// True when an external file modification has been detected and we're waiting for user response
+    pub external_modification_pending: bool,
 }
 
 impl App {
@@ -223,12 +226,14 @@ impl App {
         )
         .context(messages::failed_to_load_csv(file_path))?;
 
-        Ok(Self::new(
+        let mut app = Self::new(
             csv_data,
             csv_files,
             current_file_index,
             file_config,
-        ))
+        );
+        app.session.record_file_mtime(file_path);
+        Ok(app)
     }
 
     /// Create a new `App` instance from CLI arguments.
@@ -283,6 +288,7 @@ impl App {
             magnifier_state: None,
             should_quit: false,
             sqlite_cache: None,
+            external_modification_pending: false,
         }
     }
 
@@ -360,6 +366,8 @@ impl App {
         self.session.remove_from_cache(&file_path);
         // No longer a virtual query output once saved to disk
         self.session.unmark_query_output(&file_path);
+        // Record new mtime so we don't treat our own save as external modification
+        self.session.record_file_mtime(&file_path);
 
         Ok(file_path)
     }
@@ -508,6 +516,33 @@ impl App {
         self.sqlite_cache = None;
     }
 
+    /// Check if the current file has been modified externally.
+    /// Sets `external_modification_pending` and a status message if so.
+    /// Returns true if a modification was detected (triggers redraw).
+    pub fn check_current_file_modification(&mut self) -> bool {
+        // Don't re-check if we're already prompting
+        if self.external_modification_pending {
+            return false;
+        }
+        let path = self.get_current_file().clone();
+        // Skip query output files (they don't live on disk in the normal sense)
+        if self.session.is_query_output(&path) {
+            return false;
+        }
+        if self.session.check_file_modified(&path) {
+            self.external_modification_pending = true;
+            let msg = if self.document.is_dirty {
+                "File modified externally (unsaved changes). Press 'r' to reload, Esc to ignore"
+            } else {
+                "File modified externally. Press 'r' to reload, Esc to ignore"
+            };
+            self.status_message = Some(StatusMessage::new_persistent(msg.to_string()));
+            true
+        } else {
+            false
+        }
+    }
+
     /// Load a CSV file with cancellation support.
     /// Same as `load_file` but uses `Document::from_file_cancellable`.
     pub fn load_file_cancellable(
@@ -527,12 +562,14 @@ impl App {
         )
         .context(messages::failed_to_load_csv(file_path))?;
 
-        Ok(Self::new(
+        let mut app = Self::new(
             csv_data,
             csv_files,
             current_file_index,
             file_config,
-        ))
+        );
+        app.session.record_file_mtime(file_path);
+        Ok(app)
     }
 
     /// Reload CSV data from current file with cancellation support.
@@ -572,6 +609,8 @@ impl App {
                 self.document = doc;
                 // Invalidate SQLite cache for this file (generation reset to 0)
                 self.invalidate_sqlite_cache_for(&file_path);
+                // Record new mtime so we don't re-prompt for this version
+                self.session.record_file_mtime(&file_path);
                 self.view_state = ViewState::default();
                 let initial_row = if self.document.header_mode && self.document.row_count() > 1 {
                     1

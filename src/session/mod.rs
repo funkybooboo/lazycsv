@@ -6,6 +6,7 @@
 use crate::Document;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 /// Configuration for CSV file parsing
 #[derive(Debug, Clone)]
@@ -72,6 +73,9 @@ pub struct Session {
 
     /// Files that are SQL query output sheets (should be reused on next query)
     query_output_files: HashSet<PathBuf>,
+
+    /// Last-known modification times for files (used to detect external changes)
+    file_mtimes: HashMap<PathBuf, SystemTime>,
 }
 
 impl Session {
@@ -86,6 +90,7 @@ impl Session {
             dirty_files: HashSet::new(),
             document_cache: HashMap::new(),
             query_output_files: HashSet::new(),
+            file_mtimes: HashMap::new(),
         }
     }
 
@@ -251,7 +256,11 @@ impl Session {
         }
         // Migrate query output tracking
         if self.query_output_files.remove(&old_path) {
-            self.query_output_files.insert(new_path);
+            self.query_output_files.insert(new_path.clone());
+        }
+        // Migrate file mtime tracking
+        if let Some(mtime) = self.file_mtimes.remove(&old_path) {
+            self.file_mtimes.insert(new_path, mtime);
         }
     }
 
@@ -270,6 +279,33 @@ impl Session {
         self.query_output_files.contains(path)
     }
 
+    /// Record the current disk modification time for a file.
+    /// Silently ignores errors (file might not exist for query outputs).
+    pub fn record_file_mtime(&mut self, path: &Path) {
+        if let Ok(metadata) = std::fs::metadata(path) {
+            if let Ok(mtime) = metadata.modified() {
+                self.file_mtimes.insert(path.to_path_buf(), mtime);
+            }
+        }
+    }
+
+    /// Check if a file was modified externally (disk mtime differs from stored).
+    /// Returns false if no stored mtime, file doesn't exist, or metadata fails.
+    pub fn check_file_modified(&self, path: &Path) -> bool {
+        let Some(stored) = self.file_mtimes.get(path) else {
+            return false;
+        };
+        match std::fs::metadata(path).and_then(|m| m.modified()) {
+            Ok(current) => current != *stored,
+            Err(_) => false,
+        }
+    }
+
+    /// Remove the stored mtime entry for a file.
+    pub fn clear_file_mtime(&mut self, path: &Path) {
+        self.file_mtimes.remove(path);
+    }
+
     /// Remove a file from the session by path.
     /// Cleans up dirty_files, document_cache, query_output_files, header_modes,
     /// delimiters, and adjusts active_file_index. Returns true if a file was removed.
@@ -284,6 +320,7 @@ impl Session {
         self.query_output_files.remove(&removed);
         self.header_modes.remove(&removed);
         self.delimiters.remove(&removed);
+        self.file_mtimes.remove(&removed);
 
         // Adjust active_file_index
         if self.files.is_empty() {

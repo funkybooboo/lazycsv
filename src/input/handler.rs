@@ -158,6 +158,33 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         }
     }
 
+    // Handle external modification prompt — intercept keys before normal processing
+    if app.external_modification_pending {
+        match key.code {
+            KeyCode::Char('r') => {
+                app.external_modification_pending = false;
+                app.status_message = None;
+                return Ok(InputResult::ReloadFile);
+            }
+            KeyCode::Esc => {
+                app.external_modification_pending = false;
+                // Record current disk mtime so we don't re-prompt until next change
+                let path = app.get_current_file().clone();
+                app.session.record_file_mtime(&path);
+                app.status_message = None;
+                return Ok(InputResult::Continue);
+            }
+            _ => {
+                // Other keys dismiss the prompt silently (ignore the change)
+                app.external_modification_pending = false;
+                let path = app.get_current_file().clone();
+                app.session.record_file_mtime(&path);
+                app.status_message = None;
+                // Fall through to normal handling
+            }
+        }
+    }
+
     // Note: No timeout on pending commands (vim-like behavior - wait indefinitely)
 
     // Handle pending multi-key sequences

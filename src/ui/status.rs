@@ -6,7 +6,7 @@
 use crate::App;
 use ratatui::{
     layout::Rect,
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::Paragraph,
     Frame,
@@ -363,7 +363,13 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         }
     };
 
-    let status = Paragraph::new(status_text).style(Style::default());
+    let style = if app.external_modification_pending {
+        Style::default().fg(Color::Black).bg(Color::Green)
+    } else {
+        Style::default()
+    };
+
+    let status = Paragraph::new(status_text).style(style);
 
     frame.render_widget(status, area);
 }

@@ -4,7 +4,7 @@ use lazycsv::{cli, ui, App, FileConfig, InputResult};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 fn main() -> Result<()> {
     let cli_args = cli::parse_args();
@@ -81,6 +81,7 @@ fn run(
 ) -> Result<()> {
     // Event-driven rendering: only redraw when state changes
     let mut needs_redraw = true;
+    let mut last_mtime_check = Instant::now();
 
     loop {
         // Only render if state has changed
@@ -104,6 +105,8 @@ fn run(
 
                     match result {
                         InputResult::ReloadFile => {
+                            // Clear any pending external modification prompt
+                            app.external_modification_pending = false;
                             // Show loading feedback before blocking file load
                             let filename = app
                                 .get_current_file()
@@ -339,6 +342,14 @@ fn run(
                         }
                     }
                 }
+            }
+        }
+
+        // Periodically check if the current file was modified externally
+        if last_mtime_check.elapsed() >= Duration::from_secs(2) {
+            last_mtime_check = Instant::now();
+            if app.check_current_file_modification() {
+                needs_redraw = true;
             }
         }
 
