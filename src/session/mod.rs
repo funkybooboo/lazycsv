@@ -270,6 +270,33 @@ impl Session {
         self.query_output_files.contains(path)
     }
 
+    /// Remove a file from the session by path.
+    /// Cleans up dirty_files, document_cache, query_output_files, header_modes,
+    /// delimiters, and adjusts active_file_index. Returns true if a file was removed.
+    pub fn remove_file(&mut self, path: &Path) -> bool {
+        let Some(idx) = self.files.iter().position(|p| p == path) else {
+            return false;
+        };
+
+        let removed = self.files.remove(idx);
+        self.dirty_files.remove(&removed);
+        self.document_cache.remove(&removed);
+        self.query_output_files.remove(&removed);
+        self.header_modes.remove(&removed);
+        self.delimiters.remove(&removed);
+
+        // Adjust active_file_index
+        if self.files.is_empty() {
+            self.active_file_index = 0;
+        } else if self.active_file_index >= self.files.len() {
+            self.active_file_index = self.files.len() - 1;
+        } else if self.active_file_index > idx {
+            self.active_file_index -= 1;
+        }
+
+        true
+    }
+
     /// Find the first unsaved query output file in the session
     pub fn find_query_output_file(&self) -> Option<&PathBuf> {
         self.files

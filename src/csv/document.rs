@@ -1,11 +1,13 @@
 //! In-memory CSV document with headers and rows
 
+use crate::cancel::{self, CancelledError};
 use crate::domain::position::{ColIndex, RowIndex};
 use anyhow::{Context, Result};
 use csv;
 use encoding_rs::Encoding;
 use std::fs;
 use std::path::Path;
+use std::sync::atomic::AtomicBool;
 
 /// Holds parsed CSV document in memory
 #[derive(Debug, Clone, PartialEq)]
@@ -61,7 +63,7 @@ impl Document {
     }
 
     /// Decodes file bytes into a UTF-8 string using the specified encoding.
-    fn decode_file_bytes(file_bytes: &[u8], encoding_label: Option<String>) -> Result<String> {
+    pub(crate) fn decode_file_bytes(file_bytes: &[u8], encoding_label: Option<String>) -> Result<String> {
         if let Some(label) = &encoding_label {
             let encoding = Encoding::for_label(label.as_bytes())
                 .ok_or_else(|| anyhow::anyhow!("Unsupported encoding: {}", label))?;
@@ -90,6 +92,81 @@ impl Document {
 
         let mut rows: Vec<Vec<String>> = Vec::new();
         for result in reader.records() {
+            let record = result?;
+            rows.push(record.iter().map(String::from).collect());
+        }
+
+        let final_headers = if no_headers {
+            rows.first()
+                .map(|first_row| {
+                    (1..=first_row.len())
+                        .map(|i| format!("Column {}", i))
+                        .collect()
+                })
+                .unwrap_or_default()
+        } else {
+            headers_from_csv.iter().map(String::from).collect()
+        };
+
+        Ok((final_headers, rows))
+    }
+
+    /// Load CSV from file path with cancellation support.
+    /// Same as `from_file` but checks `cancelled` flag periodically during parsing.
+    pub fn from_file_cancellable(
+        path: &Path,
+        delimiter: Option<u8>,
+        no_headers: bool,
+        encoding_label: Option<String>,
+        cancelled: &AtomicBool,
+    ) -> Result<Self> {
+        let filename = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("unknown")
+            .to_string();
+
+        let file_bytes =
+            fs::read(path).context(format!("Failed to read file: {}", path.display()))?;
+
+        let decoded_content = Self::decode_file_bytes(&file_bytes, encoding_label)?;
+        let (headers, data_rows) =
+            Self::parse_csv_content_cancellable(&decoded_content, delimiter, no_headers, cancelled)?;
+
+        let mut all_rows = vec![headers];
+        all_rows.extend(data_rows);
+
+        Ok(Document {
+            rows: all_rows,
+            filename,
+            is_dirty: false,
+            header_mode: true,
+            delimiter: delimiter.map(|d| d as char).unwrap_or(','),
+        })
+    }
+
+    /// Parses CSV content with cancellation support.
+    /// Checks `cancelled` flag every CHECK_INTERVAL rows.
+    fn parse_csv_content_cancellable(
+        content: &str,
+        delimiter: Option<u8>,
+        no_headers: bool,
+        cancelled: &AtomicBool,
+    ) -> Result<(Vec<String>, Vec<Vec<String>>)> {
+        let mut builder = csv::ReaderBuilder::new();
+        builder.has_headers(!no_headers);
+        if let Some(d) = delimiter {
+            builder.delimiter(d);
+        }
+
+        let mut reader = builder.from_reader(content.as_bytes());
+        let headers_from_csv = reader.headers()?.clone();
+
+        let mut rows: Vec<Vec<String>> = Vec::new();
+        for (i, result) in reader.records().enumerate() {
+            if i % cancel::CHECK_INTERVAL == 0 && cancel::check_esc(cancelled) {
+                anyhow::bail!(CancelledError);
+            }
             let record = result?;
             rows.push(record.iter().map(String::from).collect());
         }

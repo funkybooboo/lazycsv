@@ -247,6 +247,16 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             return Ok(InputResult::Continue);
         }
 
+        // G command: go to last row, or {count}G to go to specific line
+        KeyCode::Char('G') if is_navigation_allowed(app) => {
+            if let Some(count) = app.input_state.command_count.take() {
+                navigation::commands::goto_line(app, count.get());
+            } else {
+                navigation::commands::goto_last_row(app);
+            }
+            return Ok(InputResult::Continue);
+        }
+
         KeyCode::Char('z') if is_navigation_allowed(app) => {
             app.input_state.set_pending_command(PendingCommand::Z);
             return Ok(InputResult::Continue);
@@ -773,13 +783,16 @@ fn handle_command_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         }
 
         KeyCode::Enter => {
-            execute_command(app)?;
+            let result = execute_command(app)?;
             // Only return to Normal if command didn't change mode
             // (Some commands like :files switch to a different mode)
             if app.mode == Mode::Command {
                 app.mode = Mode::Normal;
             }
             app.input_state.clear_command_buffer();
+            if !matches!(result, InputResult::Continue) {
+                return Ok(result);
+            }
         }
 
         KeyCode::Backspace => {
@@ -798,7 +811,7 @@ fn handle_command_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
 
 /// Parse and execute range commands like :5,10d, :%d, :.d, :$d
 /// Returns Some(Result) if this is a range command, None otherwise
-fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()>> {
+fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<InputResult>> {
     use crate::RowIndex;
 
     // Check if command contains a range pattern or special markers
@@ -813,7 +826,7 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                 let row_count = app.document.data_row_count();
                 if row_count == 0 {
                     app.status_message = Some(StatusMessage::from("No data rows to delete"));
-                    return Some(Ok(()));
+                    return Some(Ok(InputResult::Continue));
                 }
 
                 // Delete rows 1 to row_count (all data rows, preserving header at row 0)
@@ -832,14 +845,14 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                     app.view_state.table_state.select(Some(0));
                 }
 
-                return Some(Ok(()));
+                return Some(Ok(InputResult::Continue));
             }
             "y" => {
                 // Yank all data rows
                 let row_count = app.document.data_row_count();
                 if row_count == 0 {
                     app.status_message = Some(StatusMessage::from("No data rows to yank"));
-                    return Some(Ok(()));
+                    return Some(Ok(InputResult::Continue));
                 }
 
                 let yanked = app
@@ -851,14 +864,14 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                     yanked.len()
                 )));
 
-                return Some(Ok(()));
+                return Some(Ok(InputResult::Continue));
             }
             _ => {
                 app.status_message = Some(StatusMessage::from(format!(
                     "Unknown range operation: :{}",
                     cmd
                 )));
-                return Some(Ok(()));
+                return Some(Ok(InputResult::Continue));
             }
         }
     }
@@ -890,7 +903,7 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                 } else {
                     app.status_message = Some(StatusMessage::from("No row selected"));
                 }
-                return Some(Ok(()));
+                return Some(Ok(InputResult::Continue));
             }
             "y" => {
                 // Yank current row
@@ -905,14 +918,14 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                 } else {
                     app.status_message = Some(StatusMessage::from("No row selected"));
                 }
-                return Some(Ok(()));
+                return Some(Ok(InputResult::Continue));
             }
             _ => {
                 app.status_message = Some(StatusMessage::from(format!(
                     "Unknown range operation: :{}",
                     cmd
                 )));
-                return Some(Ok(()));
+                return Some(Ok(InputResult::Continue));
             }
         }
     }
@@ -925,7 +938,7 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                 let row_count = app.document.data_row_count();
                 if row_count == 0 {
                     app.status_message = Some(StatusMessage::from("No data rows to delete"));
-                    return Some(Ok(()));
+                    return Some(Ok(InputResult::Continue));
                 }
 
                 if let Some(_deleted) = app.document.delete_row(RowIndex::new(row_count)) {
@@ -942,14 +955,14 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                 } else {
                     app.status_message = Some(StatusMessage::from("Failed to delete row"));
                 }
-                return Some(Ok(()));
+                return Some(Ok(InputResult::Continue));
             }
             "y" => {
                 // Yank last row
                 let row_count = app.document.data_row_count();
                 if row_count == 0 {
                     app.status_message = Some(StatusMessage::from("No data rows to yank"));
-                    return Some(Ok(()));
+                    return Some(Ok(InputResult::Continue));
                 }
 
                 let yanked = app
@@ -961,14 +974,14 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                 } else {
                     app.status_message = Some(StatusMessage::from("Failed to yank row"));
                 }
-                return Some(Ok(()));
+                return Some(Ok(InputResult::Continue));
             }
             _ => {
                 app.status_message = Some(StatusMessage::from(format!(
                     "Unknown range operation: :{}",
                     cmd
                 )));
-                return Some(Ok(()));
+                return Some(Ok(InputResult::Continue));
             }
         }
     }
@@ -994,14 +1007,14 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                                 app.status_message = Some(StatusMessage::from(
                                     "Row numbers must be >= 1 (row 0 is header)",
                                 ));
-                                return Some(Ok(()));
+                                return Some(Ok(InputResult::Continue));
                             }
 
                             if start_num > end_num {
                                 app.status_message = Some(StatusMessage::from(
                                     "Invalid range: start must be <= end",
                                 ));
-                                return Some(Ok(()));
+                                return Some(Ok(InputResult::Continue));
                             }
 
                             let deleted = app
@@ -1029,7 +1042,7 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                                 }
                             }
 
-                            return Some(Ok(()));
+                            return Some(Ok(InputResult::Continue));
                         }
                         'y' => {
                             // Yank range
@@ -1037,14 +1050,14 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                                 app.status_message = Some(StatusMessage::from(
                                     "Row numbers must be >= 1 (row 0 is header)",
                                 ));
-                                return Some(Ok(()));
+                                return Some(Ok(InputResult::Continue));
                             }
 
                             if start_num > end_num {
                                 app.status_message = Some(StatusMessage::from(
                                     "Invalid range: start must be <= end",
                                 ));
-                                return Some(Ok(()));
+                                return Some(Ok(InputResult::Continue));
                             }
 
                             let yanked = app
@@ -1063,14 +1076,14 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                                 )));
                             }
 
-                            return Some(Ok(()));
+                            return Some(Ok(InputResult::Continue));
                         }
                         _ => {
                             app.status_message = Some(StatusMessage::from(format!(
                                 "Unknown range operation: {}",
                                 operation
                             )));
-                            return Some(Ok(()));
+                            return Some(Ok(InputResult::Continue));
                         }
                     }
                 }
@@ -1090,21 +1103,21 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                     if !end_col_str.chars().all(|c| c.is_ascii_alphabetic()) {
                         app.status_message =
                             Some(StatusMessage::from("Invalid end column in move command"));
-                        return Some(Ok(()));
+                        return Some(Ok(InputResult::Continue));
                     }
 
                     let start_col = match excel_letter_to_column(&start_str.to_uppercase()) {
                         Ok(c) => c,
                         Err(e) => {
                             app.status_message = Some(StatusMessage::from(e));
-                            return Some(Ok(()));
+                            return Some(Ok(InputResult::Continue));
                         }
                     };
                     let end_col = match excel_letter_to_column(&end_col_str.to_uppercase()) {
                         Ok(c) => c,
                         Err(e) => {
                             app.status_message = Some(StatusMessage::from(e));
-                            return Some(Ok(()));
+                            return Some(Ok(InputResult::Continue));
                         }
                     };
 
@@ -1112,7 +1125,7 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                         app.status_message = Some(StatusMessage::from(
                             "Invalid range: start column must be <= end column",
                         ));
-                        return Some(Ok(()));
+                        return Some(Ok(InputResult::Continue));
                     }
 
                     let max_col = app.document.column_count();
@@ -1122,7 +1135,7 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                             start_str.to_uppercase(),
                             crate::ui::utils::column_to_excel_letter(max_col.saturating_sub(1))
                         )));
-                        return Some(Ok(()));
+                        return Some(Ok(InputResult::Continue));
                     }
 
                     // Parse destination
@@ -1133,14 +1146,14 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                             Ok(dest_col) => dest_col + 1, // "after" that column
                             Err(e) => {
                                 app.status_message = Some(StatusMessage::from(e));
-                                return Some(Ok(()));
+                                return Some(Ok(InputResult::Continue));
                             }
                         }
                     } else {
                         app.status_message = Some(StatusMessage::from(
                             "Invalid destination: use a column letter or 0",
                         ));
-                        return Some(Ok(()));
+                        return Some(Ok(InputResult::Continue));
                     };
 
                     // Check if destination is inside source range (no-op)
@@ -1148,7 +1161,7 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                         app.status_message = Some(StatusMessage::from(
                             "Columns already in position (destination inside source range)",
                         ));
-                        return Some(Ok(()));
+                        return Some(Ok(InputResult::Continue));
                     }
 
                     let count = end_col - start_col + 1;
@@ -1162,7 +1175,7 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                     app.status_message =
                         Some(StatusMessage::from(format!("Moved {} column(s)", count)));
 
-                    return Some(Ok(()));
+                    return Some(Ok(InputResult::Continue));
                 }
             }
 
@@ -1190,7 +1203,7 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                                     app.status_message = Some(StatusMessage::from(
                                         "Invalid range: start column must be <= end column",
                                     ));
-                                    return Some(Ok(()));
+                                    return Some(Ok(InputResult::Continue));
                                 }
 
                                 let max_col = app.document.column_count();
@@ -1202,7 +1215,7 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                                             max_col.saturating_sub(1)
                                         )
                                     )));
-                                    return Some(Ok(()));
+                                    return Some(Ok(InputResult::Continue));
                                 }
 
                                 let deleted = app.document.delete_columns(
@@ -1239,7 +1252,7 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                                     }
                                 }
 
-                                return Some(Ok(()));
+                                return Some(Ok(InputResult::Continue));
                             }
                             'y' => {
                                 // Yank column range
@@ -1247,7 +1260,7 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                                     app.status_message = Some(StatusMessage::from(
                                         "Invalid range: start column must be <= end column",
                                     ));
-                                    return Some(Ok(()));
+                                    return Some(Ok(InputResult::Continue));
                                 }
 
                                 let yanked = app
@@ -1266,20 +1279,20 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
                                     )));
                                 }
 
-                                return Some(Ok(()));
+                                return Some(Ok(InputResult::Continue));
                             }
                             _ => {
                                 app.status_message = Some(StatusMessage::from(format!(
                                     "Unknown range operation: {}",
                                     operation
                                 )));
-                                return Some(Ok(()));
+                                return Some(Ok(InputResult::Continue));
                             }
                         }
                     }
                     (Err(e), _) | (_, Err(e)) => {
                         app.status_message = Some(StatusMessage::from(e));
-                        return Some(Ok(()));
+                        return Some(Ok(InputResult::Continue));
                     }
                 }
             }
@@ -1291,11 +1304,17 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<()
 }
 
 /// Execute command from command buffer
-fn execute_command(app: &mut App) -> Result<()> {
+fn execute_command(app: &mut App) -> Result<InputResult> {
     let cmd = app.input_state.command_buffer.trim().to_string();
 
     if cmd.is_empty() {
-        return Ok(());
+        return Ok(InputResult::Continue);
+    }
+
+    // Pure number → go to line (vim :# syntax, e.g., :5, :100)
+    if let Ok(line_num) = cmd.parse::<usize>() {
+        navigation::commands::goto_line(app, line_num);
+        return Ok(InputResult::Continue);
     }
 
     // Special handling for :c command (column jump)
@@ -1325,7 +1344,7 @@ fn execute_command(app: &mut App) -> Result<()> {
                     ));
                 }
             }
-            return Ok(());
+            return Ok(InputResult::Continue);
         }
     }
 
@@ -1359,7 +1378,7 @@ fn execute_command(app: &mut App) -> Result<()> {
                     app.status_message = Some(StatusMessage::from(format!("Error: {}", e)));
                 }
             }
-            return Ok(());
+            return Ok(InputResult::Continue);
         }
         "Wq" => {
             // Save all dirty files and quit
@@ -1371,7 +1390,7 @@ fn execute_command(app: &mut App) -> Result<()> {
                     app.status_message = Some(StatusMessage::from(format!("Error: {}", e)));
                 }
             }
-            return Ok(());
+            return Ok(InputResult::Continue);
         }
         _ => {} // Fall through to case-insensitive commands
     }
@@ -1386,13 +1405,13 @@ fn execute_command(app: &mut App) -> Result<()> {
             } else {
                 app.should_quit = true;
             }
-            return Ok(());
+            return Ok(InputResult::Continue);
         }
         "q!" => {
             // Force quit - clear cache and quit
             app.session.clear_cache();
             app.should_quit = true;
-            return Ok(());
+            return Ok(InputResult::Continue);
         }
         "w" | "write" => {
             // Save current file only
@@ -1407,7 +1426,7 @@ fn execute_command(app: &mut App) -> Result<()> {
                     app.status_message = Some(StatusMessage::from(format!("Error: {}", e)));
                 }
             }
-            return Ok(());
+            return Ok(InputResult::Continue);
         }
         "wq" | "x" => {
             // Save current file and quit
@@ -1419,11 +1438,11 @@ fn execute_command(app: &mut App) -> Result<()> {
                     app.status_message = Some(StatusMessage::from(format!("Error: {}", e)));
                 }
             }
-            return Ok(());
+            return Ok(InputResult::Continue);
         }
         "h" | "help" => {
             app.status_message = Some(StatusMessage::from("Press ? for help"));
-            return Ok(());
+            return Ok(InputResult::Continue);
         }
         "ht" => {
             // Toggle header mode
@@ -1444,7 +1463,7 @@ fn execute_command(app: &mut App) -> Result<()> {
                 "OFF"
             };
             app.status_message = Some(StatusMessage::from(format!("Header mode: {}", mode_str)));
-            return Ok(());
+            return Ok(InputResult::Continue);
         }
         "delim" => {
             // Change CSV delimiter for current file and reload
@@ -1478,7 +1497,7 @@ fn execute_command(app: &mut App) -> Result<()> {
                     "Usage: :delim <char> (e.g., :delim ; or :delim |)",
                 ));
             }
-            return Ok(());
+            return Ok(InputResult::Continue);
         }
         "new" => {
             // Create a new CSV document with optional headers
@@ -1519,7 +1538,7 @@ fn execute_command(app: &mut App) -> Result<()> {
                 "New CSV created with {} column(s)",
                 headers.len()
             )));
-            return Ok(());
+            return Ok(InputResult::Continue);
         }
         "c" => {
             // Column jump: :cA, :cB, :cAA, :c1, etc.
@@ -1547,7 +1566,7 @@ fn execute_command(app: &mut App) -> Result<()> {
                     "Usage: :c<column> (e.g., :cA, :cB, :cAA, :c1, :c27)",
                 ));
             }
-            return Ok(());
+            return Ok(InputResult::Continue);
         }
         "f" => {
             // :f (no arg) shows current filename, :f <name> renames
@@ -1564,7 +1583,7 @@ fn execute_command(app: &mut App) -> Result<()> {
                 let current = app.document.filename.clone();
                 app.status_message = Some(StatusMessage::from(format!("\"{}\"", current)));
             }
-            return Ok(());
+            return Ok(InputResult::Continue);
         }
         "files" => {
             // Enter FileList mode to show file picker
@@ -1573,7 +1592,7 @@ fn execute_command(app: &mut App) -> Result<()> {
             app.status_message = Some(StatusMessage::from(
                 "Type to filter, number to select, Enter for first, Esc to cancel",
             ));
-            return Ok(());
+            return Ok(InputResult::Continue);
         }
         "sort" | "sort!" => {
             let ascending = cmd_name_lower == "sort";
@@ -1588,48 +1607,58 @@ fn execute_command(app: &mut App) -> Result<()> {
                                 num,
                                 app.document.column_count()
                             )));
-                            return Ok(());
+                            return Ok(InputResult::Continue);
                         }
                         col_indices.push(num - 1);
                     } else {
-                        match app
-                            .document
-                            .rows
-                            .first()
-                            .and_then(|h| h.iter().position(|name| name.eq_ignore_ascii_case(spec)))
-                        {
-                            Some(idx) => col_indices.push(idx),
-                            None => {
-                                app.status_message = Some(StatusMessage::from(format!(
-                                    "Column \"{}\" not found",
-                                    spec
-                                )));
-                                return Ok(());
+                        // Try header name first (case-insensitive), then Excel column letter
+                        let header_match = app.document.rows.first().and_then(|h| {
+                            h.iter().position(|name| name.eq_ignore_ascii_case(spec))
+                        });
+                        if let Some(idx) = header_match {
+                            col_indices.push(idx);
+                        } else if spec.chars().all(|c| c.is_ascii_alphabetic()) {
+                            // Try as Excel-style column letter (A, B, AA, etc.)
+                            use crate::ui::utils::excel_letter_to_column;
+                            match excel_letter_to_column(spec) {
+                                Ok(idx) if idx < app.document.column_count() => {
+                                    col_indices.push(idx);
+                                }
+                                _ => {
+                                    app.status_message = Some(StatusMessage::from(format!(
+                                        "Column \"{}\" not found",
+                                        spec
+                                    )));
+                                    return Ok(InputResult::Continue);
+                                }
                             }
+                        } else {
+                            app.status_message = Some(StatusMessage::from(format!(
+                                "Column \"{}\" not found",
+                                spec
+                            )));
+                            return Ok(InputResult::Continue);
                         }
                     }
                 }
-                app.document.sort_by_columns(&col_indices, ascending);
-                let current_file = app.get_current_file().clone();
-                app.session.mark_dirty(&current_file);
-                let direction = if ascending { "ascending" } else { "descending" };
-                app.status_message = Some(StatusMessage::from(format!(
-                    "Sorted by {} {}",
-                    arg, direction
-                )));
+                return Ok(InputResult::SortDocument {
+                    col_indices,
+                    ascending,
+                    description: arg.to_string(),
+                });
             } else {
                 app.status_message = Some(StatusMessage::from(
                     "Usage: :sort <col,...> or :sort! <col,...> (e.g., :sort 1 or :sort! Name,Age)",
                 ));
             }
-            return Ok(());
+            return Ok(InputResult::Continue);
         }
         _ => {}
     }
 
     // Unknown command
     app.status_message = Some(StatusMessage::from(format!("Unknown command: :{}", cmd)));
-    Ok(())
+    Ok(InputResult::Continue)
 }
 
 /// Handle keyboard input in FileList mode
@@ -1938,34 +1967,6 @@ fn handle_insert_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     Ok(InputResult::Continue)
 }
 
-/// Generate a unique output filename that doesn't conflict with existing session files.
-/// Returns "output.csv", "output1.csv", "output2.csv", etc.
-fn generate_output_filename(app: &App) -> String {
-    let existing: std::collections::HashSet<String> = app
-        .session
-        .files()
-        .iter()
-        .filter_map(|p| {
-            p.file_name()
-                .and_then(|n| n.to_str())
-                .map(|s| s.to_string())
-        })
-        .collect();
-
-    let base = "output.csv".to_string();
-    if !existing.contains(&base) {
-        return base;
-    }
-    let mut i = 1;
-    loop {
-        let name = format!("output{}.csv", i);
-        if !existing.contains(&name) {
-            return name;
-        }
-        i += 1;
-    }
-}
-
 /// Move the SQL cursor up one line within the sql_buffer.
 fn move_sql_cursor_up(buffer: &str, cursor: usize) -> usize {
     let chars: Vec<char> = buffer.chars().collect();
@@ -2036,7 +2037,7 @@ fn handle_sql_editor_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             app.sql_cursor += 1;
         }
 
-        // Enter → execute query
+        // Enter → execute query (deferred to main loop for UI feedback)
         (KeyCode::Enter, KeyModifiers::NONE) => {
             let query = app.sql_buffer.trim().to_string();
             if query.is_empty() {
@@ -2045,70 +2046,7 @@ fn handle_sql_editor_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                 return Ok(InputResult::Continue);
             }
 
-            // Build SQLite connection and load all session CSVs
-            let conn = rusqlite::Connection::open_in_memory()
-                .map_err(|e| anyhow::anyhow!("Failed to open SQLite: {}", e))?;
-
-            // Load each session file into SQLite
-            for file_path in app.session.files().to_vec() {
-                let table_name = crate::query::table_name_from_path(&file_path);
-
-                // Check if this is the current document
-                let filename = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                let doc = if filename == app.document.filename {
-                    // Use current in-memory document (may have unsaved edits)
-                    app.document.clone()
-                } else if let Some(cached) = app.session.get_cached_document(&file_path) {
-                    // Use cached (dirty) document
-                    cached.clone()
-                } else if file_path.exists() {
-                    // Load from disk
-                    let config = app.session.config();
-                    match crate::csv::Document::from_file(
-                        &file_path,
-                        config.delimiter,
-                        config.no_headers,
-                        config.encoding.clone(),
-                    ) {
-                        Ok(d) => d,
-                        Err(_) => continue,
-                    }
-                } else {
-                    continue; // Skip virtual files that don't exist on disk
-                };
-
-                if doc.rows.is_empty() || doc.rows[0].is_empty() {
-                    continue;
-                }
-
-                if crate::query::load_csv_into_sqlite(&conn, &doc, &table_name).is_err() {
-                    continue; // Skip files that fail to load
-                }
-            }
-
-            // Execute query
-            match crate::query::execute_query_to_document(&conn, &query, "output.csv".to_string()) {
-                Ok(mut doc) => {
-                    // Determine output filename using reuse logic:
-                    // Look for an existing query output sheet (may have been renamed)
-                    let reuse_name = app.session.find_query_output_file().and_then(|p| {
-                        p.file_name()
-                            .and_then(|n| n.to_str())
-                            .map(|s| s.to_string())
-                    });
-
-                    let output_name = reuse_name.unwrap_or_else(|| generate_output_filename(app));
-                    doc.filename = output_name;
-
-                    app.sql_error = None;
-                    app.mode = Mode::Normal;
-                    return Ok(InputResult::SwitchToDocument(doc));
-                }
-                Err(e) => {
-                    app.sql_error = Some(format!("SQL error: {}", e));
-                    // Stay in SqlEditor mode so user can fix the query
-                }
-            }
+            return Ok(InputResult::ExecuteQuery { query });
         }
 
         // Type character

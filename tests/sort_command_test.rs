@@ -1,5 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use lazycsv::{App, Document, FileConfig};
+use lazycsv::{App, Document, FileConfig, InputResult};
 use std::path::PathBuf;
 
 fn key_event(code: KeyCode) -> KeyEvent {
@@ -7,12 +7,31 @@ fn key_event(code: KeyCode) -> KeyEvent {
 }
 
 /// Helper to send command string to app
+/// Handles deferred operations like SortDocument by executing them inline
 fn send_command(app: &mut App, cmd: &str) {
     let _ = app.handle_key(key_event(KeyCode::Char(':')));
     for c in cmd.chars() {
         let _ = app.handle_key(key_event(KeyCode::Char(c)));
     }
-    let _ = app.handle_key(key_event(KeyCode::Enter));
+    if let Ok(result) = app.handle_key(key_event(KeyCode::Enter)) {
+        match result {
+            InputResult::SortDocument {
+                col_indices,
+                ascending,
+                description,
+            } => {
+                app.document.sort_by_columns(&col_indices, ascending);
+                let current_file = app.get_current_file().clone();
+                app.session.mark_dirty(&current_file);
+                let direction = if ascending { "ascending" } else { "descending" };
+                app.status_message = Some(lazycsv::input::StatusMessage::from(format!(
+                    "Sorted by {} {}",
+                    description, direction
+                )));
+            }
+            _ => {}
+        }
+    }
 }
 
 /// Helper to create a test app with Name, Age, City columns
@@ -316,6 +335,78 @@ fn test_sort_empty_cells() {
     assert_eq!(app.document.rows[1][0], "");
     assert_eq!(app.document.rows[2][0], "Alice");
     assert_eq!(app.document.rows[3][0], "Bob");
+}
+
+// ===== Column letter specifiers =====
+
+#[test]
+fn test_sort_by_column_letter() {
+    let mut app = create_test_app();
+
+    // Column A is Name — sort ascending: Alice, Bob, Charlie
+    send_command(&mut app, "sort A");
+
+    assert_eq!(app.document.rows[1][0], "Alice");
+    assert_eq!(app.document.rows[2][0], "Bob");
+    assert_eq!(app.document.rows[3][0], "Charlie");
+}
+
+#[test]
+fn test_sort_by_column_letter_lowercase() {
+    let mut app = create_test_app();
+
+    send_command(&mut app, "sort a");
+
+    assert_eq!(app.document.rows[1][0], "Alice");
+    assert_eq!(app.document.rows[2][0], "Bob");
+    assert_eq!(app.document.rows[3][0], "Charlie");
+}
+
+#[test]
+fn test_sort_by_multiple_column_letters() {
+    let doc = Document::new(
+        vec!["City".to_string(), "Name".to_string()],
+        vec![
+            vec!["NYC".to_string(), "Charlie".to_string()],
+            vec!["LA".to_string(), "Alice".to_string()],
+            vec!["NYC".to_string(), "Bob".to_string()],
+        ],
+        "test.csv".to_string(),
+    );
+    let files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(doc, files, 0, FileConfig::new());
+
+    // Sort by column A (City), then column B (Name)
+    send_command(&mut app, "sort A,B");
+
+    assert_eq!(app.document.rows[1][0], "LA");
+    assert_eq!(app.document.rows[1][1], "Alice");
+    assert_eq!(app.document.rows[2][0], "NYC");
+    assert_eq!(app.document.rows[2][1], "Bob");
+    assert_eq!(app.document.rows[3][0], "NYC");
+    assert_eq!(app.document.rows[3][1], "Charlie");
+}
+
+#[test]
+fn test_sort_descending_by_column_letter() {
+    let mut app = create_test_app();
+
+    send_command(&mut app, "sort! A");
+
+    assert_eq!(app.document.rows[1][0], "Charlie");
+    assert_eq!(app.document.rows[2][0], "Bob");
+    assert_eq!(app.document.rows[3][0], "Alice");
+}
+
+#[test]
+fn test_sort_column_letter_out_of_range() {
+    let mut app = create_test_app();
+
+    // Only 3 columns (A, B, C) — ZZ is out of range
+    send_command(&mut app, "sort ZZ");
+
+    let msg = app.status_message.as_ref().unwrap().as_str();
+    assert!(msg.contains("not found"));
 }
 
 // ===== No regression: :c column jump still works =====

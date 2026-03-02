@@ -1,11 +1,13 @@
 //! SQL query mode — load CSV files into SQLite and execute queries.
 
+use crate::cancel::{self, CancelledError};
 use crate::csv::Document;
 use crate::file_system;
 use crate::session::FileConfig;
 use anyhow::{bail, Context, Result};
 use rusqlite::Connection;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::AtomicBool;
 
 /// Derive a SQLite table name from a file path.
 /// Strips the `.csv` extension and replaces non-alphanumeric characters with `_`.
@@ -66,26 +68,114 @@ pub fn load_csv_into_sqlite(conn: &Connection, doc: &Document, table_name: &str)
     conn.execute(&create_sql, [])
         .context(format!("Failed to create table '{}'", table_name))?;
 
-    // Prepare INSERT statement
-    let placeholders: Vec<&str> = vec!["?"; headers.len()];
+    // Use a prepared single-row INSERT inside a transaction.
+    // Binds &str refs directly — no heap allocation per cell.
+    let col_count = headers.len();
+    let placeholders: Vec<&str> = vec!["?"; col_count];
     let insert_sql = format!(
         "INSERT INTO \"{}\" VALUES ({})",
         table_name.replace('"', "\"\""),
         placeholders.join(", ")
     );
-    let mut stmt = conn.prepare(&insert_sql)?;
 
-    // Insert data rows (skip row 0 which is headers)
+    conn.execute("BEGIN", [])
+        .context("Failed to begin transaction")?;
+
+    let mut stmt = conn.prepare_cached(&insert_sql)?;
+
     for row in doc.rows.iter().skip(1) {
-        let params: Vec<&dyn rusqlite::types::ToSql> = (0..headers.len())
-            .map(|i| {
-                row.get(i)
-                    .map(|s| s as &dyn rusqlite::types::ToSql)
-                    .unwrap_or(&"" as &dyn rusqlite::types::ToSql)
-            })
+        let params: Vec<&str> = (0..col_count)
+            .map(|i| row.get(i).map(|s| s.as_str()).unwrap_or(""))
             .collect();
-        stmt.execute(params.as_slice())?;
+        stmt.execute(rusqlite::params_from_iter(params))?;
     }
+
+    drop(stmt);
+    conn.execute("COMMIT", [])
+        .context("Failed to commit transaction")?;
+
+    Ok(())
+}
+
+/// Stream a CSV file directly into a SQLite table, bypassing the Document intermediate.
+/// Used by the CLI `-q` path where we don't need the Document in memory.
+fn load_csv_file_into_sqlite(
+    conn: &Connection,
+    file_path: &Path,
+    table_name: &str,
+    config: &FileConfig,
+) -> Result<()> {
+    let file_bytes = std::fs::read(file_path)
+        .context(format!("Failed to read file: {}", file_path.display()))?;
+
+    let decoded = crate::csv::Document::decode_file_bytes(&file_bytes, config.encoding.clone())?;
+
+    let mut builder = csv::ReaderBuilder::new();
+    builder.has_headers(!config.no_headers);
+    if let Some(d) = config.delimiter {
+        builder.delimiter(d);
+    }
+
+    let mut reader = builder.from_reader(decoded.as_bytes());
+
+    // Get headers
+    let headers: Vec<String> = if config.no_headers {
+        let first = reader.headers().context("CSV file has no records")?;
+        (1..=first.len())
+            .map(|i| format!("Column {}", i))
+            .collect()
+    } else {
+        let h = reader.headers().context("CSV file has no headers")?;
+        h.iter().map(String::from).collect()
+    };
+
+    if headers.is_empty() {
+        bail!("CSV file has no columns");
+    }
+
+    // CREATE TABLE
+    let col_defs: Vec<String> = headers
+        .iter()
+        .map(|h| format!("\"{}\" TEXT", h.replace('"', "\"\"")))
+        .collect();
+    let escaped_table = table_name.replace('"', "\"\"");
+    conn.execute(
+        &format!(
+            "CREATE TABLE \"{}\" ({})",
+            escaped_table,
+            col_defs.join(", ")
+        ),
+        [],
+    )
+    .context(format!("Failed to create table '{}'", table_name))?;
+
+    // Use a prepared single-row INSERT inside a transaction.
+    // This avoids all heap allocation for params — we bind &str refs directly
+    // from the CSV StringRecord into SQLite's prepared statement.
+    let col_count = headers.len();
+    let placeholders: Vec<&str> = vec!["?"; col_count];
+    let insert_sql = format!(
+        "INSERT INTO \"{}\" VALUES ({})",
+        escaped_table,
+        placeholders.join(", ")
+    );
+
+    conn.execute("BEGIN", [])
+        .context("Failed to begin transaction")?;
+
+    let mut stmt = conn.prepare_cached(&insert_sql)?;
+
+    for result in reader.records() {
+        let record = result.context("Failed to read CSV record")?;
+        let params: Vec<&str> = (0..col_count)
+            .map(|i| record.get(i).unwrap_or(""))
+            .collect();
+        stmt.execute(rusqlite::params_from_iter(params))?;
+    }
+
+    drop(stmt);
+    conn.execute("COMMIT", [])
+        .context("Failed to commit transaction")?;
 
     Ok(())
 }
@@ -128,30 +218,134 @@ pub fn execute_query_to_document(
     Ok(Document::new(col_names, data_rows, output_filename))
 }
 
+/// Load a parsed CSV Document into a SQLite table with cancellation support.
+/// Checks the `cancelled` flag every CHECK_INTERVAL rows.
+/// On cancellation, rolls back the transaction and returns CancelledError.
+pub fn load_csv_into_sqlite_cancellable(
+    conn: &Connection,
+    doc: &Document,
+    table_name: &str,
+    cancelled: &AtomicBool,
+) -> Result<()> {
+    if doc.rows.is_empty() {
+        bail!("Document has no rows (not even headers)");
+    }
+
+    let headers = &doc.rows[0];
+    if headers.is_empty() {
+        bail!("Document has no columns");
+    }
+
+    let col_defs: Vec<String> = headers
+        .iter()
+        .map(|h| format!("\"{}\" TEXT", h.replace('"', "\"\"")))
+        .collect();
+
+    let create_sql = format!(
+        "CREATE TABLE \"{}\" ({})",
+        table_name.replace('"', "\"\""),
+        col_defs.join(", ")
+    );
+    conn.execute(&create_sql, [])
+        .context(format!("Failed to create table '{}'", table_name))?;
+
+    let col_count = headers.len();
+    let placeholders: Vec<&str> = vec!["?"; col_count];
+    let insert_sql = format!(
+        "INSERT INTO \"{}\" VALUES ({})",
+        table_name.replace('"', "\"\""),
+        placeholders.join(", ")
+    );
+
+    conn.execute("BEGIN", [])
+        .context("Failed to begin transaction")?;
+
+    let mut stmt = conn.prepare_cached(&insert_sql)?;
+
+    for (i, row) in doc.rows.iter().skip(1).enumerate() {
+        if i % cancel::CHECK_INTERVAL == 0 && cancel::check_esc(cancelled) {
+            drop(stmt);
+            let _ = conn.execute("ROLLBACK", []);
+            bail!(CancelledError);
+        }
+        let params: Vec<&str> = (0..col_count)
+            .map(|j| row.get(j).map(|s| s.as_str()).unwrap_or(""))
+            .collect();
+        stmt.execute(rusqlite::params_from_iter(params))?;
+    }
+
+    drop(stmt);
+    conn.execute("COMMIT", [])
+        .context("Failed to commit transaction")?;
+
+    Ok(())
+}
+
+/// Execute a SQL query and return results as a Document, with cancellation support.
+/// Checks the `cancelled` flag every CHECK_INTERVAL result rows.
+pub fn execute_query_to_document_cancellable(
+    conn: &Connection,
+    query: &str,
+    output_filename: String,
+    cancelled: &AtomicBool,
+) -> Result<Document> {
+    let mut stmt = conn.prepare(query).map_err(|e| anyhow::anyhow!("{}", e))?;
+    let col_count = stmt.column_count();
+    let col_names: Vec<String> = (0..col_count)
+        .map(|i| stmt.column_name(i).unwrap_or("?").to_string())
+        .collect();
+
+    let rows = stmt
+        .query_map([], |row| {
+            let values: Vec<String> = (0..col_count)
+                .map(|i| {
+                    use rusqlite::types::ValueRef;
+                    match row.get_ref(i).unwrap_or(ValueRef::Null) {
+                        ValueRef::Null => String::new(),
+                        ValueRef::Integer(n) => n.to_string(),
+                        ValueRef::Real(f) => f.to_string(),
+                        ValueRef::Text(s) => String::from_utf8_lossy(s).into_owned(),
+                        ValueRef::Blob(b) => String::from_utf8_lossy(b).into_owned(),
+                    }
+                })
+                .collect();
+            Ok(values)
+        })
+        .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+    let mut data_rows = Vec::new();
+    for (i, row_result) in rows.enumerate() {
+        if i % cancel::CHECK_INTERVAL == 0 && cancel::check_esc(cancelled) {
+            bail!(CancelledError);
+        }
+        data_rows.push(row_result.context("Failed to read query result row")?);
+    }
+
+    Ok(Document::new(col_names, data_rows, output_filename))
+}
+
 /// Execute a SQL query against CSV files and write results as CSV to stdout.
 pub fn execute_query(path: &Path, query: &str, config: &FileConfig) -> Result<()> {
     let csv_files = resolve_csv_files(path)?;
 
-    let conn = Connection::open_in_memory().context("Failed to open in-memory SQLite database")?;
+    let conn =
+        Connection::open_in_memory().context("Failed to open in-memory SQLite database")?;
 
-    // Load each CSV file as a table, skipping files that can't be parsed
+    // Optimize SQLite for bulk loading (safe for in-memory databases)
+    conn.execute_batch(
+        "PRAGMA journal_mode=OFF;
+         PRAGMA synchronous=OFF;
+         PRAGMA temp_store=MEMORY;
+         PRAGMA cache_size=-64000;",
+    )
+    .context("Failed to set SQLite pragmas")?;
+
+    // Stream each CSV file directly into SQLite, skipping files that can't be parsed
     for file_path in &csv_files {
         let table_name = table_name_from_path(file_path);
-        let doc = match Document::from_file(
-            file_path,
-            config.delimiter,
-            config.no_headers,
-            config.encoding.clone(),
-        ) {
-            Ok(doc) => doc,
-            Err(_) => continue, // Skip unparseable files (e.g., empty files)
-        };
-
-        if doc.rows.is_empty() || doc.rows[0].is_empty() {
-            continue; // Skip documents with no columns
+        if load_csv_file_into_sqlite(&conn, file_path, &table_name, config).is_err() {
+            continue;
         }
-
-        load_csv_into_sqlite(&conn, &doc, &table_name)?;
     }
 
     // Execute user query

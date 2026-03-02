@@ -157,7 +157,7 @@ fn test_c_command_works_with_and_without_space() {
 }
 
 #[test]
-fn test_old_colon_number_navigation_removed() {
+fn test_colon_number_navigates_to_line() {
     let doc = Document::new(
         vec!["A".to_string()],
         vec![
@@ -172,11 +172,12 @@ fn test_old_colon_number_navigation_removed() {
     let files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(doc, files, 0, FileConfig::new());
 
-    // Try old :5 command (should not work as navigation)
+    // :5 should jump to row 5 (vim :# syntax)
     send_command(&mut app, "5");
+    assert_eq!(app.view_state.table_state.selected(), Some(5));
 
-    // Should either show error or do nothing (not jump to row 5)
-    // The cursor should still be at the original position
+    // :1 should jump to row 1
+    send_command(&mut app, "1");
     assert_eq!(app.view_state.table_state.selected(), Some(1));
 }
 

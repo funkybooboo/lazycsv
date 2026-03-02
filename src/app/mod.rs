@@ -1,5 +1,6 @@
 pub mod messages;
 
+use crate::cancel;
 use crate::clipboard::DualClipboard;
 use crate::domain::position::{ColIndex, RowIndex};
 use crate::input::{InputResult, InputState, StatusMessage};
@@ -8,7 +9,8 @@ use crate::ui::ViewState;
 use crate::Document;
 use anyhow::{Context, Result};
 use crossterm::event::KeyEvent;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::AtomicBool;
 
 /// Application modes (vim-style modal editing)
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -89,10 +91,12 @@ pub struct App {
 }
 
 impl App {
-    /// Create a new `App` instance from CLI arguments.
-    /// This function handles file scanning, initial data loading, and App creation.
-    pub fn from_cli(cli_args: crate::cli::CliArgs) -> Result<Self> {
-        let path = cli_args.path.unwrap_or_else(|| PathBuf::from("."));
+    /// Resolve file paths from CLI arguments (fast, no file loading).
+    /// Returns (file_path, csv_files, current_file_index, file_config).
+    pub fn resolve_files(
+        cli_args: &crate::cli::CliArgs,
+    ) -> Result<(PathBuf, Vec<PathBuf>, usize, crate::session::FileConfig)> {
+        let path = cli_args.path.clone().unwrap_or_else(|| PathBuf::from("."));
 
         // Determine the CSV file to load and scan directory for others
         let (file_path, csv_files, current_file_index) = if path.is_file() {
@@ -117,22 +121,46 @@ impl App {
             cli_args.encoding.clone(),
         );
 
-        // Load CSV data
+        Ok((file_path, csv_files, current_file_index, file_config))
+    }
+
+    /// Load a CSV file and create an App instance.
+    /// Call after `resolve_files` to actually load the document.
+    pub fn load_file(
+        file_path: &Path,
+        csv_files: Vec<PathBuf>,
+        current_file_index: usize,
+        file_config: crate::session::FileConfig,
+        cli_args: &crate::cli::CliArgs,
+    ) -> Result<Self> {
         let csv_data = crate::csv::Document::from_file(
-            &file_path,
+            file_path,
             cli_args.delimiter,
             cli_args.no_headers,
             cli_args.encoding.clone(),
         )
-        .context(messages::failed_to_load_csv(&file_path))?;
+        .context(messages::failed_to_load_csv(file_path))?;
 
-        // Create and return the App
         Ok(Self::new(
             csv_data,
             csv_files,
             current_file_index,
             file_config,
         ))
+    }
+
+    /// Create a new `App` instance from CLI arguments.
+    /// This function handles file scanning, initial data loading, and App creation.
+    pub fn from_cli(cli_args: crate::cli::CliArgs) -> Result<Self> {
+        let (file_path, csv_files, current_file_index, file_config) =
+            Self::resolve_files(&cli_args)?;
+        Self::load_file(
+            &file_path,
+            csv_files,
+            current_file_index,
+            file_config,
+            &cli_args,
+        )
     }
 
     /// Create new App from loaded CSV data, file list, and file configuration
@@ -381,6 +409,351 @@ impl App {
     /// Get mutable reference to magnifier state (for input handling)
     pub fn magnifier_state_mut(&mut self) -> Option<&mut crate::magnifier::MagnifierState> {
         self.magnifier_state.as_mut()
+    }
+
+    /// Execute a SQL query against session CSVs and return the result document.
+    /// On success, also updates app state (clears sql_error, sets mode to Normal).
+    /// On failure, sets sql_error and returns None (stays in SqlEditor mode).
+    pub fn execute_sql_query(&mut self, query: &str) -> Option<Document> {
+        let conn = match rusqlite::Connection::open_in_memory() {
+            Ok(c) => c,
+            Err(e) => {
+                self.sql_error = Some(format!("Failed to open SQLite: {}", e));
+                return None;
+            }
+        };
+
+        // Optimize SQLite for bulk loading (safe for in-memory databases)
+        if conn
+            .execute_batch(
+                "PRAGMA journal_mode=OFF;
+                 PRAGMA synchronous=OFF;
+                 PRAGMA temp_store=MEMORY;
+                 PRAGMA cache_size=-64000;",
+            )
+            .is_err()
+        {
+            self.sql_error = Some("Failed to set SQLite pragmas".to_string());
+            return None;
+        }
+
+        // Load each session file into SQLite
+        for file_path in self.session.files().to_vec() {
+            let table_name = crate::query::table_name_from_path(&file_path);
+
+            let filename = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            let doc = if filename == self.document.filename {
+                self.document.clone()
+            } else if let Some(cached) = self.session.get_cached_document(&file_path) {
+                cached.clone()
+            } else if file_path.exists() {
+                let config = self.session.config();
+                match crate::csv::Document::from_file(
+                    &file_path,
+                    config.delimiter,
+                    config.no_headers,
+                    config.encoding.clone(),
+                ) {
+                    Ok(d) => d,
+                    Err(_) => continue,
+                }
+            } else {
+                continue;
+            };
+
+            if doc.rows.is_empty() || doc.rows[0].is_empty() {
+                continue;
+            }
+
+            if crate::query::load_csv_into_sqlite(&conn, &doc, &table_name).is_err() {
+                continue;
+            }
+        }
+
+        // Execute query
+        match crate::query::execute_query_to_document(&conn, query, "result.csv".to_string()) {
+            Ok(mut doc) => {
+                // Determine output filename using reuse logic
+                let reuse_name = self.session.find_query_output_file().and_then(|p| {
+                    p.file_name()
+                        .and_then(|n| n.to_str())
+                        .map(|s| s.to_string())
+                });
+
+                let output_name = reuse_name.unwrap_or_else(|| self.generate_output_filename());
+                doc.filename = output_name;
+
+                self.sql_error = None;
+                self.mode = Mode::Normal;
+                Some(doc)
+            }
+            Err(e) => {
+                self.sql_error = Some(format!("SQL error: {}", e));
+                None
+            }
+        }
+    }
+
+    /// Load a CSV file with cancellation support.
+    /// Same as `load_file` but uses `Document::from_file_cancellable`.
+    pub fn load_file_cancellable(
+        file_path: &Path,
+        csv_files: Vec<PathBuf>,
+        current_file_index: usize,
+        file_config: crate::session::FileConfig,
+        cli_args: &crate::cli::CliArgs,
+        cancelled: &AtomicBool,
+    ) -> Result<Self> {
+        let csv_data = crate::csv::Document::from_file_cancellable(
+            file_path,
+            cli_args.delimiter,
+            cli_args.no_headers,
+            cli_args.encoding.clone(),
+            cancelled,
+        )
+        .context(messages::failed_to_load_csv(file_path))?;
+
+        Ok(Self::new(
+            csv_data,
+            csv_files,
+            current_file_index,
+            file_config,
+        ))
+    }
+
+    /// Reload CSV data from current file with cancellation support.
+    /// Returns Ok(true) if loaded successfully, Ok(false) if cancelled (keeps existing document).
+    pub fn reload_current_file_cancellable(&mut self, cancelled: &AtomicBool) -> Result<bool> {
+        let file_path = self.get_current_file().clone();
+
+        // Check for cached document first (e.g. query output files that don't exist on disk)
+        if let Some(cached) = self.session.get_cached_document(&file_path) {
+            // Drop old rows on background thread to avoid blocking UI
+            let old_rows = std::mem::take(&mut self.document.rows);
+            std::thread::spawn(move || drop(old_rows));
+            self.document = cached.clone();
+            self.view_state = ViewState::default();
+            let initial_row = if self.document.header_mode && self.document.row_count() > 1 {
+                1
+            } else {
+                0
+            };
+            self.view_state.table_state.select(Some(initial_row));
+            return Ok(true);
+        }
+
+        // Not cached — reload from disk
+        let config = self.session.config();
+        match crate::csv::Document::from_file_cancellable(
+            &file_path,
+            config.delimiter,
+            config.no_headers,
+            config.encoding.clone(),
+            cancelled,
+        ) {
+            Ok(doc) => {
+                // Drop old rows on background thread
+                let old_rows = std::mem::take(&mut self.document.rows);
+                std::thread::spawn(move || drop(old_rows));
+                self.document = doc;
+                self.view_state = ViewState::default();
+                let initial_row = if self.document.header_mode && self.document.row_count() > 1 {
+                    1
+                } else {
+                    0
+                };
+                self.view_state.table_state.select(Some(initial_row));
+                Ok(true)
+            }
+            Err(e) => {
+                if e.downcast_ref::<cancel::CancelledError>().is_some() {
+                    Ok(false)
+                } else {
+                    Err(e).context(messages::failed_to_reload_file(&file_path))
+                }
+            }
+        }
+    }
+
+    /// Execute a SQL query with cancellation support.
+    /// Returns (Some(doc), false) on success, (None, true) if cancelled,
+    /// (None, false) on query error.
+    pub fn execute_sql_query_cancellable(
+        &mut self,
+        query: &str,
+        cancelled: &AtomicBool,
+    ) -> (Option<Document>, bool) {
+        let conn = match rusqlite::Connection::open_in_memory() {
+            Ok(c) => c,
+            Err(e) => {
+                self.sql_error = Some(format!("Failed to open SQLite: {}", e));
+                return (None, false);
+            }
+        };
+
+        if conn
+            .execute_batch(
+                "PRAGMA journal_mode=OFF;
+                 PRAGMA synchronous=OFF;
+                 PRAGMA temp_store=MEMORY;
+                 PRAGMA cache_size=-64000;",
+            )
+            .is_err()
+        {
+            self.sql_error = Some("Failed to set SQLite pragmas".to_string());
+            return (None, false);
+        }
+
+        // Load each session file into SQLite.
+        // Avoid cloning the current document (can be huge) — pass references instead.
+        for file_path in self.session.files().to_vec() {
+            // Check cancellation between files
+            if cancel::check_esc(cancelled) {
+                return (None, true);
+            }
+
+            let table_name = crate::query::table_name_from_path(&file_path);
+            let filename = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+
+            // Current document — use reference directly (no clone)
+            if filename == self.document.filename {
+                if self.document.rows.is_empty() || self.document.rows[0].is_empty() {
+                    continue;
+                }
+                match crate::query::load_csv_into_sqlite_cancellable(
+                    &conn,
+                    &self.document,
+                    &table_name,
+                    cancelled,
+                ) {
+                    Ok(()) => {}
+                    Err(e) => {
+                        if e.downcast_ref::<cancel::CancelledError>().is_some() {
+                            return (None, true);
+                        }
+                        continue;
+                    }
+                }
+                continue;
+            }
+
+            // Cached document — use reference directly (no clone)
+            if let Some(cached) = self.session.get_cached_document(&file_path) {
+                if cached.rows.is_empty() || cached.rows[0].is_empty() {
+                    continue;
+                }
+                match crate::query::load_csv_into_sqlite_cancellable(
+                    &conn,
+                    cached,
+                    &table_name,
+                    cancelled,
+                ) {
+                    Ok(()) => {}
+                    Err(e) => {
+                        if e.downcast_ref::<cancel::CancelledError>().is_some() {
+                            return (None, true);
+                        }
+                        continue;
+                    }
+                }
+                continue;
+            }
+
+            // Load from file with cancellation
+            if file_path.exists() {
+                let config = self.session.config();
+                match crate::csv::Document::from_file_cancellable(
+                    &file_path,
+                    config.delimiter,
+                    config.no_headers,
+                    config.encoding.clone(),
+                    cancelled,
+                ) {
+                    Ok(d) => {
+                        if d.rows.is_empty() || d.rows[0].is_empty() {
+                            continue;
+                        }
+                        match crate::query::load_csv_into_sqlite_cancellable(
+                            &conn,
+                            &d,
+                            &table_name,
+                            cancelled,
+                        ) {
+                            Ok(()) => {}
+                            Err(e) => {
+                                if e.downcast_ref::<cancel::CancelledError>().is_some() {
+                                    return (None, true);
+                                }
+                                continue;
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        if e.downcast_ref::<cancel::CancelledError>().is_some() {
+                            return (None, true);
+                        }
+                        continue;
+                    }
+                }
+            }
+        }
+
+        // Execute query
+        match crate::query::execute_query_to_document_cancellable(
+            &conn,
+            query,
+            "result.csv".to_string(),
+            cancelled,
+        ) {
+            Ok(mut doc) => {
+                let reuse_name = self.session.find_query_output_file().and_then(|p| {
+                    p.file_name()
+                        .and_then(|n| n.to_str())
+                        .map(|s| s.to_string())
+                });
+
+                let output_name = reuse_name.unwrap_or_else(|| self.generate_output_filename());
+                doc.filename = output_name;
+
+                self.sql_error = None;
+                self.mode = Mode::Normal;
+                (Some(doc), false)
+            }
+            Err(e) => {
+                if e.downcast_ref::<cancel::CancelledError>().is_some() {
+                    return (None, true);
+                }
+                self.sql_error = Some(format!("SQL error: {}", e));
+                (None, false)
+            }
+        }
+    }
+
+    /// Generate a unique output filename for SQL query results
+    pub fn generate_output_filename(&self) -> String {
+        let existing: std::collections::HashSet<String> = self
+            .session
+            .files()
+            .iter()
+            .filter_map(|p| {
+                p.file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|s| s.to_string())
+            })
+            .collect();
+
+        let base = "result.csv".to_string();
+        if !existing.contains(&base) {
+            return base;
+        }
+        let mut i = 1;
+        loop {
+            let name = format!("result{}.csv", i);
+            if !existing.contains(&name) {
+                return name;
+            }
+            i += 1;
+        }
     }
 }
 
@@ -1746,7 +2119,7 @@ mod tests {
     #[test]
     fn test_f_command_rename_preserves_query_output_status() {
         let csv_data = create_test_csv_data();
-        let csv_files = vec![PathBuf::from("output.csv")];
+        let csv_files = vec![PathBuf::from("result.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Mark as query output (simulating what happens after SQL execution)
@@ -1757,16 +2130,16 @@ mod tests {
         app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('f'))).unwrap();
         app.handle_key(key_event(KeyCode::Char(' '))).unwrap();
-        for c in "results.csv".chars() {
+        for c in "renamed_result.csv".chars() {
             app.handle_key(key_event(KeyCode::Char(c))).unwrap();
         }
         app.handle_key(key_event(KeyCode::Enter)).unwrap();
 
         // Query output status should follow the renamed file
         let new_path = app.get_current_file().clone();
-        assert_eq!(new_path, PathBuf::from("results.csv"));
+        assert_eq!(new_path, PathBuf::from("renamed_result.csv"));
         assert!(app.session.is_query_output(&new_path));
-        assert!(!app.session.is_query_output(&PathBuf::from("output.csv")));
+        assert!(!app.session.is_query_output(&PathBuf::from("result.csv")));
     }
 
     // ============================================================================

@@ -1,4 +1,5 @@
 pub mod app;
+pub mod cancel;
 pub mod cli;
 pub mod clipboard;
 pub mod csv;

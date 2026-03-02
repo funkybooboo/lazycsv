@@ -16,6 +16,24 @@ use ratatui::{
     Frame,
 };
 
+/// Render a centered loading message (used before App exists, e.g. initial file load)
+pub fn render_loading(frame: &mut Frame, message: &str) {
+    use ratatui::layout::Alignment;
+    use ratatui::widgets::Paragraph;
+
+    let area = frame.area();
+    let vertical = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage(50),
+            Constraint::Length(1),
+            Constraint::Percentage(50),
+        ])
+        .split(area);
+    let paragraph = Paragraph::new(message.to_string()).alignment(Alignment::Center);
+    frame.render_widget(paragraph, vertical[1]);
+}
+
 /// Main UI rendering function
 pub fn render(frame: &mut Frame, app: &mut App) {
     // Split terminal into main area + file switcher + status bar

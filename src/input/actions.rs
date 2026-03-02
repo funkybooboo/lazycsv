@@ -12,6 +12,15 @@ pub enum InputResult {
     Quit,
     /// Switch to a new document (from SQL query results)
     SwitchToDocument(crate::csv::Document),
+    /// Sort document by columns (deferred to main loop for UI feedback)
+    SortDocument {
+        col_indices: Vec<usize>,
+        ascending: bool,
+        /// Human-readable description for status message (e.g. "Name,Age")
+        description: String,
+    },
+    /// Execute SQL query (deferred to main loop for UI feedback)
+    ExecuteQuery { query: String },
 }
 
 /// High-level user actions that can be performed
