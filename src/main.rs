@@ -20,6 +20,59 @@ fn main() -> Result<()> {
         return lazycsv::query::execute_query(&path, query, &config);
     }
 
+    // Non-interactive row/column count mode: print counts and exit
+    if cli_args.rows || cli_args.columns {
+        let path = cli_args.path.clone().unwrap_or_else(|| PathBuf::from("."));
+        let files = if path.is_file() {
+            vec![path]
+        } else if path.is_dir() {
+            let csv_files = lazycsv::file_system::scan_directory(&path)?;
+            if csv_files.is_empty() {
+                anyhow::bail!("No CSV files found in {}", path.display());
+            }
+            csv_files
+        } else {
+            anyhow::bail!("Path does not exist: {}", path.display());
+        };
+
+        let separator = if cli_args.format {
+            detect_thousands_separator()
+        } else {
+            '\0' // sentinel: no formatting
+        };
+
+        for file in &files {
+            let name = file
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("unknown");
+
+            let mut parts = Vec::new();
+
+            if cli_args.rows {
+                let count = lazycsv::csv::Document::count_rows(
+                    file,
+                    cli_args.delimiter,
+                    cli_args.no_headers,
+                    cli_args.encoding.clone(),
+                )?;
+                parts.push(format!("{} rows", format_number(count, separator)));
+            }
+
+            if cli_args.columns {
+                let count = lazycsv::csv::Document::count_columns(
+                    file,
+                    cli_args.delimiter,
+                    cli_args.encoding.clone(),
+                )?;
+                parts.push(format!("{} columns", format_number(count, separator)));
+            }
+
+            println!("{}: {}", name, parts.join(", "));
+        }
+        return Ok(());
+    }
+
     // Interactive TUI mode: resolve files first, then show loading screen
     let (file_path, csv_files, index, config) = App::resolve_files(&cli_args)?;
 
@@ -369,4 +422,40 @@ fn run(
     std::mem::forget(app);
 
     Ok(())
+}
+
+/// Format a number with thousands separators. If `sep` is '\0', return plain number.
+fn format_number(n: usize, sep: char) -> String {
+    if sep == '\0' {
+        return n.to_string();
+    }
+    let s = n.to_string();
+    let mut result = String::with_capacity(s.len() + s.len() / 3);
+    for (i, ch) in s.chars().rev().enumerate() {
+        if i > 0 && i % 3 == 0 {
+            result.push(sep);
+        }
+        result.push(ch);
+    }
+    result.chars().rev().collect()
+}
+
+/// Detect the locale-appropriate thousands separator from environment variables.
+/// Returns ',' for English-like locales, '.' for European locales (de, fr, es, it, pt, nl, etc.).
+fn detect_thousands_separator() -> char {
+    let locale = std::env::var("LC_NUMERIC")
+        .or_else(|_| std::env::var("LC_ALL"))
+        .or_else(|_| std::env::var("LANG"))
+        .unwrap_or_default()
+        .to_lowercase();
+
+    // European locales that use '.' as thousands separator
+    let dot_locales = ["de", "fr", "es", "it", "pt", "nl", "sv", "nb", "nn", "da", "fi", "pl", "cs", "sk", "hu", "ro", "bg", "hr", "sl", "sr", "tr", "el", "ru", "uk", "vi", "id"];
+    for prefix in &dot_locales {
+        if locale.starts_with(prefix) {
+            return '.';
+        }
+    }
+
+    ','
 }

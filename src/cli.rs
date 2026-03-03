@@ -14,7 +14,7 @@ pub struct CliArgs {
     pub delimiter: Option<u8>,
 
     /// Treat the first row as data rather than a header.
-    #[arg(long, help = "Treat the first row as data, not headers.")]
+    #[arg(short = 'H', long, help = "Treat the first row as data, not headers.")]
     pub no_headers: bool,
 
     /// Specify the character encoding of the file.
@@ -32,6 +32,18 @@ pub struct CliArgs {
         help = "SQL query to execute against CSV file(s) (non-interactive mode)"
     )]
     pub query: Option<String>,
+
+    /// Print row count for each CSV file (non-interactive mode).
+    #[arg(short = 'r', long, help = "Print row count for each CSV file")]
+    pub rows: bool,
+
+    /// Print column count for each CSV file (non-interactive mode).
+    #[arg(short = 'c', long, help = "Print column count for each CSV file")]
+    pub columns: bool,
+
+    /// Format numbers with locale-aware thousands separators.
+    #[arg(short = 'f', long, help = "Format numbers with thousands separators (',' or '.' based on locale)")]
+    pub format: bool,
 }
 
 fn parse_delimiter(s: &str) -> Result<u8, String> {

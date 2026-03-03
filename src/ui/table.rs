@@ -57,15 +57,25 @@ fn build_column_letters_row<'a>(
 
 /// Build the header row with column names
 /// Highlights the selected column if the cursor is on row 0 (header row)
-fn build_header_row<'a>(
-    app: &'a App,
+fn build_header_row(
+    app: &App,
     start_col: usize,
     end_col: usize,
     selected_row: Option<usize>,
-) -> Row<'a> {
+) -> Row<'static> {
     let is_header_selected = selected_row == Some(0);
     let selected_col = app.view_state.selected_column;
     let search_state = app.search_state.as_ref();
+    let is_insert_mode = app.mode == Mode::Insert;
+
+    // Get edit buffer content if editing a header cell
+    let edit_content = if is_header_selected && is_insert_mode {
+        app.edit_buffer
+            .as_ref()
+            .map(|buf| format_edit_buffer(&buf.content, buf.cursor))
+    } else {
+        None
+    };
 
     // Row number for header: "0" if selected, otherwise empty or dim
     let row_num_cell = if is_header_selected {
@@ -76,10 +86,20 @@ fn build_header_row<'a>(
     let mut header_cells = vec![row_num_cell];
 
     for i in start_col..end_col {
-        let header_text = app.document.get_header(ColIndex::new(i));
         let is_selected_cell = is_header_selected && ColIndex::new(i) == selected_col;
         let ri = RowIndex::new(0);
         let ci = ColIndex::new(i);
+
+        // Show edit buffer content when editing this header cell
+        let header_text = if is_selected_cell && is_insert_mode {
+            if let Some(ref content) = edit_content {
+                content.clone()
+            } else {
+                app.document.get_header(ci).to_string()
+            }
+        } else {
+            app.document.get_header(ci).to_string()
+        };
 
         let style = if is_selected_cell {
             // Selected cell in header row: highlight with white background

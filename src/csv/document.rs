@@ -80,6 +80,49 @@ impl Document {
         }
     }
 
+    /// Count data rows in a CSV file without storing row data in memory.
+    /// Returns the number of data rows (excludes header when `no_headers` is false).
+    pub fn count_rows(
+        path: &Path,
+        delimiter: Option<u8>,
+        no_headers: bool,
+        encoding_label: Option<String>,
+    ) -> Result<usize> {
+        let file_bytes =
+            fs::read(path).context(format!("Failed to read file: {}", path.display()))?;
+        let decoded_content = Self::decode_file_bytes(&file_bytes, encoding_label)?;
+
+        let mut builder = csv::ReaderBuilder::new();
+        builder.has_headers(!no_headers);
+        if let Some(d) = delimiter {
+            builder.delimiter(d);
+        }
+
+        let mut reader = builder.from_reader(decoded_content.as_bytes());
+        Ok(reader.records().count())
+    }
+
+    /// Count columns in a CSV file without storing row data in memory.
+    /// Returns the number of columns from the first row.
+    pub fn count_columns(
+        path: &Path,
+        delimiter: Option<u8>,
+        encoding_label: Option<String>,
+    ) -> Result<usize> {
+        let file_bytes =
+            fs::read(path).context(format!("Failed to read file: {}", path.display()))?;
+        let decoded_content = Self::decode_file_bytes(&file_bytes, encoding_label)?;
+
+        let mut builder = csv::ReaderBuilder::new();
+        builder.has_headers(true);
+        if let Some(d) = delimiter {
+            builder.delimiter(d);
+        }
+
+        let mut reader = builder.from_reader(decoded_content.as_bytes());
+        Ok(reader.headers().map(|h| h.len()).unwrap_or(0))
+    }
+
     /// Parses CSV content from a string.
     fn parse_csv_content(
         content: &str,
