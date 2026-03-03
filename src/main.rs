@@ -267,7 +267,7 @@ fn run(
                             let cancelled = Arc::new(AtomicBool::new(false));
                             let watcher = lazycsv::cancel::EscWatcher::spawn(&cancelled);
                             let (query_result, was_cancelled) =
-                                app.execute_sql_query_cancellable(&query, &cancelled);
+                                app.execute_sql_query_cancellable(&query, &output_name, &cancelled);
                             watcher.stop();
 
                             if was_cancelled {
@@ -312,6 +312,10 @@ fn run(
 
                                 let current_path = app.get_current_file().clone();
                                 app.session.mark_query_output(&current_path);
+
+                                // Cache query result so switching back works
+                                app.session
+                                    .cache_document(current_path, doc.clone());
 
                                 // Drop old document rows on a background thread to avoid
                                 // blocking the UI for large documents.

@@ -92,6 +92,17 @@ fn handle_file_switch(app: &mut App, next: bool) -> InputResult {
         return InputResult::Continue;
     }
 
+    // Cache current document before switching if it's a query output or dirty
+    // (query results don't exist on disk, so they must be cached to switch back)
+    let current_path = app.get_current_file().clone();
+    if app.session.is_query_output(&current_path) || app.document.is_dirty {
+        app.session
+            .cache_document(current_path.clone(), app.document.clone());
+        if app.document.is_dirty {
+            app.session.mark_dirty(&current_path);
+        }
+    }
+
     let switched = if next {
         app.session.next_file()
     } else {

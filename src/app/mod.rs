@@ -603,6 +603,11 @@ impl App {
             return Ok(true);
         }
 
+        // Query output files don't exist on disk — if not cached, keep current document
+        if self.session.is_query_output(&file_path) {
+            return Ok(true);
+        }
+
         // Not cached — reload from disk
         let config = self.session.config();
         match crate::csv::Document::from_file_cancellable(
@@ -646,9 +651,12 @@ impl App {
     ///
     /// Uses a cached SQLite connection so that unchanged documents are not
     /// re-imported on subsequent queries.
+    ///
+    /// `output_name` is the filename to assign to the result document.
     pub fn execute_sql_query_cancellable(
         &mut self,
         query: &str,
+        output_name: &str,
         cancelled: &AtomicBool,
     ) -> (Option<Document>, bool) {
         // Take the cache out of self so we can borrow self.document / self.session
@@ -796,14 +804,7 @@ impl App {
             cancelled,
         ) {
             Ok(mut doc) => {
-                let reuse_name = self.session.find_query_output_file().and_then(|p| {
-                    p.file_name()
-                        .and_then(|n| n.to_str())
-                        .map(|s| s.to_string())
-                });
-
-                let output_name = reuse_name.unwrap_or_else(|| self.generate_output_filename());
-                doc.filename = output_name;
+                doc.filename = output_name.to_string();
 
                 self.sql_error = None;
                 self.mode = Mode::Normal;
@@ -2505,5 +2506,38 @@ mod tests {
         app.handle_key(key_event(KeyCode::Enter)).unwrap();
 
         assert!(app.search_state.is_none());
+    }
+
+    #[test]
+    fn test_file_switch_caches_query_output() {
+        // Simulate: real.csv + query result.csv, switch away and back
+        let csv_data = create_test_csv_data();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        // Simulate adding a query result file
+        let result_path = PathBuf::from("result.csv");
+        let idx = app.session.add_file(result_path.clone());
+        app.session.set_active_file_index(idx);
+        app.session.mark_query_output(&result_path);
+        app.document = Document::new(
+            vec!["Col1".to_string()],
+            vec![vec!["query_result".to_string()]],
+            "result.csv".to_string(),
+        );
+
+        // Verify we're on result.csv
+        assert_eq!(app.get_current_file(), &result_path);
+        assert!(app.session.is_query_output(&result_path));
+
+        // Press [ to switch to previous file
+        let result = app.handle_key(key_event(KeyCode::Char('['))).unwrap();
+        assert!(matches!(result, InputResult::ReloadFile));
+
+        // Session should have switched to test.csv
+        assert_eq!(app.get_current_file(), &PathBuf::from("test.csv"));
+
+        // result.csv should now be cached
+        assert!(app.session.get_cached_document(&result_path).is_some());
     }
 }
