@@ -18,7 +18,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 - **v0.4.1** - Persistence & Edge Cases  (Complete)
 - **v0.5.0** - Column Operations & Visual Mode
 - **v0.6.0** - Magnifier Mode  (Complete)
-- **v0.7.0** - Search
+- **v0.7.0** - Search  (Complete)
 - **v0.8.0** - Undo/Redo
 - **v0.9.0** - Transforms & Polish
 
@@ -1583,11 +1583,11 @@ NORMAL                                                          3,C
 **Known Issues:**
 - Unicode handling: char vs byte index (test ignored)
 
-**Next:** v0.7.0 - Search
+**Next:** v0.8.0 - Undo/Redo
 
 ---
 
-## v0.7.0 - Search
+## v0.7.0 - Search  (Complete)
 
 *Find data in the CSV*
 
@@ -1604,48 +1604,48 @@ NORMAL                                                          3,C
 ### Implementation Steps
 
 **File: `src/search/mod.rs` (new file)**
-- [ ] Create search module
-- [ ] Implement `find_matches(document: &Document, pattern: &str) -> Vec<(RowIndex, ColIndex)>`
-- [ ] Implement `find_next_match()` with wrap-around
-- [ ] Case-insensitive by default
-- [ ] Support regex patterns
+- [x] Create search module
+- [x] Implement `find_matches(document: &Document, pattern: &str) -> Vec<(RowIndex, ColIndex)>`
+- [x] Implement `find_next_match()` with wrap-around
+- [x] Case-insensitive by default
+- [x] Support regex patterns
 
 **File: `src/app/mod.rs`**
-- [ ] Add `search_state: Option<SearchState>` field
-- [ ] Add `search_pattern: Option<String>` field
-- [ ] Add `search_matches: Vec<(RowIndex, ColIndex)>` field
-- [ ] Add `current_match_index: usize` field
+- [x] Add `search_state: Option<SearchState>` field
+- [x] Add `search_buffer: String` field
+- [x] Add `Mode::Search` variant
 
 **File: `src/input/handler.rs`**
-- [ ] Add `/` handler to enter Search mode
-- [ ] Add `n`, `N`, `*` handlers
-- [ ] Add `:noh` command handler
+- [x] Add `/` handler to enter Search mode
+- [x] Add `n`, `N`, `*` handlers
+- [x] Add `:noh` command handler
+- [x] Esc in Normal mode clears search highlighting
 
 **File: `src/ui/table.rs`**
-- [ ] Highlight matching cells
-- [ ] Different style for current match vs other matches
+- [x] Highlight matching cells
+- [x] Different style for current match vs other matches
 
 ### Tests to Add
 
-- [ ] `test_slash_enters_search_mode`
-- [ ] `test_n_moves_to_next_match`
-- [ ] `test_N_moves_to_previous_match`
-- [ ] `test_search_wraps_around`
-- [ ] `test_asterisk_searches_current_cell`
-- [ ] `test_noh_clears_highlighting`
-- [ ] `test_search_case_insensitive`
-- [ ] `test_search_regex_patterns`
+- [x] `test_slash_enters_search_mode`
+- [x] `test_n_moves_to_next_match`
+- [x] `test_N_moves_to_previous_match`
+- [x] `test_search_wraps_around`
+- [x] `test_asterisk_searches_current_cell`
+- [x] `test_noh_clears_highlighting`
+- [x] `test_search_case_insensitive`
+- [x] `test_search_regex_patterns`
 
 ### Acceptance Criteria
 
-- [ ] `/` enters search mode
-- [ ] `n` moves to next match with wrap-around
-- [ ] `N` moves to previous match with wrap-around
-- [ ] `*` searches current cell content
-- [ ] `:noh` clears highlighting
-- [ ] Search is case-insensitive by default
-- [ ] Regex patterns supported
-- [ ] All existing tests pass
+- [x] `/` enters search mode
+- [x] `n` moves to next match with wrap-around
+- [x] `N` moves to previous match with wrap-around
+- [x] `*` searches current cell content
+- [x] `:noh` clears highlighting
+- [x] Search is case-insensitive by default
+- [x] Regex patterns supported
+- [x] All existing tests pass
 
 ---
 

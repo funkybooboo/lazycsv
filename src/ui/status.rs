@@ -255,12 +255,19 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             let left = format!(":{}", app.input_state.command_buffer);
             build_status_line(&left, &right_side, area.width as usize)
         }
+        crate::app::Mode::Search => {
+            // Show search input: "/pattern" on left, position on right
+            let left = format!("/{}", app.search_buffer);
+            build_status_line(&left, &right_side, area.width as usize)
+        }
         crate::app::Mode::Normal => {
             // Show notification or mode indicator
             let left = if let Some(ref msg) = app.status_message {
                 msg.as_str().to_string()
             } else if !pending_indicator.is_empty() {
                 pending_indicator.clone()
+            } else if let Some(ref search) = app.search_state {
+                format!("/{} {}", search.pattern, search.display_position())
             } else {
                 let dirty = if app.document.is_dirty { "*" } else { "" };
                 format!("NORMAL{}", dirty)

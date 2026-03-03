@@ -32,6 +32,8 @@ pub enum Mode {
     FileList,
     /// SQL query editor (entered via q)
     SqlEditor,
+    /// Search input (entered via /)
+    Search,
 }
 
 /// Edit buffer for cell editing
@@ -173,6 +175,12 @@ pub struct App {
 
     /// True when an external file modification has been detected and we're waiting for user response
     pub external_modification_pending: bool,
+
+    /// Active search state (persists after search for n/N navigation)
+    pub search_state: Option<crate::search::SearchState>,
+
+    /// Search input buffer (typed text during / search prompt)
+    pub search_buffer: String,
 }
 
 impl App {
@@ -289,6 +297,8 @@ impl App {
             should_quit: false,
             sqlite_cache: None,
             external_modification_pending: false,
+            search_state: None,
+            search_buffer: String::new(),
         }
     }
 
@@ -2377,5 +2387,123 @@ mod tests {
         // Check that multiline content was saved
         let cell = app.document.get_cell(RowIndex::new(1), ColIndex::new(0));
         assert_eq!(cell, "L1\nL2");
+    }
+
+    #[test]
+    fn test_search_slash_enters_search_mode() {
+        let csv_data = create_test_csv_data();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        assert_eq!(app.mode, Mode::Normal);
+        app.handle_key(key_event(KeyCode::Char('/'))).unwrap();
+        assert_eq!(app.mode, Mode::Search);
+    }
+
+    #[test]
+    fn test_search_esc_returns_to_normal() {
+        let csv_data = create_test_csv_data();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        // Enter search mode
+        app.handle_key(key_event(KeyCode::Char('/'))).unwrap();
+        assert_eq!(app.mode, Mode::Search);
+
+        // Type something
+        app.handle_key(key_event(KeyCode::Char('t'))).unwrap();
+        assert_eq!(app.mode, Mode::Search);
+        assert_eq!(app.search_buffer, "t");
+
+        // Esc should return to Normal
+        app.handle_key(key_event(KeyCode::Esc)).unwrap();
+        assert_eq!(app.mode, Mode::Normal);
+    }
+
+    #[test]
+    fn test_search_enter_executes_search() {
+        let csv_data = create_test_csv_data();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        // Enter search, type "5", press Enter
+        app.handle_key(key_event(KeyCode::Char('/'))).unwrap();
+        app.handle_key(key_event(KeyCode::Char('5'))).unwrap();
+        app.handle_key(key_event(KeyCode::Enter)).unwrap();
+
+        assert_eq!(app.mode, Mode::Normal);
+        assert!(app.search_state.is_some());
+        let state = app.search_state.as_ref().unwrap();
+        assert_eq!(state.pattern, "5");
+        assert_eq!(state.match_count(), 1);
+    }
+
+    #[test]
+    fn test_search_esc_in_normal_mode_clears_search() {
+        let csv_data = create_test_csv_data();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        // Perform a search
+        app.handle_key(key_event(KeyCode::Char('/'))).unwrap();
+        app.handle_key(key_event(KeyCode::Char('5'))).unwrap();
+        app.handle_key(key_event(KeyCode::Enter)).unwrap();
+        assert_eq!(app.mode, Mode::Normal);
+        assert!(app.search_state.is_some());
+
+        // Esc in Normal mode should clear search highlighting
+        app.handle_key(key_event(KeyCode::Esc)).unwrap();
+        assert!(app.search_state.is_none());
+        assert_eq!(app.mode, Mode::Normal);
+    }
+
+    #[test]
+    fn test_search_asterisk_searches_current_cell() {
+        let csv_data = Document::new(
+            vec!["Name".to_string(), "City".to_string()],
+            vec![
+                vec!["Alice".to_string(), "Portland".to_string()],
+                vec!["Bob".to_string(), "Boston".to_string()],
+                vec!["Charlie".to_string(), "Portland".to_string()],
+            ],
+            "test.csv".to_string(),
+        );
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        // Move to row 1, col 1 ("Portland")
+        app.view_state.table_state.select(Some(1));
+        app.view_state.selected_column = ColIndex::new(1);
+
+        // Press * to search for current cell content
+        app.handle_key(key_event(KeyCode::Char('*'))).unwrap();
+
+        assert_eq!(app.mode, Mode::Normal);
+        assert!(app.search_state.is_some());
+        let state = app.search_state.as_ref().unwrap();
+        assert_eq!(state.pattern, "Portland");
+        assert_eq!(state.match_count(), 2);
+    }
+
+    #[test]
+    fn test_search_noh_clears_search() {
+        let csv_data = create_test_csv_data();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
+
+        // Perform a search
+        app.handle_key(key_event(KeyCode::Char('/'))).unwrap();
+        app.handle_key(key_event(KeyCode::Char('5'))).unwrap();
+        app.handle_key(key_event(KeyCode::Enter)).unwrap();
+        assert!(app.search_state.is_some());
+
+        // Execute :noh
+        app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
+        for c in "noh".chars() {
+            app.handle_key(key_event(KeyCode::Char(c))).unwrap();
+        }
+        app.handle_key(key_event(KeyCode::Enter)).unwrap();
+
+        assert!(app.search_state.is_none());
     }
 }

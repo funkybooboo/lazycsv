@@ -5,7 +5,7 @@
 
 use super::{utils::column_to_excel_letter, MAX_VISIBLE_COLS};
 use crate::app::Mode;
-use crate::domain::position::ColIndex;
+use crate::domain::position::{ColIndex, RowIndex};
 use crate::App;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -65,6 +65,7 @@ fn build_header_row<'a>(
 ) -> Row<'a> {
     let is_header_selected = selected_row == Some(0);
     let selected_col = app.view_state.selected_column;
+    let search_state = app.search_state.as_ref();
 
     // Row number for header: "0" if selected, otherwise empty or dim
     let row_num_cell = if is_header_selected {
@@ -77,6 +78,8 @@ fn build_header_row<'a>(
     for i in start_col..end_col {
         let header_text = app.document.get_header(ColIndex::new(i));
         let is_selected_cell = is_header_selected && ColIndex::new(i) == selected_col;
+        let ri = RowIndex::new(0);
+        let ci = ColIndex::new(i);
 
         let style = if is_selected_cell {
             // Selected cell in header row: highlight with white background
@@ -84,6 +87,16 @@ fn build_header_row<'a>(
                 .bg(Color::White)
                 .fg(Color::Black)
                 .add_modifier(Modifier::BOLD)
+        } else if search_state
+            .map(|s| s.is_current_match(ri, ci))
+            .unwrap_or(false)
+        {
+            Style::default()
+                .bg(Color::Yellow)
+                .fg(Color::Black)
+                .add_modifier(Modifier::BOLD)
+        } else if search_state.map(|s| s.is_match(ri, ci)).unwrap_or(false) {
+            Style::default().bg(Color::DarkGray).fg(Color::Yellow)
         } else if app.document.header_mode {
             // Header mode ON: bold headers
             Style::default().add_modifier(Modifier::BOLD)
@@ -162,6 +175,7 @@ fn build_data_rows(
     let selected_column = app.view_state.selected_column;
     let selected_row_idx = app.get_selected_row().map(|r| r.get());
     let is_insert_mode = app.mode == Mode::Insert;
+    let search_state = app.search_state.as_ref();
 
     // Get edit buffer content if in Insert mode
     let edit_content = if is_insert_mode {
@@ -232,8 +246,23 @@ fn build_data_rows(
                 };
 
                 // Highlight current cell with background color
+                let ri = RowIndex::new(row_idx);
+                let ci = ColIndex::new(col_idx);
                 let style = if is_selected {
                     Style::default().bg(Color::White).fg(Color::Black)
+                } else if search_state
+                    .map(|s| s.is_current_match(ri, ci))
+                    .unwrap_or(false)
+                {
+                    Style::default()
+                        .bg(Color::Yellow)
+                        .fg(Color::Black)
+                        .add_modifier(Modifier::BOLD)
+                } else if search_state
+                    .map(|s| s.is_match(ri, ci))
+                    .unwrap_or(false)
+                {
+                    Style::default().bg(Color::DarkGray).fg(Color::Yellow)
                 } else {
                     Style::default()
                 };

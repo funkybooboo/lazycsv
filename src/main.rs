@@ -107,6 +107,7 @@ fn run(
                         InputResult::ReloadFile => {
                             // Clear any pending external modification prompt
                             app.external_modification_pending = false;
+                            app.search_state = None;
                             // Show loading feedback before blocking file load
                             let filename = app
                                 .get_current_file()

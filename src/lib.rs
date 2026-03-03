@@ -9,6 +9,7 @@ pub mod input;
 pub mod magnifier;
 pub mod navigation;
 pub mod query;
+pub mod search;
 pub mod session;
 pub mod ui;
 

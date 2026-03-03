@@ -63,6 +63,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         Mode::FileList => handle_file_list_mode(app, key),
         Mode::SqlEditor => handle_sql_editor_mode(app, key),
         Mode::Magnifier => handle_magnifier_mode(app, key),
+        Mode::Search => handle_search_mode(app, key),
         // TODO: Implement handlers for new modes in future versions
         Mode::HeaderEdit | Mode::Visual => {
             // For now, Esc returns to Normal mode
@@ -98,6 +99,7 @@ fn handle_file_switch(app: &mut App, next: bool) -> InputResult {
     };
 
     if switched {
+        app.search_state = None;
         InputResult::ReloadFile
     } else {
         InputResult::Continue
@@ -251,6 +253,11 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             app.status_message = Some(StatusMessage::from(messages::CMD_CANCELLED));
         }
 
+        // Clear search highlighting with Esc
+        KeyCode::Esc if app.search_state.is_some() => {
+            app.search_state = None;
+        }
+
         // File switching
         KeyCode::Char('[') if is_navigation_allowed(app) => {
             return Ok(handle_file_switch(app, false));
@@ -293,6 +300,99 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         KeyCode::Char(':') if is_navigation_allowed(app) => {
             app.mode = Mode::Command;
             app.input_state.clear_command_buffer();
+            return Ok(InputResult::Continue);
+        }
+
+        // Enter search mode
+        KeyCode::Char('/') if is_navigation_allowed(app) => {
+            app.search_buffer.clear();
+            app.mode = Mode::Search;
+            return Ok(InputResult::Continue);
+        }
+
+        // Next search match
+        KeyCode::Char('n') if is_navigation_allowed(app) => {
+            let cursor_row = app.get_selected_row().unwrap_or(RowIndex::new(0));
+            let cursor_col = app.view_state.selected_column;
+            if let Some(ref mut state) = app.search_state {
+                if let Some(((row, col), wrapped)) = state.jump_to_next(cursor_row, cursor_col) {
+                    app.view_state.table_state.select(Some(row.get()));
+                    app.view_state.selected_column = col;
+                    let pos = state.display_position();
+                    let pattern = state.pattern.clone();
+                    if wrapped {
+                        app.status_message = Some(StatusMessage::new_owned(format!(
+                            "search hit BOTTOM, continuing at TOP  /{} {}",
+                            pattern, pos
+                        )));
+                    } else {
+                        app.status_message = Some(StatusMessage::new_owned(format!(
+                            "/{} {}",
+                            pattern, pos
+                        )));
+                    }
+                }
+            }
+            return Ok(InputResult::Continue);
+        }
+
+        // Previous search match
+        KeyCode::Char('N') if is_navigation_allowed(app) => {
+            let cursor_row = app.get_selected_row().unwrap_or(RowIndex::new(0));
+            let cursor_col = app.view_state.selected_column;
+            if let Some(ref mut state) = app.search_state {
+                if let Some(((row, col), wrapped)) = state.jump_to_prev(cursor_row, cursor_col) {
+                    app.view_state.table_state.select(Some(row.get()));
+                    app.view_state.selected_column = col;
+                    let pos = state.display_position();
+                    let pattern = state.pattern.clone();
+                    if wrapped {
+                        app.status_message = Some(StatusMessage::new_owned(format!(
+                            "search hit TOP, continuing at BOTTOM  /{} {}",
+                            pattern, pos
+                        )));
+                    } else {
+                        app.status_message = Some(StatusMessage::new_owned(format!(
+                            "/{} {}",
+                            pattern, pos
+                        )));
+                    }
+                }
+            }
+            return Ok(InputResult::Continue);
+        }
+
+        // Search for current cell content (vim *)
+        KeyCode::Char('*') if is_navigation_allowed(app) => {
+            let cursor_row = app.get_selected_row().unwrap_or(RowIndex::new(0));
+            let cursor_col = app.view_state.selected_column;
+            let cell_content = app.document.get_cell(cursor_row, cursor_col).to_string();
+
+            if !cell_content.is_empty() {
+                let matches = crate::search::find_matches(&app.document, &cell_content);
+                if !matches.is_empty() {
+                    let mut state =
+                        crate::search::SearchState::new(cell_content.clone(), matches);
+                    // Jump to next match (skips the current cell)
+                    if let Some(((row, col), _wrapped)) =
+                        state.jump_to_next(cursor_row, cursor_col)
+                    {
+                        app.view_state.table_state.select(Some(row.get()));
+                        app.view_state.selected_column = col;
+                        app.status_message = Some(StatusMessage::new_owned(format!(
+                            "/{} {}",
+                            cell_content,
+                            state.display_position()
+                        )));
+                    }
+                    app.search_state = Some(state);
+                } else {
+                    app.status_message = Some(StatusMessage::new_owned(format!(
+                        "Pattern not found: {}",
+                        cell_content
+                    )));
+                }
+            }
             return Ok(InputResult::Continue);
         }
 
@@ -828,6 +928,67 @@ fn handle_command_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
 
         KeyCode::Char(c) => {
             app.input_state.push_command_char(c);
+        }
+
+        _ => {}
+    }
+
+    Ok(InputResult::Continue)
+}
+
+/// Handle keyboard input in Search mode (/ prompt)
+fn handle_search_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
+    match key.code {
+        KeyCode::Esc => {
+            // Cancel search input, preserve existing search_state
+            app.mode = Mode::Normal;
+        }
+
+        KeyCode::Enter => {
+            let buffer = app.search_buffer.clone();
+            app.mode = Mode::Normal;
+
+            if buffer.is_empty() {
+                return Ok(InputResult::Continue);
+            }
+
+            let matches = crate::search::find_matches(&app.document, &buffer);
+            if matches.is_empty() {
+                app.search_state = None;
+                app.status_message = Some(StatusMessage::new_owned(format!(
+                    "Pattern not found: {}",
+                    buffer
+                )));
+                return Ok(InputResult::Continue);
+            }
+
+            let mut state = crate::search::SearchState::new(buffer.clone(), matches);
+            let cursor_row = app.get_selected_row().unwrap_or(RowIndex::new(0));
+            let cursor_col = app.view_state.selected_column;
+
+            if let Some(((row, col), _wrapped)) = state.jump_to_next(cursor_row, cursor_col) {
+                app.view_state.table_state.select(Some(row.get()));
+                app.view_state.selected_column = col;
+                app.status_message = Some(StatusMessage::new_owned(format!(
+                    "/{} {}",
+                    buffer,
+                    state.display_position()
+                )));
+            }
+
+            app.search_state = Some(state);
+        }
+
+        KeyCode::Backspace => {
+            if app.search_buffer.is_empty() {
+                app.mode = Mode::Normal;
+            } else {
+                app.search_buffer.pop();
+            }
+        }
+
+        KeyCode::Char(c) => {
+            app.search_buffer.push(c);
         }
 
         _ => {}
@@ -1610,6 +1771,11 @@ fn execute_command(app: &mut App) -> Result<InputResult> {
                 let current = app.document.filename.clone();
                 app.status_message = Some(StatusMessage::from(format!("\"{}\"", current)));
             }
+            return Ok(InputResult::Continue);
+        }
+        "noh" | "nohlsearch" => {
+            app.search_state = None;
+            app.status_message = Some(StatusMessage::from("Search cleared"));
             return Ok(InputResult::Continue);
         }
         "files" => {
