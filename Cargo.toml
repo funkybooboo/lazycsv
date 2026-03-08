@@ -1,6 +1,6 @@
 [package]
 name = "lazycsv"
-version = "0.6.0"
+version = "0.7.1"
 edition = "2021"
 description = "A blazingly fast terminal UI for viewing and editing CSV files"
 authors = ["Nate Stott <nate.stott@pm.me>", "Dana Stott <danastott@gmail.com>"]
@@ -38,4 +38,8 @@ harness = false
 
 [[bench]]
 name = "rendering"
+harness = false
+
+[[bench]]
+name = "search"
 harness = false

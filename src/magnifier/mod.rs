@@ -86,8 +86,9 @@
 //! mag.move_down();           // j - move down
 //! mag.push_undo();           // Save undo point
 //! mag.delete_line();         // dd - delete line
-//! mag.move_to_line_end();    // $ - end of line
+//! mag.move_up();             // k - move to line 1
 //! mag.enter_insert_mode();   // i - enter insert mode
+//! mag.move_to_line_end();    // $ - end of line (in insert mode, goes after last char)
 //! mag.insert_char('!');      // Type '!'
 //! mag.exit_insert_mode();    // Esc - back to normal
 //!
