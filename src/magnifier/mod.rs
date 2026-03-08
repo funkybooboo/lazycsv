@@ -1,23 +1,122 @@
 //! Magnifier Mode - Full vim editor for complex cell editing
 //!
-//! This module implements a complete vim-like text editor for editing cell content
-//! with multi-line support, vim motions, and vim operators.
+//! This module implements a comprehensive vim-style text editor for editing CSV cell content
+//! with multi-line support, vim motions, operators, visual selection, search, and unlimited undo/redo.
 //!
 //! ## Features
 //!
-//! - Full vim motions: hjkl, w/b/e, 0/$, gg/G, count prefixes
-//! - Full vim operators: dd, yy, p, x, s, i/a/o/O
-//! - Multi-line editing with proper CSV escaping
-//! - Internal clipboard for magnifier operations
-//! - Mode switching between Normal and Insert
+//! ### Modal Editing
+//! - **Normal Mode**: Navigation and commands (default mode)
+//! - **Insert Mode**: Text input and editing
+//! - **Visual Mode**: Character-wise and line-wise selection
+//! - **Command Mode**: Ex commands (`:w`, `:q`, `:wq`, `:q!`)
 //!
-//! ## Usage
+//! ### Vim Motions
+//! - **Basic**: `hjkl` (arrow keys also work)
+//! - **Word**: `w` (next word), `b` (back), `e` (end)
+//! - **Line**: `0` (start), `$` (end), `^` (first non-blank)
+//! - **Document**: `gg` (top), `G` (bottom)
+//! - **Find**: `f{char}`, `F{char}`, `t{char}`, `T{char}`, `;`, `,`
 //!
-//! Open magnifier on current cell, edit with vim commands, and get the result:
+//! ### Vim Operators
+//! - **Delete**: `x` (char), `dd` (line), `d{motion}`
+//! - **Yank**: `yy` (line), `y{motion}`
+//! - **Change**: `cc` (line), `C` (to end), `c{motion}`
+//! - **Paste**: `p` (below), `P` (above)
+//! - **Other**: `J` (join lines), `r{char}` (replace), `>>` / `<<` (indent/dedent)
 //!
-//! 1. Create state: `MagnifierState::new(content, position)`
-//! 2. Edit: `move_down()`, `delete_line()`, etc.
-//! 3. Get result: `get_content()`
+//! ### Insert Mode Entry
+//! - `i` (before cursor), `a` (after cursor)
+//! - `I` (line start), `A` (line end)
+//! - `o` (line below), `O` (line above)
+//! - `s` (substitute char)
+//!
+//! ### Visual Selection
+//! - `v`: Character-wise visual mode
+//! - `V`: Line-wise visual mode
+//! - `d`, `y`, `c`: Delete, yank, change selection
+//! - `gv`: Reselect last visual selection
+//!
+//! ### Search
+//! - `/pattern`: Search forward (case-sensitive)
+//! - `n`: Next match, `N`: Previous match
+//! - `*`: Search word under cursor
+//! - `:noh`: Clear search highlighting
+//!
+//! ### Undo/Redo
+//! - `u`: Undo (unlimited history)
+//! - `Ctrl+r`: Redo
+//!
+//! ### Ex Commands
+//! - `:w` - Save to cell (updates in-memory document)
+//! - `:q` - Quit (warns if unsaved changes)
+//! - `:wq` or `ZZ` - Save and quit
+//! - `:q!` - Force quit without saving
+//!
+//! ## Architecture
+//!
+//! The magnifier uses a modal state machine with full document snapshots for undo/redo.
+//! This provides simplicity and correctness at the cost of memory (acceptable for cell editing).
+//!
+//! ### State Management
+//! - **Document**: Stored as `Vec<String>` (one string per line)
+//! - **Cursor**: `(line, col)` tuple using char positions (not bytes)
+//! - **Undo/Redo**: Full snapshots, O(1) operations
+//! - **Registers**: Separate registers for char, line, and region operations
+//!
+//! ### Performance Characteristics
+//! - **Motions**: O(1) for basic, O(n) for word/find (n = line length)
+//! - **Operators**: O(n) where n = affected lines
+//! - **Search**: O(n*m) where n = document size, m = pattern length
+//! - **Undo/Redo**: O(1) stack operations
+//! - **Memory**: document_size * (1 + undo_count) for undo history
+//!
+//! ## Usage Example
+//!
+//! ```rust
+//! use lazycsv::magnifier::MagnifierState;
+//! use lazycsv::domain::position::{RowIndex, ColIndex};
+//!
+//! // Create magnifier state for a cell
+//! let content = "Line 1\nLine 2\nLine 3".to_string();
+//! let position = (RowIndex::new(1), ColIndex::new(0));
+//! let mut mag = MagnifierState::new(content, position);
+//!
+//! // Use vim commands
+//! mag.move_down();           // j - move down
+//! mag.push_undo();           // Save undo point
+//! mag.delete_line();         // dd - delete line
+//! mag.move_to_line_end();    // $ - end of line
+//! mag.enter_insert_mode();   // i - enter insert mode
+//! mag.insert_char('!');      // Type '!'
+//! mag.exit_insert_mode();    // Esc - back to normal
+//!
+//! // Get modified content
+//! let result = mag.get_content();
+//! assert_eq!(result, "Line 1!\nLine 3");
+//! ```
+//!
+//! ## Multi-byte Character Support
+//!
+//! The magnifier correctly handles multi-byte UTF-8 characters including emojis:
+//! - Cursor positions use char indices, not byte indices
+//! - Search handles multi-byte patterns correctly (fixed in v0.6.1)
+//! - All operations respect character boundaries
+//!
+//! ## Integration with LazyCSV
+//!
+//! The magnifier integrates with the main CSV editor:
+//! - `:w` saves to in-memory CSV document (not to disk)
+//! - `Alt+hjkl` navigates to adjacent cells (prompts to save if dirty)
+//! - Changes are only persisted when explicitly saved
+//! - Magnifier state is destroyed on close (changes must be saved first)
+//!
+//! ## See Also
+//!
+//! - User documentation: `docs/keybindings.md` (lines 373-472)
+//! - Implementation details: `docs/vim-implementation.md`
+//! - Test files: `tests/magnifier_*_test.rs`
+//! - Benchmarks: `benches/magnifier.rs`
 
 use crate::domain::position::{ColIndex, RowIndex};
 
@@ -74,27 +173,89 @@ enum FindCommand {
     TillBackward(char),
 }
 
-/// Undo snapshot
+/// Undo snapshot for state restoration
+///
+/// Stores a complete snapshot of the document and cursor position for undo/redo operations.
+/// We use full snapshots instead of deltas for simplicity and correctness.
 #[derive(Debug, Clone)]
 struct UndoSnapshot {
     lines: Vec<String>,
     cursor: (usize, usize),
 }
 
-/// Selection range for visual mode
+/// Selection range for visual mode operations
+///
+/// Represents the selected text region in either character-wise or line-wise mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Selection {
+    /// Character-wise selection (like vim's `v`)
     CharWise {
         start: (usize, usize),
         end: (usize, usize),
     },
-    LineWise {
-        start_line: usize,
-        end_line: usize,
-    },
+    /// Line-wise selection (like vim's `V`)
+    LineWise { start_line: usize, end_line: usize },
 }
 
-/// State for magnifier mode editing
+/// Complete state for vim-style text editor within magnifier mode
+///
+/// The `MagnifierState` represents a full-featured vim-style editor for editing
+/// individual CSV cell content. It maintains the document as a vector of lines,
+/// tracks cursor position, and implements all vim operations through public methods.
+///
+/// ## Architecture
+///
+/// - **Document**: Stored as `Vec<String>`, one string per line
+/// - **Cursor**: `(line, col)` using char indices (not bytes) for UTF-8 safety
+/// - **Modes**: Normal, Insert, Visual, VisualLine, Command
+/// - **Undo/Redo**: Full document snapshots (unlimited history)
+/// - **Registers**: Separate clipboards for char/line/region operations
+///
+/// ## Example
+///
+/// ```rust
+/// use lazycsv::magnifier::MagnifierState;
+/// use lazycsv::domain::position::{RowIndex, ColIndex};
+///
+/// let mut mag = MagnifierState::new(
+///     "Hello\nWorld".to_string(),
+///     (RowIndex::new(1), ColIndex::new(0))
+/// );
+///
+/// // Vim commands
+/// mag.move_down();        // j
+/// mag.move_to_line_end(); // $
+/// mag.push_undo();
+/// mag.insert_after();     // a
+/// mag.insert_char('!');
+/// mag.exit_insert_mode(); // Esc
+///
+/// assert_eq!(mag.get_content(), "Hello\nWorld!");
+/// ```
+///
+/// ## Public API
+///
+/// The public API exposes 83 methods organized into categories:
+///
+/// - **Mode management**: `mode()`, `enter_insert_mode()`, `exit_insert_mode()`
+/// - **Basic motions**: `move_up()`, `move_down()`, `move_left()`, `move_right()`
+/// - **Word motions**: `move_next_word()`, `move_prev_word()`, `move_end_word()`
+/// - **Line motions**: `move_to_line_start()`, `move_to_line_end()`, `move_to_first_non_blank()`
+/// - **Document navigation**: `move_to_first_line()`, `move_to_last_line()`, `move_to_line()`
+/// - **Find commands**: `find_char_forward()`, `find_char_backward()`, etc.
+/// - **Operators**: `delete_char()`, `delete_line()`, `yank_line()`, `paste_below()`, `paste_above()`
+/// - **Insert operations**: `insert_char()`, `newline()`, `backspace()`, `delete_key()`
+/// - **Visual mode**: `enter_visual_mode()`, `enter_visual_line_mode()`, `get_visual_selection()`
+/// - **Search**: `search_forward()`, `jump_to_next_match()`, `jump_to_prev_match()`
+/// - **Undo/Redo**: `push_undo()`, `undo()`, `redo()`
+/// - **State access**: `get_content()`, `is_dirty()`, `cursor()`, `lines()`
+///
+/// ## Performance
+///
+/// - Motions: O(1) for basic, O(n) for word/find
+/// - Operators: O(n) where n = affected lines
+/// - Undo/Redo: O(1) stack operations
+/// - Memory: document_size × (1 + undo_count)
 #[derive(Debug, Clone)]
 pub struct MagnifierState {
     /// Text buffer as vector of lines
@@ -1062,10 +1223,22 @@ impl MagnifierState {
 
         if let Some(pattern) = &self.search_pattern {
             for (line_idx, line) in self.lines.iter().enumerate() {
-                let mut col = 0;
-                while let Some(pos) = line[col..].find(pattern) {
-                    self.search_matches.push((line_idx, col + pos));
-                    col += pos + 1;
+                // Use char indices to handle multi-byte characters correctly
+                let chars: Vec<char> = line.chars().collect();
+                let mut char_pos = 0;
+
+                while char_pos < chars.len() {
+                    let remaining: String = chars[char_pos..].iter().collect();
+                    if let Some(match_pos) = remaining.find(pattern) {
+                        // Convert byte position to char position
+                        let match_char_pos = remaining[..match_pos].chars().count();
+                        self.search_matches
+                            .push((line_idx, char_pos + match_char_pos));
+                        // Move past this match (by at least 1 char to avoid infinite loop)
+                        char_pos += match_char_pos + pattern.chars().count().max(1);
+                    } else {
+                        break;
+                    }
                 }
             }
         }

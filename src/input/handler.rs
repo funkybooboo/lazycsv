@@ -2406,7 +2406,7 @@ fn handle_magnifier_navigate(app: &mut App, direction: Direction) -> Result<Inpu
 
 /// Handle keys in magnifier Normal mode
 fn handle_magnifier_normal(app: &mut App, key: KeyEvent) -> Result<InputResult> {
-    use crate::magnifier::PendingCommand;
+    use crate::input::magnifier_mode::{mode_changes, motions, operators, pending, search};
 
     let mag = match app.magnifier_state.as_mut() {
         Some(m) => m,
@@ -2414,33 +2414,10 @@ fn handle_magnifier_normal(app: &mut App, key: KeyEvent) -> Result<InputResult> 
     };
 
     // Handle pending commands first
-    if let Some(pending) = mag.take_pending() {
-        match (pending, key.code) {
-            // Multi-key sequences
-            (PendingCommand::G, KeyCode::Char('g')) => mag.move_to_first_line(),
-            (PendingCommand::D, KeyCode::Char('d')) => {
-                mag.push_undo();
-                mag.delete_line();
-            }
-            (PendingCommand::Y, KeyCode::Char('y')) => mag.yank_line(),
-            (PendingCommand::C, KeyCode::Char('c')) => mag.change_line(),
-            (PendingCommand::Z, KeyCode::Char('Z')) => {
-                app.save_and_close_magnifier();
-                return Ok(InputResult::Continue);
-            }
-            (PendingCommand::IndentRight, KeyCode::Char('>')) => mag.indent_line(),
-            (PendingCommand::IndentLeft, KeyCode::Char('<')) => mag.dedent_line(),
-
-            // Character find commands
-            (PendingCommand::FindForward, KeyCode::Char(c)) => mag.find_char_forward(c),
-            (PendingCommand::FindBackward, KeyCode::Char(c)) => mag.find_char_backward(c),
-            (PendingCommand::TillForward, KeyCode::Char(c)) => mag.till_char_forward(c),
-            (PendingCommand::TillBackward, KeyCode::Char(c)) => mag.till_char_backward(c),
-            (PendingCommand::Replace, KeyCode::Char(c)) => mag.replace_char(c),
-
-            _ => {
-                // Invalid sequence, clear pending
-            }
+    if let Some(pending_cmd) = mag.take_pending() {
+        let should_close = handle_pending_command(mag, pending_cmd, key.code);
+        if should_close {
+            app.save_and_close_magnifier();
         }
         return Ok(InputResult::Continue);
     }
@@ -2453,89 +2430,18 @@ fn handle_magnifier_normal(app: &mut App, key: KeyEvent) -> Result<InputResult> 
         }
     }
 
+    // Try helper modules for common operations
+    if motions::handle_motion_command(mag, key.code)
+        || operators::handle_operator_command(mag, key.code)
+        || mode_changes::handle_mode_change_command(mag, key.code)
+        || search::handle_search_command(mag, key.code)
+        || pending::handle_pending_setup(mag, key.code)
+    {
+        return Ok(InputResult::Continue);
+    }
+
+    // Handle remaining special commands
     match key.code {
-        // Basic motions
-        KeyCode::Char('h') | KeyCode::Left => mag.move_left(),
-        KeyCode::Char('j') | KeyCode::Down => mag.move_down(),
-        KeyCode::Char('k') | KeyCode::Up => mag.move_up(),
-        KeyCode::Char('l') | KeyCode::Right => mag.move_right(),
-
-        // Line motions
-        KeyCode::Char('0') => mag.move_to_line_start(),
-        KeyCode::Char('$') => mag.move_to_line_end(),
-        KeyCode::Char('^') => mag.move_to_first_non_blank(),
-
-        // Word motions
-        KeyCode::Char('w') => mag.move_next_word(),
-        KeyCode::Char('b') => mag.move_prev_word(),
-        KeyCode::Char('e') => mag.move_end_word(),
-
-        // Buffer motions
-        KeyCode::Char('G') => mag.move_to_last_line(),
-
-        // Simple operators
-        KeyCode::Char('x') => {
-            mag.push_undo();
-            mag.delete_char();
-        }
-        KeyCode::Char('p') => mag.paste_below(),
-        KeyCode::Char('P') => mag.paste_above(),
-        KeyCode::Char('J') => mag.join_lines(),
-
-        // Undo/redo
-        KeyCode::Char('u') => mag.undo(),
-
-        // Enter insert mode
-        KeyCode::Char('i') => mag.insert_before(),
-        KeyCode::Char('a') => mag.insert_after(),
-        KeyCode::Char('A') => {
-            mag.move_to_line_end();
-            mag.insert_after();
-        }
-        KeyCode::Char('I') => {
-            mag.move_to_first_non_blank();
-            mag.insert_before();
-        }
-        KeyCode::Char('o') => mag.insert_line_below(),
-        KeyCode::Char('O') => mag.insert_line_above(),
-        KeyCode::Char('s') => mag.substitute_char(),
-        KeyCode::Char('C') => mag.change_to_eol(),
-
-        // Visual mode
-        KeyCode::Char('v') => mag.enter_visual_mode(),
-        KeyCode::Char('V') => mag.enter_visual_line_mode(),
-
-        // Search
-        KeyCode::Char('/') => mag.enter_command_mode_with("/"),
-        KeyCode::Char('n') => mag.jump_to_next_match(),
-        KeyCode::Char('N') => mag.jump_to_prev_match(),
-        KeyCode::Char('*') => {
-            if let Some(word) = mag.get_word_under_cursor() {
-                mag.search_forward(word);
-            }
-        }
-
-        // Multi-key command initiators
-        KeyCode::Char('g') => mag.set_pending(PendingCommand::G),
-        KeyCode::Char('d') => mag.set_pending(PendingCommand::D),
-        KeyCode::Char('y') => mag.set_pending(PendingCommand::Y),
-        KeyCode::Char('c') => mag.set_pending(PendingCommand::C),
-        KeyCode::Char('Z') => mag.set_pending(PendingCommand::Z),
-        KeyCode::Char('f') => mag.set_pending(PendingCommand::FindForward),
-        KeyCode::Char('F') => mag.set_pending(PendingCommand::FindBackward),
-        KeyCode::Char('t') => mag.set_pending(PendingCommand::TillForward),
-        KeyCode::Char('T') => mag.set_pending(PendingCommand::TillBackward),
-        KeyCode::Char('r') => mag.set_pending(PendingCommand::Replace),
-        KeyCode::Char('>') => mag.set_pending(PendingCommand::IndentRight),
-        KeyCode::Char('<') => mag.set_pending(PendingCommand::IndentLeft),
-
-        // Repeat find
-        KeyCode::Char(';') => mag.repeat_find(),
-        KeyCode::Char(',') => mag.repeat_find_reverse(),
-
-        // Command mode
-        KeyCode::Char(':') => mag.enter_command_mode(),
-
         // Escape - close if clean, warn if dirty
         KeyCode::Esc => {
             if app.magnifier_is_dirty() {
@@ -2558,6 +2464,76 @@ fn handle_magnifier_normal(app: &mut App, key: KeyEvent) -> Result<InputResult> 
     }
 
     Ok(InputResult::Continue)
+}
+
+/// Handle pending command completion (multi-key sequences)
+/// Returns true if the magnifier should be closed (ZZ command)
+fn handle_pending_command(
+    mag: &mut crate::magnifier::MagnifierState,
+    pending: crate::magnifier::PendingCommand,
+    key_code: KeyCode,
+) -> bool {
+    use crate::magnifier::PendingCommand;
+
+    match (pending, key_code) {
+        // Multi-key sequences
+        (PendingCommand::G, KeyCode::Char('g')) => {
+            mag.move_to_first_line();
+            false
+        }
+        (PendingCommand::D, KeyCode::Char('d')) => {
+            mag.push_undo();
+            mag.delete_line();
+            false
+        }
+        (PendingCommand::Y, KeyCode::Char('y')) => {
+            mag.yank_line();
+            false
+        }
+        (PendingCommand::C, KeyCode::Char('c')) => {
+            mag.change_line();
+            false
+        }
+        (PendingCommand::Z, KeyCode::Char('Z')) => {
+            // Signal to close magnifier
+            true
+        }
+        (PendingCommand::IndentRight, KeyCode::Char('>')) => {
+            mag.indent_line();
+            false
+        }
+        (PendingCommand::IndentLeft, KeyCode::Char('<')) => {
+            mag.dedent_line();
+            false
+        }
+
+        // Character find commands
+        (PendingCommand::FindForward, KeyCode::Char(c)) => {
+            mag.find_char_forward(c);
+            false
+        }
+        (PendingCommand::FindBackward, KeyCode::Char(c)) => {
+            mag.find_char_backward(c);
+            false
+        }
+        (PendingCommand::TillForward, KeyCode::Char(c)) => {
+            mag.till_char_forward(c);
+            false
+        }
+        (PendingCommand::TillBackward, KeyCode::Char(c)) => {
+            mag.till_char_backward(c);
+            false
+        }
+        (PendingCommand::Replace, KeyCode::Char(c)) => {
+            mag.replace_char(c);
+            false
+        }
+
+        _ => {
+            // Invalid sequence, clear pending
+            false
+        }
+    }
 }
 
 /// Handle keys in magnifier Insert mode

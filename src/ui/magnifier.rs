@@ -44,20 +44,8 @@ pub fn render_magnifier(frame: &mut Frame, app: &App, area: Rect) {
     let popup_area = centered_rect(70, 60, area);
     frame.render_widget(Clear, popup_area);
 
-    // Build title with cell position and helpful hints
-    let (row, col) = magnifier.cell_position();
-    let cell_name = format!(
-        "{}{}",
-        crate::ui::utils::column_to_excel_letter(col.get()),
-        row.get()
-    );
-
-    let title = if magnifier.is_dirty() {
-        format!(" {} [modified] (:wq save, :q! discard) ", cell_name)
-    } else {
-        format!(" {} (:wq save, :q! discard, Esc cancel) ", cell_name)
-    };
-
+    // Build and render main block with title
+    let title = build_magnifier_title(magnifier);
     let main_block = Block::default()
         .title(title)
         .borders(Borders::ALL)
@@ -72,9 +60,36 @@ pub fn render_magnifier(frame: &mut Frame, app: &App, area: Rect) {
         .constraints([Constraint::Min(0), Constraint::Length(1)])
         .split(inner);
 
+    // Render content area
     render_content(frame, magnifier, chunks[0]);
 
-    // Build status bar
+    // Render status bar
+    let status_text = build_magnifier_status_bar(magnifier, chunks[1].width as usize);
+    let status_bar = Paragraph::new(status_text).style(Style::default());
+    frame.render_widget(status_bar, chunks[1]);
+}
+
+/// Build the magnifier title bar with cell position and hints
+fn build_magnifier_title(magnifier: &crate::magnifier::MagnifierState) -> String {
+    let (row, col) = magnifier.cell_position();
+    let cell_name = format!(
+        "{}{}",
+        crate::ui::utils::column_to_excel_letter(col.get()),
+        row.get()
+    );
+
+    if magnifier.is_dirty() {
+        format!(" {} [modified] (:wq save, :q! discard) ", cell_name)
+    } else {
+        format!(" {} (:wq save, :q! discard, Esc cancel) ", cell_name)
+    }
+}
+
+/// Build the magnifier status bar with mode, cursor position, and search info
+fn build_magnifier_status_bar(
+    magnifier: &crate::magnifier::MagnifierState,
+    available_width: usize,
+) -> String {
     let (cursor_line, cursor_col) = magnifier.cursor();
     let line_count = magnifier.lines().len();
     let line_percent = if line_count > 0 {
@@ -83,6 +98,7 @@ pub fn render_magnifier(frame: &mut Frame, app: &App, area: Rect) {
         100
     };
 
+    // Left side: mode indicator or command buffer
     let left_text = if magnifier.mode() == crate::magnifier::MagnifierMode::Command {
         format!(":{}", magnifier.command_buffer())
     } else {
@@ -97,8 +113,10 @@ pub fn render_magnifier(frame: &mut Frame, app: &App, area: Rect) {
         }
     };
 
+    // Right side: cursor position and percentage
     let right_text = format!("{},{} {}%", cursor_line + 1, cursor_col + 1, line_percent);
 
+    // Middle: search info if active
     let middle_text = if let Some(pattern) = magnifier.search_pattern() {
         let matches = magnifier.search_matches();
         let current = magnifier.current_match_index();
@@ -113,7 +131,7 @@ pub fn render_magnifier(frame: &mut Frame, app: &App, area: Rect) {
         String::new()
     };
 
-    let available_width = chunks[1].width as usize;
+    // Calculate padding
     let padding_total = available_width
         .saturating_sub(left_text.len())
         .saturating_sub(middle_text.len())
@@ -121,18 +139,14 @@ pub fn render_magnifier(frame: &mut Frame, app: &App, area: Rect) {
     let padding_left = padding_total / 2;
     let padding_right = padding_total - padding_left;
 
-    let status_text = format!(
+    format!(
         "{}{}{}{}{}",
         left_text,
         " ".repeat(padding_left),
         middle_text,
         " ".repeat(padding_right),
         right_text
-    );
-
-    let status_bar = Paragraph::new(status_text).style(Style::default());
-
-    frame.render_widget(status_bar, chunks[1]);
+    )
 }
 
 /// Render content area with line numbers and text
@@ -264,7 +278,7 @@ fn render_line_with_highlights(
     let chars: Vec<char> = line_text.chars().collect();
     let mut spans: Vec<Span> = Vec::new();
 
-    // Add left scroll indicator if needed
+    // Add scroll indicators and calculate visible range
     if h_scroll > 0 {
         spans.push(Span::styled(
             "<",
@@ -272,41 +286,33 @@ fn render_line_with_highlights(
         ));
     }
 
-    // Calculate visible range
-    let start_col = if h_scroll > 0 { h_scroll } else { 0 };
-    let end_col = (start_col + visible_width.saturating_sub(if h_scroll > 0 { 2 } else { 1 }))
-        .min(chars.len());
+    let (start_col, end_col) = calculate_visible_range(h_scroll, visible_width, chars.len());
 
-    // Render each character with appropriate styling
+    // Render each visible character with appropriate styling
     for col in start_col..end_col {
         let ch = chars.get(col).copied().unwrap_or(' ');
-
-        // Determine if this position should be highlighted
-        let is_cursor = line_idx == cursor_line && col == cursor_col;
-        let is_selected = is_position_selected(line_idx, col, selection);
-        let search_highlight = get_search_highlight(line_idx, col, search_matches, current_match);
-
-        let style = if is_cursor {
-            // Cursor takes priority - use explicit colors for visibility
-            Style::default().bg(Color::White).fg(Color::Black)
-        } else if is_selected {
-            // Visual selection - use explicit colors
-            Style::default().bg(Color::White).fg(Color::Black)
-        } else {
-            // Search match or normal text
-            search_highlight.unwrap_or_default()
-        };
-
+        let style = get_char_style(
+            line_idx,
+            col,
+            cursor_line,
+            cursor_col,
+            selection,
+            search_matches,
+            current_match,
+        );
         let display_char = if ch == '\t' { ' ' } else { ch };
         spans.push(Span::styled(display_char.to_string(), style));
     }
 
     // Add cursor at end of line if needed
-    if line_idx == cursor_line
-        && cursor_col >= chars.len()
-        && cursor_col >= start_col
-        && cursor_col < end_col + 1
-    {
+    if should_show_eol_cursor(
+        line_idx,
+        cursor_line,
+        cursor_col,
+        &chars,
+        start_col,
+        end_col,
+    ) {
         let cursor_style = Style::default().bg(Color::White).fg(Color::Black);
         spans.push(Span::styled(" ", cursor_style));
     }
@@ -320,6 +326,56 @@ fn render_line_with_highlights(
     }
 
     Line::from(spans)
+}
+
+/// Calculate the visible column range considering horizontal scroll
+fn calculate_visible_range(
+    h_scroll: usize,
+    visible_width: usize,
+    line_len: usize,
+) -> (usize, usize) {
+    let start_col = if h_scroll > 0 { h_scroll } else { 0 };
+    let end_col =
+        (start_col + visible_width.saturating_sub(if h_scroll > 0 { 2 } else { 1 })).min(line_len);
+    (start_col, end_col)
+}
+
+/// Get the appropriate style for a character based on cursor, selection, and search
+fn get_char_style(
+    line_idx: usize,
+    col: usize,
+    cursor_line: usize,
+    cursor_col: usize,
+    selection: &Option<crate::magnifier::Selection>,
+    search_matches: &[(usize, usize)],
+    current_match: Option<usize>,
+) -> Style {
+    let is_cursor = line_idx == cursor_line && col == cursor_col;
+    let is_selected = is_position_selected(line_idx, col, selection);
+    let search_highlight = get_search_highlight(line_idx, col, search_matches, current_match);
+
+    if is_cursor || is_selected {
+        // Cursor and selection take priority - explicit colors for visibility
+        Style::default().bg(Color::White).fg(Color::Black)
+    } else {
+        // Search match or normal text
+        search_highlight.unwrap_or_default()
+    }
+}
+
+/// Check if cursor should be shown at end of line
+fn should_show_eol_cursor(
+    line_idx: usize,
+    cursor_line: usize,
+    cursor_col: usize,
+    chars: &[char],
+    start_col: usize,
+    end_col: usize,
+) -> bool {
+    line_idx == cursor_line
+        && cursor_col >= chars.len()
+        && cursor_col >= start_col
+        && cursor_col < end_col + 1
 }
 
 /// Check if a position is within the visual selection

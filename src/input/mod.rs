@@ -6,6 +6,7 @@
 pub mod actions;
 pub mod handler;
 pub mod insert_mode;
+pub mod magnifier_mode;
 pub mod state;
 pub mod visual_mode;
 
