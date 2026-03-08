@@ -2,32 +2,49 @@
 
 A versioned checklist for building the LazyCSV TUI. Each version represents a deliverable milestone.
 
-## Version Milestones
+## Version Overview
 
-**Pre-1.0: Building Core Features**
-- **v0.1.0** - Foundation  (Complete)
-- **v0.1.1** - Foundation Cleanup  (Complete)
-- **v0.1.2** - Test Coverage Expansion  (Complete)
-- **v0.1.3** - Rust Idioms & Code Quality  (Complete)
-- **v0.1.4** - Comprehensive Test Coverage  (Complete)
-- **v0.2.0** - Type Safety Refactor  (Complete)
-- **v0.3.0** - Advanced Navigation  (Complete)
-- **v0.3.1** - UI/UX Polish  (Complete)
-- **v0.3.2** - Pre-Edit Polish  (Complete)
-- **v0.4.0** - Insert Mode  (Complete)
-- **v0.4.1** - Persistence & Edge Cases  (Complete)
-- **v0.5.0** - Column Operations & Visual Mode (Complete)
-- **v0.6.0** - Magnifier Mode  (Complete)
-- **v0.7.0** - Search  (Complete)
-- **v0.8.0** - Undo/Redo
-- **v0.9.0** - Transforms & Polish
+| Version | Focus | Status | Tests |
+|---------|-------|--------|-------|
+| v0.1.0 | Foundation & Core Viewing | [x] | 257 |
+| v0.1.1 | Post-Foundation Refactor | [ ] | TBD |
+| v0.2.0 | Type Safety & Architecture | [x] | 257 |
+| v0.2.1 | Type System Cleanup | [ ] | TBD |
+| v0.3.0 | Advanced Navigation & UI Polish | [x] | 344 |
+| v0.3.1 | Navigation Code Quality | [ ] | TBD |
+| v0.4.0 | Cell Editing & Persistence | [x] | 517 |
+| v0.4.1 | Editing System Refactor | [ ] | TBD |
+| v0.5.0 | Column Operations & Visual Mode | [x] | 515+ |
+| v0.5.1 | Column Operations Cleanup | [ ] | TBD |
+| v0.6.0 | Magnifier Mode (Full Vim Editor) | [x] | 415 |
+| v0.6.1 | Magnifier Performance & Quality | [ ] | TBD |
+| v0.7.0 | Search & Filtering | [x] | 27 |
+| v0.7.1 | Search System Optimization | [ ] | TBD |
+| v0.8.0 | SQL Query Mode & Data Operations | [x] | 30 |
+| v0.8.1 | SQL & Data Operations Polish | [ ] | TBD |
+| v0.9.0 | Undo/Redo & Command History | [ ] | - |
+| v0.9.1 | Code Quality & Architecture Refactor | [ ] | TBD |
+| v0.10.0 | Cell Transforms & Data Cleanup | [ ] | - |
+| v0.10.1 | Performance Optimization & Profiling | [ ] | TBD |
+| v0.11.0 | System Clipboard & External Integration | [ ] | - |
+| v0.11.1 | Testing & Reliability Improvements | [ ] | TBD |
+| v0.12.0 | Bulk Operations & Find/Replace | [ ] | - |
+| v0.12.1 | Error Handling & Robustness | [ ] | TBD |
+| v0.13.0 | Advanced Filtering & Conditional Views | [ ] | - |
+| v0.13.1 | Module Organization & Cleanup | [ ] | TBD |
+| v0.14.0 | Column Resize & Advanced Column Operations | [ ] | - |
+| v0.14.1 | Documentation & Maintainability | [ ] | TBD |
+| v0.15.0 | Data Analysis & Statistics | [ ] | - |
+| v0.15.1 | Technical Debt Reduction | [ ] | TBD |
+| v0.16.0 | Export & Import (JSON, Markdown, TSV) | [ ] | - |
+| v0.16.1 | Code Coverage & Test Quality | [ ] | TBD |
+| v0.17.0 | Configuration System | [ ] | - |
+| v0.17.1 | Performance Benchmarking & Tuning | [ ] | TBD |
+| v0.18.0 | Macros & Command Recording | [ ] | - |
+| v0.18.1 | Final Architecture Polish | [ ] | TBD |
+| v1.0.0 | Stable Release & Polish | [ ] | - |
 
-**v1.0.0 - First Stable Release**
-
-**Post-1.0: Future Enhancements**
-- **v1.1.0** - Bulk Operations & Advanced Filtering
-- **v1.2.0** - Advanced Column Operations
-- **v1.3.0** - Data Analysis & Export
+**Total Tests Passing:** 420+ library tests + integration tests
 
 ---
 
@@ -36,10 +53,10 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 - **Vim-First Philosophy:** Navigation and commands should feel native to vim users. Composable commands (operator + motion). No timeouts on pending commands. Clean status line.
 - **Truly Hybrid:** Balance vim power with spreadsheet familiarity. Support both vim keys (hjkl) and arrow keys, vim commands and spreadsheet-like operations.
 - **Three-Tier Operator System:** Cell (`x`) → Row (`dd`) → Column (`,dd`). Comma as leader for CSV-specific column operations.
-- **Simplified Navigation:** Use `g` suffix for jumps: `5g` (row 5), `Bg` (column B), `A4g` (cell A4). Reserve `:` for operations only.
+- **Simplified Navigation:** Use `g` suffix for jumps: `5g` (row 5), `:cB` (column B). Reserve `:` for operations and explicit navigation.
 - **Header Toggle System:** Header row is always row 0. Toggle header mode with `:ht` to freeze/style row 0. When ON, `gg` goes to row 1 (first data row).
 - **Command Ranges:** Standardized ranges: `:5,10d` for rows, `:B,Dd` for columns. Don't overcomplicate.
-- **Unified Clipboard:** One clipboard with type metadata. `yy`+`p` for rows, `,yy`+`,p` for columns, `yy`+`,p` transposes row as column.
+- **Triple Clipboard:** Three independent buffers: row buffer (yy/p), column buffer (,yy/,p), region buffer (visual y/p). No cross-pasting.
 - **Ephemeral Edits:** No changes saved to file until explicit `:w`. All edits update in-memory representation first.
 - **Minimal UI Chrome:** No heavy borders. Use subtle separators. Maximum content, minimum decoration. Status line shows mode + row + column only.
 - **In-Memory Only:** All CSV files loaded entirely into RAM for maximum performance.
@@ -62,6 +79,8 @@ LazyCSV uses vim-style modal editing with these modes:
 | Visual Line | `VISUAL LINE` | Whole row selection | `V` | `Esc`, or after operation |
 | Visual Column | `VISUAL COLUMN` | Whole column selection | `,v` | `Esc`, or after operation |
 | Command | `:` prompt | Execute commands | `:` | `Enter` (execute), `Esc` (cancel) |
+| Search | `/` prompt | Enter search pattern | `/` | `Enter` (search), `Esc` (cancel) |
+| SQL Editor | `SQL` | Edit SQL query | `:q SELECT...` | `Enter` (execute), `Esc` (cancel) |
 
 **Mode hierarchy:** Normal is the "home" mode. All other modes return to Normal.
 
@@ -72,353 +91,123 @@ LazyCSV uses vim-style modal editing with these modes:
 
 ---
 
-## Header Row System
+## Quick Command Reference
 
-**Revolutionary simplification:** Header row is always row 0 (no special storage). Toggle header mode ON/OFF with `:ht`.
-
-### Header Mode: ON (Default)
-- Row 0 is styled/frozen as header row
-- `gg` goes to row 1 (first data row)
-- `k` from row 1 goes to row 0 (header row)
-- Header mode remembered per-file in session (not persisted to disk)
-- Deleting row 0 with `dd` auto-toggles header mode OFF
-- Edit header cells with `i` (just like any other cell - no special keybinding needed)
-
-### Header Mode: OFF
-- Row 0 treated as normal data
-- `gg` goes to row 0
-- No frozen/styled header row
-- Edit row 0 like any other row
-
-### Behavior
-- Default: Header mode ON for all files in directory
-- `:ht` toggles current file's header mode
-- Setting persists in RAM during session only
-- Visual indicator: Row 0 styling (bold/frozen) when header mode ON
-- No status line indicator needed
-
----
-
-## Command Mode Reference
-
-### Reserved Commands (Priority)
-These commands always take priority:
+### Core Commands
 
 | Command | Action |
 |---------|--------|
-| `:q` | Quit (checks all files for unsaved changes) |
+| `:q` | Quit (checks for unsaved changes) |
 | `:q!` | Force quit (discard all changes) |
 | `:w` | Write all dirty files |
-| `:Wq` | Write all dirty files and quit |
-| `:wq` | Alias for `:Wq` |
-| `:h` `:help` | Show full scrollable help buffer |
-| `:noh` | Clear search highlighting |
-| `:ht` | Toggle header mode for current file |
-| `:delim X` | Set delimiter for current file (session-only, e.g., `:delim ;`) |
-| `:new Name,Age,City` | Create new CSV with specified headers (0 rows) |
-| `:new` | Create new CSV with 1 column "Column 1" (0 rows) |
-| `:files` | Show file menu with numbers to select |
-| `:c<column>` | Jump to column (e.g., `:cA`, `:cB`, `:cAA`, `:c1`) |
+| `:wq` / `:Wq` | Write all and quit |
+| `:h` / `:help` | Show full help buffer |
+| `:files` | Show file menu |
 
 ### Navigation Commands
 
-**Column Navigation (Dual Approach):**
+| Command | Action |
+|---------|--------|
+| `:cA` / `:cB` / `:cAA` | Jump to column A, B, AA |
+| `:c1` / `:c27` | Jump to column by number (1=A, 27=AA) |
+| `5g` | Jump to row 5 |
+| `gg` / `G` | First/last row |
 
-**Method 1: `g` suffix (fast, vim-like, works for most columns):**
-- `5g` → row 5
-- `Bg` → column B
-- `B4g` → cell B4
--  **Limitation:** Doesn't work for columns A, I, O, G (keys reserved for other commands)
+### Data Commands
 
-**Method 2: `:c` command (explicit, works for all columns):**
-- `:cA` → column A (reliable for reserved letters)
-- `:cB` → column B
-- `:cAA` → column AA
-- `:c1` → column 1 (numeric: 1=A, 2=B, 27=AA)
-- Case-insensitive: `:ca`, `:cA`, `:CA` all work
-
-**Recommended usage:**
-- Row jumps: Always use `5g`, `gg`, `G`
-- Column jumps (B-Y): Use `Bg` for speed
-- Column jumps (A, I, O, G): Use `:cA`, `:cI`, `:cO`, `:cG`
-
-**Rationale:** Reserve `:` for operations/commands, but provide `:c` as a reliable escape hatch for columns whose letters conflict with other commands.
+| Command | Action |
+|---------|--------|
+| `:ht` | Toggle header mode for current file |
+| `:delim ;` | Set delimiter to semicolon (session-only) |
+| `:new A,B,C` | Create new CSV with headers |
+| `:sort A,B` | Sort by columns A, B ascending |
+| `:sort! A,B` | Sort by columns A, B descending |
+| `:q SELECT...` | Execute SQL query |
+| `:sql` | Open SQL editor |
+| `:noh` | Clear search highlighting |
 
 ### Range Operations
 
-**Row ranges (vim-style):**
-- `:5,10d` - delete rows 5-10
-- `:5,10y` - yank rows 5-10
-- `:%d` - delete all rows
-- `:.d` - delete current row
-- `:.,+5d` - delete current row and next 5
-- `:$d` - delete last row
-
-**Column ranges (comma separator):**
-- `:B,Dd` - delete columns B through D
-- `:B,Dy` - yank columns B through D
-- `:B,D` alone - ERROR: "Incomplete command. Use :B,Dd to delete"
-
-**Important:** Don't overcomplicate. Stick to these two patterns.
+| Command | Action |
+|---------|--------|
+| `:5,10d` | Delete rows 5-10 |
+| `:5,10y` | Yank rows 5-10 |
+| `:%d` | Delete all rows |
+| `:B,Dd` | Delete columns B through D |
+| `:B,Dy` | Yank columns B through D |
 
 ---
 
-## Vim Keybinding Reference
+## Essential Keybindings
 
-### Motions (Navigation)
+### Navigation
+- `hjkl` / arrows - Move around
+- `gg` / `G` - First/last row
+- `5g` - Jump to row 5
+- `0` / `$` - First/last column
+- `w` / `b` / `e` - Next/prev/end non-empty cell
+- `zt` / `zz` / `zb` - Scroll position
 
-| Key | Action |
-|-----|--------|
-| `h` `j` `k` `l` | Move left/down/up/right |
-| `Arrow keys` | Move left/down/up/right |
-| `gg` | First non-header row (row 1 if header ON, row 0 if header OFF) |
-| `G` | Last row |
-| `5g` | Go to row 5 (NEW: replaces old `:5`) |
-| `Bg` | Go to column B (NEW: replaces old `:B`) |
-| `A4g` | Go to cell A4 (NEW: replaces old `:A5`) |
-| `0` | First column |
-| `$` | Last column |
-| `w` | Next non-empty cell |
-| `b` | Previous non-empty cell |
-| `e` | Last non-empty cell in row |
-| `zt` | Scroll current row to top |
-| `zz` | Scroll current row to center |
-| `zb` | Scroll current row to bottom |
-| `5j` | Move down 5 rows (count prefix) |
-| `3h` | Move left 3 columns (count prefix) |
+### Editing
+- `i` / `a` / `I` / `A` / `s` - Enter Insert mode
+- `m` - Enter Magnifier mode (full vim editor)
+- `x` - Delete cell content
+- `o` / `O` - Insert row below/above
 
-**Note:** `g` is reserved for goto/movement operations ONLY. No other uses.
+### Row Operations
+- `dd` - Delete row
+- `yy` - Yank (copy) row
+- `p` / `P` - Paste row below/above
+- `5dd` - Delete 5 rows
 
-### Cell Editing
-
-| Key | Action |
-|-----|--------|
-| `i` | Enter Insert mode (quick edit, single-line) |
-| `a` | Enter Insert mode at end of cell |
-| `I` | Enter Insert mode at start of cell |
-| `A` | Enter Insert mode at end of cell (same as `a`) |
-| `s` | Substitute cell (clear + edit) |
-| `m` | Enter Magnifier mode (full vim editor, multi-line) |
-| `x` | Delete cell content |
-| `Delete` | Clear cell content (stay in Normal mode) |
-
-**In Insert Mode:**
-- Type characters - insert at cursor
-- `Backspace` / `Ctrl+h` - delete before cursor
-- `Delete` - delete at cursor
-- `Ctrl+w` - delete word backward
-- `Ctrl+u` - delete to start of cell
-- `Home` / `End` - move to start/end
-- `Left` / `Right` - move cursor
-- `Enter` - commit edit, move down
-- `Shift+Enter` - commit edit, move up
-- `Tab` - commit edit, move right
-- `Shift+Tab` - commit edit, move left
-- `Esc` - cancel edit, stay in place
-
-**In Magnifier Mode:**
-- Full vim editing (multi-line, word motion, operators)
-- `:w` - save cell content
-- `:wq` or `ZZ` - save and close
-- `:q!` - close without saving
-- `Alt+hjkl` or `Alt+arrows` - navigate to adjacent cells (prompts to save if dirty)
-
-### Row Operators
-
-| Key | Action |
-|-----|--------|
-| `o` | Insert row below, enter Insert mode |
-| `O` | Insert row above, enter Insert mode |
-| `dd` | Delete row (stores in unified clipboard) |
-| `yy` | Yank row (stores in unified clipboard) |
-| `p` | Paste row below |
-| `P` | Paste row above |
-| `cc` | Clear row and enter Insert mode |
-| `5dd` | Delete 5 rows (count prefix) |
-| `5yy` | Yank 5 rows (count prefix) |
-
-### Column Operators (Comma Leader)
-
-**Three-tier system:** Cell (`x`) → Row (`dd`) → Column (`,dd`)
-
-| Key | Action |
-|-----|--------|
-| `,o` | Insert column right |
-| `,O` | Insert column left |
-| `,dd` | Delete column (stores in unified clipboard) |
-| `,yy` | Yank column (includes header, stores in unified clipboard) |
-| `,p` | Paste column right (cursor moves to new column) |
-| `,P` | Paste column left (cursor moves to new column) |
-
-**Behavior:**
-- `,yy` yanks entire column including header (row 0)
-- `,p` pastes column, cursor moves to new column
-- `,o`/`,O` creates column with generic header (e.g., "Column D")
-- Comma leader waits silently for next key (standard vim behavior)
-
-**No `,h` for header editing:** Header row is just row 0. Navigate to row 0 with `k` from row 1 (or `gg` when header mode OFF) and use `i` to edit like any other cell.
-
-### Unified Clipboard System
-
-One clipboard that adapts based on what was yanked and how you paste:
-
-| Operation | Clipboard Type | Paste Behavior |
-|-----------|----------------|----------------|
-| `yy` then `p` | Row | Paste as row |
-| `,yy` then `,p` | Column | Paste as column |
-| `yy` then `,p` | Row → Column | Transpose row as column |
-| `,yy` then `p` | Column → Row | Transpose column as row |
-| Visual selection `y` then `p` | Region | Paste rectangular region |
-
-**Silent adaptation:** No indicator shown for clipboard type. Paste operation adapts intelligently.
+### Column Operations (Comma Leader)
+- `,dd` - Delete column
+- `,yy` - Yank column (includes header)
+- `,p` / `,P` - Paste column right/left
+- `,o` / `,O` - Insert column right/left
 
 ### Visual Mode
-
-| Key | Mode | Selection |
-|-----|------|-----------|
-| `v` | Visual Block | Rectangular region (bounding box) |
-| `V` | Visual Line | Whole rows |
-| `,v` | Visual Column | Whole columns |
-
-**In Visual Mode:**
-- `h` `j` `k` `l` - expand/contract selection
-- `d` - delete selection (clears cells for regions, removes rows/columns for line modes)
-- `y` - yank selection (stores in unified clipboard)
-- `c` - change selection (clear + insert)
-- `p` - paste over selection (overwrites existing, adds rows/cols if needed)
-- `Esc` - exit visual mode
-- `gv` - re-select last selection
-
-**Notes:**
-- Visual Block (`v`): Always creates rectangular bounding box
-- No `Ctrl+v` (redundant with `v`)
-- Delete cell region clears cells, preserves structure
-- Delete whole rows/columns removes them entirely
+- `v` - Visual block (rectangular)
+- `V` - Visual line (whole rows)
+- `,v` - Visual column (whole columns)
+- `d` / `y` / `p` - Delete/yank/paste selection
+- `gv` - Re-select last selection
 
 ### Search
-
-| Key | Action |
-|-----|--------|
-| `/pattern` | Search forward |
-| `n` | Next match |
-| `N` | Previous match |
-| `*` | Search for current cell content |
-| `:noh` | Clear search highlighting |
-
-### Clipboard (System Only)
-
-| Key | Action |
-|-----|--------|
-| `"+yy` | Yank row to system clipboard |
-| `"+,yy` | Yank column to system clipboard |
-| `"+p` | Paste from system clipboard |
-
-### Undo/Redo
-
-| Key | Action |
-|-----|--------|
-| `u` | Undo last operation |
-| `Ctrl+r` | Redo last undone operation |
-| `.` | Repeat last change |
-
-**Undo behavior:**
-- Per-file undo history (preserved across file switches)
-- History maintained in RAM during session
-- `:w` does NOT clear undo history
-- Max undo levels: configurable (default 1000)
-
-### Cell Transforms
-
-| Key | Action |
-|-----|--------|
-| `~` | Toggle case (UPPER ↔ lower) |
-| `gU` | Uppercase entire cell |
-| `gu` | Lowercase entire cell |
-| `g~` | Title Case cell |
-| `g.` | Toggle boolean (yes↔no, true↔false, 1↔0) |
-
-### Row Movement
-
-| Key | Action |
-|-----|--------|
-| `gj` | Swap current row with row below |
-| `gk` | Swap current row with row above |
+- `/pattern` - Search forward (regex supported)
+- `n` / `N` - Next/previous match
+- `*` - Search current cell content
+- `:noh` - Clear search highlighting
 
 ### File Navigation
-
-| Key | Action |
-|-----|--------|
-| `[` | Previous CSV file in directory |
-| `]` | Next CSV file in directory |
-| `:files` | Show file menu with numbers to select |
+- `[` / `]` - Previous/next CSV file
+- `:files` - Show file menu
 
 ### Help
-
-| Key | Action |
-|-----|--------|
-| `?` | Quick reference overlay (summary of common commands) |
-| `:help` | Full scrollable help buffer (comprehensive, searchable with `/`) |
-
-### Other
-
-| Key | Action |
-|-----|--------|
-| `Esc` | Cancel/return to Normal mode |
-| `:ht` | Toggle header mode for current file |
+- `?` - Quick reference overlay
+- `:help` - Full help buffer
 
 ---
 
-## Configuration System
+## Version Details
 
-**Philosophy:** Zero configuration by default. Optional config for power users.
+### v0.1.0 - Foundation & Core Viewing [x]
 
-### Config File Locations
+**Focus:** Basic CSV viewing with vim navigation and multi-file support  
+**Status:** [x]  
+**Tests:** 257 passing (229 unit + 7 CLI + 21 workflow)
 
-1. **Global config:** `~/.config/lazycsv/config.toml`
-2. **Per-directory config:** `./.lazycsv/config.toml` (overrides global)
+**Features:**
+- [x] CSV file parsing with encoding detection
+- [x] Vim navigation (hjkl, arrows, gg, G, 0, $)
+- [x] Multi-file switching with [ and ] keys
+- [x] Row/column numbering (1, 2, 3... and A, B, C...)
+- [x] Basic UI with status bar and file list
+- [x] Help overlay with ? key
+- [x] Directory scanning for CSV files
+- [x] Zero configuration - works out of the box
 
-### Config File Format (TOML)
-
-```toml
-# ~/.config/lazycsv/config.toml example
-
-[defaults]
-delimiter = ","           # Default delimiter for new files
-header_mode = true        # Default header mode (ON/OFF)
-undo_limit = 1000         # Max undo history per file
-
-[colors]
-header_bg = "blue"        # Header row background
-cursor_fg = "yellow"      # Cursor foreground
-dirty_indicator = "red"   # Dirty file indicator color
-
-[keybindings]
-# Full keybind remapping support (advanced users)
-quit = ":q"
-save_all = ":w"
-# ... etc
-```
-
-### Customization Levels
-
-- **None:** Works perfectly out of the box
-- **Basic:** Colors, default delimiter
-- **Advanced:** Full keybind remapping, undo limits, UI tweaks
-
----
-
-## CLI Options
-
-**Simplified:** No `--delimiter` or `--no-headers` flags. Use commands instead.
-
-### Usage
-
-```bash
-lazycsv [FILES...]
-```
-
-### Examples
-
+**CLI Usage:**
 ```bash
 # Open current directory (scans for CSV files)
 lazycsv
@@ -433,1506 +222,1654 @@ lazycsv customers.csv orders.csv
 lazycsv ./data/
 ```
 
-### Delimiter Handling
+**Design Philosophy:**
+- No CLI flags for delimiter or headers (use in-app commands instead)
+- Default delimiter: comma (`,`)
+- Default header mode: ON
+- Simpler CLI, more discoverable in-app commands
 
-- **Default:** Comma `,`
-- **Change:** Use `:delim X` command in-app (e.g., `:delim ;` for semicolon)
-- **Persistence:** Session-only (not saved to disk)
-- **Per-file:** Each file remembers its delimiter during session
+**Architecture Decisions:**
+- **In-Memory Design:** All CSV files loaded entirely into RAM for maximum performance
+- **Target Performance:** 100K+ rows at 60 FPS
+- **Memory Usage:** ~1MB RAM per 10K rows (approximate)
+- **Startup Time:** < 100ms for files under 10MB
+- **Trade-off:** Prioritize speed over handling files larger than RAM (use DuckDB/ClickHouse for huge files)
 
-### Header Handling
-
-- **Default:** Header mode ON (row 0 is header)
-- **Toggle:** Use `:ht` command in-app
-- **Persistence:** Session-only (not saved to disk)
-- **Per-file:** Each file remembers its header mode during session
-
-**Rationale:** Simpler CLI, more discoverable in-app commands.
-
----
-
-## Status Line Design
-
-**Minimalist approach:** Mode + row + column only. No cell preview.
-
-### Format
-
-```
-MODE                                                               ROW,COL
-```
-
-### Examples
-
-```
-NORMAL                                                             5,C
-INSERT                                                             12,AA
-MAGNIFIER                                                          3,B
-VISUAL                                                             1-5,A-C
-```
-
-### Empty File Display
-
-- **0 rows, 0 columns:** `NORMAL                                                             0,0`
-- **0 rows, N columns:** `NORMAL                                                             0,B`
-- **Header-only (header mode ON):** Cursor on row 0, shows `0,A` (row 0 = header row)
-
-**Note:** No cell preview. Users can see cell content directly in the table.
+**Consolidates:** v0.1.1 (Foundation Cleanup), v0.1.2 (Test Coverage), v0.1.3 (Rust Idioms), v0.1.4 (Comprehensive Tests)
 
 ---
 
-## Empty Document Handling
+### v0.1.1 - Post-Foundation Refactor [ ]
 
-### Completely Empty File (0 bytes)
+**Focus:** Refactor foundation code for maintainability  
+**Status:** [ ]  
+**Primary Focus:** Code quality improvements after initial foundation
 
-**Opening empty.csv:**
-- Status: `NORMAL                                                             0,0`
-- Message: "Empty file (0 rows, 0 columns). Press 'o' to insert first row, ':new' to initialize, 'q' to quit"
+**Philosophy:**
+Clean up technical debt from initial implementation. Focus on improving code organization, test coverage, and documentation based on lessons learned from v0.1.0.
 
-**User presses `o`:**
-1. Creates 1 column with header "Column 1"
-2. Header mode auto-enabled
-3. Inserts row 1 (first data row)
-4. Cursor at row 1, col 0
-5. Enters Insert mode automatically
+**Audit Phase:**
+Start with comprehensive audit of foundation code:
+- Review core viewing and navigation logic
+- Identify code duplication and complexity
+- Check test coverage gaps
+- Verify error handling completeness
+- Review module boundaries
 
-**User uses `:new Name,Email,Phone`:**
-1. Creates 3 columns with those headers
-2. Header mode auto-enabled
-3. 0 data rows
-4. Cursor on row 0 (header row)
-5. Returns to Normal mode
-6. Can press `i` to edit headers or `o` to add first row
-
-### Header-Only File (0 rows, N columns)
-
-**Opening headers.csv (headers: Name,Age,City | 0 data rows):**
-- Header mode ON by default
-- Cursor on row 0 (header row)
-- Status: `NORMAL                                                             0,A`
-
-**Available operations:**
--  `h`, `l`, `0`, `$` - navigate between columns (on header row)
--  `i`, `a`, `I`, `A`, `s` - edit header cells (header is just row 0)
--  `,dd` - delete column
--  `,o`, `,O` - insert new column
--  `o`, `O` - insert first data row (cursor moves to row 1)
--  `dd` - delete header row (auto-toggles header mode OFF)
--  `j`, `k`, `gg`, `G` - no-op or show message "No data rows"
-
-### Delete Last Row Workflow
-
-**File has 1 data row, delete with `dd`:**
-1. Row deleted
-2. Cursor automatically moves to row 0 (header row)
-3. Header mode remains ON
-4. Status shows `NORMAL                                                             0,A`
-
-**From header row:**
-- `h`/`l`/`0`/`$` - navigate columns
-- `i`/`a`/`I`/`A`/`s` - edit header cells (header is just row 0, no special keybinding)
-- `,dd` - delete column (if only 1 column, creates empty 0x0 file)
-- `dd` - delete header row (auto-toggles header mode OFF, row 1 becomes new row 0)
-- `o` or `O` - insert first data row (cursor moves to row 1)
-- `j` - move to row 1 (if it exists), otherwise no-op
-- `k` - no-op (can't go above header)
-
-### Delete Last Column Workflow
-
-**Allow 0-column files (full support, no warning):**
-- Deleting last column with `,dd` is allowed
-- Creates 0-column document
-- Can use `,o` to add new column back
-- Status shows `NORMAL                                                             1,0`
-
----
-
-## v0.1.0 - Foundation 
-
-*Core viewing with vim navigation (COMPLETE)*
-
--  Vim navigation (hjkl, arrows)
--  Multi-file switching ([, ])
--  Basic UI with status bar
--  Help overlay (?)
--  File scanning and loading
--  Row/column numbering (A, B, C...)
-
----
-
-## v0.2.0 - Type Safety Refactor 
-
-*Type safety, separation of concerns, and clean architecture (COMPLETE)*
-
--  Type-safe position types (RowIndex/ColIndex newtypes)
--  Action abstraction layer (UserAction, NavigateAction, ViewportAction)
--  Separation of concerns (InputState, Session, ViewState)
--  Module reorganization (domain/, input/, navigation/, session/, ui/, csv/, file_system/)
--  Consistent naming (document, view_state, get_*/move_*/goto_*)
--  Clean code (decomposed long functions, removed magic numbers, full docs)
--  Comprehensive tests (257 passing: 229 unit + 7 CLI + 21 workflow)
--  Zero warnings (cargo test  | cargo clippy )
-
----
-
-## v0.3.0 - Advanced Navigation 
-
-*Vim-style navigation enhancements (COMPLETE)*
-
--  **Row Jumping:** `gg`, `G`, `<number>G` (e.g., `15G`)
--  **Column Jumping:** `g<letter(s)>` for column navigation
--  **Command-line Jumps:** `:<number>` and `:<column>`
--  **Count Prefixes:** `5j` moves down 5 rows
--  **Enter Key:** In Normal mode, `Enter` moves cursor down one row
--  **Word Motion:** `w`, `b`, `e` for sparse data navigation
--  **Error Handling:** Out-of-bounds jumps clamp to valid range
-
----
-
-## v0.3.1 - UI/UX Polish 
-
-*Polish the user interface and feedback systems (COMPLETE)*
-
--  **Intuitive Bottom Bar:** Status bar with clear mode indicators
--  **Transient Message System:** Non-critical feedback that clears on next keypress
--  **Scrolling File Viewer:** Horizontal scroll for file list
--  **Clean Help Menu:** Redesigned `?` overlay with logical groupings
-
----
-
-## v0.3.2 - Pre-Edit Polish 
-
-*UI redesign, bug fixes, and command mode improvements (COMPLETE)*
-
-### UI Redesign: Vim-like Minimal Interface 
-
-**New UI:**
-```
- lazycsv: customers.csv                                                    1/5
-─────────────────────────────────────────────────────────────────────────────
-      A                B                C                D                E
-  #   CustomerID       Company          Contact          Country          Phone
-  1   101              Acme Corp        John Doe         USA              555-0001
-> 3   103              Global Solutions Mike Johnson     UK               555-0003
-  4   104              DataDrive LLC    Sarah Wilson     USA              555-0004
-
-─────────────────────────────────────────────────────────────────────────────
-customers.csv | sample.csv | test.csv                                    [1/5]
-NORMAL                                                          3,C
-```
-
-**Completed changes:**
-- [x] No box borders - just horizontal rules to separate sections
-- [x] Current row indicator: Single `>` in row number column
-- [x] Current column: Highlighted letter in header row
-- [x] Top bar: Filename left, row/total right
-- [x] File list: Single line, minimal chrome
-- [x] Status line: Mode + position (simplified, no cell preview)
-- [x] Pending commands visible in status line (e.g., `g` when waiting after `g`)
-- [x] Auto-width columns based on content (8-50 char range)
-
-### Bug Fixes 
-
-- [x] **Bug 1: Default to current directory** - Running `lazycsv` without arguments scans "." for CSV files
-- [x] **Bug 2: Notifications inline** - Status bar shows notification with position info
-- [x] **Bug 3: User-friendly error messages** - Shows readable key names
-- [x] **Bug 4: Jump commands fixed**
-  - No timeout on pending commands (vim-like)
-  - Pending command shown in status bar
-  - `:c` command for column navigation
-- [x] **Bug 5: Auto-width columns** - Column widths calculated from content
-
-### Command Mode Improvements 
-
-- [x] **Reserved commands take priority:** `:q`, `:w`, `:wq`, `:help` always work
-- [x] **`:c` command for column jumps:**
-  - `:c A` or `:c a` → column A
-  - `:c 1` → column A (by number)
-  - `:c AA` or `:c aa` → column AA
-  - `:c 27` → column AA (by number)
-- [x] **Out-of-bounds errors:** Show error instead of silently clamping
-
-### Architecture Prep for Editing 
-
-- [x] Mode enum variants: `Normal, Insert, Magnifier, Visual, Command`
-- [x] `edit_buffer: Option<EditBuffer>` added to App
-- [x] `EditBuffer { content, cursor, original }` defined
-
-### Test Summary
-- 344 tests passing at v0.3.2 completion
+**Success Criteria:**
 - Zero clippy warnings
-- Zero compiler warnings
+- Code coverage > 80%
+- All functions < 50 lines
+- Performance benchmarks met
+- Module structure documented
+- Cyclomatic complexity reduced
+- All tests pass with no panics
+
+**Testing Strategy:**
+- Full regression test suite
+- Increase test coverage for core viewing
+- Edge case testing for navigation
+- Property-based testing where appropriate
+
+**Documentation Requirements:**
+- Architecture documentation for core modules
+- Code comments for complex logic
+- Rustdoc for public APIs
+- Refactoring notes documenting improvements
 
 ---
 
-## v0.4.0 - Insert Mode 
+### v0.2.0 - Type Safety & Architecture Refactor [x]
 
-*Fast, intuitive in-place editing of cell values (COMPLETE)*
+**Focus:** Clean architecture with type-safe position handling  
+**Status:** [x]  
+**Tests:** 257 passing (zero warnings)
 
-### Design Philosophy
-- **Essentials only**: Focus on commands that help users get work done
-- **Vim-first**: Vim commands take precedence
-- **Zero configuration**: Works great out of the box
+**Features:**
+- [x] Type-safe position types (RowIndex/ColIndex newtypes)
+- [x] Action abstraction layer (UserAction, NavigateAction, ViewportAction)
+- [x] Separation of concerns (InputState, Session, ViewState)
+- [x] Module reorganization (domain/, input/, navigation/, session/, ui/, csv/, file_system/)
+- [x] Consistent naming conventions (document, view_state, get_*/move_*/goto_*)
+- [x] Comprehensive documentation (all public items documented)
+- [x] Zero compiler warnings
 
-### Implemented Keybindings
+---
 
-**Enter Insert Mode:**
-| Key | Action | Status |
-|-----|--------|--------|
-| `i` | Edit cell (cursor at end) |  |
-| `a` | Edit cell (cursor at end) |  |
-| `I` | Edit cell (cursor at start) |  |
-| `A` | Edit cell (cursor at end) |  |
-| `s` | Replace cell (clear + edit) |  |
-| `F2` | Edit cell (cursor at end) |  |
-| `Delete` | Clear cell (stay in Normal mode) |  |
+### v0.2.1 - Type System Cleanup [ ]
 
-**Exit Insert Mode:**
-| Key | Action | Status |
-|-----|--------|--------|
-| `Enter` | Commit edit, move down |  |
-| `Shift+Enter` | Commit edit, move up |  |
-| `Tab` | Commit edit, move right |  |
-| `Shift+Tab` | Commit edit, move left |  |
-| `Esc` | Cancel edit, stay in place |  |
+**Focus:** Refine type safety and architecture improvements  
+**Status:** [ ]  
+**Primary Focus:** Type system and module organization polish
+
+**Philosophy:**
+Build on v0.2.0's architectural improvements by refining type safety, improving module boundaries, and ensuring all abstractions are clean and maintainable.
+
+**Audit Phase:**
+Start with comprehensive audit of type system:
+- Review newtype implementations (RowIndex, ColIndex)
+- Check action abstraction consistency
+- Verify module separation of concerns
+- Identify remaining type safety improvements
+- Review naming conventions
+
+**Success Criteria:**
+- Zero clippy warnings
+- Code coverage > 80%
+- All functions < 50 lines
+- Performance benchmarks met
+- Module structure documented
+- Cyclomatic complexity reduced
+- All tests pass with no panics
+
+**Testing Strategy:**
+- Type safety property tests
+- Module integration tests
+- Boundary condition testing
+- Regression test suite
+
+**Documentation Requirements:**
+- Architecture documentation for type system
+- Module responsibility documentation
+- Rustdoc for all public types
+- Design decision documentation
+
+---
+
+### v0.3.0 - Advanced Navigation & UI Polish [x]
+
+**Focus:** Vim-style navigation enhancements and polished UI  
+**Status:** [x]  
+**Tests:** 344 passing
+
+**Features:**
+- [x] Row jumping (gg, G, 5g for row 5)
+- [x] Column jumping (:cA, :cB, :cAA)
+- [x] Count prefixes (5j moves down 5 rows, 3h moves left 3)
+- [x] Word motion (w, b, e for sparse data navigation)
+- [x] Viewport control (zt, zz, zb for scroll positioning)
+- [x] Minimal vim-like UI (no heavy borders, clean status line)
+- [x] Status bar with mode indicators (NORMAL, COMMAND)
+- [x] Transient message system (clears on next keypress)
+- [x] Pending command display (shows g_, z_, 5_)
+- [x] Auto-width columns based on content (8-50 char range)
+- [x] Horizontal file list scrolling
+- [x] Reserved commands take priority (:q, :w, :wq, :help)
+- [x] Out-of-bounds errors instead of silent clamping
+
+**Consolidates:** v0.3.1 (UI/UX Polish), v0.3.2 (Pre-Edit Polish)
+
+---
+
+### v0.3.1 - Navigation Code Quality [ ]
+
+**Focus:** Refine navigation implementation and UI rendering  
+**Status:** [ ]  
+**Primary Focus:** Navigation performance and code quality
+
+**Philosophy:**
+Improve navigation code quality, optimize rendering performance, and ensure all navigation features are maintainable and well-tested.
+
+**Audit Phase:**
+Start with comprehensive audit of navigation code:
+- Review navigation command implementations
+- Check viewport management efficiency
+- Verify UI rendering performance
+- Identify code duplication in navigation logic
+- Review jump command consistency
+
+**Success Criteria:**
+- Zero clippy warnings
+- Code coverage > 80%
+- All functions < 50 lines
+- Performance benchmarks met
+- Module structure documented
+- Cyclomatic complexity reduced
+- All tests pass with no panics
+
+**Testing Strategy:**
+- Navigation command regression tests
+- Viewport boundary condition tests
+- UI rendering performance tests
+- Jump command integration tests
+
+**Documentation Requirements:**
+- Navigation architecture documentation
+- Viewport management documentation
+- UI rendering pipeline documentation
+- Performance optimization notes
+
+---
+
+### v0.4.0 - Cell Editing & Persistence [x]
+
+**Focus:** Fast cell editing with Insert mode, file persistence, header toggle  
+**Status:** [x]  
+**Tests:** 517 passing
+
+**Features:**
+
+**Insert Mode:**
+- [x] Enter Insert mode (i, a, I, A, s, F2)
+- [x] Text editing (type, backspace, delete, Ctrl+w, Ctrl+u)
+- [x] Exit options (Enter/Shift+Enter/Tab/Shift+Tab/Esc)
+- [x] Cursor movement (Home, End, arrows)
+- [x] Edit buffer with visible cursor
 
 **Row Operations:**
-| Key | Action | Status |
-|-----|--------|--------|
-| `o` | Add row below, enter Insert mode |  |
-| `O` | Add row above, enter Insert mode |  |
-| `dd` | Delete row (stores in clipboard) |  |
-| `yy` | Yank (copy) row |  |
-| `p` | Paste row below |  |
+- [x] Insert row (o, O)
+- [x] Delete row (dd)
+- [x] Yank row (yy)
+- [x] Paste row (p, P)
+- [x] Clear row (cc)
+- [x] Count prefixes (5dd, 5yy)
 
-**Text Editing (in Insert mode):**
-| Key | Action | Status |
-|-----|--------|--------|
-| Type characters | Insert at cursor |  |
-| `Backspace` | Delete character before cursor |  |
-| `Delete` | Delete character at cursor |  |
-| `Ctrl+h` | Delete character before cursor |  |
-| `Ctrl+w` | Delete word backward |  |
-| `Ctrl+u` | Delete to start of cell |  |
-| `Home` | Move cursor to start |  |
-| `End` | Move cursor to end |  |
-| `Left`/`Right` | Move cursor |  |
+**File Persistence:**
+- [x] :w - Write current file
+- [x] :W - Write all dirty files
+- [x] :wq / :Wq - Write and quit
+- [x] :q - Quit (blocks if dirty)
+- [x] :q! - Force quit (discard changes)
+- [x] Multi-file dirty tracking with * indicator
+- [x] Document caching for unsaved edits
+- [x] CSV escaping (quotes, commas, newlines)
+- [x] Atomic writes (temp file + rename)
 
-### Implementation Details
+**Header Toggle System:**
+- [x] :ht command to toggle header mode ON/OFF
+- [x] Header row is always row 0 (no special storage)
+- [x] When ON: row 0 styled/frozen, gg goes to row 1
+- [x] When OFF: row 0 normal data, gg goes to row 0
+- [x] Per-file header mode (session-only, not persisted)
+- [x] Deleting row 0 auto-toggles header mode OFF
 
-- [x] `Mode::Insert` in Mode enum (was prepared in v0.3.2)
-- [x] `EditBuffer { content, cursor, original }` for edit state
-- [x] `last_edit_position` tracking for future `gi` command
-- [x] `row_clipboard` for `yy`/`p` operations
-- [x] `set_cell()`, `insert_row()`, `delete_row()` in Document
-- [x] Handle all exit keys with appropriate cursor movement
-- [x] Set `is_dirty = true` on commit (only if content changed)
-- [x] Status bar shows `INSERT` mode indicator
-- [x] Edit buffer displayed with visible cursor (`│`)
-- [x] Pending `d` and `y` commands shown in status bar
+**Other Commands:**
+- [x] :delim ; - Set delimiter (session-only)
+- [x] :new A,B,C - Create new CSV with headers
+- [x] :files - File menu with cursor navigation
+- [x] :c<column> - Column navigation (:cA, :cB, :cAA, :c1)
 
-### Test Summary
-- 427 tests passing (271 lib + 156 integration)
-- 64 comprehensive Insert mode tests
+**Range Operations:**
+- [x] Row ranges (:5,10d, :5,10y, :%d, :.d, :$d)
+- [x] Column ranges (:B,Dd, :B,Dy)
+- [x] Column reordering (:D,E m A)
+
+**Edge Cases:**
+- [x] Empty document handling (0 rows, 0 columns)
+- [x] Header-only files (0 data rows)
+- [x] Absolute row indexing (includes header row)
+- [x] Simplified navigation (5g for rows, :c for columns)
+
+**Empty Document Handling Details:**
+
+*Completely Empty File (0 bytes):*
+- Opening empty.csv shows: "Empty file (0 rows, 0 columns)"
+- Press `o` to create first row (auto-creates "Column 1" header)
+- Use `:new Name,Email,Phone` to create headers without data
+
+*Header-Only File (0 data rows):*
+- Cursor starts on row 0 (header row)
+- Can edit headers with `i`, `a`, `I`, `A`, `s`
+- Can navigate columns with `h`, `l`, `0`, `$`
+- Press `o` or `O` to insert first data row
+- Deleting row 0 with `dd` auto-toggles header mode OFF
+
+*Delete Last Row Workflow:*
+- After deleting last data row, cursor moves to row 0 (header)
+- Header mode remains ON
+- From header row: can edit headers, insert columns, or add new data row
+
+*Delete Last Column Workflow:*
+- Deleting last column with `,dd` creates 0-column document (fully supported)
+- Use `,o` to add column back
+- Status shows position as `1,0`
+
+**Consolidates:** v0.4.1 (Persistence & Edge Cases)
+
+---
+
+### v0.4.1 - Editing System Refactor [ ]
+
+**Focus:** Refine cell editing and persistence implementation  
+**Status:** [ ]  
+**Primary Focus:** Editing reliability and edge case handling
+
+**Philosophy:**
+Improve editing system robustness, ensure persistence is reliable, and handle all edge cases gracefully. Focus on data integrity and user experience.
+
+**Audit Phase:**
+Start with comprehensive audit of editing system:
+- Review Insert mode implementation
+- Check file persistence reliability
+- Verify header toggle functionality
+- Identify edge cases in editing workflow
+- Review dirty state tracking
+
+**Success Criteria:**
 - Zero clippy warnings
-- Zero compiler warnings
+- Code coverage > 80%
+- All functions < 50 lines
+- Performance benchmarks met
+- Module structure documented
+- Cyclomatic complexity reduced
+- All tests pass with no panics
+
+**Testing Strategy:**
+- Insert mode edge case tests
+- File persistence integration tests
+- Header toggle scenario tests
+- Dirty state tracking tests
+- Data integrity tests
+
+**Documentation Requirements:**
+- Editing system architecture documentation
+- Persistence strategy documentation
+- Header toggle behavior documentation
+- Edge case handling documentation
 
 ---
 
-## v0.4.1 - Persistence & Edge Cases
-
-*Save files, fix edge cases, header toggle system, simplified navigation*
-
-### Critical Edge Case Fixes  COMPLETE
-
-**Empty Document Handling:**  COMPLETE
-- [x] `App::new` handles documents with 0 rows gracefully 
-- [x] Navigation (`gg`, `G`, `j`, `k`) handles 0-row documents 
-- [x] Status line shows correct position for empty documents 
-- [x] `o` command works on empty documents 
-- [x] 0-column documents supported 
-- [x] 0-row documents supported (delete last row → moves to header) 
-- [x] Comprehensive edge case test suite (7 tests in empty_document_test.rs) 
-
-**Header Row as Row 0:**
-- [x] Refactor `Document` - header row is `rows[0]`, not separate field
-- [x] Add `header_mode: bool` flag to track header toggle state
-- [x] Add `delimiter: char` field to Document
-- [x] Update all Document methods to handle +1 offset for data rows
-- [x] Add `Document::new()` helper for tests
-- [x] Fix all test files to use new Document structure
-- [x] Fix `yy` command bug (was yanking header instead of data row)
-- [x] Session tracks header mode per-file (in RAM only) via `HashMap<PathBuf, bool>`
-- [x] Session tracks delimiter per-file via `HashMap<PathBuf, char>`
-- [x] Add `get_header_mode()`, `set_header_mode()`, `get_delimiter()`, `set_delimiter()` to Session
-- [x] Implement `:ht` command to toggle header mode
-- [x] When header mode ON: style row 0, `gg` goes to row 1
-- [x] When header mode OFF: no special styling, `gg` goes to row 0
-- [x] Deleting row 0 with `dd` auto-toggles header mode OFF
-- [x] Default all files to header mode ON
-- [x] Refactor all navigation to use absolute row indices (0-based including header)
-- [x] Cannot navigate to row 0 when header_mode ON (k from row 1 stops at row 1)
-- [x] Status line shows absolute row numbers (0 for header, 1+ for data)
-- [x] Fix all 427 tests to work with absolute row indexing
-
-### Simplified Navigation  COMPLETE (`:c` command only)
-
-**Row Navigation -  COMPLETE:**
-- [x] Remove `:5` (row jump) - replaced with `5g` 
-- [x] Add `5g` → jump to row 5 
-- [x] `gg` → first non-header row 
-- [x] `G` → last row 
-- [x] 9 tests in `simplified_navigation_test.rs` 
-
-**Column Navigation -  COMPLETE (`:c` command only):**
-- [x] `:c<column>` command for all column jumps 
-- [x] `:cA` → jump to column A 
-- [x] `:cB` → jump to column B 
-- [x] `:cAA` → jump to column AA (multi-letter columns) 
-- [x] `:c1` → jump to column 1 (numeric alternative: 1=A, 2=B, 27=AA) 
-- [x] Case-insensitive: `:ca`, `:cA`, `:CA` all work 
-- [x] Proper error messages for invalid columns 
-- [x] 8 tests for `:c` command 
-- [x] **REMOVED** `<LETTER>g` syntax (Bg, Cg, etc.) - too confusing with reserved keys 
-
-**Navigation Summary:**
-- **Row jumps:** Use `5g`, `gg`, `G` (vim-like, fast, no conflicts)
-- **Column jumps:** Use `:cA`, `:cB`, `:cZ`, `:cAA` (explicit, consistent, works for all columns)
-- No more dual approach - one clear way to jump to columns
-- 497 tests passing → 507 tests passing 
-
-### File Persistence 
-
-**Commands Implemented:**
-| Command | Action |
-|---------|--------|
-| `:w` | Write current file only  |
-| `:W` | Write all dirty files  |
-| `:wq` | Write current file and quit  |
-| `:Wq` | Write all dirty files and quit  |
-| `:q` | Quit (fails if current file dirty)  |
-| `:q!` | Force quit (discard all changes)  |
-
-**Multi-File Dirty Tracking:**
-- [x] Session tracks dirty files in `HashSet<PathBuf>` 
-- [x] Session caches dirty `Document` instances in `HashMap<PathBuf, Document>` 
-- [x] When switching files: use cache if dirty, reload from disk if clean 
-- [x] After `:w` / `:W`: remove from cache (reload fresh next time) 
-- [x] `:q` checks current file for dirty state, blocks if unsaved 
-- [x] File switcher shows `*` next to dirty files: `customers.csv* | orders.csv` 
-
-### Range Operations  ROWS COMPLETE
-
-**Row range syntax -  COMPLETE:**
-- [x] `:5,10d` - delete rows 5-10 
-- [x] `:5,10y` - yank rows 5-10 
-- [x] `:%d` - delete all data rows 
-- [x] `:%y` - yank all data rows 
-- [x] `:.d` - delete current row 
-- [x] `:.y` - yank current row 
-- [x] `:$d` - delete last row 
-- [x] `:$y` - yank last row 
-- [x] 10 comprehensive tests in `range_operations_test.rs` 
-
-**Column range syntax -  COMPLETE:**
-- [x] `:B,Dd` - delete columns B through D 
-- [x] `:B,Dy` - yank columns B through D 
-- [x] `:C,Cd` - delete single column C 
-- [x] `:B,D` alone - ERROR: "Incomplete command. Use :B,Dd to delete" 
-- [x] 10 comprehensive tests in `column_range_operations_test.rs` 
-- [x] 517 tests passing (507 + 10 new) 
-
-### New Commands
-
-**`:delim X` - Set Delimiter:**  COMPLETE
-- [x] `:delim ;` sets delimiter to semicolon for current file 
-- [x] Reloads file with new delimiter automatically 
-- [x] Setting is session-only (not persisted to disk) 
-- [x] Default delimiter is `,` (comma) 
-- [x] Each file remembers its delimiter during session 
-
-**`:new` - Create New CSV:**  COMPLETE
-- [x] `:new Name,Age,City` creates CSV with those headers (0 data rows) 
-- [x] `:new` creates CSV with 1 column "Column 1" (0 data rows) 
-- [x] Header mode auto-enabled 
-- [x] File marked as dirty (unsaved) 
-- [x] Preserves current delimiter setting 
-
-**`:files` - File Menu:**  COMPLETE
-- [x] Cursor-based navigation with j/k or arrow keys 
-- [x] Type to filter file list (case-insensitive) 
-- [x] Enter to select file 
-- [x] Visual cursor indicator `>` 
-- [x] Shows dirty indicator `*` 
-
-### Implementation Steps
-
-**File: `src/csv/writer.rs` (new file)**  COMPLETE
-- [x] Create CSV writer module 
-- [x] Implement `write_csv_atomic(document: &Document, path: &Path, delimiter: char) -> Result<()>` 
-  - Write to temp file first 
-  - Atomically rename to target path 
-  - Handle CSV escaping (quotes, commas, newlines) 
-  - Preserves original on write failure 
-
-**File: `src/csv/document.rs`**  COMPLETE
-- [x] Refactor: header row is `rows[0]`, not separate field 
-- [x] Add `header_mode: bool` field 
-- [x] Add `delimiter: char` field (default: `,`) 
-- [x] Update all methods to handle header row as row 0 
-- [x] Add `Document::new()` helper for tests 
-- [x] Add `toggle_header_mode(&mut self)` method 
-- [x] Add `delete_last_row_moves_to_header()` logic 
-
-**File: `src/session/mod.rs`**  COMPLETE
-- [x] Add `header_modes: HashMap<PathBuf, bool>` field (track per-file) 
-- [x] Add `delimiters: HashMap<PathBuf, char>` field (track per-file) 
-- [x] Add `get_header_mode(&self) -> bool` method (default: true) 
-- [x] Add `set_header_mode(&mut self, mode: bool)` method 
-- [x] Add `get_delimiter(&self, file: &PathBuf) -> char` method (default: ',') 
-- [x] Add `set_delimiter(&mut self, file: PathBuf, delimiter: char)` method 
-- [x] Add `dirty_files: HashSet<PathBuf>` field 
-- [x] Add `document_cache: HashMap<PathBuf, Document>` field 
-- [x] Add `mark_dirty(&mut self, path: &Path)` method 
-- [x] Add `mark_clean(&mut self, path: &Path)` method 
-- [x] Add `is_dirty(&self, path: &Path) -> bool` method 
-- [x] Add `cache_document(&mut self, path: PathBuf, doc: Document)` method 
-- [x] Add `get_cached_document(&self, path: &Path) -> Option<&Document>` method 
-- [x] Add `remove_from_cache(&mut self, path: &Path)` method 
-- [x] Add `is_current_file_dirty()`, `has_any_dirty_files()`, `get_dirty_files()` methods 
-- [x] Add `clear_cache()` method 
-
-**File: `src/app/mod.rs`**  COMPLETE
-- [x] Add `save_current_file(&mut self) -> Result<PathBuf>` method (saves current file) 
-- [x] Add `save_all_files(&mut self) -> Result<Vec<PathBuf>>` method (saves all dirty files) 
-- [x] Cursor positioning for empty documents handled gracefully 
-- [x] Handle `gg` differently based on header mode 
-
-**File: `src/input/handler.rs`**  COMPLETE  
-- [x] Fixed case-sensitive command matching (`:W` vs `:w`) 
-- [x] Add `:w` command handler (saves current file only) 
-- [x] Add `:W` command handler (saves all dirty files) 
-- [x] Add `:wq` command handler (save current and quit) 
-- [x] Add `:Wq` command handler (save all and quit) 
-- [x] Modify `:q` handler (check current file for dirty state) 
-- [x] Add `:q!` handler (quit immediately, clear cache) 
-- [x] Add `:ht` command handler (toggle header mode) 
-- [x] Add `:delim X` command handler (change delimiter with auto-reload) 
-- [x] Add `:new [headers]` command handler (create new CSV) 
-- [x] Add `:files` command handler (file picker with cursor navigation) 
-- [x] `:c` command works for column navigation (no old version to remove) 
-- [x] Old `:5`, `:B`, `:A5` navigation removed 
-- [x] `5g` row jump implemented 
-- [x] `Bg` column jump **removed** (conflicts with reserved keys, use `:cB` instead) 
-- [x] Range operation handlers implemented (`:5,10d`, `:B,Dd`) 
-
-**File: `src/ui/status.rs`**  COMPLETE
-- [x] Status line shows mode + row + column 
-- [x] `render_file_switcher()` shows `*` for dirty files 
-
-**File: `src/ui/table.rs`**  COMPLETE
-- [x] Header row styling applied when `header_mode == true` 
-- [x] Row 0 visually distinct when header mode ON 
-
-### Tests to Add
-
-**Edge Cases (`tests/empty_document_test.rs`):**  COMPLETE (7 tests)
-- [x] `test_empty_file_0_bytes` 
-- [x] `test_header_only_file_no_data` 
-- [x] `test_app_new_with_empty_document_0_cols` 
-- [x] `test_app_new_with_header_only_document` 
-- [x] `test_single_row_single_column` 
-- [x] `test_navigation_with_header_only_file` 
-- [x] `test_delete_last_data_row_moves_to_header` 
-
-**Header Toggle:**  TESTED THROUGHOUT
-- [x] Header mode toggle tested in `empty_document_test.rs` 
-- [x] Header mode behavior tested in `new_command_test.rs` 
-- [x] `gg` behavior with header mode tested in multiple files 
-- [x] `dd` on row 0 behavior tested implicitly 
-- [x] Header mode defaults tested throughout 
-
-**Navigation (`tests/simplified_navigation_test.rs`):**  COMPLETE (17 tests)
-- [x] `test_5g_jumps_to_row_5` 
-- [x] `test_bg_removed_use_c_command_instead` (tests old `Bg` syntax removed) 
-- [x] `test_cell_jump_removed_use_c_command_and_row_jump` 
-- [x] `test_old_colon_number_navigation_removed` (tests `:5` removed) 
-- [x] Multiple `:c` command tests (10+ tests) 
-
-**Persistence (`tests/persistence_test.rs`):**  COMPLETE (8 tests)
-- [x] `test_w_saves_current_file` 
-- [x] `test_W_saves_all_dirty_files` 
-- [x] `test_wq_saves_and_quits` 
-- [x] `test_q_blocks_if_dirty` 
-- [x] `test_q_succeeds_if_clean` 
-- [x] `test_q_bang_discards_changes` 
-- [x] `test_csv_writer_escapes_quotes` 
-- [x] `test_csv_writer_escapes_commas` 
-- [x] Dirty indicator tested via integration (file switcher shows `*`) 
-- [x] File switch preserves edits (via document cache implementation) 
-- [x] Save removes from cache (via cache management implementation) 
-- [x] CSV writer atomic write (via temp file implementation) 
-
-**Range Operations (`tests/range_operations_test.rs`):**  COMPLETE
-- [x] `test_delete_row_range_5_to_10` 
-- [x] `test_delete_all_rows_percent_d` 
-- [x] `test_delete_current_row_dot_d` 
-- [x] `test_delete_last_row_dollar_d` 
-- [x] `test_yank_row_range_5_to_10` 
-- [x] `test_yank_all_rows_percent_y` 
-- [x] `test_yank_current_row_dot_y` 
-- [x] `test_invalid_range_start_greater_than_end` 
-- [x] `test_delete_range_with_row_zero` 
-- [x] `test_delete_out_of_bounds_range` 
-- [x] `test_delete_column_range_b_to_d` 
-- [x] `test_yank_column_range_b_to_d` 
-- [x] `test_delete_single_column_c` 
-- [x] `test_delete_all_columns_a_to_e` 
-- [x] `test_column_range_invalid_start_after_end` 
-- [x] `test_column_range_out_of_bounds` 
-- [x] `test_column_range_both_out_of_bounds` 
-- [x] `test_column_range_multi_letter_columns` 
-- [x] `test_column_range_cursor_adjustment_after_delete` 
-- [x] `test_incomplete_column_range_shows_error` 
-
-**Commands (`tests/commands_test.rs`):**  COMPLETE
-- [x] `test_delim_command_changes_delimiter`  (6 tests in delimiter_test.rs)
-- [x] `test_new_command_with_headers`  (8 tests in new_command_test.rs)
-- [x] `test_new_command_default` 
-- [x] `test_files_command_shows_menu`  (12 tests in files_command_test.rs)
-
-### Acceptance Criteria
-
-**File Persistence:**  COMPLETE
-- [x] `:w` saves current file only 
-- [x] `:W` saves all dirty files 
-- [x] `:wq` saves current file and quits 
-- [x] `:Wq` saves all dirty files and quits 
-- [x] `:q` blocks if current file dirty 
-- [x] `:q!` quits without saving 
-- [x] File switcher shows `*` next to dirty files 
-- [x] Switching files preserves unsaved edits (via cache) 
-- [x] CSV output properly escapes special characters (quotes, commas, newlines) 
-- [x] Atomic writes (temp file → rename) 
-
-**Header System:**  COMPLETE
-- [x] `:ht` toggles header mode for current file 
-- [x] Header mode ON: row 0 styled/frozen, `gg` → row 1 
-- [x] Header mode OFF: row 0 normal, `gg` → row 0 
-- [x] `dd` on row 0 toggles header mode OFF 
-- [x] All 489 tests passing 
-- [x] No clippy warnings 
-
-**Simplified Navigation:**  COMPLETE
-- [x] `5g` jumps to row 5 (old `:5` removed) 
-- [x] `:c<column>` command for column jumps 
-- [x] **REMOVED** `<LETTER>g` syntax (Bg, Cg, etc.) 
-- [x] 497 tests passing → 507 tests passing 
-- [x] No clippy warnings 
-
-**Range Operations:**  COMPLETE (ALL OPERATIONS)
-- [x] `:5,10d` deletes rows 5-10 
-- [x] `:5,10y` yanks rows 5-10 
-- [x] `:%d` deletes all data rows 
-- [x] `:%y` yanks all data rows 
-- [x] `:.d` deletes current row 
-- [x] `:.y` yanks current row 
-- [x] `:$d` deletes last row 
-- [x] `:$y` yanks last row 
-- [x] `:B,Dd` deletes columns B through D 
-- [x] `:B,Dy` yanks columns B through D 
-- [x] 517 tests passing (20 range operation tests) 
-- [x] Zero clippy warnings 
-
-**New Commands:**  COMPLETE
-- [x] `:delim ;` changes delimiter to semicolon 
-- [x] `:new Name,Age` creates new CSV with those headers 
-- [x] `:files` shows file menu with cursor navigation 
-
-**Still TODO for v0.4.1:**
-- **NONE** - v0.4.1 is feature complete! 
-
-**Ready for release:**
--  517 tests passing
--  Zero compiler warnings  
--  1 pre-existing clippy warning (unrelated)
--  All acceptance criteria met
-
----
-
-## v0.5.0 - Column Operations & Visual Mode ✅ COMPLETE
-
-*Full column manipulation with comma leader, visual selections, triple clipboard system*
-
-**Status:** COMPLETE (2026-03-07)
-**Tests:** 420+ lib tests, 43 dual clipboard tests, 20 column range tests, 32 visual mode tests = **515+ total tests passing**
-**Implementation:** Triple clipboard (row/column/region buffers) with full visual mode support
-
-### Column Operations (Comma Leader) ✅ COMPLETE
-
-| Key | Action | Status |
-|-----|--------|--------|
-| `,o` | Insert column right | ✅ |
-| `,O` | Insert column left | ✅ |
-| `,dd` | Delete column (stores in column buffer) | ✅ |
-| `,yy` | Yank column (includes header, stores in column buffer) | ✅ |
-| `,p` | Paste column right (cursor moves to new column) | ✅ |
-| `,P` | Paste column left (cursor moves to new column) | ✅ |
-
-**Behavior:**
-- `,yy` yanks entire column including header (row 0) ✅
-- `,p` pastes column, cursor moves to new column ✅
-- `,o`/`,O` creates column with generic header (e.g., "Column D") ✅
-- Comma leader is silent (no visual feedback, standard vim behavior) ✅
-- No `,h` for header editing - just navigate to row 0 and use `i` ✅
-- **43 tests passing** in `tests/dual_clipboard_test.rs`
-
-### Visual Mode ✅ COMPLETE
-
-**Table-level visual mode:** Full visual mode implementation with 32 passing tests
-- `v` - Visual Block (rectangular cell selection) - ✅ COMPLETE
-- `V` - Visual Line (whole row selection) - ✅ COMPLETE
-- `,v` - Visual Column (whole column selection) - ✅ COMPLETE
-- Operations: `d` (delete), `y` (yank), `p` (paste over) - ✅ COMPLETE
-- `gv` - Reselect last visual selection - ✅ COMPLETE
-- Movement: `hjkl`, arrow keys extend selection - ✅ COMPLETE
-- UI rendering: Visual selection highlighting with `bg(Color::DarkGray)` - ✅ COMPLETE
-
-**Magnifier visual mode:** ✅ COMPLETE
-- `v` - Character-wise visual (works in Magnifier)
-- `V` - Line-wise visual (works in Magnifier)
-- Full visual operations within cell editing
-
-**Design decisions made:**
-- Vim-like rectangular selections (not freeform)
-- Triple clipboard: row buffer, column buffer, region buffer
-- Visual Block uses region buffer for rectangular selections
-- Visual Line uses row buffer, Visual Column uses column buffer
-- Selection rendering with `bg(Color::DarkGray)` highlighting
-
-### Triple Clipboard System ✅ COMPLETE
-
-**Three independent buffers for different operation types:**
-- **Row buffer:** Used by `yy`, `dd`, `p`, `P`, `o`, `O`, `5dd`, `5yy`, Visual Line `y` ✅
-- **Column buffer:** Used by `,yy`, `,dd`, `,p`, `,P`, `,o`, `,O`, Visual Column `y` ✅
-- **Region buffer:** Used by Visual Block `y` (rectangular selections) ✅
-- **Isolation:** Buffers remain independent (no cross-pasting) ✅
-
-**Examples:**
-- `yy` then `p` = paste as row ✅
-- `,yy` then `,p` = paste as column ✅
-- Visual Block `y` then `p` = paste rectangular region ✅
-- `yy` then `,p` = ERROR "Nothing to paste" ✅
-- `,yy` then `p` = ERROR "Nothing to paste" ✅
-
-**Implementation:** `src/clipboard/mod.rs` - `DualClipboard` struct (supports 3 buffers, naming kept for compatibility)
-**Tests:** 43 passing for row/column buffers, 32 visual mode tests covering region buffer
-
-**NOTE:** Extended from dual clipboard to support visual mode rectangular selections.
-Original "unified clipboard with transpose" design was not implemented.
-
-### Count Prefixes ✅ COMPLETE
-
-| Key | Action | Status |
-|-----|--------|--------|
-| `5dd` | Delete 5 rows | ✅ |
-| `5yy` | Yank 5 rows | ✅ |
-| `3,dd` | Delete 3 columns | ✅ |
-| `3,yy` | Yank 3 columns | ✅ |
-| `P` | Paste above current row | ✅ |
-| `cc` | Clear row and enter Insert mode | ✅ |
-
-**Tests:** Count prefix tests in `tests/dual_clipboard_test.rs`
-
-### Column Reordering ✅ COMPLETE
-
-**Command syntax:**
-- `:D,E m A` - move columns D-E to after column A ✅
-- `:C m $` - move column C to end ✅
-- `:A m 0` - move column A to beginning ✅
-
-**Implementation:** `Document::move_columns()` in `src/csv/document.rs`
-**Tests:** 10 passing in `tests/column_range_operations_test.rs`:
-- `test_move_columns_d_e_after_a`
-- `test_move_column_to_end`
-- `test_move_column_to_beginning`
-- `test_move_cursor_follows_moved_columns`
-- And 6 more edge case tests
-
-### Implementation Summary
-
-**Completed Features:**
-- ✅ Column operations (,o, ,O, ,dd, ,yy, ,p, ,P)
-- ✅ Row/Column/Region clipboard buffers (triple clipboard system)
-- ✅ Count prefixes (5dd, 3,dd, etc.)
-- ✅ Column reordering commands (:D,E m A)
-- ✅ All Document methods (insert_column, delete_column, move_columns)
-- ✅ Visual mode (v, V, ,v) with d, y, p operations
-- ✅ Visual selection highlighting in UI
-- ✅ gv command to reselect last visual selection
-- ✅ 43 dual clipboard tests
-- ✅ 20 column range operation tests
-- ✅ 32 visual mode tests
-- ✅ Total: **515+ tests passing**
-
-**Not Implemented (By Design):**
-- ❌ Transpose operations (design changed to triple clipboard)
-- ❌ Unified clipboard with type metadata
-- ❌ Visual c (change) operation - deferred to later
-
-**Design Decisions:**
-1. **Triple Clipboard:** Extended to row/column/region buffers for visual mode
-2. **No Transpose:** `yy` + `,p` shows error, buffers stay isolated
-3. **Vim-like Selections:** Rectangular bounding boxes (not freeform like Excel)
-4. **Operations Priority:** d, y, p first; c (change) deferred
-
----
-
-**Implementation Plan (2026-03-07):**
-
-**Phase 1: Visual Mode Foundation** ✅ COMPLETE
-- [X] Add `VisualSelection` struct to track selection start/end with anchor and cursor
-- [X] Implement `bounds()` method for rectangular regions
-- [X] Add `last_visual_selection` field for `gv` command
-- [X] Update Mode enum with VisualBlock, VisualLine, VisualColumn variants
-
-**Phase 2: Visual Entry & UI** ✅ COMPLETE
-- [X] `v` enters Visual Block mode (rectangular selection)
-- [X] `V` enters Visual Line mode (whole rows)
-- [X] `,v` enters Visual Column mode (whole columns)
-- [X] `gv` command to reselect last visual selection
-- [X] Render selection highlighting (bg(Color::DarkGray))
-- [X] Status line shows selection range (e.g., "VISUAL 1-5,A-C")
-
-**Phase 3: Visual Operations** ✅ COMPLETE
-- [X] `d` in Visual Block: delete cells in rectangle (yank to region buffer)
-- [X] `d` in Visual Line: delete entire rows (yank to row buffer)
-- [X] `d` in Visual Column: delete entire columns (yank to column buffer)
-- [X] `y` in all modes: yank to appropriate buffer (region/row/column)
-- [X] `p` in Visual Block: paste over selection (extend table if needed)
-- [X] `p` in Visual Line: replace selected rows
-- [X] `p` in Visual Column: replace selected columns
-- [X] Movement keys (hjkl, arrows) extend selection
-
-**Phase 4: Region Clipboard** ✅ COMPLETE
-- [X] Extended `DualClipboard` with region buffer support (kept name for compatibility)
-- [X] Add `region_buffer: ClipboardBuffer` field
-- [X] Implement `yank_region()` and `get_region()`
-- [X] Region paste extends table if selection larger
-- [X] Three independent buffers (no cross-pasting)
-
-**Phase 5: Testing** ✅ COMPLETE
-- [X] 32 comprehensive tests for visual mode operations
-- [X] Tests for all 3 visual mode types (Block, Line, Column)
-- [X] Tests for region clipboard with rectangular selections
-- [X] Tests for `gv` command (reselect last selection)
-- [X] Edge cases: empty selections, out of bounds, single cell/row/column
-
-**Quality:**
-- ✅ All existing tests pass (420+ tests)
-- ✅ 43 dual clipboard tests passing
-- ✅ 20 column range operation tests passing
-- ✅ 32 visual mode tests passing
-- ✅ Total: **515+ tests passing**
-- ✅ No compilation errors
-- ✅ No clippy warnings (except pre-existing)
-
-**Release Status:** v0.5.0 COMPLETE ✅
-1. Column operations 100% complete and tested
-2. Visual mode fully implemented with all three modes (v, V, ,v)
-3. Visual operations (d, y, p) working for all three modes
-4. Visual selection rendering complete with bg(Color::DarkGray)
-5. Triple clipboard system with row/column/region buffers
-6. gv command to reselect last visual selection
-7. All 515+ tests passing
-5. Triple clipboard (row/column/region) fully implemented
-6. `gv` command implemented
-7. Next: Visual selection UI rendering + comprehensive tests
-8. Estimated remaining work: Visual rendering + ~43 new tests
-
----
-
-## v0.6.0 - Magnifier Mode  COMPLETE
-
-*Comprehensive vim editor for complex cell editing*
-
-**Status:** Enhanced 2026-02-28
-**Tests:** 415 total (370 lib + 12 integration + 33 advanced)
-**Features:** Tier 1 + Tier 2 vim functionality (visual mode, search, undo/redo, char find, ex commands)
-
-### Keybindings Implemented
-
-| Key | Action |
-|-----|--------|
-| `m` | Open Magnifier on current cell |
-
-**In Magnifier Mode - Complete Vim Experience:**
-
-**Motions:**
-- `hjkl`, arrows - Character movement
-- `w/b/e` - Word navigation
-- `0/$` - Line start/end
-- `^` - First non-blank
-- `gg/G` - First/last line
-- `f/F/t/T{char}` - Character find
-- `;/,` - Repeat find forward/backward
-
-**Operators:**
-- `x` - Delete character
-- `dd` - Delete line
-- `yy` - Yank line
-- `p/P` - Paste below/above
-- `cc` - Change line
-- `C` - Change to end of line
-- `c{motion}` - Change operator
-- `r{char}` - Replace character
-- `J` - Join lines
-- `>>/<<` - Indent/dedent
+### v0.5.0 - Column Operations & Visual Mode [x]
+
+**Focus:** Full column manipulation and visual selections  
+**Status:** [x]  
+**Tests:** 515+ passing (420 lib + 43 dual clipboard + 20 column range + 32 visual)
+
+**Features:**
+
+**Column Operations (Comma Leader):**
+- [x] ,o / ,O - Insert column right/left
+- [x] ,dd - Delete column
+- [x] ,yy - Yank column (includes header)
+- [x] ,p / ,P - Paste column right/left
+- [x] Count prefixes (3,dd, 3,yy)
+- [x] Cursor moves to new column on paste
+- [x] Generic headers on insert ("Column D")
 
 **Visual Mode:**
-- `v` - Character-wise visual
-- `V` - Line-wise visual
-- `d/y/c` - Operate on selection
+- [x] v - Visual Block (rectangular selection)
+- [x] V - Visual Line (whole rows)
+- [x] ,v - Visual Column (whole columns)
+- [x] Movement keys (hjkl, arrows) extend selection
+- [x] d - Delete selection
+- [x] y - Yank selection
+- [x] p - Paste over selection
+- [x] gv - Re-select last selection
+- [x] Visual selection highlighting (bg(Color::DarkGray))
 
-**Search:**
-- `/pattern` - Search forward (case-sensitive)
-- `n/N` - Next/previous match
-- `*` - Search word under cursor
-- `:noh` - Clear search
+**Triple Clipboard System:**
+- [x] Row buffer (yy, dd, p, P, o, O, 5dd, 5yy, Visual Line y)
+- [x] Column buffer (,yy, ,dd, ,p, ,P, ,o, ,O, Visual Column y)
+- [x] Region buffer (Visual Block y, rectangular selections)
+- [x] Buffers isolated (no cross-pasting, no transpose)
 
-**Undo/Redo:**
-- `u` - Undo (unlimited history)
-- `Ctrl+r` - Redo
+**Column Reordering:**
+- [x] :D,E m A - Move columns D-E after column A
+- [x] :C m $ - Move column C to end
+- [x] :A m 0 - Move column A to beginning
 
-**Ex Commands:**
-- `:w` - Save to cell (updates in-memory document)
-- `:q` - Quit (warns if dirty)
-- `:wq` or `ZZ` - Save and close
-- `:q!` - Force quit without saving
+---
 
-**Insert Mode Entry:**
-- `i/a/A/I` - Various insert positions
-- `o/O` - Open line below/above
-- `s` - Substitute character
+### v0.5.1 - Column Operations Cleanup [ ]
 
-**Navigation:**
-- `Alt+hjkl` or `Alt+arrows` - Navigate to adjacent cells (prompts to save if dirty)
+**Focus:** Refine column operations and visual mode implementation  
+**Status:** [ ]  
+**Primary Focus:** Column operation reliability and visual mode quality
 
-### Use Cases
-- Editing JSON data in cells
-- Multi-line descriptions or notes
-- Complex text that needs vim power
-- Large cell content (>100 chars)
+**Philosophy:**
+Improve column operation code quality, ensure visual mode is robust, and handle all clipboard operations reliably. Focus on maintaining data integrity during column manipulations.
 
-### Insert vs Magnifier Decision Tree
+**Audit Phase:**
+Start with comprehensive audit of column operations:
+- Review column clipboard implementation
+- Check visual mode selection logic
+- Verify column operation correctness
+- Identify edge cases in column reordering
+- Review operator-motion composability
 
-| Scenario | Use Insert (`i`) | Use Magnifier (`m`) |
-|----------|------------------|---------------------|
-| Fix a typo |  | Overkill |
-| Replace entire cell |  | Works |
-| Multi-line content |  (single line only) |  |
-| Long text (>50 chars) | Awkward |  |
-| Complex vim editing (operators, macros) |  |  |
+**Success Criteria:**
+- Zero clippy warnings
+- Code coverage > 80%
+- All functions < 50 lines
+- Performance benchmarks met
+- Module structure documented
+- Cyclomatic complexity reduced
+- All tests pass with no panics
 
-**Default behavior:** Always start with Insert mode. Manually upgrade to Magnifier when needed.
+**Testing Strategy:**
+- Column operation regression tests
+- Visual mode selection tests
+- Column clipboard integration tests
+- Column reordering edge case tests
+- Multi-column operation tests
 
-### Implementation Steps
+**Documentation Requirements:**
+- Column operation architecture documentation
+- Visual mode behavior documentation
+- Clipboard system documentation
+- Operator-motion composition documentation
 
-**Phase 1: Magnifier Module Foundation (`src/magnifier/mod.rs`)**  COMPLETE
-- [x] Create module structure with public exports
-- [x] Define `MagnifierState` struct (lines, mode, cursor, position, original, clipboard, dirty flag)
-- [x] Define `MagnifierMode` enum (Normal, Insert)
-- [x] Implement `MagnifierState::new(content, position)` constructor
-- [x] Implement `get_content()` - join lines with newlines
-- [x] Implement `is_dirty()` - compare current to original
-- [x] Implement cursor helpers: `clamp_cursor()`, `current_line()`, `current_line_mut()`
-- [x] Implement mode switching: `enter_insert_mode()`, `exit_insert_mode()`
+---
 
-**Phase 2: Vim Motions (`src/magnifier/mod.rs`)**  COMPLETE
-- [x] Character motions: `move_left()`, `move_right()`, `move_up()`, `move_down()`
-- [x] Line motions: `move_to_line_start()` (0), `move_to_line_end()` ($), `move_to_first_non_blank()` (^)
-- [x] Buffer motions: `move_to_first_line()` (gg), `move_to_last_line()` (G), `move_to_line(n)`
-- [x] Word motions: `move_next_word()` (w), `move_prev_word()` (b), `move_end_word()` (e)
-- [x] Count prefix support: add `count_prefix` field and apply to motions
+### v0.6.0 - Magnifier Mode (Full Vim Editor) [x]
 
-**Phase 3: Vim Operators (`src/magnifier/mod.rs`)**  COMPLETE
-- [x] Insert mode text: `insert_char()`, `delete_char_before()`, `delete_char_at()`, `newline()`
-- [x] Normal mode operators: `delete_char()` (x), `delete_line()` (dd), `yank_line()` (yy)
-- [x] Paste operators: `paste_below()` (p), `paste_above()` (P)
-- [x] Enter insert variations: `insert_before()` (i), `insert_after()` (a), `insert_line_below()` (o), `insert_line_above()` (O)
-- [x] Other operators: `substitute_char()` (s)
-- [x] Internal clipboard for magnifier operations
+**Focus:** Comprehensive vim editor for complex cell editing  
+**Status:** [x]  
+**Tests:** 415 total (370 lib + 12 integration + 33 advanced)
 
-**Phase 4: App Integration (`src/app/mod.rs`)**  COMPLETE
-- [x] Add `magnifier_state: Option<MagnifierState>` field to App
-- [x] Implement `open_magnifier(&mut self)` - create state from current cell
-- [x] Implement `save_and_close_magnifier(&mut self)` - save to document and close
-- [x] Implement `close_magnifier_discard(&mut self)` - close without saving
-- [x] Implement `magnifier_is_dirty(&self)` - check for unsaved changes
-
-**Phase 5: Input Handling (`src/input/handler.rs`)**  COMPLETE
-- [x] Add `m` key handler in Normal mode to open magnifier
-- [x] Create `handle_magnifier_mode()` dispatcher function
-- [x] Create `handle_magnifier_normal()` for Normal mode keys with proper multi-key sequences
-- [x] Create `handle_magnifier_insert()` for Insert mode keys
-- [x] Create `handle_magnifier_command()` for Command mode (ex commands)
-- [x] Create `handle_magnifier_visual()` for Visual mode operations
-- [x] Implement `ZZ` shortcut (save and close)
-- [x] Implement Alt+hjkl/arrows cell navigation (changed from Ctrl to avoid terminal conflicts)
-- [x] Dirty check warning for navigation
-- [x] Implement `:w` command (save to cell)
-- [x] Implement `:wq` command (save and close)
-- [x] Implement `:q!` command (discard and close)
-- [x] Implement `:noh` command (clear search)
-- [x] Pending command infrastructure (gg, dd, yy, cc, ZZ, f/F/t/T, r, >>, <<)
-
-**Phase 6: UI Rendering (`src/ui/magnifier.rs`)**  COMPLETE
-- [x] Create new file `src/ui/magnifier.rs` 
-- [x] Implement `render_magnifier()` main function 
-- [x] Implement `centered_rect()` helper (80% width/height) 
-- [x] Render border and background 
-- [x] Render title bar with cell position (e.g., "Editing A5") 
-- [x] Render line numbers (right-aligned, dim color) 
-- [x] Render text content with cursor (block in Normal, pipe in Insert) 
-- [x] Render mode indicator (NORMAL/INSERT) 
-- [x] Render cursor position (line:col) 
-- [x] Render bottom help bar with commands 
-- [x] Add to `src/ui/mod.rs` exports 
-
-**Phase 7: Testing**  COMPLETE
-- [x] Create test file `tests/magnifier_integration_test.rs` (12 tests)
-- [x] Basic operations tests: open, close, save, discard 
-- [x] Vim motions tests: hjkl, w/b/e, 0/$, gg/G 
-- [x] Vim operators tests: x, dd, yy, p, P, s, i/a/o/O 
-- [x] Insert mode tests: typing, newlines 
-- [x] Multi-line editing tests: newlines, content preservation 
-- [x] Integration tests: full workflows (edit-save, edit-discard) 
-- [x] Edge cases tests: empty cells, long content 
-- [x] Create test file `tests/magnifier_advanced_test.rs` (33 tests)
-- [x] Visual mode tests: v, V, delete/yank/change selection
-- [x] Search tests: /, n, N, *, word under cursor, clear search
-- [x] Character find tests: f, F, t, T, ;, , (repeat)
-- [x] Change operator tests: c, cc, C
-- [x] Replace tests: r
-- [x] Join/indent tests: J, >>, <<
-- [x] Undo/redo tests: u, Ctrl+r, multiple undo/redo
-- [x] Command mode tests: :w, :q, :wq, :q!, command buffer
-- [x] Pending command tests: gg, dd, multi-key sequences
-- [x] 415 total tests passing (370 lib + 12 integration + 33 advanced)
-- [x] All tests passing with zero warnings
-- [x] Known issue: Unicode handling needs char/byte index fix (test ignored) 
-
-**Phase 8: Advanced Vim Features (Tier 1 + Tier 2)**  COMPLETE
-- [x] Multi-key command infrastructure with pending state
-- [x] Command mode (MagnifierMode::Command) for ex commands
-- [x] Visual mode (MagnifierMode::Visual, VisualLine) for selections
-- [x] Change operator (c, cc, C) - delete and enter insert
-- [x] Replace operator (r{char}) - replace single character
-- [x] Join lines (J) - merge current line with next
-- [x] Indent/dedent (>>, <<) - adjust line indentation
-- [x] Undo/redo (u, Ctrl+r) - unlimited history stack
-- [x] Search (/, n, N, *) - pattern matching with highlighting
-- [x] Character find (f, F, t, T, ;, ,) - intra-line navigation
-- [x] Ex commands (:w, :q, :wq, :q!, :noh)
-- [x] UI updates: command line display, mode indicators, search info
-- [x] Saves to in-memory document buffer (NOT directly to file)
-- [x] 33 comprehensive tests for advanced features
-- [x] Zero clippy warnings
-- [x] Clean borders (fixed double-line issue)
-
-**Phase 9: Polish & Documentation**  COMPLETE
-- [x] Update `Cargo.toml` version to 0.6.0
-- [x] Update roadmap.md with advanced features
-- [x] Update keybindings documentation 
-- [x] Update `README.md` with magnifier features (deferred - not critical) 
-- [x] Update `CHANGELOG.md` with v0.6.0 entry (deferred - not critical) 
-- [x] Update `src/ui/help.rs` with magnifier keybindings 
-- [x] Run `cargo fmt` 
-- [x] Run `cargo clippy` (pre-existing warnings only) 
-- [x] Add module-level documentation (already present) 
-- [x] Manual QA testing checklist (deferred - functional testing complete) 
-- [x] Mark roadmap v0.6.0 as complete 
-
-### Tests to Add (~120 total)
-
-**Basic Operations (10 tests):**
-- [ ] `test_m_opens_magnifier`
-- [ ] `test_magnifier_shows_cell_content`
-- [ ] `test_magnifier_initial_cursor_position`
-- [ ] `test_magnifier_mode_starts_normal`
-- [ ] `test_magnifier_escape_closes_if_clean`
-
-**Vim Motions (20 tests):**
-- [ ] `test_hjkl_movement`
-- [ ] `test_word_motions_w_b_e`
-- [ ] `test_line_motions_0_dollar_caret`
-- [ ] `test_buffer_motions_gg_G`
-- [ ] `test_count_prefix_5j_10w`
-- [ ] `test_motion_boundary_conditions`
-
-**Vim Operators (25 tests):**
-- [ ] `test_x_deletes_character`
-- [ ] `test_dd_deletes_line`
-- [ ] `test_yy_yanks_line`
-- [ ] `test_p_pastes_below`
-- [ ] `test_P_pastes_above`
-- [ ] `test_s_substitutes_character`
-- [ ] `test_i_a_o_O_enter_insert`
-
-**Insert Mode (15 tests):**
-- [ ] `test_insert_characters`
-- [ ] `test_backspace_deletes`
-- [ ] `test_enter_creates_newline`
-- [ ] `test_esc_exits_insert`
-
-**Commands (15 tests):**
-- [ ] `test_w_saves_cell_content`
-- [ ] `test_wq_saves_and_closes`
-- [ ] `test_q_bang_discards_changes`
-- [ ] `test_ZZ_saves_and_closes`
-- [ ] `test_w_marks_document_dirty`
-
-**Cell Navigation (10 tests):**
-- [ ] `test_ctrl_h_navigates_left`
-- [ ] `test_ctrl_j_navigates_down`
-- [ ] `test_ctrl_k_navigates_up`
-- [ ] `test_ctrl_l_navigates_right`
-- [ ] `test_ctrl_nav_prompts_if_dirty`
-
-**Multi-line (10 tests):**
-- [ ] `test_multiline_content_preserved`
-- [ ] `test_newline_insertion`
-- [ ] `test_multiline_csv_escaping`
-
-**Integration (15 tests):**
-- [ ] `test_open_edit_save_close_workflow`
-- [ ] `test_open_edit_discard_workflow`
-- [ ] `test_dirty_flag_integration`
-
-**Edge Cases (10 tests):**
-- [ ] `test_empty_cell_magnifier`
-- [ ] `test_very_long_lines`
-- [ ] `test_unicode_content`
-
-### Acceptance Criteria
-
-**Core Functionality:**
-- [ ] `m` key opens magnifier for current cell
-- [ ] Magnifier displays cell content correctly
-- [ ] Multi-line cell content works (newlines preserved)
-- [ ] CSV escaping works for multi-line cells (RFC 4180 compliant)
+**Features:**
 
 **Vim Motions:**
-- [ ] Character motions work: `h`, `j`, `k`, `l`
-- [ ] Word motions work: `w`, `b`, `e`
-- [ ] Line motions work: `0`, `$`, `^`
-- [ ] Buffer motions work: `gg`, `G`, `<number>G`
-- [ ] Count prefixes work: `5j`, `10w`, etc.
+- [x] hjkl, arrows - Character movement
+- [x] w / b / e - Word navigation
+- [x] 0 / $ / ^ - Line motions (start/end/first non-blank)
+- [x] gg / G - First/last line
+- [x] f/F/t/T{char} - Character find
+- [x] ; / , - Repeat find forward/backward
+- [x] Count prefixes (5j, 10w, etc.)
 
 **Vim Operators:**
-- [ ] Delete works: `x` (char), `dd` (line)
-- [ ] Yank works: `yy` (line)
-- [ ] Paste works: `p` (below), `P` (above)
-- [ ] Insert mode entry works: `i`, `a`, `o`, `O`
-- [ ] Substitute works: `s`
-- [ ] Internal clipboard works for dd/yy/p
+- [x] x - Delete character
+- [x] dd - Delete line
+- [x] yy - Yank line
+- [x] p / P - Paste below/above
+- [x] cc - Change line
+- [x] C - Change to end of line
+- [x] c{motion} - Change operator
+- [x] r{char} - Replace character
+- [x] J - Join lines
+- [x] >> / << - Indent/dedent
 
-**Commands:**
-- [ ] `:w` saves cell content to in-memory document
-- [ ] `:wq` saves and closes magnifier
-- [ ] `:q!` discards changes and closes
-- [ ] `ZZ` saves and closes (shortcut)
-- [ ] `:w` marks document as dirty
+**Visual Mode in Magnifier:**
+- [x] v - Character-wise visual
+- [x] V - Line-wise visual
+- [x] d / y / c - Operate on selection
+
+**Search in Magnifier:**
+- [x] /pattern - Search forward (case-sensitive)
+- [x] n / N - Next/previous match
+- [x] * - Search word under cursor
+- [x] :noh - Clear search
+
+**Undo/Redo in Magnifier:**
+- [x] u - Undo (unlimited history)
+- [x] Ctrl+r - Redo
+
+**Ex Commands in Magnifier:**
+- [x] :w - Save to cell (updates in-memory document)
+- [x] :q - Quit (warns if dirty)
+- [x] :wq / ZZ - Save and close
+- [x] :q! - Force quit without saving
+
+**Insert Mode Entry:**
+- [x] i / a / A / I - Various insert positions
+- [x] o / O - Open line below/above
+- [x] s - Substitute character
 
 **Cell Navigation:**
-- [ ] `Alt+h` or `Alt+Left` navigates to left cell
-- [ ] `Alt+j` or `Alt+Down` navigates to cell below
-- [ ] `Alt+k` or `Alt+Up` navigates to cell above
-- [ ] `Alt+l` or `Alt+Right` navigates to right cell
-- [ ] Save prompt appears if buffer is dirty
-- [ ] Save prompt options work: y (save), n (discard), c (cancel)
+- [x] Alt+hjkl or Alt+arrows - Navigate to adjacent cells
+- [x] Prompts to save if dirty
 
-**UI Rendering:**
-- [ ] Magnifier overlay renders centered (80% width/height)
-- [ ] Line numbers shown on left (right-aligned, dim color)
-- [ ] Cursor renders correctly (block in Normal, pipe in Insert)
-- [ ] Mode indicator shows NORMAL or INSERT
-- [ ] Cursor position shown (line:col format)
-- [ ] Title bar shows cell location (e.g., "Editing A5")
-- [ ] Help bar shows available commands
-- [ ] Colors match main table theme
+**UI Features:**
+- [x] Centered popup overlay (80% width/height)
+- [x] Title bar shows cell position (e.g., "Editing A5")
+- [x] Line numbers (right-aligned, dim)
+- [x] Mode indicator (NORMAL/INSERT)
+- [x] Cursor position (line:col)
+- [x] Bottom help bar with commands
+- [x] Different cursor styles (block/pipe)
+- [x] Dirty tracking with warnings
 
-**Mode Transitions:**
-- [ ] Normal → Insert (via i/a/o/O)
-- [ ] Insert → Normal (via Esc)
-- [ ] Normal → closed (via :wq, :q!, ZZ)
-- [ ] Esc in Normal mode closes if clean, warns if dirty
+---
 
-**Quality:**  COMPLETE
-- [x] All 370 lib tests pass 
-- [x] 79 magnifier tests pass 
-- [x] Zero new clippy warnings 
-- [x] Zero compiler warnings 
-- [x] Code formatted with `cargo fmt` 
-- [x] Documentation complete (README, CHANGELOG, help system) 
-- [x] Version bumped to 0.6.0 
+### v0.6.1 - Magnifier Performance & Quality [ ]
 
-### v0.6.0 Release Summary
+**Focus:** Optimize magnifier mode and improve code quality  
+**Status:** [ ]  
+**Primary Focus:** Magnifier mode performance and maintainability
 
-**Released:** 2026-02-28
-**Tag:** v0.6.0
+**Philosophy:**
+Improve magnifier mode performance, ensure all vim operations are efficient and correct, and maintain high code quality. Focus on user experience and editor responsiveness.
+
+**Audit Phase:**
+Start with comprehensive audit of magnifier mode:
+- Review vim operation implementations
+- Check editor rendering performance
+- Verify undo/redo correctness
+- Identify performance bottlenecks
+- Review modal state management
+
+**Success Criteria:**
+- Zero clippy warnings
+- Code coverage > 80%
+- All functions < 50 lines
+- Performance benchmarks met
+- Module structure documented
+- Cyclomatic complexity reduced
+- All tests pass with no panics
+
+**Testing Strategy:**
+- Vim operation regression tests
+- Performance benchmarks for editing
+- Undo/redo correctness tests
+- Modal state transition tests
+- Large text handling tests
+
+**Documentation Requirements:**
+- Magnifier architecture documentation
+- Vim operation implementation notes
+- Performance optimization documentation
+- Modal state machine documentation
+
+---
+
+### v0.7.0 - Search & Filtering [x]
+
+**Focus:** Find and navigate data across the entire CSV  
+**Status:** [x]  
+**Tests:** 27 passing
+
+**Features:**
+- [x] /pattern - Search forward (regex supported, case-insensitive)
+- [x] n - Jump to next match with wrap-around
+- [x] N - Jump to previous match with wrap-around
+- [x] * - Search current cell content
+- [x] :noh - Clear search highlighting
+- [x] Esc in Normal mode clears search
+- [x] Visual match highlighting (current match vs others)
+- [x] Match counter in status line [n/total]
+- [x] Invalid regex falls back to literal substring search
 
 **Implementation:**
-- 8 phases completed
-- 4 commits
-- ~1,640 lines of new code
-- 79 new tests
-
-**Known Issues:**
-- Unicode handling: char vs byte index (test ignored)
-
-**Next:** v0.8.0 - Undo/Redo
+- Module: src/search/mod.rs
+- SearchState struct with pattern, matches, current_match
+- find_matches() with regex support
+- jump_to_next() / jump_to_prev() with wrap-around
+- UI highlighting in src/ui/table.rs
 
 ---
 
-## v0.7.0 - Search  (Complete)
+### v0.7.1 - Search System Optimization [ ]
 
-*Find data in the CSV*
+**Focus:** Optimize search and filtering implementation  
+**Status:** [ ]  
+**Primary Focus:** Search performance and code quality
 
-### Keybindings to Implement
+**Philosophy:**
+Improve search system performance, ensure filtering is efficient for large datasets, and maintain clean, testable code. Focus on search responsiveness and accuracy.
 
-| Key | Action |
-|-----|--------|
-| `/pattern` | Search forward |
-| `n` | Jump to next match |
-| `N` | Jump to previous match |
-| `*` | Search forward for current cell content |
-| `:noh` | Clear search highlighting |
+**Audit Phase:**
+Start with comprehensive audit of search system:
+- Review search algorithm efficiency
+- Check filtering implementation
+- Verify highlight rendering performance
+- Identify optimization opportunities
+- Review regex pattern handling
 
-### Implementation Steps
+**Success Criteria:**
+- Zero clippy warnings
+- Code coverage > 80%
+- All functions < 50 lines
+- Performance benchmarks met
+- Module structure documented
+- Cyclomatic complexity reduced
+- All tests pass with no panics
 
-**File: `src/search/mod.rs` (new file)**
-- [x] Create search module
-- [x] Implement `find_matches(document: &Document, pattern: &str) -> Vec<(RowIndex, ColIndex)>`
-- [x] Implement `find_next_match()` with wrap-around
-- [x] Case-insensitive by default
-- [x] Support regex patterns
+**Testing Strategy:**
+- Search performance benchmarks
+- Filtering correctness tests
+- Regex pattern edge case tests
+- Large dataset search tests
+- Highlight rendering tests
 
-**File: `src/app/mod.rs`**
-- [x] Add `search_state: Option<SearchState>` field
-- [x] Add `search_buffer: String` field
-- [x] Add `Mode::Search` variant
-
-**File: `src/input/handler.rs`**
-- [x] Add `/` handler to enter Search mode
-- [x] Add `n`, `N`, `*` handlers
-- [x] Add `:noh` command handler
-- [x] Esc in Normal mode clears search highlighting
-
-**File: `src/ui/table.rs`**
-- [x] Highlight matching cells
-- [x] Different style for current match vs other matches
-
-### Tests to Add
-
-- [x] `test_slash_enters_search_mode`
-- [x] `test_n_moves_to_next_match`
-- [x] `test_N_moves_to_previous_match`
-- [x] `test_search_wraps_around`
-- [x] `test_asterisk_searches_current_cell`
-- [x] `test_noh_clears_highlighting`
-- [x] `test_search_case_insensitive`
-- [x] `test_search_regex_patterns`
-
-### Acceptance Criteria
-
-- [x] `/` enters search mode
-- [x] `n` moves to next match with wrap-around
-- [x] `N` moves to previous match with wrap-around
-- [x] `*` searches current cell content
-- [x] `:noh` clears highlighting
-- [x] Search is case-insensitive by default
-- [x] Regex patterns supported
-- [x] All existing tests pass
+**Documentation Requirements:**
+- Search algorithm documentation
+- Filtering strategy documentation
+- Performance characteristics documentation
+- Regex pattern handling documentation
 
 ---
 
-## v0.8.0 - Undo/Redo
+### v0.8.0 - SQL Query Mode & Data Operations [x]
 
-*Command history for all mutations*
+**Focus:** Powerful SQL queries across CSV files with data operations  
+**Status:** [x]  
+**Tests:** 30 passing (19 lib + 11 integration)
 
-### Keybindings to Implement
+**Features:**
 
-| Key | Action |
-|-----|--------|
-| `u` | Undo last operation |
-| `Ctrl+r` | Redo last undone operation |
-| `.` | Repeat last edit (dot command) |
+**SQL Query Mode:**
+- [x] :q <SQL> - Execute SQL query, open editor with query
+- [x] :sql - Open empty SQL editor
+- [x] Load CSV files into SQLite automatically
+- [x] Multi-file JOIN support (all CSVs in directory)
+- [x] Query results displayed as read-only CSV view
+- [x] Column name normalization (spaces, special chars → underscores)
+- [x] Handles missing cells and inconsistent column counts
+- [x] Useful error messages for SQL errors (e.g., misspelled columns)
+- [x] Esc cancels query execution
+- [x] SQLite connection caching for performance
 
-### Undo/Redo Behavior
+**SQL Editor:**
+- [x] Full editing support (type, backspace, arrows)
+- [x] Enter - Execute query
+- [x] Esc - Cancel/close editor
+- [x] Loading indicator during query execution
+- [x] Mode indicator "SQL"
 
-**Granularity:**
-- Single operations: edit cell (`i`), delete row (`dd`), insert row (`o`) = 1 undo step each
-- Compound operations: `5dd` (delete 5 rows) = 1 undo step (NOT 5 separate steps)
+**Sort Commands:**
+- [x] :sort col1,col2 - Sort by columns ascending
+- [x] :sort! col1,col2 - Sort by columns descending
+- [x] Works with column names or numbers
+
+**File Management:**
+- [x] External file modification detection
+- [x] Prompt user to reload when file changes externally
+- [x] reload_current_file_cancellable() method
+
+**Implementation:**
+- Module: src/query/mod.rs (576 lines)
+- UI: src/ui/sql_editor.rs
+- table_name_from_path() - Derive table names from file paths
+- load_csv_into_sqlite() - Load Document into SQLite table
+- execute_query() - Run SQL and convert back to Document
+- Session tracking for query output sheets
+
+**Example Queries:**
+```sql
+SELECT * FROM customers WHERE age > 30
+SELECT c.name, o.total FROM customers c JOIN orders o ON c.id = o.customer_id
+SELECT country, COUNT(*) as count FROM customers GROUP BY country ORDER BY count DESC
+```
+
+---
+
+### v0.8.1 - SQL & Data Operations Polish [ ]
+
+**Focus:** Refine SQL query mode and data operations  
+**Status:** [ ]  
+**Primary Focus:** SQL query reliability and performance
+
+**Philosophy:**
+Improve SQL query mode robustness, ensure data operations are reliable, and maintain high performance for complex queries. Focus on query correctness and error handling.
+
+**Audit Phase:**
+Start with comprehensive audit of SQL system:
+- Review SQL query parsing and execution
+- Check DuckDB integration efficiency
+- Verify data operation correctness
+- Identify query optimization opportunities
+- Review error handling for invalid queries
+
+**Success Criteria:**
+- Zero clippy warnings
+- Code coverage > 80%
+- All functions < 50 lines
+- Performance benchmarks met
+- Module structure documented
+- Cyclomatic complexity reduced
+- All tests pass with no panics
+
+**Testing Strategy:**
+- SQL query correctness tests
+- Complex query performance benchmarks
+- Error handling tests for invalid SQL
+- Data operation integration tests
+- Large dataset query tests
+
+**Documentation Requirements:**
+- SQL query mode architecture documentation
+- DuckDB integration documentation
+- Query performance optimization notes
+- Error handling strategy documentation
+
+---
+
+### v0.9.0 - Undo/Redo & Command History [ ]
+
+**Focus:** Complete command history for all mutations  
+**Status:** [ ]  
+**Target Tests:** 50+
+
+**Features:**
+- [ ] u - Undo last operation
+- [ ] Ctrl+r - Redo last undone operation
+- [ ] . - Repeat last edit (dot command)
+- [ ] Per-file undo history (preserved across file switches)
+- [ ] Max undo levels: 1000 per file (configurable)
+- [ ] Undo stack preserved after :w (save doesn't clear history)
+- [ ] Single-step granularity (5dd = 1 undo step, not 5)
+
+**Undo Granularity:**
+- Single operations: edit cell (i), delete row (dd), insert row (o) = 1 undo step
+- Compound operations: 5dd (delete 5 rows) = 1 undo step (NOT 5 separate steps)
 - Visual mode operations: delete selection = 1 undo step
-- Range operations: `:5,10d` = 1 undo step
+- Range operations: :5,10d = 1 undo step
 
 **History Management:**
-- Max undo levels: 1000 per file (configurable in `~/.config/lazycsv/config.toml`)
-- `:w` saves file but PRESERVES undo history (don't clear on save)
+- `:w` saves file but PRESERVES undo history
 - File switching preserves undo history per file (stored in session)
 - Undo/redo only works within current file (can't undo across files)
 
 **Limitations:**
 - Cannot undo file switch
-- Cannot undo `:w` (file write)
-- Cannot undo `:q` (quit)
+- Cannot undo :w (file write)
+- Cannot undo :q (quit)
 
-### Implementation Steps
+**Implementation Plan:**
+- File: src/history/mod.rs (new file)
+  - [ ] Create history module
+  - [ ] Define EditCommand enum (variants for all mutation types)
+  - [ ] Define History struct with undo/redo stacks
+  - [ ] Implement push_command() method
+  - [ ] Implement undo() method
+  - [ ] Implement redo() method
+  - [ ] Implement clear_redo_stack() on new command
+  - [ ] Respect max undo limit
 
-**File: `src/history/mod.rs` (new file)**
-- [ ] Create history module
-- [ ] Define `EditCommand` enum (variants for all mutation types)
-- [ ] Define `History` struct with undo/redo stacks
-- [ ] Implement `push_command()` method
-- [ ] Implement `undo()` method
-- [ ] Implement `redo()` method
-- [ ] Implement `clear_redo_stack()` on new command
-- [ ] Respect max undo limit
+- File: src/app/mod.rs
+  - [ ] Add history: History field
+  - [ ] Record all mutations to history
+  - [ ] Add last_edit_command: Option<EditCommand> for dot command
 
-**File: `src/app/mod.rs`**
-- [ ] Add `history: History` field
-- [ ] Record all mutations to history
-- [ ] Add `last_edit_command: Option<EditCommand>` for dot command
+- File: src/session/mod.rs
+  - [ ] Store per-file history in HashMap<PathBuf, History>
+  - [ ] Preserve history across file switches
 
-**File: `src/session/mod.rs`**
-- [ ] Store per-file history in `HashMap<PathBuf, History>`
-- [ ] Preserve history across file switches
+- File: src/input/handler.rs
+  - [ ] Add u handler
+  - [ ] Add Ctrl+r handler
+  - [ ] Add . handler (repeat last edit)
 
-**File: `src/input/handler.rs`**
-- [ ] Add `u` handler
-- [ ] Add `Ctrl+r` handler
-- [ ] Add `.` handler (repeat last edit)
-
-### Tests to Add
-
-- [ ] `test_u_undoes_cell_edit`
-- [ ] `test_u_undoes_row_delete`
-- [ ] `test_u_undoes_column_delete`
-- [ ] `test_5dd_creates_single_undo_step`
-- [ ] `test_ctrl_r_redoes`
-- [ ] `test_dot_repeats_last_edit`
-- [ ] `test_undo_limit_respected`
-- [ ] `test_w_preserves_undo_history`
-- [ ] `test_file_switch_preserves_history`
-- [ ] `test_new_command_clears_redo_stack`
-
-### Acceptance Criteria
-
-- [ ] `u` undoes last operation
-- [ ] `Ctrl+r` redoes last undone operation
-- [ ] `.` repeats last edit
-- [ ] Compound operations (`5dd`, visual mode, ranges) = single undo step
-- [ ] History respects max size (1000 default, configurable)
-- [ ] `:w` preserves undo history
-- [ ] File switching preserves per-file history
-- [ ] All existing tests pass
-- [ ] No clippy warnings
+**Tests:**
+- [ ] test_u_undoes_cell_edit
+- [ ] test_u_undoes_row_delete
+- [ ] test_u_undoes_column_delete
+- [ ] test_5dd_creates_single_undo_step
+- [ ] test_ctrl_r_redoes
+- [ ] test_dot_repeats_last_edit
+- [ ] test_undo_limit_respected
+- [ ] test_w_preserves_undo_history
+- [ ] test_file_switch_preserves_history
+- [ ] test_new_command_clears_redo_stack
 
 ---
 
-## v0.9.0 - Transforms & Polish
+### v0.9.1 - Code Quality & Architecture Refactor [ ]
 
-*Data cleanup transformations, final polish*
+**Focus:** Improve code organization, reduce complexity, and establish quality baselines  
+**Status:** Refactoring milestone  
+**Type:** Maintenance & Quality
 
-### Cell Transforms
+**Audit Phase (Complete First):**
+- [ ] Run `cargo clippy --all-targets` and document all warnings
+- [ ] Measure current code coverage with `cargo tarpaulin` or `cargo llvm-cov`
+- [ ] Identify all functions > 50 lines
+- [ ] Profile performance with `cargo flamegraph` or `perf`
+- [ ] Review module dependencies and coupling
+- [ ] Calculate cyclomatic complexity for complex functions
+- [ ] Review error handling patterns (find all `unwrap()`, `expect()`)
+- [ ] Document technical debt items
 
-| Key | Action |
-|-----|--------|
-| `~` | Toggle case (UPPER ↔ lower) |
-| `gU` | Uppercase entire cell |
-| `gu` | Lowercase entire cell |
-| `g~` | Title Case cell |
-| `g.` | Toggle boolean (yes↔no, true↔false, 1↔0) |
+**Success Criteria:**
+- [ ] Zero clippy warnings
+- [ ] Code coverage > 80%
+- [ ] All functions < 50 lines (or documented exceptions)
+- [ ] Performance benchmarks established and met
+- [ ] Module structure documented in docs/architecture.md
+- [ ] Cyclomatic complexity reduced for flagged functions
+- [ ] All tests pass with no panics or unwrap failures
+- [ ] Error handling follows consistent patterns
 
-### Row Movement
+**Testing Strategy:**
+- [ ] All existing tests pass (regression testing)
+- [ ] Add tests to reach coverage target
+- [ ] Consider property-based tests for complex logic
+- [ ] Create benchmark suite for performance tracking
 
-| Key | Action |
-|-----|--------|
-| `gj` | Swap current row with row below |
-| `gk` | Swap current row with row above |
+**Documentation Updates:**
+- [ ] Update docs/architecture.md with module structure
+- [ ] Add inline comments for complex logic
+- [ ] Ensure all public APIs have rustdoc comments
+- [ ] Document refactoring decisions and trade-offs
+- [ ] Record performance improvements with metrics
 
-### System Clipboard
-
-| Key | Action |
-|-----|--------|
-| `"+yy` | Yank row to system clipboard |
-| `"+,yy` | Yank column to system clipboard |
-| `"+p` | Paste from system clipboard |
-
-### Implementation Steps
-
-**File: `src/transforms/mod.rs` (new file)**
-- [ ] Create transforms module
-- [ ] Implement `toggle_case()` function
-- [ ] Implement `uppercase()` function
-- [ ] Implement `lowercase()` function
-- [ ] Implement `title_case()` function
-- [ ] Implement `toggle_boolean()` function (yes↔no, true↔false, 1↔0)
-
-**File: `src/csv/document.rs`**
-- [ ] Add `swap_rows(&mut self, a: RowIndex, b: RowIndex)` method
-- [ ] Add `apply_transform(&mut self, transform: TransformFn, pos: Position)` method
-
-**File: `src/clipboard/mod.rs`**
-- [ ] Add system clipboard integration
-- [ ] Implement `copy_to_system()` method
-- [ ] Implement `paste_from_system()` method
-
-**File: `src/input/handler.rs`**
-- [ ] Add `~` handler
-- [ ] Add `gU`, `gu`, `g~`, `g.` handlers
-- [ ] Add `gj`, `gk` handlers
-- [ ] Add `"+yy`, `"+,yy`, `"+p` handlers
-
-### Tests to Add
-
-- [ ] `test_tilde_toggles_case`
-- [ ] `test_gU_uppercases_cell`
-- [ ] `test_gu_lowercases_cell`
-- [ ] `test_g_tilde_title_cases_cell`
-- [ ] `test_g_dot_toggles_boolean`
-- [ ] `test_gj_swaps_row_below`
-- [ ] `test_gk_swaps_row_above`
-- [ ] `test_system_clipboard_yank_row`
-- [ ] `test_system_clipboard_yank_column`
-- [ ] `test_system_clipboard_paste`
-
-### Acceptance Criteria
-
-- [ ] All case transforms work (`~`, `gU`, `gu`, `g~`)
-- [ ] Boolean toggle works (`g.`)
-- [ ] Row swapping works (`gj`, `gk`)
-- [ ] System clipboard works (`"+yy`, `"+,yy`, `"+p`)
-- [ ] All existing tests pass
-- [ ] No clippy warnings
+**Common Refactoring Patterns:**
+- Extract large functions into smaller, testable units
+- Reduce code duplication through abstractions
+- Simplify complex conditional logic
+- Improve naming consistency across modules
+- Replace `unwrap()` with proper error handling
+- Reduce coupling between modules
 
 ---
 
-## v1.0.0 - First Stable Release
+### v0.10.0 - Cell Transforms & Data Cleanup [ ]
 
-*All core features working, stable command interface*
+**Focus:** Case transformations, boolean toggles, and row movement  
+**Status:** [ ]  
+**Target Tests:** 30+
 
-### Pre-Release Checklist
+**Features:**
+
+**Case Transforms:**
+- [ ] ~ - Toggle case (UPPER <-> lower)
+- [ ] gU - Uppercase entire cell
+- [ ] gu - Lowercase entire cell
+- [ ] g~ - Title Case cell
+
+**Data Transforms:**
+- [ ] g. - Toggle boolean (yes<->no, true<->false, 1<->0)
+
+**Row Movement:**
+- [ ] gj - Swap current row with row below
+- [ ] gk - Swap current row with row above
+
+**Implementation Plan:**
+- File: src/transforms/mod.rs (new file)
+  - [ ] Create transforms module
+  - [ ] Implement toggle_case() function
+  - [ ] Implement uppercase() function
+  - [ ] Implement lowercase() function
+  - [ ] Implement title_case() function
+  - [ ] Implement toggle_boolean() function
+
+- File: src/csv/document.rs
+  - [ ] Add swap_rows(&mut self, a: RowIndex, b: RowIndex) method
+  - [ ] Add apply_transform(&mut self, transform: TransformFn, pos: Position) method
+
+- File: src/input/handler.rs
+  - [ ] Add ~ handler
+  - [ ] Add gU, gu, g~, g. handlers
+  - [ ] Add gj, gk handlers
+
+**Tests:**
+- [ ] test_tilde_toggles_case
+- [ ] test_gU_uppercases_cell
+- [ ] test_gu_lowercases_cell
+- [ ] test_g_tilde_title_cases_cell
+- [ ] test_g_dot_toggles_boolean
+- [ ] test_gj_swaps_row_below
+- [ ] test_gk_swaps_row_above
+
+---
+
+### v0.10.1 - Performance Optimization & Profiling [ ]
+
+**Focus:** Profile hot paths, optimize rendering, reduce allocations  
+**Status:** Refactoring milestone  
+**Type:** Performance & Optimization
+
+**Audit Phase (Complete First):**
+- [ ] Profile with `cargo flamegraph` to identify hot paths
+- [ ] Run `cargo bench` to establish performance baselines
+- [ ] Measure memory usage with `heaptrack` or `valgrind massif`
+- [ ] Identify unnecessary allocations and clones
+- [ ] Review rendering pipeline efficiency
+- [ ] Check for N+1 query patterns in document operations
+- [ ] Profile large file loading (100K+ rows)
+
+**Success Criteria:**
+- [ ] Zero clippy warnings (performance lints enabled)
+- [ ] Maintain 60 FPS for 100K+ row files
+- [ ] Reduce memory usage by 10-20% where possible
+- [ ] File loading < 100ms for 10MB files
+- [ ] No performance regressions in benchmark suite
+- [ ] Document performance characteristics in code
+
+**Testing Strategy:**
+- [ ] Create comprehensive benchmark suite
+- [ ] Add performance regression tests
+- [ ] Test with large datasets (100K, 500K, 1M rows)
+- [ ] Ensure all existing tests still pass
+
+**Documentation Updates:**
+- [ ] Document performance optimization decisions
+- [ ] Add performance notes to hot path functions
+- [ ] Update architecture docs with performance considerations
+- [ ] Record before/after benchmark results
+
+**Optimization Targets:**
+- Rendering pipeline (viewport calculations, cell drawing)
+- Document operations (insert, delete, search)
+- File I/O and parsing
+- Memory allocations in tight loops
+- String handling and formatting
+
+---
+
+### v0.11.0 - System Clipboard & External Integration [ ]
+
+**Focus:** Integration with system clipboard for copy/paste with external tools  
+**Status:** [ ]  
+**Target Tests:** 20+
+
+**Features:**
+
+**System Clipboard:**
+- [ ] "+yy - Yank row to system clipboard (CSV format)
+- [ ] "+,yy - Yank column to system clipboard (CSV format)
+- [ ] "+y - Yank visual selection to system clipboard
+- [ ] "+p - Paste from system clipboard (auto-detect format)
+- [ ] Support for TSV from system clipboard
+- [ ] Support for plain text (single cell or column)
+
+**Implementation Plan:**
+- File: src/clipboard/mod.rs (new file)
+  - [ ] Add system clipboard integration (use `arboard` crate)
+  - [ ] Implement copy_to_system() method
+  - [ ] Implement paste_from_system() method
+  - [ ] Implement format detection (CSV, TSV, plain text)
+  - [ ] Handle clipboard errors gracefully
+
+- File: src/input/handler.rs
+  - [ ] Add "+yy, "+,yy, "+y handlers
+  - [ ] Add "+p handler
+
+**Tests:**
+- [ ] test_system_clipboard_yank_row
+- [ ] test_system_clipboard_yank_column
+- [ ] test_system_clipboard_yank_visual
+- [ ] test_system_clipboard_paste_csv
+- [ ] test_system_clipboard_paste_tsv
+- [ ] test_system_clipboard_paste_plain_text
+
+---
+
+### v0.11.1 - Testing & Reliability Improvements [ ]
+
+**Focus:** Increase test coverage, add property-based tests, improve reliability  
+**Status:** Refactoring milestone  
+**Type:** Testing & Quality Assurance
+
+**Audit Phase (Complete First):**
+- [ ] Run coverage report (`cargo tarpaulin` or `cargo llvm-cov`)
+- [ ] Identify untested or under-tested modules
+- [ ] Review test quality (unit vs integration balance)
+- [ ] Find edge cases that lack tests
+- [ ] Review error paths for test coverage
+- [ ] Identify areas suitable for property-based testing
+
+**Success Criteria:**
+- [ ] Code coverage > 80% (90%+ for critical paths)
+- [ ] All error paths have tests
+- [ ] Property-based tests for complex algorithms
+- [ ] Integration tests cover major workflows
+- [ ] No flaky tests in CI
+- [ ] All panics and unwraps have test coverage
+
+**Testing Strategy:**
+- [ ] Add unit tests for under-tested modules
+- [ ] Write integration tests for user workflows
+- [ ] Implement property-based tests using `proptest` or `quickcheck`
+- [ ] Add fuzzing targets for parsers
+- [ ] Test error handling paths explicitly
+- [ ] Add regression tests for all discovered bugs
+
+**Documentation Updates:**
+- [ ] Document testing strategy in docs/development.md
+- [ ] Add examples of property-based tests
+- [ ] Document test organization and patterns
+- [ ] Update CI/CD documentation
+
+**Focus Areas:**
+- CSV parsing edge cases (malformed files, encoding issues)
+- Navigation boundary conditions
+- Undo/redo state consistency
+- Multi-file session management
+- Error handling and recovery
+
+---
+
+### v0.12.0 - Bulk Operations & Find/Replace [ ]
+
+**Focus:** Find and replace across cells, rows, and columns  
+**Status:** [ ]  
+**Target Tests:** 40+
+
+**Features:**
+
+**Find and Replace:**
+- [ ] :%s/old/new/ - Replace first occurrence in all cells
+- [ ] :%s/old/new/g - Replace all occurrences in all cells
+- [ ] :5,10s/old/new/g - Replace in row range
+- [ ] :B,Ds/old/new/g - Replace in column range
+- [ ] Visual mode selection replace
+- [ ] Regex support for find patterns
+- [ ] Case-sensitive and case-insensitive options
+- [ ] Confirmation prompts (:%s/old/new/gc)
+
+**Bulk Delete/Clear:**
+- [ ] :%d - Delete all data rows (already implemented)
+- [ ] :B,Dd - Delete column range (already implemented)
+- [ ] :%clear - Clear all cell contents (preserve structure)
+
+**Implementation Plan:**
+- File: src/find_replace/mod.rs (new file)
+  - [ ] Create find_replace module
+  - [ ] Implement parse_substitute_command()
+  - [ ] Implement apply_substitute() method
+  - [ ] Support regex patterns
+  - [ ] Handle confirmation mode
+
+- File: src/input/command.rs
+  - [ ] Add :s command parser
+  - [ ] Handle range parsing (:%, :5,10, :B,D)
+
+**Tests:**
+- [ ] test_substitute_all_cells
+- [ ] test_substitute_row_range
+- [ ] test_substitute_column_range
+- [ ] test_substitute_with_regex
+- [ ] test_substitute_case_sensitive
+- [ ] test_substitute_with_confirmation
+
+---
+
+### v0.12.1 - Error Handling & Robustness [ ]
+
+**Focus:** Consistent error handling, better error messages, resilience  
+**Status:** Refactoring milestone  
+**Type:** Reliability & Error Handling
+
+**Audit Phase (Complete First):**
+- [ ] Find all `unwrap()` and `expect()` calls
+- [ ] Review `Result` and `Option` handling patterns
+- [ ] Identify error types that could be more descriptive
+- [ ] Review error propagation and context
+- [ ] Check for silent error swallowing
+- [ ] Test error handling paths
+
+**Success Criteria:**
+- [ ] No production `unwrap()` calls (test code OK)
+- [ ] All errors have helpful messages for users
+- [ ] Consistent error types across modules
+- [ ] Error context preserved through call stack
+- [ ] All error paths tested
+- [ ] Graceful degradation where possible
+
+**Testing Strategy:**
+- [ ] Add negative tests for all error conditions
+- [ ] Test file I/O errors (permissions, disk full, etc.)
+- [ ] Test malformed CSV files
+- [ ] Test resource exhaustion scenarios
+- [ ] Verify error messages are user-friendly
+
+**Documentation Updates:**
+- [ ] Document error handling patterns
+- [ ] Add error handling guidelines for contributors
+- [ ] Document error types and when to use them
+- [ ] Update user-facing error messages
+
+**Error Handling Improvements:**
+- Replace `unwrap()` with proper error handling
+- Add context to errors (which file, which operation)
+- Implement custom error types where needed
+- Improve error recovery mechanisms
+- Add user-friendly error messages
+
+---
+
+### v0.13.0 - Advanced Filtering & Conditional Views [ ]
+
+**Focus:** Show/hide rows based on conditions, highlight cells  
+**Status:** [ ]  
+**Target Tests:** 35+
+
+**Features:**
+
+**Row Filtering:**
+- [ ] :filter col=value - Show only rows where column equals value
+- [ ] :filter col>10 - Show rows where column > 10
+- [ ] :filter col~pattern - Show rows matching regex pattern
+- [ ] :filter! - Clear filter, show all rows
+- [ ] Visual indicator for filtered view
+- [ ] Filter status in status line
+
+**Conditional Formatting:**
+- [ ] Highlight cells based on value (e.g., negative numbers in red)
+- [ ] Highlight duplicates
+- [ ] Highlight empty cells
+- [ ] Custom color rules
+
+**Implementation Plan:**
+- File: src/filter/mod.rs (new file)
+  - [ ] Create filter module
+  - [ ] Define FilterCondition enum
+  - [ ] Implement parse_filter_command()
+  - [ ] Implement apply_filter() method
+  - [ ] Track filtered row indices
+
+- File: src/ui/table.rs
+  - [ ] Update render to skip filtered rows
+  - [ ] Add conditional formatting logic
+
+**Tests:**
+- [ ] test_filter_by_equality
+- [ ] test_filter_by_comparison
+- [ ] test_filter_by_regex
+- [ ] test_clear_filter
+- [ ] test_multiple_filters
+- [ ] test_conditional_formatting
+
+---
+
+### v0.13.1 - Module Organization & Cleanup [ ]
+
+**Focus:** Improve module structure, reduce coupling, clean interfaces  
+**Status:** Refactoring milestone  
+**Type:** Architecture & Organization
+
+**Audit Phase (Complete First):**
+- [ ] Review module dependencies with `cargo modules` or similar
+- [ ] Identify circular dependencies
+- [ ] Find modules with too many responsibilities
+- [ ] Review public API surface area
+- [ ] Check for leaky abstractions
+- [ ] Identify overly-coupled modules
+
+**Success Criteria:**
+- [ ] Clear module responsibilities documented
+- [ ] No circular dependencies
+- [ ] Reduced coupling between modules
+- [ ] Clean public APIs with minimal surface area
+- [ ] Logical module hierarchy
+- [ ] Updated architecture documentation
+
+**Testing Strategy:**
+- [ ] Ensure all tests pass after reorganization
+- [ ] Add tests for new module boundaries
+- [ ] Verify integration points work correctly
+
+**Documentation Updates:**
+- [ ] Update docs/architecture.md with module structure
+- [ ] Document module responsibilities
+- [ ] Add module dependency diagram
+- [ ] Update API documentation
+
+**Organization Improvements:**
+- Split large modules into focused sub-modules
+- Extract shared code into utility modules
+- Clarify module boundaries and responsibilities
+- Reduce public API surface where possible
+- Improve naming consistency across modules
+
+---
+
+### v0.14.0 - Column Resize & Advanced Column Operations [ ]
+
+**Focus:** Manual column width control, column pinning, and metadata  
+**Status:** [ ]  
+**Target Tests:** 30+
+
+**Features:**
+
+**Column Width:**
+- [ ] :width A 20 - Set column A width to 20 characters
+- [ ] :width B auto - Auto-size column B
+- [ ] :width * auto - Auto-size all columns
+- [ ] Manual resize with mouse or keybindings
+- [ ] Per-file column width memory (session)
+
+**Column Pinning:**
+- [ ] :freeze A,B - Freeze columns A and B (always visible)
+- [ ] :unfreeze - Unfreeze all columns
+- [ ] Visual indicator for frozen columns
+
+**Column Metadata:**
+- [ ] :type A number - Mark column A as numeric
+- [ ] :type B date - Mark column B as date
+- [ ] Type validation on edit
+- [ ] Type-aware sorting (numbers sort numerically)
+
+**Implementation Plan:**
+- File: src/column/metadata.rs (new file)
+  - [ ] Define ColumnMetadata struct
+  - [ ] Track column widths, types, frozen state
+  - [ ] Per-file metadata storage in Session
+
+- File: src/ui/table.rs
+  - [ ] Implement frozen column rendering
+  - [ ] Use custom widths instead of auto-sizing
+
+**Tests:**
+- [ ] test_set_column_width
+- [ ] test_auto_size_column
+- [ ] test_freeze_columns
+- [ ] test_column_type_validation
+- [ ] test_numeric_sort
+
+---
+
+### v0.14.1 - Documentation & Maintainability [ ]
+
+**Focus:** Comprehensive documentation, code comments, maintainability  
+**Status:** Refactoring milestone  
+**Type:** Documentation & Maintainability
+
+**Audit Phase (Complete First):**
+- [ ] Run `cargo doc` and review for missing docs
+- [ ] Find complex functions lacking comments
+- [ ] Review public API documentation quality
+- [ ] Check architecture docs for accuracy
+- [ ] Review inline comments for clarity
+- [ ] Identify undocumented design decisions
+
+**Success Criteria:**
+- [ ] All public items have rustdoc comments
+- [ ] Complex algorithms have explanatory comments
+- [ ] Architecture docs up-to-date and comprehensive
+- [ ] API examples provided where helpful
+- [ ] Design decisions documented
+- [ ] Contributing guide updated
+
+**Testing Strategy:**
+- [ ] Ensure doc tests pass (`cargo test --doc`)
+- [ ] Add examples to documentation
+- [ ] Verify doc coverage meets standards
+
+**Documentation Updates:**
+- [ ] Complete API documentation (rustdoc)
+- [ ] Add code examples to docs
+- [ ] Update docs/architecture.md comprehensively
+- [ ] Document design patterns and idioms used
+- [ ] Add inline comments for complex logic
+- [ ] Update docs/development.md for contributors
+
+**Maintainability Improvements:**
+- Improve function and variable naming
+- Add high-level module documentation
+- Document non-obvious code patterns
+- Add TODO/FIXME tracking
+- Clarify ownership and lifetime patterns
+
+---
+
+### v0.15.0 - Data Analysis & Statistics [ ]
+
+**Focus:** Basic statistical analysis and aggregation  
+**Status:** [ ]  
+**Target Tests:** 25+
+
+**Features:**
+
+**Column Statistics:**
+- [ ] :stats A - Show statistics for column A (sum, avg, min, max, count)
+- [ ] :sum A - Show sum of column A
+- [ ] :avg A - Show average of column A
+- [ ] :count A - Count non-empty cells in column A
+- [ ] :distinct A - Count distinct values in column A
+
+**Aggregation:**
+- [ ] Visual mode selection statistics
+- [ ] Footer row showing column totals (optional)
+- [ ] Statistics overlay/popup
+
+**Implementation Plan:**
+- File: src/stats/mod.rs (new file)
+  - [ ] Create statistics module
+  - [ ] Implement calculate_stats() function
+  - [ ] Handle numeric vs text columns
+  - [ ] Parse numeric values safely
+
+- File: src/ui/stats_overlay.rs (new file)
+  - [ ] Create statistics display overlay
+  - [ ] Format statistics nicely
+
+**Tests:**
+- [ ] test_stats_numeric_column
+- [ ] test_stats_text_column
+- [ ] test_sum_column
+- [ ] test_avg_column
+- [ ] test_count_non_empty
+- [ ] test_distinct_values
+
+---
+
+### v0.15.1 - Technical Debt Reduction [ ]
+
+**Focus:** Address accumulated TODOs, simplify complex code, pay down debt  
+**Status:** Refactoring milestone  
+**Type:** Technical Debt & Simplification
+
+**Audit Phase (Complete First):**
+- [ ] Find all TODO, FIXME, HACK, XXX comments
+- [ ] Identify complex functions (high cyclomatic complexity)
+- [ ] Review code duplication with tools
+- [ ] Find deprecated patterns still in use
+- [ ] Identify over-engineered solutions
+- [ ] Review dead code and unused features
+
+**Success Criteria:**
+- [ ] All critical TODOs addressed
+- [ ] Complex functions simplified or documented
+- [ ] Code duplication significantly reduced
+- [ ] No deprecated patterns in use
+- [ ] Dead code removed
+- [ ] Consistent coding patterns throughout
+
+**Testing Strategy:**
+- [ ] Ensure refactoring doesn't break functionality
+- [ ] Add tests for previously untested areas
+- [ ] Remove tests for removed functionality
+
+**Documentation Updates:**
+- [ ] Document resolved technical debt items
+- [ ] Update known issues list
+- [ ] Document remaining acceptable debt
+- [ ] Add lessons learned
+
+**Debt Reduction Targets:**
+- Resolve high-priority TODOs
+- Simplify overly complex functions
+- Extract duplicated code
+- Remove unused code and features
+- Standardize inconsistent patterns
+- Update deprecated API usage
+
+---
+
+### v0.16.0 - Export & Import (JSON, Markdown, TSV) [ ]
+
+**Focus:** Export CSV to other formats, import from TSV  
+**Status:** [ ]  
+**Target Tests:** 30+
+
+**Features:**
+
+**Export:**
+- [ ] :export json - Export current file to JSON
+- [ ] :export markdown - Export to Markdown table
+- [ ] :export html - Export to HTML table
+- [ ] :export tsv - Export to TSV
+- [ ] Visual selection export
+- [ ] Output file path prompt
+
+**Import:**
+- [ ] :import file.tsv - Import TSV file
+- [ ] :import file.json - Import JSON (array of objects)
+- [ ] Auto-detect format on file open
+
+**Implementation Plan:**
+- File: src/export/mod.rs (new file)
+  - [ ] Create export module
+  - [ ] Implement export_json()
+  - [ ] Implement export_markdown()
+  - [ ] Implement export_html()
+  - [ ] Implement export_tsv()
+
+- File: src/import/mod.rs (new file)
+  - [ ] Create import module
+  - [ ] Implement import_tsv()
+  - [ ] Implement import_json()
+
+**Tests:**
+- [ ] test_export_json
+- [ ] test_export_markdown
+- [ ] test_export_html
+- [ ] test_export_tsv
+- [ ] test_import_tsv
+- [ ] test_import_json
+
+---
+
+### v0.16.1 - Code Coverage & Test Quality [ ]
+
+**Focus:** Maximize test coverage, improve test quality and organization  
+**Status:** Refactoring milestone  
+**Type:** Testing Excellence
+
+**Audit Phase (Complete First):**
+- [ ] Generate detailed coverage report
+- [ ] Identify untested branches and paths
+- [ ] Review test organization and naming
+- [ ] Find slow or flaky tests
+- [ ] Check test duplication
+- [ ] Review test assertions quality
+
+**Success Criteria:**
+- [ ] Code coverage > 85% (stretch: 90%+)
+- [ ] All critical paths have tests
+- [ ] Fast test suite (< 30s for full run)
+- [ ] No flaky tests
+- [ ] Well-organized test modules
+- [ ] Meaningful test names and assertions
+
+**Testing Strategy:**
+- [ ] Add tests for all uncovered code paths
+- [ ] Improve test organization by feature area
+- [ ] Add edge case and boundary tests
+- [ ] Ensure error paths are tested
+- [ ] Add integration tests for workflows
+- [ ] Remove or fix flaky tests
+
+**Documentation Updates:**
+- [ ] Document test organization patterns
+- [ ] Add testing best practices guide
+- [ ] Document coverage requirements
+- [ ] Update CI test documentation
+
+**Test Quality Improvements:**
+- Improve test naming conventions
+- Add descriptive assertion messages
+- Organize tests by feature/module
+- Remove duplicate test code
+- Speed up slow tests
+- Add missing edge case tests
+
+---
+
+### v0.17.0 - Configuration System [ ]
+
+**Focus:** User customization via config files  
+**Status:** [ ]  
+**Target Tests:** 20+
+
+**Features:**
+
+**Config File Support:**
+- [ ] Load config from ~/.config/lazycsv/config.toml
+- [ ] Per-directory config (./.lazycsv/config.toml)
+- [ ] Default settings (delimiter, header_mode, undo_limit)
+- [ ] Color customization
+- [ ] Keybinding remapping (advanced)
+
+**Config Options:**
+```toml
+[defaults]
+delimiter = ","
+header_mode = true
+undo_limit = 1000
+
+[colors]
+header_bg = "blue"
+cursor_fg = "yellow"
+dirty_indicator = "red"
+
+[keybindings]
+quit = ":q"
+save_all = ":w"
+```
+
+**Implementation Plan:**
+- File: src/config/mod.rs (new file)
+  - [ ] Create config module
+  - [ ] Define Config struct
+  - [ ] Implement load_config()
+  - [ ] Parse TOML with `toml` crate
+  - [ ] Merge global + directory configs
+
+- File: src/app/mod.rs
+  - [ ] Load config on startup
+  - [ ] Apply config settings
+
+**Tests:**
+- [ ] test_load_global_config
+- [ ] test_load_directory_config
+- [ ] test_config_merge
+- [ ] test_invalid_config_handling
+
+---
+
+### v0.17.1 - Performance Benchmarking & Tuning [ ]
+
+**Focus:** Establish benchmarks, tune critical paths, validate performance  
+**Status:** Refactoring milestone  
+**Type:** Performance Validation
+
+**Audit Phase (Complete First):**
+- [ ] Create comprehensive benchmark suite
+- [ ] Profile with real-world datasets (10K, 100K, 1M rows)
+- [ ] Identify performance regressions since last version
+- [ ] Measure memory usage patterns
+- [ ] Test with various CSV sizes and complexities
+- [ ] Profile startup time and file loading
+
+**Success Criteria:**
+- [ ] Comprehensive benchmark suite in place
+- [ ] 60 FPS maintained for 100K+ row files
+- [ ] File loading < 100ms for 10MB files
+- [ ] Memory usage within acceptable bounds
+- [ ] No performance regressions
+- [ ] Performance characteristics documented
+
+**Testing Strategy:**
+- [ ] Add criterion benchmarks for critical paths
+- [ ] Test performance with large datasets
+- [ ] Add memory usage tests
+- [ ] Create performance regression tests
+- [ ] Benchmark against previous versions
+
+**Documentation Updates:**
+- [ ] Document performance characteristics
+- [ ] Add benchmark results to docs
+- [ ] Document performance optimization decisions
+- [ ] Update performance goals and targets
+
+**Performance Validation:**
+- Navigation responsiveness (hjkl, gg, G, searches)
+- Rendering performance (viewport updates, redraws)
+- File operations (load, save, switch)
+- Search and filter operations
+- Large dataset handling
+- Memory efficiency
+
+---
+
+### v0.18.0 - Macros & Command Recording [ ]
+
+**Focus:** Record and replay command sequences  
+**Status:** [ ]  
+**Target Tests:** 25+
+
+**Features:**
+
+**Macro Recording:**
+- [ ] qa - Start recording macro into register 'a'
+- [ ] q - Stop recording
+- [ ] @a - Replay macro from register 'a'
+- [ ] @@ - Replay last macro
+- [ ] Support for multiple registers (a-z)
+
+**Command History:**
+- [ ] :history - Show command history
+- [ ] Up/Down arrows in command mode to navigate history
+- [ ] Persistent command history across sessions
+
+**Implementation Plan:**
+- File: src/macro/mod.rs (new file)
+  - [ ] Create macro module
+  - [ ] Define Macro struct
+  - [ ] Implement record_action()
+  - [ ] Implement replay_macro()
+  - [ ] Store macros in HashMap<char, Vec<Action>>
+
+- File: src/input/handler.rs
+  - [ ] Add q handler for recording
+  - [ ] Add @ handler for replay
+
+**Tests:**
+- [ ] test_record_macro
+- [ ] test_replay_macro
+- [ ] test_replay_last_macro
+- [ ] test_multiple_registers
+- [ ] test_command_history
+
+---
+
+### v0.18.1 - Final Architecture Polish [ ]
+
+**Focus:** Pre-release code quality and architecture finalization  
+**Status:** [ ]  
+**Primary Focus:** Final architecture polish and 1.0 readiness
+
+**Philosophy:**
+This is the final refactoring pass before v1.0.0. Focus on polishing the entire codebase to ensure it's maintainable, well-documented, and ready for stable release. Address any remaining architectural concerns and ensure all modules are production-ready.
+
+**Audit Phase:**
+Start with comprehensive audit of entire codebase:
+- Review all module boundaries and public APIs
+- Identify any remaining technical debt
+- Check consistency across all features
+- Verify documentation completeness
+- Ensure performance targets are met
+- Review test coverage gaps
+
+**Success Criteria:**
+- Zero clippy warnings
+- Code coverage > 80%
+- All functions < 50 lines
+- Performance benchmarks met
+- Module structure documented
+- Cyclomatic complexity reduced
+- All tests pass with no panics
+- All public APIs have rustdoc
+- Architecture docs complete
+- Ready for 1.0 release
+
+**Testing Strategy:**
+- Full regression test suite
+- Integration tests for all features
+- Performance benchmark validation
+- Edge case verification
+- User workflow testing
+- Documentation accuracy checks
+
+**Documentation Requirements:**
+- Complete rustdoc for all public APIs
+- Architecture documentation finalized
+- User guide comprehensive
+- Developer documentation complete
+- Migration guide if needed
+- Performance characteristics documented
+
+---
+
+### v1.0.0 - Stable Release & Polish [ ]
+
+**Focus:** All core features working, stable command interface, comprehensive documentation  
+**Status:** [ ]
+
+**Pre-Release Checklist:**
 
 **Feature Verification:**
-- [ ] All navigation features work (hjkl, gg, G, 5g, Bg, A4g, w/b/e, zt/zz/zb)
+- [ ] All navigation features work (hjkl, gg, G, 5g, :cB, w/b/e, zt/zz/zb)
 - [ ] All editing features work (Insert mode, Magnifier mode)
 - [ ] All column operations work (,dd, ,yy, ,p, ,o, ,O)
 - [ ] All visual mode features work (v, V, ,v)
 - [ ] Search works (/pattern, n, N, *, :noh)
+- [ ] SQL query mode works (:q SELECT..., :sql, :sort)
 - [ ] Undo/redo works (u, Ctrl+r, .)
-- [ ] Transforms work (~, gU, gu, g~, g., gj, gk)
+- [ ] Cell transforms work (~, gU, gu, g~, g.)
+- [ ] Row movement works (gj, gk)
+- [ ] System clipboard works ("+yy, "+,yy, "+p)
+- [ ] Find/replace works (:%s/old/new/g)
+- [ ] Filtering works (:filter, :filter!)
+- [ ] Column operations work (:width, :freeze, :type)
+- [ ] Statistics work (:stats, :sum, :avg)
+- [ ] Export/import works (JSON, Markdown, TSV, HTML)
+- [ ] Configuration system works (config.toml)
+- [ ] Macros work (qa, @a, @@)
 - [ ] Multi-file workflow works ([, ], :files)
 - [ ] Save/quit protection works (:w, :Wq, :q, :q!)
 - [ ] Header toggle system works (:ht)
-- [ ] Unified clipboard works (yy+p, ,yy+,p, transpose)
+- [ ] Triple clipboard works (row, column, region buffers)
 - [ ] Range operations work (:5,10d, :B,Dd)
-- [ ] System clipboard works ("+yy, "+,yy, "+p)
 
 **Code Quality:**
-- [ ] All tests passing (target: 500+ tests)
+- [ ] All tests pass (target: 700+ tests)
 - [ ] Zero clippy warnings
 - [ ] Zero compiler warnings
+- [ ] All public APIs documented
 - [ ] Code coverage > 80%
-- [ ] Documentation complete and accurate
-
-**User Experience:**
-- [ ] Help system complete (? for quick ref, :help for full)
-- [ ] Error messages clear and helpful
-- [ ] Empty document handling graceful
-- [ ] Edge cases covered (0 rows, 0 columns, single row/column)
-
-**Performance:**
-- [ ] Opens 100K row file in < 2 seconds
-- [ ] Smooth scrolling at 60fps
-- [ ] No memory leaks
 
 **Documentation:**
 - [ ] README.md complete and accurate
-- [ ] Keybinding reference up to date
-- [ ] Configuration guide complete
-- [ ] Examples and tutorials available
-- [ ] `--help` output accurate
+- [ ] CHANGELOG.md up to date
+- [ ] docs/keybindings.md comprehensive
+- [ ] docs/architecture.md accurate
+- [ ] docs/development.md for contributors
+- [ ] Example CSV files in test_data/
 
-### Acceptance Criteria
+**Performance:**
+- [ ] 100K+ rows at 60 FPS
+- [ ] Instant file switching
+- [ ] No memory leaks (valgrind clean)
+- [ ] Startup time < 100ms for 10MB files
 
-- [ ] All v0.4.1 - v0.9.0 features complete
-- [ ] No known critical bugs
-- [ ] Documentation matches implementation
-- [ ] Performance meets targets
-- [ ] Ready for public announcement
-- [ ] Version 1.0.0 tagged and released
+**UX Polish:**
+- [ ] All error messages clear and actionable
+- [ ] Help system (? and :help) comprehensive
+- [ ] No confusing edge cases
+- [ ] Vim users feel at home immediately
 
----
-
-## Post-1.0 Roadmap
-
-Future enhancements for post-1.0 releases:
-
-### v1.1.0 - Bulk Operations & Advanced Filtering
-
-**Bulk Operations:**
-- Fill down: `:.,$ fd` (fill current cell down to end)
-- Auto-number: `:@A enum` (auto-number column A)
-- Delete empty rows: `:g/^$/d`
-- Delete rows matching pattern: `:g/pattern/d`
-- Deduplication: `:dedup` (remove duplicate rows)
-
-**Advanced Filtering:**
-- `:filter column=value` - show only matching rows
-- ~~`:sort column` - sort by column~~ ✅ Implemented as `:sort <col,...>`
-- ~~`:sort -r column` - reverse sort~~ ✅ Implemented as `:sort! <col,...>`
-
-**Deferred because:** Complex features, less critical for v1.0. Better to stabilize core first.
-
-### v1.2.0 - Advanced Column Operations
-
-**Features:**
-- Column resize (manual width adjustment)
-- Column freeze (keep columns visible when scrolling)
-- Column hide/unhide
-- Column reorder via drag (visual mode enhancement)
-
-**Deferred because:** Nice-to-have features, core functionality sufficient for v1.0.
-
-### v1.3.0 - Data Analysis & Export
-
-**Features:**
-- Formulas (basic calculations)
-- Aggregations (sum, avg, count)
-- Export formats (JSON, Markdown, HTML)
-- Data validation
-- Conditional formatting
-
-**Deferred because:** Advanced features beyond core CSV editing. Post-stable enhancements.
+**Release Prep:**
+- [ ] Version bumped to 1.0.0
+- [ ] Git tag created
+- [ ] Crates.io metadata accurate
+- [ ] LICENSE file up to date
+- [ ] GitHub release notes written
 
 ---
 
-## Design Decisions Summary
-
-This roadmap reflects extensive design refinement. Key decisions:
-
-1. **Header Row Toggle System** - Revolutionary simplification. Header is row 0, toggleable with `:ht`.
-2. **Simplified Navigation** - `5g`, `Bg`, `A4g` instead of `:5`, `:B`, `:A5`. Reserve `:` for operations.
-3. **Comma Leader** - Use `,` for column operations (not `;`). More vim-like, doesn't conflict with vim's `;`.
-4. **3 Visual Modes** - Simplified from 4 to 3: `v` (block), `V` (line), `,v` (column). Cleaner, less complex.
-5. **Unified Clipboard** - One clipboard with type metadata. Smart paste adaptation. Transpose support.
-6. **Magnifier via `m`** - Use `m` for Magnifier (not `Enter`). Clear distinction from Insert mode.
-7. **Truly Hybrid** - Balance vim power with spreadsheet familiarity. Support both paradigms.
-8. **Zero Config Default** - Works perfectly out of the box. Optional `~/.config/lazycsv/config.toml` for power users.
-9. **Simplified Commands** - `:w` saves all (not just current). `:Wq` for write all and quit. Fewer variants.
-10. **Status Line** - Mode + row + column only. No cell preview. Minimalist.
-11. **No CLI Flags** - No `--delimiter` or `--no-headers`. Use `:delim` and `:ht` commands instead. More discoverable.
-12. **Full Edge Case Support** - 0 rows, 0 columns, header-only, empty files. All gracefully handled.
-
-**Philosophy:** Maximum power, minimum complexity. Vim-first, but truly hybrid. Zero configuration, full customization.
+**End of Roadmap**
