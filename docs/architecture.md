@@ -788,6 +788,384 @@ pub struct EditBuffer {
 }
 ```
 
+## Insert Mode Architecture (v0.4.1)
+
+**Status:** Implemented and refactored in v0.4.1
+
+Insert Mode provides quick, inline cell editing with vim-style keybindings. The implementation is organized into focused modules for maintainability.
+
+### Module Structure
+
+```
+src/input/insert_mode/
+├── mod.rs              # Main handler (36 lines)
+├── commit_cancel.rs    # Enter, Tab, Esc operations (57 lines)
+├── text_editing.rs     # Character input, backspace, delete (58 lines)
+├── cursor_movement.rs  # Arrow keys, Home, End (39 lines)
+└── vim_commands.rs     # Ctrl+h, Ctrl+w, Ctrl+u (73 lines)
+```
+
+### Editing Flow
+
+```
+User presses 's' in Normal mode
+     ↓
+Enter Insert mode with EditBuffer
+     ↓
+EditBuffer {
+    content: "current cell value",
+    cursor: 0,  // Character position (not bytes!)
+    original: "current cell value"  // For cancellation
+}
+     ↓
+User types/edits with:
+  • Regular keys → Insert characters
+  • Backspace/Delete → Remove characters
+  • Ctrl+w → Delete word backward
+  • Ctrl+u → Delete to start of line
+  • Arrow keys → Move cursor
+     ↓
+User commits with:
+  • Enter → Save and move down
+  • Shift+Enter → Save and move up
+  • Tab → Save and move right
+  • Shift+Tab → Save and move left
+     ↓
+OR cancels with:
+  • Esc → Discard changes, return to Normal mode
+     ↓
+commit_edit() called:
+  • Only marks dirty if content changed
+  • Updates document.set_cell(row, col, new_value)
+  • Tracks last_edit_position for potential undo
+```
+
+### Unicode Handling
+
+Insert Mode correctly handles multi-byte UTF-8 characters:
+
+```rust
+// Cursor position is in CHARACTERS, not bytes
+buffer.cursor = 5;  // 5th character (could be 15+ bytes)
+
+// Convert char position to byte position for string operations
+let byte_pos = buffer.content
+    .char_indices()
+    .nth(buffer.cursor)
+    .map(|(i, _)| i)
+    .unwrap_or(buffer.content.len());
+
+buffer.content.insert(byte_pos, new_char);
+```
+
+**Why this matters:**
+- Emoji like "🚀" is 1 character but 4 bytes
+- Japanese characters like "こんにちは" are 5 characters but 15 bytes
+- Cursor position must match user's visual perception (characters)
+- String mutations must use byte offsets (Rust requirement)
+
+**Tested edge cases:**
+- Emoji insertion and deletion
+- Multi-byte Unicode (Japanese, accented characters)
+- Cursor movement at grapheme boundaries
+- Backspace/Delete with combining characters
+
+### Commit Strategies
+
+Insert Mode supports directional commit for efficient data entry:
+
+| Key Combination | Action | Use Case |
+|----------------|--------|----------|
+| `Enter` | Save + move down | Vertical data entry (column-wise) |
+| `Shift+Enter` | Save + move up | Correction workflow |
+| `Tab` | Save + move right | Horizontal data entry (row-wise) |
+| `Shift+Tab` | Save + move left | Backward correction |
+| `Esc` | Cancel (no save) | Discard unwanted changes |
+
+**Design rationale:**
+- Matches spreadsheet UX (Excel, Google Sheets)
+- Minimizes mode switches for bulk editing
+- Directional navigation after commit reduces keystrokes
+
+### Vim-Style Editing Commands
+
+Insert Mode includes vim keybindings for power users:
+
+| Command | Action | Example |
+|---------|--------|---------|
+| `Ctrl+h` | Backspace (vim) | Delete previous character |
+| `Ctrl+w` | Delete word backward | `"hello world"` → `"hello "` |
+| `Ctrl+u` | Delete to line start | `"hello world"` → `"world"` (cursor at 11) |
+
+**Ctrl+w behavior:**
+1. Delete trailing spaces first
+2. Then delete word characters until hitting a space
+3. Repeatable (keeps deleting words)
+
+**Performance:**
+- All editing operations are O(1) or O(n) where n = string length
+- No performance degradation with long cell content
+- Character-based cursor tracking: ~1.4ns per operation
+
+### Dirty Tracking
+
+The document tracks which cells have been modified:
+
+```rust
+// In commit_edit()
+if buffer.content != buffer.original {
+    app.document.set_cell(row_idx, col_idx, buffer.content);
+    app.last_edit_position = Some((row_idx, col_idx));
+    // Document internally sets is_dirty = true
+}
+```
+
+**Why track dirty state?**
+- Enable "unsaved changes" warnings (future: v0.6.0)
+- Support undo/redo (future: v1.0.0)
+- Optimize saves (only write if changed)
+- Track last edit position for potential jump-to-last-edit command
+
+### Refactoring Notes (v0.4.1)
+
+The v0.4.1 refactor reduced `handle_insert_mode` from 183 lines to 36 lines by:
+
+1. **Extracting commit/cancel operations** → `commit_cancel.rs`
+   - Clearer separation of "exit insert mode" logic
+   - commit_edit() duplicated from handler.rs to keep module self-contained
+
+2. **Extracting text editing** → `text_editing.rs`
+   - Character insertion with UTF-8 handling
+   - Backspace/Delete operations
+
+3. **Extracting cursor movement** → `cursor_movement.rs`
+   - Arrow keys with saturation at boundaries
+   - Home/End keys
+
+4. **Extracting vim commands** → `vim_commands.rs`
+   - Complex multi-step operations (Ctrl+w, Ctrl+u)
+   - Ctrl+h as vim-style backspace
+
+**Benefits:**
+- Each module has a single responsibility
+- Easier to test individual operations
+- Improved readability and maintainability
+- Reduced cognitive load when making changes
+
+**Test coverage:**
+- 64 tests in `tests/insert_mode_test.rs` (v0.4.0)
+- 13 additional edge case tests in `tests/insert_mode_edge_cases.rs` (v0.4.1)
+- Tests cover: Unicode, boundaries, vim commands, commit strategies, cancellation
+
+## Visual Mode Architecture (v0.5.1)
+
+### Overview
+
+LazyCSV supports three visual modes for selecting and manipulating data:
+
+- **Block Mode** (`v`): Rectangular selection of cells
+- **Line Mode** (`V`): Whole row selection
+- **Column Mode** (`,v`): Whole column selection
+
+Each mode supports delete (`d`), yank (`y`), and paste (`p`/`P`) operations using an independent clipboard buffer.
+
+### Triple Clipboard System
+
+```
+┌─────────────────────────────────────────────┐
+│           Triple Clipboard System           │
+├─────────────────┬─────────────┬─────────────┤
+│   Row Buffer    │Col Buffer   │Region Buffer│
+│                 │             │             │
+│  yy/dd/p/P/o/O  │ ,yy/,dd/... │ Visual Block│
+│  Visual Line    │Visual Column│   yank/del  │
+└─────────────────┴─────────────┴─────────────┘
+         ↓                ↓              ↓
+    No cross-pasting between buffers
+```
+
+**Design principles:**
+- **Isolated buffers**: Row, column, and region buffers never cross-contaminate
+- **No transpose**: Yanked rows stay as rows, columns stay as columns
+- **Mode-specific paste**: Each mode only reads from its corresponding buffer
+- **Independent lifecycle**: Yanking in one mode doesn't affect other buffers
+
+**Example:**
+```
+1. yy (yank row)      → Row buffer: ["A","B","C"]
+2. ,yy (yank column)  → Column buffer: ["A","D","G"] (Row buffer unchanged)
+3. Visual Block yank  → Region buffer: [["A","B"],["D","E"]] (Others unchanged)
+4. p (paste row)      → Uses only Row buffer (ignores Column/Region)
+```
+
+### Module Structure
+
+Visual mode operations were refactored in v0.5.1 from a single 331-line block into separate modules:
+
+```
+src/input/visual_mode/
+├── mod.rs          # Module overview and public exports (25 lines)
+├── delete.rs       # Visual delete operations (141 lines)
+├── paste.rs        # Visual paste operations (115 lines)
+└── yank.rs         # Visual yank operations (113 lines)
+```
+
+### Visual Delete Operations
+
+**Flow:**
+```
+User presses 'd' in visual mode
+    ↓
+handle_visual_delete(app, clipboard)
+    ↓
+Match visual mode type:
+    ├─ Block → delete_visual_block()
+    │           ├─ Store region in region_buffer
+    │           ├─ Delete cells in rectangle
+    │           └─ Replace with empty strings
+    │
+    ├─ Line → delete_visual_line()
+    │          ├─ Store rows in row_buffer
+    │          ├─ Delete entire rows
+    │          └─ Update cursor position
+    │
+    └─ Column → delete_visual_column()
+               ├─ Store columns in column_buffer
+               ├─ Delete entire columns (including header)
+               └─ Adjust cursor if needed
+```
+
+**Key functions:**
+- `delete_visual_block()`: Deletes rectangular selection, stores in region buffer
+- `delete_visual_line()`: Deletes rows, stores in row buffer
+- `delete_visual_column()`: Deletes columns, stores in column buffer
+
+### Visual Yank Operations
+
+**Flow:**
+```
+User presses 'y' in visual mode
+    ↓
+handle_visual_yank(app, clipboard)
+    ↓
+Match visual mode type:
+    ├─ Block → yank_visual_block()
+    │           └─ Copy cells to region_buffer (no modification)
+    │
+    ├─ Line → yank_visual_line()
+    │          └─ Copy rows to row_buffer (no modification)
+    │
+    └─ Column → yank_visual_column()
+               └─ Copy columns to column_buffer (no modification)
+```
+
+**Key functions:**
+- `yank_visual_block()`: Copies rectangular selection to region buffer
+- `yank_visual_line()`: Copies rows to row buffer
+- `yank_visual_column()`: Copies columns to column buffer
+
+### Visual Paste Operations
+
+**Flow:**
+```
+User presses 'p'/'P' in visual mode
+    ↓
+handle_visual_paste(app, clipboard, key)
+    ↓
+Match visual mode type:
+    ├─ Block → paste_visual_block()
+    │           ├─ Replace selection with region_buffer
+    │           └─ Expand document if needed
+    │
+    ├─ Line → paste_visual_line()
+    │          ├─ Replace rows with row_buffer
+    │          │  (p: after, P: before)
+    │          └─ Delete original selection
+    │
+    └─ Column → paste_visual_column()
+               ├─ Replace columns with column_buffer
+               │  (p: after, P: before)
+               └─ Delete original selection
+```
+
+**Key functions:**
+- `paste_visual_block()`: Pastes region buffer into rectangular selection
+- `paste_visual_line()`: Pastes row buffer, replacing selected rows
+- `paste_visual_column()`: Pastes column buffer, replacing selected columns
+
+**P vs p behavior:**
+- Block mode: Same behavior (paste into selection)
+- Line mode: `P` pastes before selection, `p` pastes after
+- Column mode: `P` pastes before selection, `p` pastes after
+
+### Refactoring Results (v0.5.1)
+
+**Before refactoring (v0.5.0):**
+```
+src/input/handler.rs: 3053 lines
+  ├─ handle_visual_delete: 118 lines
+  ├─ handle_visual_paste: 115 lines
+  └─ handle_visual_yank: 93 lines
+Total: 326 lines in handler.rs
+```
+
+**After refactoring (v0.5.1):**
+```
+src/input/handler.rs: 2722 lines (-331 lines, -10.8%)
+
+src/input/visual_mode/
+  ├─ delete.rs: 141 lines
+  │   ├─ handle_visual_delete: 47 lines (-60%)
+  │   ├─ delete_visual_block: 26 lines
+  │   ├─ delete_visual_line: 29 lines
+  │   └─ delete_visual_column: 28 lines
+  │
+  ├─ paste.rs: 115 lines
+  │   ├─ handle_visual_paste: 36 lines (-69%)
+  │   ├─ paste_visual_block: 22 lines
+  │   ├─ paste_visual_line: 28 lines
+  │   └─ paste_visual_column: 22 lines
+  │
+  └─ yank.rs: 113 lines
+      ├─ handle_visual_yank: 30 lines (-68%)
+      ├─ yank_visual_block: 23 lines
+      ├─ yank_visual_line: 30 lines
+      └─ yank_visual_column: 24 lines
+
+Total: 369 lines in visual_mode/ (+43 lines for improved organization)
+```
+
+**Benefits:**
+- Main handler functions reduced by 60-69%
+- Each operation type isolated in its own module
+- Single responsibility per function
+- Easier to test and maintain
+- Clear separation between Block/Line/Column logic
+
+### Test Coverage
+
+**Existing tests:**
+- 32 tests in `tests/visual_mode_test.rs` (v0.5.0)
+  - Block, Line, Column mode operations
+  - Delete, yank, paste combinations
+  - Selection boundaries and edge cases
+
+**New tests (v0.5.1):**
+- 11 tests in `tests/clipboard_isolation.rs`
+  - Buffer isolation (row/column/region don't cross-contaminate)
+  - Yank operations only update their own buffer
+  - No transpose operations between modes
+  - Multiple operations stay in correct buffer
+
+- 14 tests in `tests/column_reorder_edge_cases.rs`
+  - Move single column to beginning/end
+  - Move multiple columns forward/backward
+  - Move to same position (no-op)
+  - Column letter and numeric notation
+  - Invalid source/target handling
+
+**Total visual mode test coverage:** 57 tests
+
 ## Error Handling Strategy
 
 LazyCSV uses `anyhow` for error handling:

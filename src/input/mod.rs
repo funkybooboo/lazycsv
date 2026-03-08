@@ -5,7 +5,9 @@
 
 pub mod actions;
 pub mod handler;
+pub mod insert_mode;
 pub mod state;
+pub mod visual_mode;
 
 pub use actions::{
     FileDirection, InputResult, NavigateAction, PendingCommand, StatusMessage, UserAction,
