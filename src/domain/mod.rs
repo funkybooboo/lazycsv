@@ -4,3 +4,6 @@
 //! wrappers (RowIndex, ColIndex) to prevent coordinate confusion.
 
 pub mod position;
+
+#[cfg(test)]
+mod position_proptests;

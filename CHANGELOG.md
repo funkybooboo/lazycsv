@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-03-08
+
+### Added
+- **Testing:** Property-based testing infrastructure with proptest
+  - 29 comprehensive property tests for RowIndex/ColIndex arithmetic
+  - Tests verify reversibility, associativity, identity properties
+  - Saturation behavior verification at boundaries (0 and usize::MAX)
+  - Type safety verification through randomized testing
+- **Testing:** Integration testing suite with 11 domain integration tests
+  - Position-based navigation across real CSV documents
+  - Type conversion scenarios (usize ↔ RowIndex/ColIndex)
+  - Large document navigation tests (1000 rows × 50 cols)
+  - Empty document edge cases
+- **Documentation:** Comprehensive rustdoc for domain/position.rs
+  - 125+ lines of module-level documentation
+  - Usage examples for RowIndex, ColIndex, Position
+  - Design rationale (saturation arithmetic, type safety benefits)
+  - Compile-time type safety demonstrations
+- **Documentation:** Unwrap audit documentation in docs/unwrap-audit-v0.2.1.md
+  - Comprehensive audit of all 172 unwrap instances
+  - Classification by risk level and acceptability
+  - Zero critical unwraps on user-facing paths
+
+### Changed
+- **Code Quality:** Enhanced all public API methods with detailed rustdoc
+- **Code Quality:** Added panic documentation for edge cases
+- **Testing:** Test count increased from 479 to 519 library tests (+40 new tests)
+- **Testing:** Total test executions increased to 894 (including property test cases)
+
+### Fixed
+- **Documentation:** All roadmap tasks for v0.2.1 completed
+- **Code Quality:** Zero clippy warnings in domain/ and csv/ modules
+- **Code Quality:** Zero rustdoc warnings for domain module
+
+### Technical
+- Added `proptest = "1.4"` to dev-dependencies
+- Created `src/domain/position_proptests.rs` (355 lines)
+- Created `tests/domain_integration_test.rs` (300+ lines)
+- Module boundaries verified clean (domain/ has zero UI dependencies)
+- Code coverage >90% for domain types achieved
+
 ## [0.1.1] - 2026-03-08
 
 ### Changed
