@@ -4,6 +4,7 @@
 //! - Row buffer: for row operations (yy/dd/p/P/o/O, Visual Line)
 //! - Column buffer: for column operations (,yy/,dd/,p/,P/,o/,O, Visual Column)  
 //! - Region buffer: for rectangular selections (Visual Block)
+//!
 //! No cross-buffer pasting between the three buffers.
 
 /// Internal buffer shared by both row and column clipboards

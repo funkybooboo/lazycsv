@@ -1,0 +1,582 @@
+[2m2026-03-08T03:58:37.229779Z[0m [32m INFO[0m [2mcargo_tarpaulin::config[0m[2m:[0m Creating config
+[2m2026-03-08T03:58:39.951812Z[0m [32m INFO[0m [2mcargo_tarpaulin[0m[2m:[0m Running Tarpaulin
+[2m2026-03-08T03:58:39.951821Z[0m [32m INFO[0m [2mcargo_tarpaulin[0m[2m:[0m Building project
+[2m2026-03-08T03:58:39.951896Z[0m [32m INFO[0m [2mcargo_tarpaulin::cargo[0m[2m:[0m Cleaning project
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.44
+   Compiling unicode-ident v1.0.23
+   Compiling libc v0.2.181
+   Compiling cfg-if v1.0.4
+   Compiling strsim v0.11.1
+   Compiling rustversion v1.0.22
+   Compiling bitflags v2.10.0
+   Compiling parking_lot_core v0.9.12
+   Compiling smallvec v1.15.1
+   Compiling zerocopy v0.8.40
+   Compiling version_check v0.9.5
+   Compiling unicode-segmentation v1.12.0
+   Compiling signal-hook v0.3.18
+   Compiling find-msvc-tools v0.1.9
+   Compiling heck v0.5.0
+   Compiling ahash v0.8.12
+   Compiling log v0.4.29
+   Compiling ident_case v1.0.1
+   Compiling scopeguard v1.2.0
+   Compiling memchr v2.8.0
+   Compiling once_cell v1.21.3
+   Compiling shlex v1.3.0
+   Compiling cc v1.2.56
+   Compiling lock_api v0.4.14
+   Compiling syn v2.0.114
+   Compiling rustix v1.1.3
+   Compiling utf8parse v0.2.2
+   Compiling pkg-config v0.3.32
+   Compiling errno v0.3.14
+   Compiling signal-hook-registry v1.4.8
+   Compiling mio v1.1.1
+   Compiling rustix v0.38.44
+   Compiling vcpkg v0.2.15
+   Compiling parking_lot v0.12.5
+   Compiling signal-hook-mio v0.2.5
+   Compiling anstyle-parse v0.2.7
+   Compiling convert_case v0.10.0
+   Compiling getrandom v0.4.1
+   Compiling foldhash v0.1.5
+   Compiling colorchoice v1.0.4
+   Compiling serde_core v1.0.228
+   Compiling anstyle v1.0.13
+   Compiling either v1.15.0
+   Compiling linux-raw-sys v0.4.15
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling allocator-api2 v0.2.21
+   Compiling equivalent v1.0.2
+   Compiling paste v1.0.15
+   Compiling anstyle-query v1.1.5
+   Compiling ryu v1.0.23
+   Compiling instability v0.3.11
+   Compiling linux-raw-sys v0.11.0
+   Compiling libsqlite3-sys v0.30.1
+   Compiling itoa v1.0.17
+   Compiling hashbrown v0.15.5
+   Compiling anstream v0.6.21
+   Compiling itertools v0.13.0
+   Compiling darling_core v0.23.0
+   Compiling aho-corasick v1.1.4
+   Compiling castaway v0.2.4
+   Compiling unicode-width v0.1.14
+   Compiling anyhow v1.0.101
+   Compiling litrs v1.0.0
+   Compiling regex-syntax v0.8.10
+   Compiling hashbrown v0.14.5
+   Compiling indoc v2.0.7
+   Compiling static_assertions v1.1.0
+   Compiling clap_lex v1.0.0
+   Compiling regex-automata v0.4.14
+   Compiling clap_builder v4.5.58
+   Compiling compact_str v0.8.1
+   Compiling hashlink v0.9.1
+   Compiling derive_more-impl v2.1.1
+   Compiling strum_macros v0.26.4
+   Compiling darling_macro v0.23.0
+   Compiling clap_derive v4.5.55
+   Compiling darling v0.23.0
+   Compiling derive_more v2.1.1
+   Compiling document-features v0.2.12
+   Compiling unicode-truncate v1.1.0
+   Compiling crossterm v0.28.1
+   Compiling strum v0.26.3
+   Compiling lru v0.12.5
+   Compiling csv-core v0.1.13
+   Compiling fallible-streaming-iterator v0.1.9
+   Compiling fastrand v2.3.0
+   Compiling fallible-iterator v0.3.0
+   Compiling unicode-width v0.2.0
+   Compiling cassowary v0.3.0
+   Compiling tempfile v3.25.0
+   Compiling clap v4.5.58
+   Compiling crossterm v0.29.0
+   Compiling rusqlite v0.32.1
+   Compiling ratatui v0.29.0
+   Compiling csv v1.4.0
+   Compiling regex v1.12.3
+   Compiling encoding_rs v0.8.35
+   Compiling lazycsv v0.6.0 (/home/nate/projects/lazycsv)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 32.28s
+[2m2026-03-08T03:59:13.137430Z[0m [32m INFO[0m [2mcargo_tarpaulin::process_handling::linux[0m[2m:[0m Launching test
+[2m2026-03-08T03:59:13.137457Z[0m [32m INFO[0m [2mcargo_tarpaulin::process_handling[0m[2m:[0m running /home/nate/projects/lazycsv/target/debug/deps/lazycsv-203211de5ad1dd59
+
+running 420 tests
+test app::tests::test_app_initialization ... ok
+test app::tests::test_close_magnifier_discard ... ok
+test app::tests::test_column_boundary_navigation ... ok
+test app::tests::test_count_prefix_0_goes_to_first_column ... ok
+test app::tests::test_count_prefix_2j_moves_down_2_rows ... ok
+test app::tests::test_count_prefix_2l_moves_right_2_columns ... ok
+test app::tests::test_count_prefix_3g_goes_to_row_3 ... ok
+test app::tests::test_count_prefix_cleared_after_use ... ok
+test app::tests::test_count_prefix_clears_after_use ... ok
+test app::tests::test_count_prefix_exceeds_column_bounds ... ok
+test app::tests::test_count_prefix_exceeds_row_bounds ... ok
+test app::tests::test_count_prefix_max_digits ... ok
+test app::tests::test_count_prefix_zero_special_case ... ok
+test app::tests::test_current_file_path ... ok
+test app::tests::test_dirty_flag_behavior ... ok
+test app::tests::test_dirty_flag_persistence_across_operations ... ok
+test app::tests::test_dollar_sign_goes_to_last_column ... ok
+test app::tests::test_error_file_not_found_shows_message ... ok
+test app::tests::test_esc_cancels_multi_key_command ... ok
+test app::tests::test_f_command_rename_marks_session_dirty ... ok
+test app::tests::test_f_command_rename_preserves_query_output_status ... ok
+test app::tests::test_f_command_renames_file ... ok
+test app::tests::test_f_command_shows_current_filename ... ok
+test app::tests::test_file_switch_at_first_boundary ... ok
+test app::tests::test_file_switch_at_last_boundary ... ok
+test app::tests::test_file_switch_caches_query_output ... ok
+test app::tests::test_file_switch_preserves_position ... ok
+test app::tests::test_file_switch_single_file_no_op ... ok
+test app::tests::test_file_switching_next ... ok
+test app::tests::test_file_switching_previous ... ok
+test app::tests::test_help_close_with_esc ... ok
+test app::tests::test_help_closed_with_esc ... ok
+test app::tests::test_help_toggle ... ok
+test app::tests::test_home_end_keys ... ok
+test app::tests::test_magnifier_is_dirty ... ok
+test app::tests::test_magnifier_multiline_content ... ok
+test app::tests::test_magnifier_with_empty_cell ... ok
+test app::tests::test_multi_key_2g_goes_to_row_2 ... ok
+test app::tests::test_multi_key_g_goes_to_last_row ... ok
+test app::tests::test_multi_key_gg_goes_to_first_row ... ok
+test app::tests::test_navigation_blocked_when_help_shown ... ok
+test app::tests::test_navigation_dollar_on_single_column ... ok
+test app::tests::test_navigation_down ... ok
+test app::tests::test_navigation_first_last_column ... ok
+test app::tests::test_navigation_g_shift_on_single_row_file ... ok
+test app::tests::test_navigation_gg_on_single_row_file ... ok
+test app::tests::test_navigation_h_on_first_column ... ok
+test app::tests::test_navigation_home_end ... ok
+test app::tests::test_navigation_j_on_last_row ... ok
+test app::tests::test_navigation_k_on_first_row ... ok
+test app::tests::test_navigation_l_on_last_column ... ok
+test app::tests::test_navigation_left_right ... ok
+test app::tests::test_navigation_up ... ok
+test app::tests::test_navigation_zero_already_at_first_column ... ok
+test app::tests::test_no_file_switching_with_single_file ... ok
+test app::tests::test_open_magnifier ... ok
+test app::tests::test_page_up_down_navigation ... ok
+test app::tests::test_pending_key_cleared_on_esc ... ok
+test app::tests::test_pending_key_cleared_on_valid_command ... ok
+test app::tests::test_q_opens_sql_editor ... ok
+test app::tests::test_quit_via_command_mode ... ok
+test app::tests::test_quit_with_unsaved_changes ... ok
+test app::tests::test_save_and_close_magnifier ... ok
+test app::tests::test_search_asterisk_searches_current_cell ... ok
+test app::tests::test_search_enter_executes_search ... ok
+test app::tests::test_search_esc_in_normal_mode_clears_search ... ok
+test app::tests::test_search_esc_returns_to_normal ... ok
+test app::tests::test_search_noh_clears_search ... ok
+test app::tests::test_search_slash_enters_search_mode ... ok
+test app::tests::test_sequential_navigation_workflow ... ok
+test app::tests::test_special_keys_ignored_in_normal_mode ... ok
+test app::tests::test_state_after_help_toggle ... ok
+test app::tests::test_state_after_invalid_g_sequence ... ok
+test app::tests::test_state_comprehensive_after_file_switch ... ok
+test app::tests::test_state_consistency_after_rapid_navigation ... ok
+test app::tests::test_viewport_mode_persists_across_navigation ... ok
+test app::tests::test_z_command_bottom_viewport ... ok
+test app::tests::test_z_command_center_viewport ... ok
+test app::tests::test_z_command_top_viewport ... ok
+test app::tests::test_zero_goes_to_first_column ... ok
+test cli::tests::test_cli_all_args_combined ... ok
+test cli::tests::test_cli_default_args ... ok
+test cli::tests::test_cli_default_query_is_none ... ok
+test cli::tests::test_cli_invalid_delimiter ... ok
+test cli::tests::test_cli_path_not_found_is_ok_for_parser ... ok
+test cli::tests::test_cli_query_with_path_and_delimiter ... ok
+test cli::tests::test_cli_with_delimiter ... ok
+test cli::tests::test_cli_with_delimiter_short ... ok
+test cli::tests::test_cli_with_encoding ... ok
+test cli::tests::test_cli_with_encoding_short ... ok
+test cli::tests::test_cli_with_file_path ... ok
+test cli::tests::test_cli_with_no_headers ... ok
+test cli::tests::test_cli_with_query_long ... ok
+test cli::tests::test_cli_with_query_short ... ok
+test clipboard::tests::test_buffers_are_independent ... ok
+test clipboard::tests::test_clear ... ok
+test clipboard::tests::test_empty_column_buffer_returns_none ... ok
+test clipboard::tests::test_empty_row_buffer_returns_none ... ok
+test clipboard::tests::test_new_clipboard_is_empty ... ok
+test clipboard::tests::test_overwrite_column_buffer ... ok
+test clipboard::tests::test_overwrite_row_buffer ... ok
+test clipboard::tests::test_yank_cell ... ok
+test clipboard::tests::test_yank_column ... ok
+test clipboard::tests::test_yank_columns ... ok
+test clipboard::tests::test_yank_region ... ok
+test clipboard::tests::test_yank_row ... ok
+test csv::document::tests::test_csv_dirty_flag_initial_state ... ok
+test csv::document::tests::test_csv_empty_file ... ok
+test csv::document::tests::test_csv_extremely_long_filename_path ... ok
+test csv::document::tests::test_csv_extremely_wide_row_100_columns ... ok
+test csv::document::tests::test_csv_file_not_found ... ok
+test csv::document::tests::test_csv_mixed_line_endings_crlf_lf ... ok
+test csv::document::tests::test_csv_only_headers_no_data_rows ... ok
+test csv::document::tests::test_csv_pipe_delimiter ... ok
+test csv::document::tests::test_csv_semicolon_delimiter ... ok
+test csv::document::tests::test_csv_tab_delimiter ... ok
+test csv::document::tests::test_csv_unclosed_quote_recovery ... ok
+test csv::document::tests::test_csv_very_long_cell_content ... ok
+test csv::document::tests::test_csv_with_blank_lines_ignored ... ok
+test csv::document::tests::test_csv_with_commas_in_quotes ... ok
+test csv::document::tests::test_csv_with_empty_cells ... ok
+test csv::document::tests::test_csv_with_escaped_quotes ... ok
+test csv::document::tests::test_csv_with_long_text ... ok
+test csv::document::tests::test_csv_with_mixed_row_lengths ... ok
+test csv::document::tests::test_csv_with_null_bytes ... ok
+test csv::document::tests::test_csv_with_numbers ... ok
+test csv::document::tests::test_csv_with_only_newlines ... ok
+test csv::document::tests::test_csv_with_only_whitespace ... ok
+test csv::document::tests::test_csv_with_quoted_fields ... ok
+test csv::document::tests::test_csv_with_special_characters ... ok
+test csv::document::tests::test_csv_with_very_long_line ... ok
+test csv::document::tests::test_csv_with_whitespace ... ok
+test csv::document::tests::test_empty_csv ... ok
+test csv::document::tests::test_encoding_invalid_utf8_fallback ... ok
+test csv::document::tests::test_encoding_utf8_with_bom ... ok
+test csv::document::tests::test_filename_extraction ... ok
+test csv::document::tests::test_get_cell_out_of_bounds ... ok
+test csv::document::tests::test_header_and_cell_access_consistency ... ok
+test csv::document::tests::test_large_csv ... ok
+test csv::document::tests::test_load_valid_csv ... ok
+test csv::document::tests::test_long_cell_content ... ok
+test csv::document::tests::test_malformed_csv_shows_clear_error ... ok
+test csv::document::tests::test_malformed_csv_with_missing_fields ... ok
+test csv::document::tests::test_single_column_csv ... ok
+test csv::document::tests::test_single_row_csv ... ok
+test csv::document::tests::test_unicode_in_cells ... ok
+test csv::document::tests::test_wide_csv ... ok
+test csv::writer::tests::test_atomic_write ... ok
+test csv::writer::tests::test_atomic_write_overwrites_existing ... ok
+test csv::writer::tests::test_escape_commas ... ok
+test csv::writer::tests::test_escape_newlines ... ok
+test csv::writer::tests::test_escape_quotes ... ok
+test csv::writer::tests::test_write_simple_csv ... ok
+test domain::position::tests::test_col_index_from_usize ... ok
+test domain::position::tests::test_col_index_new ... ok
+test domain::position::tests::test_col_index_saturating_add ... ok
+test domain::position::tests::test_col_index_saturating_sub ... ok
+test domain::position::tests::test_position_from_raw ... ok
+test domain::position::tests::test_position_new ... ok
+test domain::position::tests::test_row_index_from_usize ... ok
+test domain::position::tests::test_row_index_new ... ok
+test domain::position::tests::test_row_index_saturating_add ... ok
+test domain::position::tests::test_row_index_saturating_sub ... ok
+test domain::position::tests::test_row_index_to_line_number ... ok
+test domain::position::tests::test_type_safety ... ok
+test file_system::discovery::tests::test_direct_scan_directory_basic ... ok
+test file_system::discovery::tests::test_direct_scan_directory_case_sensitive_extension ... ok
+test file_system::discovery::tests::test_direct_scan_directory_current_directory ... ok
+test file_system::discovery::tests::test_direct_scan_directory_empty ... ok
+test file_system::discovery::tests::test_direct_scan_directory_ignores_subdirectories ... ok
+test file_system::discovery::tests::test_direct_scan_directory_mixed_files ... ok
+test file_system::discovery::tests::test_direct_scan_directory_no_csv_files ... ok
+test file_system::discovery::tests::test_direct_scan_directory_nonexistent ... ok
+test file_system::discovery::tests::test_direct_scan_directory_preserves_full_path ... ok
+test file_system::discovery::tests::test_direct_scan_directory_sorting ... ok
+test file_system::discovery::tests::test_direct_scan_directory_with_dots_in_filename ... ok
+test file_system::discovery::tests::test_direct_scan_directory_with_hidden_files ... ok
+test file_system::discovery::tests::test_scan_directory_case_sensitivity ... ok
+test file_system::discovery::tests::test_scan_directory_empty_directory ... ok
+test file_system::discovery::tests::test_scan_directory_empty_path ... ok
+test file_system::discovery::tests::test_scan_directory_files_with_spaces_in_name ... ok
+test file_system::discovery::tests::test_scan_directory_hidden_files ... ok
+test file_system::discovery::tests::test_scan_directory_mixed_files ... ok
+test file_system::discovery::tests::test_scan_directory_multiple_csvs ... ok
+test file_system::discovery::tests::test_scan_directory_no_parent_directory ... ok
+test file_system::discovery::tests::test_scan_directory_nonexistent_path ... ok
+test file_system::discovery::tests::test_scan_directory_preserves_full_path ... ok
+test file_system::discovery::tests::test_scan_directory_relative_path_without_parent ... ok
+test file_system::discovery::tests::test_scan_directory_single_csv ... ok
+test file_system::discovery::tests::test_scan_directory_sorting ... ok
+test file_system::discovery::tests::test_scan_directory_uppercase_extension ... ok
+test file_system::discovery::tests::test_scan_directory_very_long_filename ... ok
+test file_system::discovery::tests::test_scan_directory_with_dots_in_filename ... ok
+test file_system::discovery::tests::test_scan_directory_with_mixed_case_extensions ... ok
+test file_system::discovery::tests::test_scan_directory_with_no_extension_files ... ok
+test file_system::discovery::tests::test_scan_directory_with_subdirectories ... ok
+test file_system::discovery::tests::test_scan_empty_directory_no_csvs ... ok
+test file_system::discovery::tests::test_scan_file_path_instead_of_directory ... ok
+test input::actions::tests::test_file_direction ... ok
+test input::actions::tests::test_input_result ... ok
+test input::actions::tests::test_navigate_action ... ok
+test input::actions::tests::test_pending_command_from_key ... ok
+test input::actions::tests::test_status_message_from_str ... ok
+test input::actions::tests::test_status_message_from_string ... ok
+test input::actions::tests::test_status_message_owned ... ok
+test input::actions::tests::test_status_message_static ... ok
+test input::actions::tests::test_viewport_action ... ok
+test input::state::tests::test_command_count ... ok
+test input::state::tests::test_count_overflow_protection ... ok
+test input::state::tests::test_count_prefix_cleared_after_retrieval ... ok
+test input::state::tests::test_count_prefix_very_large_number ... ok
+test input::state::tests::test_count_prefix_zero_behavior ... ok
+test input::state::tests::test_input_state_default ... ok
+test input::state::tests::test_multiple_count_digits_accumulation ... ok
+test input::state::tests::test_pending_command ... ok
+test input::state::tests::test_pending_command_no_timeout_when_none ... ok
+test input::state::tests::test_pending_command_timeout ... ok
+test magnifier::tests::test_clamp_cursor_empty_line ... ok
+test magnifier::tests::test_clamp_cursor_insert_mode ... ok
+test magnifier::tests::test_clamp_cursor_line_bounds ... ok
+test magnifier::tests::test_clamp_cursor_normal_mode ... ok
+test magnifier::tests::test_count_prefix ... ok
+test magnifier::tests::test_delete_char_at ... ok
+test magnifier::tests::test_delete_char_at_end_of_line ... ok
+test magnifier::tests::test_delete_char_before ... ok
+test magnifier::tests::test_delete_char_before_at_line_start ... ok
+test magnifier::tests::test_delete_char_normal_mode ... ok
+test magnifier::tests::test_delete_line ... ok
+test magnifier::tests::test_delete_line_last_line ... ok
+test magnifier::tests::test_get_content_multiline ... ok
+test magnifier::tests::test_get_content_single_line ... ok
+test magnifier::tests::test_insert_after ... ok
+test magnifier::tests::test_insert_before ... ok
+test magnifier::tests::test_insert_char ... ok
+test magnifier::tests::test_insert_char_at_end ... ok
+test magnifier::tests::test_insert_line_above ... ok
+test magnifier::tests::test_insert_line_below ... ok
+test magnifier::tests::test_is_dirty_after_delete_line ... ok
+test magnifier::tests::test_is_dirty_after_edit ... ok
+test magnifier::tests::test_is_dirty_unchanged ... ok
+test magnifier::tests::test_mode_switching ... ok
+test magnifier::tests::test_move_down ... ok
+test magnifier::tests::test_move_down_at_last_line ... ok
+test magnifier::tests::test_move_down_with_count ... ok
+test magnifier::tests::test_move_end_word ... ok
+test magnifier::tests::test_move_end_word_with_count ... ok
+test magnifier::tests::test_move_left ... ok
+test magnifier::tests::test_move_left_at_start ... ok
+test magnifier::tests::test_move_left_with_count ... ok
+test magnifier::tests::test_move_next_word ... ok
+test magnifier::tests::test_move_next_word_across_lines ... ok
+test magnifier::tests::test_move_next_word_with_count ... ok
+test magnifier::tests::test_move_prev_word ... ok
+test magnifier::tests::test_move_prev_word_at_line_start ... ok
+test magnifier::tests::test_move_prev_word_with_count ... ok
+test magnifier::tests::test_move_right ... ok
+test magnifier::tests::test_move_right_at_end ... ok
+test magnifier::tests::test_move_right_with_count ... ok
+test magnifier::tests::test_move_to_first_line ... ok
+test magnifier::tests::test_move_to_first_non_blank ... ok
+test magnifier::tests::test_move_to_first_non_blank_no_whitespace ... ok
+test magnifier::tests::test_move_to_last_line ... ok
+test magnifier::tests::test_move_to_line ... ok
+test magnifier::tests::test_move_to_line_end ... ok
+test magnifier::tests::test_move_to_line_end_insert_mode ... ok
+test magnifier::tests::test_move_to_line_start ... ok
+test magnifier::tests::test_move_up ... ok
+test magnifier::tests::test_move_up_at_first_line ... ok
+test magnifier::tests::test_move_up_with_count ... ok
+test magnifier::tests::test_new_empty ... ok
+test magnifier::tests::test_new_multiline ... ok
+test magnifier::tests::test_new_single_line ... ok
+test magnifier::tests::test_newline ... ok
+test magnifier::tests::test_paste_above ... ok
+test magnifier::tests::test_paste_below ... ok
+test magnifier::tests::test_paste_multiple_lines ... ok
+test magnifier::tests::test_substitute_char ... ok
+test magnifier::tests::test_yank_line ... ok
+test navigation::commands::tests::test_goto_column_beyond_available_shows_error ... ok
+test navigation::commands::tests::test_goto_column_case_insensitive ... ok
+test navigation::commands::tests::test_goto_column_invalid ... ok
+test navigation::commands::tests::test_goto_column_multi_letter_aa ... ok
+test navigation::commands::tests::test_goto_column_multi_letter_case_mixed ... ok
+test navigation::commands::tests::test_goto_column_out_of_bounds ... ok
+test navigation::commands::tests::test_goto_column_three_letters ... ok
+test navigation::commands::tests::test_goto_column_valid ... ok
+test navigation::commands::tests::test_goto_first_row ... ok
+test navigation::commands::tests::test_goto_last_row ... ok
+test navigation::commands::tests::test_goto_line_out_of_bounds ... ok
+test navigation::commands::tests::test_goto_line_valid ... ok
+test navigation::commands::tests::test_goto_line_zero ... ok
+test navigation::commands::tests::test_move_down_by_with_count ... ok
+test navigation::commands::tests::test_move_down_saturating_at_last_row ... ok
+test navigation::commands::tests::test_move_left_by_with_count ... ok
+test navigation::commands::tests::test_move_left_saturating_at_zero ... ok
+test navigation::commands::tests::test_move_right_by_with_count ... ok
+test navigation::commands::tests::test_move_right_saturating_at_last_column ... ok
+test navigation::commands::tests::test_move_up_by_with_count ... ok
+test navigation::commands::tests::test_move_up_saturating_at_zero ... ok
+test navigation::commands::tests::test_next_word_all_empty_cells ... ok
+test navigation::commands::tests::test_page_down_at_end ... ok
+test navigation::commands::tests::test_page_up_at_beginning ... ok
+test navigation::commands::tests::test_prev_word_all_empty_cells ... ok
+test navigation::commands::tests::test_select_next_page ... ok
+test navigation::commands::tests::test_select_previous_page ... ok
+test navigation::commands::tests::test_word_motion_alternating_empty_filled ... ok
+test navigation::commands::tests::test_word_motion_single_non_empty_cell ... ok
+test query::tests::test_load_and_query_roundtrip ... ok
+test query::tests::test_load_empty_document_fails ... ok
+test query::tests::test_load_headers_only ... ok
+test query::tests::test_load_special_column_names ... ok
+test query::tests::test_load_with_missing_cells ... ok
+test query::tests::test_misspelled_column_shows_useful_error ... ok
+test query::tests::test_table_name_from_csv ... ok
+test query::tests::test_table_name_no_extension ... ok
+test query::tests::test_table_name_preserves_underscores ... ok
+test query::tests::test_table_name_replaces_special_chars ... ok
+test query::tests::test_table_name_strips_extension ... ok
+test search::tests::test_display_position ... ok
+test search::tests::test_find_matches_basic ... ok
+test search::tests::test_find_matches_case_insensitive ... ok
+test search::tests::test_find_matches_includes_headers ... ok
+test search::tests::test_find_matches_invalid_regex_falls_back_to_literal ... ok
+test search::tests::test_find_matches_no_results ... ok
+test search::tests::test_find_matches_regex_anchor_end ... ok
+test search::tests::test_find_matches_regex_anchor_start ... ok
+test search::tests::test_find_matches_regex_case_insensitive ... ok
+test search::tests::test_find_matches_regex_pattern ... ok
+test search::tests::test_find_matches_substring ... ok
+test search::tests::test_is_current_match ... ok
+test search::tests::test_is_match ... ok
+test search::tests::test_jump_empty_matches ... ok
+test search::tests::test_jump_to_next_basic ... ok
+test search::tests::test_jump_to_next_wraps ... ok
+test search::tests::test_jump_to_prev_basic ... ok
+test search::tests::test_jump_to_prev_wraps ... ok
+test search::tests::test_match_count ... ok
+test search::tests::test_single_match_wraps_both_directions ... ok
+test session::tests::test_clear_cache ... ok
+test session::tests::test_dirty_file_tracking ... ok
+test session::tests::test_document_caching ... ok
+test session::tests::test_file_config_default ... ok
+test session::tests::test_file_config_with_options ... ok
+test session::tests::test_has_multiple_files ... ok
+test session::tests::test_next_file ... ok
+test session::tests::test_prev_file ... ok
+test session::tests::test_query_output_tracking ... ok
+test session::tests::test_rename_current_file_updates_path ... ok
+test session::tests::test_rename_migrates_cached_document ... ok
+test session::tests::test_rename_migrates_dirty_tracking ... ok
+test session::tests::test_rename_migrates_header_mode_and_delimiter ... ok
+test session::tests::test_rename_migrates_query_output_tracking ... ok
+test session::tests::test_session_creation ... ok
+test session::tests::test_single_file_no_switching ... ok
+test ui::magnifier::tests::test_centered_rect_50_percent ... ok
+test ui::magnifier::tests::test_centered_rect_80_percent ... ok
+test ui::magnifier::tests::test_get_search_highlight ... ok
+test ui::magnifier::tests::test_is_position_selected_charwise ... ok
+test ui::magnifier::tests::test_is_position_selected_linewise ... ok
+test ui::magnifier::tests::test_magnifier_state_creation ... ok
+test ui::magnifier::tests::test_magnifier_state_empty_content ... ok
+test ui::magnifier::tests::test_magnifier_state_single_line ... ok
+test ui::table::tests::test_calculate_scroll_offset_auto_mode_centered ... ok
+test ui::table::tests::test_calculate_scroll_offset_auto_mode_near_bottom ... ok
+test ui::table::tests::test_calculate_scroll_offset_auto_mode_near_top ... ok
+test ui::table::tests::test_calculate_scroll_offset_bottom_mode ... ok
+test ui::table::tests::test_calculate_scroll_offset_bottom_mode_near_start ... ok
+test ui::table::tests::test_calculate_scroll_offset_center_mode ... ok
+test ui::table::tests::test_calculate_scroll_offset_center_mode_near_start ... ok
+test ui::table::tests::test_calculate_scroll_offset_small_table ... ok
+test ui::table::tests::test_calculate_scroll_offset_top_mode ... ok
+test ui::table::tests::test_calculate_scroll_offset_top_mode_at_end ... ok
+test ui::table::tests::test_calculate_visible_columns_at_end ... ok
+test ui::table::tests::test_calculate_visible_columns_normal ... ok
+test ui::table::tests::test_calculate_visible_columns_scrolled ... ok
+test ui::tests::test_ui_cell_with_very_long_content ... ok
+test ui::tests::test_ui_column_letters ... ok
+test ui::tests::test_ui_column_letters_displayed ... ok
+test ui::tests::test_ui_dirty_indicator ... ok
+test ui::tests::test_ui_extreme_height_80x1 ... ok
+test ui::tests::test_ui_extreme_terminal_1x1 ... ok
+test ui::tests::test_ui_extreme_width_1x24 ... ok
+test ui::tests::test_ui_extremely_narrow_terminal_20_columns ... ok
+test ui::tests::test_ui_extremely_wide_terminal_500_columns ... ok
+test ui::tests::test_ui_file_switcher_multiple_files ... ok
+test ui::tests::test_ui_file_switcher_single_file ... ok
+test ui::tests::test_ui_minimum_viable_terminal_10x5 ... ok
+test ui::tests::test_ui_multi_byte_unicode_rendering ... ok
+test ui::tests::test_ui_renders_help_overlay ... ok
+test ui::tests::test_ui_renders_multi_file_switcher ... ok
+test ui::tests::test_ui_renders_table ... ok
+test ui::tests::test_ui_renders_with_empty_data ... ok
+test ui::tests::test_ui_renders_with_large_terminal ... ok
+test ui::tests::test_ui_renders_with_single_cell ... ok
+test ui::tests::test_ui_renders_with_small_terminal ... ok
+test ui::tests::test_ui_responsive_to_selection ... ok
+test ui::tests::test_ui_row_numbers ... ok
+test ui::tests::test_ui_shows_dirty_indicator ... ok
+test ui::tests::test_ui_shows_status_bar ... ok
+test ui::tests::test_ui_special_characters_in_cells ... ok
+test ui::tests::test_ui_state_after_navigation ... ok
+test ui::tests::test_ui_state_transitions_help_toggle ... ok
+test ui::tests::test_ui_status_bar_updates ... ok
+test ui::tests::test_ui_unicode_emoji_in_cells ... ok
+test ui::tests::test_ui_very_long_cell_truncation ... ok
+test ui::tests::test_ui_very_long_filename_200_chars ... ok
+test ui::tests::test_ui_very_tall_terminal_100_rows ... ok
+test ui::utils::tests::test_column_letter_boundary_cases ... ok
+test ui::utils::tests::test_column_letter_mixed_case_conversion ... ok
+test ui::utils::tests::test_column_to_excel_letter ... ok
+test ui::utils::tests::test_excel_letter_to_column ... ok
+test ui::utils::tests::test_excel_letter_to_column_case_insensitive ... ok
+test ui::utils::tests::test_excel_letter_to_column_invalid ... ok
+test ui::utils::tests::test_extended_roundtrip_conversion ... ok
+test ui::utils::tests::test_roundtrip_conversion ... ok
+test ui::utils::tests::test_three_letter_columns ... ok
+test ui::view_state::tests::test_show_hide_help ... ok
+test ui::view_state::tests::test_toggle_help ... ok
+test ui::view_state::tests::test_view_state_default ... ok
+test ui::view_state::tests::test_viewport_mode ... ok
+
+test result: ok. 420 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.29s
+
+[2m2026-03-08T03:59:21.949998Z[0m [32m INFO[0m [2mcargo_tarpaulin::report[0m[2m:[0m Coverage Results:
+|| Uncovered Lines:
+|| src/app/messages.rs: 17-18, 35-36, 40-41, 45-46, 50-51
+|| src/app/mod.rs: 67, 76-77, 82-84, 86, 89-90, 92, 95, 119-121, 128-130, 139, 144-147, 152, 161-162, 164, 168, 170, 172-173, 177-179, 181, 185, 189-190, 261, 264, 267-274, 276-277, 279, 284-286, 289, 294, 303-305, 307, 309-311, 316-317, 320-321, 323, 390-392, 394-398, 400, 403-404, 406, 410-412, 414-415, 417-418, 420, 423, 426-427, 429, 434-436, 439-440, 443-445, 447, 449, 451, 456-457, 460-462, 466-467, 469, 474-475, 478-479, 482-483, 485, 489, 520-523, 526-527, 530-531, 534, 537-538, 580-581, 586-589, 594-595, 601, 603-604, 606, 608-609, 611-614, 616, 618-619, 621, 627, 637-639, 642, 644-646, 651-652, 655, 657-662, 664, 666-667, 671-672, 676-681, 684, 686-688, 690, 692-695, 697, 699-700, 702-704, 706, 720, 728, 733, 738, 741-743, 749, 751-753, 756-757, 760-761, 764, 767-771, 775-778, 787-788, 791, 794-795, 797-800, 809, 812, 815-820, 823-824, 827-829, 831, 835-838, 844-847, 858-859, 861, 864-865, 867-869, 871-874, 876-877, 881-882, 886-887, 891-894, 898-900, 902-906, 908
+|| src/cancel.rs: 15-16, 27-28, 41-44, 46-47, 52, 57-58, 61-64, 70-71, 79, 82, 84, 91, 93, 98-100, 104, 112-113, 115, 122, 125, 132
+|| src/cli.rs: 57-58
+|| src/clipboard/mod.rs: 67-68, 82-83, 114-115, 141-142, 161-162
+|| src/csv/document.rs: 73-76, 85, 91, 93, 95-98, 101-102, 107, 112, 114, 116-119, 122-123, 148-152, 164, 171, 173, 177, 180-181, 184-185, 187-189, 192, 199, 205-208, 211-212, 214-217, 219-220, 223-228, 232, 235, 245-247, 249, 294, 300-306, 312-316, 318, 325-327, 330-331, 335-336, 338-339, 342-346, 350, 356-358, 361-362, 366, 369, 375-377, 380-381, 384-386, 390-391, 394, 396-399, 405-408, 412-414, 420-422, 425-426, 429-431, 435-436, 439, 441-444, 449, 457, 463-465, 467, 469-470, 472, 475-476, 480, 485-486, 488-489, 492-495, 497, 501, 506-507, 509-510, 513-515, 519, 522-524, 526, 530-532, 538-539, 541, 546-547, 550-551, 554-555, 560-561, 563, 568, 570, 574-575, 578, 584-585, 588-595, 597-599, 602, 604-605, 609-610, 615-617
+|| src/domain/position.rs: 46-47, 77-78, 89-90
+|| src/input/actions.rs: 122-125, 134-136, 138, 146, 176, 178, 194-195, 212-213
+|| src/input/handler.rs: 22-23, 25-38, 46-53, 62-65, 67, 71-73, 75, 103, 117, 126-128, 130, 132-135, 138-139, 142-143, 145, 147, 151-154, 157-159, 163, 177, 179-181, 184, 186-189, 193-196, 243, 247-248, 251, 255-256, 259, 264-265, 287-288, 326-336, 341-342, 346, 350-360, 365-366, 370, 396, 406-409, 414-415, 419-422, 427-428, 432-434, 438-440, 444-446, 450-451, 455-456, 460-461, 465-466, 470-471, 475-476, 480-481, 485-490, 495-497, 499, 504-506, 510-519, 521-522, 528, 534, 539-548, 550-551, 557-559, 565, 579-580, 585, 587, 591, 593-597, 603, 605, 609, 611-614, 645-646, 648, 650-653, 658-660, 662, 674-677, 712-713, 717, 719, 721-723, 726-730, 732-736, 739-741, 743, 754-755, 759, 761, 763, 765-769, 779-780, 782-785, 788, 790-791, 797-798, 803-804, 809-812, 817-818, 823-829, 832-833, 838, 844-850, 853, 858, 864-869, 874-877, 882-883, 887, 889-894, 896-897, 899-900, 902, 911-912, 916, 918, 920, 922-926, 957, 969-970, 975-978, 990, 995, 1021, 1026-1027, 1031, 1052-1053, 1055, 1070, 1075, 1077-1078, 1081, 1083, 1085-1086, 1091-1098, 1105-1113, 1120-1127, 1134-1142, 1150, 1155, 1160, 1166, 1170, 1173-1174, 1176-1177, 1181, 1183, 1186-1190, 1192, 1194, 1196, 1198, 1201-1206, 1210-1212, 1220-1226, 1228, 1231, 1234-1235, 1237, 1241-1243, 1245, 1251-1257, 1260, 1262, 1265-1267, 1269, 1275-1277, 1283-1284, 1286, 1290, 1293-1294, 1296-1297, 1301, 1303, 1306-1310, 1312, 1314, 1316, 1318, 1320-1322, 1330-1336, 1338, 1341-1343, 1348-1354, 1357, 1359-1361, 1369-1374, 1377-1378, 1380, 1384, 1387-1388, 1390-1391, 1395, 1397, 1400, 1402-1407, 1412-1413, 1415-1416, 1419-1421, 1424-1430, 1435, 1440, 1446, 1448, 1450-1455, 1457-1458, 1463-1464, 1466, 1472, 1474-1476, 1479-1481, 1483, 1485, 1488, 1494-1495, 1497, 1512, 1514-1517, 1521, 1523-1524, 1526, 1530-1531, 1533, 1536, 1538, 1540-1543, 1546, 1548, 1550, 1552, 1555, 1558, 1562, 1570, 1572-1574, 1577-1578, 1580, 1582-1583, 1585, 1589, 1592, 1594, 1596, 1598-1600, 1602, 1604, 1607, 1609, 1612, 1616, 1624, 1626-1629, 1632-1633, 1636-1638, 1640, 1644, 1646, 1648, 1650-1653, 1656, 1658-1659, 1661, 1663, 1665, 1668, 1672, 1679-1680, 1683, 1685-1687, 1690-1691, 1694-1695, 1698, 1701-1702, 1705, 1708, 1710, 1712-1713, 1717, 1719, 1723-1728, 1733, 1737-1738, 1741, 1744-1745, 1748, 1751, 1753, 1755-1756, 1761, 1763, 1767, 1770, 1774, 1781, 1783-1785, 1788-1789, 1791-1794, 1797-1801, 1804-1808, 1812-1813, 1816, 1819-1821, 1823-1824, 1826, 1830-1837, 1841, 1844, 1848-1849, 1852, 1855-1859, 1862-1864, 1866, 1870-1872, 1875-1877, 1882-1884, 1886-1887, 1890-1891, 1894, 1897-1899, 1901-1903, 1906, 1909-1911, 1914-1915, 1919, 1921, 1925-1926, 1928, 1930-1931, 1933-1936, 1938-1939, 1943, 1947-1948, 1951, 1954, 1956, 1958-1959, 1964, 1966, 1970, 1973, 1977, 1981-1983, 1999, 2004-2005, 2011, 2015, 2017, 2020, 2022, 2026-2028, 2030, 2035, 2041, 2054-2057, 2059, 2061, 2065-2066, 2069, 2073, 2075, 2077-2078, 2081, 2100-2102, 2106-2108, 2110, 2113-2114, 2117, 2121, 2123, 2125-2126, 2129, 2132-2133, 2137-2138, 2141-2142, 2144, 2148-2149, 2151, 2153-2154, 2158-2160, 2163-2164, 2167, 2169, 2174-2176, 2180-2181, 2184, 2188, 2192, 2194-2195, 2199, 2203-2204, 2206-2209, 2212-2213, 2216, 2219-2220, 2222, 2225, 2227, 2229, 2233-2234, 2237, 2239, 2243-2245, 2247, 2253, 2257, 2281, 2283-2285, 2288, 2290-2298, 2301, 2303, 2305, 2308-2309, 2311-2313, 2316-2318, 2321, 2325, 2329, 2333, 2337-2338, 2340, 2343, 2347, 2353-2354, 2358-2359, 2362-2366, 2370, 2372-2373, 2377-2378, 2380, 2384-2385, 2387, 2389-2391, 2393-2396, 2401-2402, 2404, 2408-2409, 2415-2417, 2419-2422, 2427-2429, 2433, 2436-2437, 2440-2444, 2446, 2449-2450, 2454-2456, 2458-2459, 2461, 2464, 2466, 2468-2469, 2473, 2479, 2481-2483, 2486, 2489-2490, 2495-2496, 2501-2502, 2507-2508, 2512-2514, 2518-2519, 2521, 2524-2528, 2534-2536, 2538, 2541-2542, 2544, 2551-2554, 2557-2558, 2560, 2567-2570, 2573-2574, 2576, 2583-2584, 2590-2592, 2598-2599, 2605-2606, 2612, 2614-2615, 2617-2618, 2621-2622, 2624, 2627-2628, 2630-2631, 2634-2635, 2637, 2644, 2646, 2649-2653, 2660, 2664-2665, 2667-2669, 2671-2672, 2674, 2676-2679, 2681-2682, 2686-2688, 2690-2692, 2694, 2696-2698, 2700-2701, 2703, 2705-2707, 2709-2710, 2714-2715, 2717-2718, 2723, 2726-2730, 2735-2739, 2742, 2746-2748, 2751-2755, 2760-2762, 2765-2766, 2768, 2774-2776, 2779-2780, 2782, 2787-2789, 2793-2794, 2799-2800, 2804-2805, 2809-2810, 2815-2818, 2820, 2825-2829, 2831, 2837, 2845, 2848-2849, 2852-2853, 2858-2859, 2861, 2864, 2867, 2870, 2876-2880, 2893, 2895-2896, 2899, 2903, 2906, 2908-2910, 2914, 2916-2917, 2921-2923, 2928-2930, 2937, 2939, 2943, 2946-2948, 2952-2953, 2955, 2957-2958, 2960-2961, 2963-2964, 2966-2967, 2970-2974, 2980, 2984-2987, 2991, 2993-2996, 2999-3001, 3004-3006, 3009, 3013-3014, 3016-3018, 3021, 3024-3025, 3027-3028, 3031-3032, 3034-3037, 3040-3041, 3044-3046, 3048-3049, 3054-3065, 3068-3069, 3072, 3076-3077, 3081, 3086-3088, 3095, 3099-3102, 3105, 3108, 3112-3113, 3118, 3123, 3128, 3132-3135, 3138-3139, 3144, 3148-3151, 3154, 3156, 3159-3160, 3163-3165, 3169-3170, 3172-3173, 3175-3177, 3181, 3184-3185, 3187-3188, 3190-3192, 3196-3197, 3201-3202, 3205, 3207-3208, 3214, 3218-3221, 3224, 3226-3229, 3232-3234, 3237-3239, 3242-3243, 3246-3248, 3251, 3256
+|| src/input/state.rs: 100-101, 105-106, 110-111, 115-116
+|| src/magnifier/mod.rs: 210-211, 225-227, 276-277, 281-282, 286-287, 291-304, 313-315, 319-321, 325-327, 331-332, 336-337, 341-342, 350-352, 356-358, 362-364, 368-370, 372, 374-375, 377, 379, 382-383, 385, 387, 392, 409, 421, 550-553, 555-556, 558, 561, 583, 754, 840-843, 847-852, 856-861, 865-873, 878-885, 887, 892-895, 899-907, 916, 918-919, 921-922, 926-927, 930-931, 933, 936-938, 943-944, 947-948, 950, 953-955, 964-968, 970, 972-976, 979-980, 982-983, 987-989, 991, 994, 999-1002, 1004, 1007-1008, 1013-1017, 1019-1024, 1027, 1030, 1034, 1037, 1042-1044, 1052-1055, 1059-1061, 1063-1068, 1075-1076, 1081-1082, 1085, 1088-1091, 1095-1096, 1101-1102, 1105-1106, 1108-1111, 1115-1118, 1122-1126, 1130-1131, 1134-1135, 1139-1140, 1143-1144, 1146, 1151-1152, 1156-1157, 1161-1162, 1170-1173, 1175-1178, 1185-1187, 1189-1192, 1199-1202, 1204-1207, 1214-1216, 1218-1221, 1228-1234, 1240-1246
+|| src/navigation/commands.rs: 58-59, 83, 91, 96, 101, 113, 121, 133, 187, 220-221, 231, 260, 278, 282-285, 292-293, 296-299, 302-304, 342, 361, 365-366, 368-369, 371-375, 380-382, 388, 390
+|| src/query/mod.rs: 32-36, 38-40, 42, 54, 102, 108-109, 111, 113-116, 119, 122-125, 128-129, 132-133, 137, 139, 141-143, 146, 150, 155-157, 160, 163, 166, 168-169, 171, 173, 176-177, 180, 190-192, 195-198, 200-205, 208-209, 211, 213-215, 218, 224, 230-231, 234-236, 239, 241, 244, 246-247, 249-250, 252-254, 256-257, 260, 263, 265-269, 272, 274, 277-278, 281, 286, 292-295, 298-301, 303-308, 311-312, 314, 316-319, 321, 324, 328-329, 331, 335, 344-346, 352-355, 358-361, 363-368, 371-372, 374, 377-378, 381, 384-386, 389, 391
+|| src/session/mod.rs: 45-46, 118-119, 263, 284-287, 294-296, 298-300, 305-306, 312-314, 317-323, 326-331, 334
+|| src/ui/help.rs: 181, 183, 188
+|| src/ui/magnifier.rs: 37-39, 44-45, 48-49, 51-52, 55-56, 58, 61-64, 66-67, 70-73, 75, 78-81, 83, 86-87, 89-92, 94, 96, 100, 102-108, 110, 113, 116-122, 124, 127, 129, 133, 135, 139-142, 144, 147-150, 152-153, 157, 163-165, 167-170, 172, 175, 177-181, 183, 185, 188, 192, 197-200, 202-205, 207, 210-213, 215, 218-221, 223, 225-226, 232, 237, 239, 242-244, 247, 252, 264-265, 268-269, 271, 276-278, 281-282, 285-287, 289, 291-292, 294, 297, 300-301, 305-308, 310-311, 315-316, 318, 322, 342
+|| src/ui/mod.rs: 20, 24-30, 32-34, 68-70, 76
+|| src/ui/sql_editor.rs: 24, 33, 37, 39-40, 43-44, 47-52, 54-57, 59-60, 63-64, 67-69, 71, 73-74, 76, 80-83, 87-88, 90-91, 93, 95, 97-100, 105-107, 112-117, 121-122, 127-128, 131-132, 135-139
+|| src/ui/status.rs: 120, 208, 216, 234-242, 245, 255-256, 260-261, 268, 270, 278, 280-282, 286, 289-290, 293-296, 298-301, 304, 307-309, 313-316, 318, 321-323, 327-330, 332-333, 336, 339-341, 345-346, 348, 350, 354-356, 362-364, 366-369, 375-376, 378-379, 382, 385-386, 388, 392-393, 396, 399-400, 405, 408, 413, 418
+|| src/ui/table.rs: 32-33, 36, 40, 44, 96, 98, 118-119, 121, 135, 140-143, 145, 151, 196, 198-201, 203, 206-207, 209, 228, 230, 262-263, 265, 301, 306-309, 311, 349, 422-424
+|| src/ui/view_state.rs: 96-97, 101-102, 106-107
+|| Tested/Total Lines:
+|| src/app/messages.rs: 2/12
+|| src/app/mod.rs: 40/322
+|| src/cancel.rs: 0/34
+|| src/cli.rs: 4/6
+|| src/clipboard/mod.rs: 46/56
+|| src/csv/document.rs: 53/265
+|| src/csv/writer.rs: 33/33
+|| src/domain/position.rs: 22/28
+|| src/file_system/discovery.rs: 19/19
+|| src/input/actions.rs: 23/38
+|| src/input/handler.rs: 220/1547
+|| src/input/state.rs: 31/39
+|| src/magnifier/mod.rs: 236/523
+|| src/navigation/commands.rs: 121/165
+|| src/query/mod.rs: 34/187
+|| src/search/mod.rs: 47/47
+|| src/session/mod.rs: 89/123
+|| src/ui/help.rs: 133/136
+|| src/ui/magnifier.rs: 30/178
+|| src/ui/mod.rs: 15/30
+|| src/ui/sql_editor.rs: 0/62
+|| src/ui/status.rs: 103/190
+|| src/ui/table.rs: 181/222
+|| src/ui/utils.rs: 21/21
+|| src/ui/view_state.rs: 17/23
+|| 
+35.30% coverage, 1520/4306 lines covered

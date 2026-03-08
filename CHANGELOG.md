@@ -7,10 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-03-08
+
 ### Changed
-- **BREAKING:** Magnifier cell navigation changed from `Ctrl+hjkl` to `Alt+hjkl` or `Alt+arrows` to avoid terminal control code conflicts (Ctrl+j is often mapped to linefeed)
+- **Code Quality:** Refactored 5 large functions (823 lines → 154 lines, 81% reduction)
+- **Code Quality:** Eliminated all functions >50 lines for improved maintainability
+- **Code Quality:** Fixed all clippy warnings (7 → 0)
+- **Code Quality:** Fixed all rustdoc warnings (2 → 0)
+- **Code Quality:** Removed all stale TODOs (6 → 0)
+
+### Added
+- **Documentation:** Created comprehensive error handling policy in `docs/error-handling.md` (280+ lines)
+- **Documentation:** Documented when unwrap is forbidden vs acceptable with migration strategy
+- **Testing:** Added 30 new unit tests for csv/document.rs and query/mod.rs
+- **Testing:** Improved code coverage from 35.30% to 63.03% (+78.6% increase)
+
+### Fixed
+- **Clipboard:** Range yank operations (`:1,10y`, `:B,Dy`) now properly use clipboard
+- **Clipboard:** All 6 stale TODOs were about unimplemented clipboard - now fully functional
 
 ## [0.6.0] - 2026-02-28
+
+### Changed
+- **BREAKING:** Magnifier cell navigation changed from `Ctrl+hjkl` to `Alt+hjkl` or `Alt+arrows` to avoid terminal control code conflicts (Ctrl+j is often mapped to linefeed)
 
 ### Added - Magnifier Mode (Full Vim Editor for Cells)
 

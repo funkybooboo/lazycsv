@@ -574,7 +574,7 @@ mod tests {
         let new_path = PathBuf::from("renamed.csv");
         session.rename_current_file(new_path.clone());
 
-        assert_eq!(session.get_header_mode(), false);
+        assert!(!session.get_header_mode());
         assert_eq!(session.get_delimiter(&new_path), ';');
     }
 

@@ -68,7 +68,10 @@ impl Document {
     }
 
     /// Decodes file bytes into a UTF-8 string using the specified encoding.
-    pub(crate) fn decode_file_bytes(file_bytes: &[u8], encoding_label: Option<String>) -> Result<String> {
+    pub(crate) fn decode_file_bytes(
+        file_bytes: &[u8],
+        encoding_label: Option<String>,
+    ) -> Result<String> {
         if let Some(label) = &encoding_label {
             let encoding = Encoding::for_label(label.as_bytes())
                 .ok_or_else(|| anyhow::anyhow!("Unsupported encoding: {}", label))?;
@@ -178,8 +181,12 @@ impl Document {
             fs::read(path).context(format!("Failed to read file: {}", path.display()))?;
 
         let decoded_content = Self::decode_file_bytes(&file_bytes, encoding_label)?;
-        let (headers, data_rows) =
-            Self::parse_csv_content_cancellable(&decoded_content, delimiter, no_headers, cancelled)?;
+        let (headers, data_rows) = Self::parse_csv_content_cancellable(
+            &decoded_content,
+            delimiter,
+            no_headers,
+            cancelled,
+        )?;
 
         let mut all_rows = vec![headers];
         all_rows.extend(data_rows);
@@ -370,7 +377,7 @@ impl Document {
     }
 
     /// Delete a range of columns (inclusive, 0-based column indices)
-    /// Returns the deleted columns (each column as Vec<String> including header)
+    /// Returns the deleted columns (each column as `Vec<String>` including header)
     /// Example: delete_columns(ColIndex(1), ColIndex(3)) deletes columns B, C, D
     pub fn delete_columns(&mut self, start: ColIndex, end: ColIndex) -> Vec<Vec<String>> {
         let start_idx = start.get();
@@ -415,7 +422,7 @@ impl Document {
     }
 
     /// Get a copy of columns in a range (inclusive, 0-based column indices)
-    /// Returns the columns without deleting them (each column as Vec<String> including header)
+    /// Returns the columns without deleting them (each column as `Vec<String>` including header)
     /// Example: get_columns(ColIndex(1), ColIndex(3)) returns columns B, C, D
     pub fn get_columns(&self, start: ColIndex, end: ColIndex) -> Vec<Vec<String>> {
         let start_idx = start.get();
@@ -1325,5 +1332,382 @@ mod tests {
 
         assert_eq!(csv_data.row_count(), 2); // 1 header + 1 data row
         assert!(csv_data.filename.len() > 100);
+    }
+
+    // ===== Mutation Method Tests =====
+
+    #[test]
+    fn test_set_cell_updates_value() {
+        let doc = Document::new(
+            vec!["Name".to_string(), "Age".to_string()],
+            vec![vec!["Alice".to_string(), "30".to_string()]],
+            "test.csv".to_string(),
+        );
+
+        let mut doc = doc;
+        doc.set_cell(RowIndex::new(1), ColIndex::new(0), "Bob".to_string());
+
+        assert_eq!(doc.get_cell(RowIndex::new(1), ColIndex::new(0)), "Bob");
+        assert!(doc.is_dirty);
+    }
+
+    #[test]
+    fn test_set_cell_out_of_bounds() {
+        let doc = Document::new(
+            vec!["Name".to_string()],
+            vec![vec!["Alice".to_string()]],
+            "test.csv".to_string(),
+        );
+
+        let mut doc = doc;
+        // Setting cell out of bounds should not panic
+        doc.set_cell(RowIndex::new(10), ColIndex::new(0), "Test".to_string());
+        // Original data should be unchanged
+        assert_eq!(doc.row_count(), 2);
+    }
+
+    #[test]
+    fn test_insert_row_at_end() {
+        let doc = Document::new(
+            vec!["A".to_string(), "B".to_string()],
+            vec![vec!["1".to_string(), "2".to_string()]],
+            "test.csv".to_string(),
+        );
+
+        let mut doc = doc;
+        let original_count = doc.row_count();
+        doc.insert_row(RowIndex::new(2)); // Insert after data row
+
+        assert_eq!(doc.row_count(), original_count + 1);
+        assert_eq!(doc.get_cell(RowIndex::new(2), ColIndex::new(0)), "");
+        assert_eq!(doc.get_cell(RowIndex::new(2), ColIndex::new(1)), "");
+        assert!(doc.is_dirty);
+    }
+
+    #[test]
+    fn test_insert_row_at_beginning() {
+        let doc = Document::new(
+            vec!["A".to_string()],
+            vec![vec!["1".to_string()], vec!["2".to_string()]],
+            "test.csv".to_string(),
+        );
+
+        let mut doc = doc;
+        doc.insert_row(RowIndex::new(1)); // Insert at first data row
+
+        assert_eq!(doc.row_count(), 4); // 1 header + 3 data rows
+        assert_eq!(doc.get_cell(RowIndex::new(1), ColIndex::new(0)), "");
+        assert_eq!(doc.get_cell(RowIndex::new(2), ColIndex::new(0)), "1");
+    }
+
+    #[test]
+    fn test_delete_row_returns_deleted_data() {
+        let doc = Document::new(
+            vec!["Name".to_string()],
+            vec![vec!["Alice".to_string()], vec!["Bob".to_string()]],
+            "test.csv".to_string(),
+        );
+
+        let mut doc = doc;
+        let deleted = doc.delete_row(RowIndex::new(1));
+
+        assert_eq!(deleted, Some(vec!["Alice".to_string()]));
+        assert_eq!(doc.row_count(), 2); // 1 header + 1 data row
+        assert_eq!(doc.get_cell(RowIndex::new(1), ColIndex::new(0)), "Bob");
+        assert!(doc.is_dirty);
+    }
+
+    #[test]
+    fn test_delete_row_out_of_bounds() {
+        let doc = Document::new(
+            vec!["A".to_string()],
+            vec![vec!["1".to_string()]],
+            "test.csv".to_string(),
+        );
+
+        let mut doc = doc;
+        let deleted = doc.delete_row(RowIndex::new(10));
+
+        assert_eq!(deleted, None);
+        assert_eq!(doc.row_count(), 2); // Unchanged
+    }
+
+    #[test]
+    fn test_delete_rows_range() {
+        let doc = Document::new(
+            vec!["A".to_string()],
+            vec![
+                vec!["1".to_string()],
+                vec!["2".to_string()],
+                vec!["3".to_string()],
+                vec!["4".to_string()],
+            ],
+            "test.csv".to_string(),
+        );
+
+        let mut doc = doc;
+        let deleted = doc.delete_rows(RowIndex::new(1), RowIndex::new(2));
+
+        assert_eq!(deleted.len(), 2);
+        assert_eq!(deleted[0][0], "1");
+        assert_eq!(deleted[1][0], "2");
+        assert_eq!(doc.row_count(), 3); // 1 header + 2 remaining data rows
+        assert_eq!(doc.get_cell(RowIndex::new(1), ColIndex::new(0)), "3");
+    }
+
+    #[test]
+    fn test_get_rows_range() {
+        let doc = Document::new(
+            vec!["A".to_string()],
+            vec![
+                vec!["1".to_string()],
+                vec!["2".to_string()],
+                vec!["3".to_string()],
+            ],
+            "test.csv".to_string(),
+        );
+
+        let rows = doc.get_rows(RowIndex::new(1), RowIndex::new(2));
+
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0][0], "1");
+        assert_eq!(rows[1][0], "2");
+        // Original document unchanged
+        assert_eq!(doc.row_count(), 4);
+    }
+
+    #[test]
+    fn test_insert_column_empty() {
+        let doc = Document::new(
+            vec!["A".to_string()],
+            vec![vec!["1".to_string()], vec!["2".to_string()]],
+            "test.csv".to_string(),
+        );
+
+        let mut doc = doc;
+        doc.insert_empty_column(ColIndex::new(1));
+
+        assert_eq!(doc.column_count(), 2);
+        assert_eq!(doc.get_header(ColIndex::new(1)), "Column B"); // Generated header
+        assert_eq!(doc.get_cell(RowIndex::new(1), ColIndex::new(1)), "");
+        assert!(doc.is_dirty);
+    }
+
+    #[test]
+    fn test_insert_column_with_data() {
+        let doc = Document::new(
+            vec!["A".to_string()],
+            vec![vec!["1".to_string()], vec!["2".to_string()]],
+            "test.csv".to_string(),
+        );
+
+        let mut doc = doc;
+        let column_data = vec!["B".to_string(), "10".to_string(), "20".to_string()];
+        doc.insert_column(ColIndex::new(1), column_data);
+
+        assert_eq!(doc.column_count(), 2);
+        assert_eq!(doc.get_header(ColIndex::new(1)), "B");
+        assert_eq!(doc.get_cell(RowIndex::new(1), ColIndex::new(1)), "10");
+        assert_eq!(doc.get_cell(RowIndex::new(2), ColIndex::new(1)), "20");
+    }
+
+    #[test]
+    fn test_delete_column_returns_data() {
+        let doc = Document::new(
+            vec!["A".to_string(), "B".to_string()],
+            vec![vec!["1".to_string(), "2".to_string()]],
+            "test.csv".to_string(),
+        );
+
+        let mut doc = doc;
+        let deleted = doc.delete_column(ColIndex::new(0));
+
+        assert_eq!(deleted.len(), 2); // Header + 1 data row
+        assert_eq!(deleted[0], "A");
+        assert_eq!(deleted[1], "1");
+        assert_eq!(doc.column_count(), 1);
+        assert_eq!(doc.get_header(ColIndex::new(0)), "B");
+    }
+
+    #[test]
+    fn test_get_column_does_not_mutate() {
+        let doc = Document::new(
+            vec!["A".to_string(), "B".to_string()],
+            vec![vec!["1".to_string(), "2".to_string()]],
+            "test.csv".to_string(),
+        );
+
+        let column = doc.get_column(ColIndex::new(0));
+
+        assert_eq!(column.len(), 2); // Header + 1 data row
+        assert_eq!(column[0], "A");
+        assert_eq!(column[1], "1");
+        assert_eq!(doc.column_count(), 2); // Unchanged
+    }
+
+    #[test]
+    fn test_delete_columns_range() {
+        let doc = Document::new(
+            vec!["A".to_string(), "B".to_string(), "C".to_string()],
+            vec![vec!["1".to_string(), "2".to_string(), "3".to_string()]],
+            "test.csv".to_string(),
+        );
+
+        let mut doc = doc;
+        let deleted = doc.delete_columns(ColIndex::new(0), ColIndex::new(1));
+
+        assert_eq!(deleted.len(), 2); // 2 columns deleted
+        assert_eq!(deleted[0][0], "A"); // First column header
+        assert_eq!(deleted[1][0], "B"); // Second column header
+        assert_eq!(doc.column_count(), 1);
+        assert_eq!(doc.get_header(ColIndex::new(0)), "C");
+    }
+
+    #[test]
+    fn test_get_columns_range() {
+        let doc = Document::new(
+            vec!["A".to_string(), "B".to_string(), "C".to_string()],
+            vec![vec!["1".to_string(), "2".to_string(), "3".to_string()]],
+            "test.csv".to_string(),
+        );
+
+        let columns = doc.get_columns(ColIndex::new(0), ColIndex::new(1));
+
+        assert_eq!(columns.len(), 2);
+        assert_eq!(columns[0][0], "A");
+        assert_eq!(columns[1][0], "B");
+        assert_eq!(doc.column_count(), 3); // Unchanged
+    }
+
+    #[test]
+    fn test_sort_by_single_column_ascending() {
+        let doc = Document::new(
+            vec!["Name".to_string(), "Age".to_string()],
+            vec![
+                vec!["Charlie".to_string(), "35".to_string()],
+                vec!["Alice".to_string(), "30".to_string()],
+                vec!["Bob".to_string(), "25".to_string()],
+            ],
+            "test.csv".to_string(),
+        );
+
+        let mut doc = doc;
+        doc.sort_by_columns(&[0], true); // Sort by Name ascending
+
+        assert_eq!(doc.get_cell(RowIndex::new(1), ColIndex::new(0)), "Alice");
+        assert_eq!(doc.get_cell(RowIndex::new(2), ColIndex::new(0)), "Bob");
+        assert_eq!(doc.get_cell(RowIndex::new(3), ColIndex::new(0)), "Charlie");
+        assert!(doc.is_dirty);
+    }
+
+    #[test]
+    fn test_sort_by_single_column_descending() {
+        let doc = Document::new(
+            vec!["Age".to_string()],
+            vec![
+                vec!["25".to_string()],
+                vec!["30".to_string()],
+                vec!["35".to_string()],
+            ],
+            "test.csv".to_string(),
+        );
+
+        let mut doc = doc;
+        doc.sort_by_columns(&[0], false); // Sort descending
+
+        assert_eq!(doc.get_cell(RowIndex::new(1), ColIndex::new(0)), "35");
+        assert_eq!(doc.get_cell(RowIndex::new(2), ColIndex::new(0)), "30");
+        assert_eq!(doc.get_cell(RowIndex::new(3), ColIndex::new(0)), "25");
+    }
+
+    #[test]
+    fn test_sort_by_multiple_columns() {
+        let doc = Document::new(
+            vec!["Dept".to_string(), "Name".to_string()],
+            vec![
+                vec!["Sales".to_string(), "Charlie".to_string()],
+                vec!["IT".to_string(), "Bob".to_string()],
+                vec!["Sales".to_string(), "Alice".to_string()],
+            ],
+            "test.csv".to_string(),
+        );
+
+        let mut doc = doc;
+        doc.sort_by_columns(&[0, 1], true); // Sort by Dept then Name
+
+        // IT before Sales, then alphabetically within same dept
+        assert_eq!(doc.get_cell(RowIndex::new(1), ColIndex::new(0)), "IT");
+        assert_eq!(doc.get_cell(RowIndex::new(2), ColIndex::new(0)), "Sales");
+        assert_eq!(doc.get_cell(RowIndex::new(2), ColIndex::new(1)), "Alice");
+        assert_eq!(doc.get_cell(RowIndex::new(3), ColIndex::new(1)), "Charlie");
+    }
+
+    #[test]
+    fn test_toggle_header_mode() {
+        let doc = Document::new(
+            vec!["A".to_string()],
+            vec![vec!["1".to_string()]],
+            "test.csv".to_string(),
+        );
+
+        let mut doc = doc;
+        assert!(doc.header_mode); // Default is true
+
+        doc.toggle_header_mode();
+        assert!(!doc.header_mode);
+
+        doc.toggle_header_mode();
+        assert!(doc.header_mode);
+    }
+
+    #[test]
+    fn test_move_columns_single() {
+        let doc = Document::new(
+            vec!["A".to_string(), "B".to_string(), "C".to_string()],
+            vec![vec!["1".to_string(), "2".to_string(), "3".to_string()]],
+            "test.csv".to_string(),
+        );
+
+        let mut doc = doc;
+        // Move column A (index 0) to before column 3 (after all columns)
+        doc.move_columns(ColIndex::new(0), ColIndex::new(0), 3);
+
+        // Result should be: B C A
+        assert_eq!(doc.get_header(ColIndex::new(0)), "B");
+        assert_eq!(doc.get_header(ColIndex::new(1)), "C");
+        assert_eq!(doc.get_header(ColIndex::new(2)), "A");
+    }
+
+    #[test]
+    fn test_generation_increments_on_mutations() {
+        let doc = Document::new(
+            vec!["A".to_string()],
+            vec![vec!["1".to_string()]],
+            "test.csv".to_string(),
+        );
+
+        let mut doc = doc;
+        assert_eq!(doc.generation, 0);
+
+        doc.set_cell(RowIndex::new(1), ColIndex::new(0), "2".to_string());
+        assert_eq!(doc.generation, 1);
+
+        doc.insert_row(RowIndex::new(2));
+        assert_eq!(doc.generation, 2);
+
+        doc.delete_row(RowIndex::new(2));
+        assert_eq!(doc.generation, 3);
+    }
+
+    #[test]
+    fn test_data_row_count() {
+        let doc = Document::new(
+            vec!["A".to_string()],
+            vec![vec!["1".to_string()], vec!["2".to_string()]],
+            "test.csv".to_string(),
+        );
+
+        assert_eq!(doc.row_count(), 3); // 1 header + 2 data
+        assert_eq!(doc.data_row_count(), 2); // Only data rows
     }
 }

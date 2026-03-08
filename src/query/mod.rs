@@ -121,9 +121,7 @@ fn load_csv_file_into_sqlite(
     // Get headers
     let headers: Vec<String> = if config.no_headers {
         let first = reader.headers().context("CSV file has no records")?;
-        (1..=first.len())
-            .map(|i| format!("Column {}", i))
-            .collect()
+        (1..=first.len()).map(|i| format!("Column {}", i)).collect()
     } else {
         let h = reader.headers().context("CSV file has no headers")?;
         h.iter().map(String::from).collect()
@@ -328,8 +326,7 @@ pub fn execute_query_to_document_cancellable(
 pub fn execute_query(path: &Path, query: &str, config: &FileConfig) -> Result<()> {
     let csv_files = resolve_csv_files(path)?;
 
-    let conn =
-        Connection::open_in_memory().context("Failed to open in-memory SQLite database")?;
+    let conn = Connection::open_in_memory().context("Failed to open in-memory SQLite database")?;
 
     // Optimize SQLite for bulk loading (safe for in-memory databases)
     conn.execute_batch(
@@ -572,5 +569,200 @@ mod tests {
             "Error should mention the bad column name, got: {}",
             err_msg
         );
+    }
+
+    #[test]
+    fn test_resolve_csv_files_directory() {
+        use std::fs;
+        let temp_dir = tempfile::tempdir().unwrap();
+
+        // Create test CSV files
+        fs::write(temp_dir.path().join("test1.csv"), "a,b\n1,2\n").unwrap();
+        fs::write(temp_dir.path().join("test2.csv"), "x,y\n3,4\n").unwrap();
+        fs::write(temp_dir.path().join("not_csv.txt"), "ignore\n").unwrap();
+
+        let files = resolve_csv_files(temp_dir.path()).unwrap();
+
+        assert_eq!(files.len(), 2);
+        assert!(files.iter().any(|p| p.file_name().unwrap() == "test1.csv"));
+        assert!(files.iter().any(|p| p.file_name().unwrap() == "test2.csv"));
+    }
+
+    #[test]
+    fn test_resolve_csv_files_single_file() {
+        use std::fs;
+        let temp_dir = tempfile::tempdir().unwrap();
+
+        // Create test CSV files
+        let target_file = temp_dir.path().join("target.csv");
+        fs::write(&target_file, "a,b\n1,2\n").unwrap();
+        fs::write(temp_dir.path().join("other.csv"), "x,y\n3,4\n").unwrap();
+
+        let files = resolve_csv_files(&target_file).unwrap();
+
+        // Should return all CSVs in the same directory (for JOINs)
+        assert_eq!(files.len(), 2);
+    }
+
+    #[test]
+    fn test_resolve_csv_files_nonexistent_path() {
+        let result = resolve_csv_files(Path::new("/nonexistent/path"));
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("does not exist"));
+    }
+
+    #[test]
+    fn test_resolve_csv_files_empty_directory() {
+        let temp_dir = tempfile::tempdir().unwrap();
+
+        let result = resolve_csv_files(temp_dir.path());
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("No CSV files found"));
+    }
+
+    #[test]
+    fn test_execute_query_to_document_simple_select() {
+        let conn = Connection::open_in_memory().unwrap();
+        let doc = Document {
+            rows: vec![
+                vec!["Name".into(), "Age".into()],
+                vec!["Alice".into(), "30".into()],
+                vec!["Bob".into(), "25".into()],
+            ],
+            filename: "people.csv".into(),
+            is_dirty: false,
+            header_mode: true,
+            delimiter: ',',
+            generation: 0,
+        };
+        load_csv_into_sqlite(&conn, &doc, "people").unwrap();
+
+        let result_doc = execute_query_to_document(
+            &conn,
+            "SELECT Name FROM people WHERE Age > '26'",
+            "result.csv".into(),
+        )
+        .unwrap();
+
+        assert_eq!(result_doc.rows.len(), 2); // 1 header + 1 data row
+        assert_eq!(result_doc.rows[0][0], "Name");
+        assert_eq!(result_doc.rows[1][0], "Alice");
+    }
+
+    #[test]
+    fn test_execute_query_to_document_aggregate() {
+        let conn = Connection::open_in_memory().unwrap();
+        let doc = Document {
+            rows: vec![
+                vec!["Product".into(), "Price".into()],
+                vec!["Apple".into(), "1.50".into()],
+                vec!["Banana".into(), "0.75".into()],
+            ],
+            filename: "products.csv".into(),
+            is_dirty: false,
+            header_mode: true,
+            delimiter: ',',
+            generation: 0,
+        };
+        load_csv_into_sqlite(&conn, &doc, "products").unwrap();
+
+        let result_doc = execute_query_to_document(
+            &conn,
+            "SELECT COUNT(*) as total FROM products",
+            "count.csv".into(),
+        )
+        .unwrap();
+
+        assert_eq!(result_doc.rows.len(), 2); // 1 header + 1 data row
+        assert_eq!(result_doc.rows[0][0], "total");
+        assert_eq!(result_doc.rows[1][0], "2");
+    }
+
+    #[test]
+    fn test_execute_query_to_document_invalid_sql() {
+        let conn = Connection::open_in_memory().unwrap();
+
+        let result =
+            execute_query_to_document(&conn, "SELECT * FROM nonexistent_table", "out.csv".into());
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("no such table") || err_msg.contains("Failed to execute query"));
+    }
+
+    #[test]
+    fn test_execute_query_to_document_empty_result() {
+        let conn = Connection::open_in_memory().unwrap();
+        let doc = Document {
+            rows: vec![
+                vec!["ID".into(), "Value".into()],
+                vec!["1".into(), "test".into()],
+            ],
+            filename: "data.csv".into(),
+            is_dirty: false,
+            header_mode: true,
+            delimiter: ',',
+            generation: 0,
+        };
+        load_csv_into_sqlite(&conn, &doc, "data").unwrap();
+
+        let result_doc = execute_query_to_document(
+            &conn,
+            "SELECT * FROM data WHERE ID = '999'",
+            "empty.csv".into(),
+        )
+        .unwrap();
+
+        // Should have headers but no data rows
+        assert_eq!(result_doc.rows.len(), 1);
+        assert_eq!(result_doc.rows[0].len(), 2); // ID and Value columns
+    }
+
+    #[test]
+    fn test_execute_query_to_document_join() {
+        let conn = Connection::open_in_memory().unwrap();
+
+        // Create two tables
+        let doc1 = Document {
+            rows: vec![
+                vec!["ID".into(), "Name".into()],
+                vec!["1".into(), "Alice".into()],
+                vec!["2".into(), "Bob".into()],
+            ],
+            filename: "users.csv".into(),
+            is_dirty: false,
+            header_mode: true,
+            delimiter: ',',
+            generation: 0,
+        };
+        let doc2 = Document {
+            rows: vec![
+                vec!["UserID".into(), "Email".into()],
+                vec!["1".into(), "alice@example.com".into()],
+            ],
+            filename: "emails.csv".into(),
+            is_dirty: false,
+            header_mode: true,
+            delimiter: ',',
+            generation: 0,
+        };
+
+        load_csv_into_sqlite(&conn, &doc1, "users").unwrap();
+        load_csv_into_sqlite(&conn, &doc2, "emails").unwrap();
+
+        let result_doc = execute_query_to_document(
+            &conn,
+            "SELECT u.Name, e.Email FROM users u JOIN emails e ON u.ID = e.UserID",
+            "joined.csv".into(),
+        )
+        .unwrap();
+
+        assert_eq!(result_doc.rows.len(), 2); // 1 header + 1 joined row
+        assert_eq!(result_doc.rows[1][0], "Alice");
+        assert_eq!(result_doc.rows[1][1], "alice@example.com");
     }
 }

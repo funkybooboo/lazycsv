@@ -180,26 +180,13 @@ pub fn render_file_switcher(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(switcher, chunks[1]);
 }
 
-/// Render the main status bar showing position and cell information.
-///
-/// Displays current row/column position, column name, total rows/columns,
-/// current cell value (truncated if too long), and help/quit keybinding hints.
-/// Also shows any pending status messages.
-///
-/// # Arguments
-///
-/// * `frame` - The Ratatui frame to render into
-/// * `app` - Application state containing cursor position and document data
-/// * `area` - The rectangle area to render the status bar within
-pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
+/// Build the right side of the status bar (position and cell value)
+fn build_right_side(app: &App) -> String {
     use crate::ui::utils::column_to_excel_letter;
 
-    // Absolute row index: 0 = header, 1 = first data, etc.
     let selected_row = app.get_selected_row().map(|r| r.get()).unwrap_or(0);
     let col_letter = column_to_excel_letter(app.view_state.selected_column.get());
-    let col_name = app.document.get_header(app.view_state.selected_column);
 
-    // Get current cell value
     let cell_value: Cow<'_, str> = if let Some(row_idx) = app.get_selected_row() {
         let value = app
             .document
@@ -216,21 +203,12 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         Cow::Borrowed("<no data>")
     };
 
-    // Vim-like status line format:
-    // Left side: mode/notification/command
-    // Right side: position and cell preview
-    //
-    // Examples:
-    //   NORMAL                                                    3,C "Mike Johnson"
-    //   :sort                                                     3,C "Mike Johnson"
-    //   Jumped to column B                                        3,C "Mike Johnson"
-    //   g_                                                        3,C "Mike Johnson"
+    format!("{},{} {}", selected_row, col_letter, cell_value)
+}
 
-    // Build right side: row,col cell_value (vim-like compact format)
-    let right_side = format!("{},{} {}", selected_row, col_letter, cell_value);
-
-    // Build pending/count indicator
-    let pending_indicator = match &app.input_state.pending_command {
+/// Build the pending command/count indicator
+fn build_pending_indicator(app: &App) -> String {
+    match &app.input_state.pending_command {
         Some(crate::input::PendingCommand::G) => "g".to_string(),
         Some(crate::input::PendingCommand::Z) => "z".to_string(),
         Some(crate::input::PendingCommand::GotoColumn(letters)) => format!("g{}", letters),
@@ -240,54 +218,52 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         Some(crate::input::PendingCommand::Comma) => ",".to_string(),
         Some(crate::input::PendingCommand::CommaD) => ",d".to_string(),
         Some(crate::input::PendingCommand::CommaY) => ",y".to_string(),
-        None => {
-            if let Some(count) = app.input_state.command_count {
-                format!("{}", count)
-            } else {
-                String::new()
-            }
-        }
-    };
+        None => app
+            .input_state
+            .command_count
+            .map(|c| c.to_string())
+            .unwrap_or_default(),
+    }
+}
 
-    let status_text = match app.mode {
+/// Build the status text based on current mode
+fn build_status_text(app: &App, right_side: &str, pending_indicator: &str, width: usize) -> String {
+    
+    let col_name = app.document.get_header(app.view_state.selected_column);
+
+    match app.mode {
         crate::app::Mode::Command => {
             // Show command input: ":sort_" on left, position on right
             let left = format!(":{}", app.input_state.command_buffer);
-            build_status_line(&left, &right_side, area.width as usize)
+            build_status_line(&left, right_side, width)
         }
         crate::app::Mode::Search => {
             // Show search input: "/pattern" on left, position on right
             let left = format!("/{}", app.search_buffer);
-            build_status_line(&left, &right_side, area.width as usize)
+            build_status_line(&left, right_side, width)
         }
         crate::app::Mode::Normal => {
             // Show notification or mode indicator
             let left = if let Some(ref msg) = app.status_message {
                 msg.as_str().to_string()
             } else if !pending_indicator.is_empty() {
-                pending_indicator.clone()
+                pending_indicator.to_string()
             } else if let Some(ref search) = app.search_state {
                 format!("/{} {}", search.pattern, search.display_position())
             } else {
                 let dirty = if app.document.is_dirty { "*" } else { "" };
                 format!("NORMAL{}", dirty)
             };
-            build_status_line(&left, &right_side, area.width as usize)
+            build_status_line(&left, right_side, width)
         }
         crate::app::Mode::Insert => {
             let dirty = if app.document.is_dirty { "*" } else { "" };
-            build_status_line(
-                &format!("INSERT{}", dirty),
-                &right_side,
-                area.width as usize,
-            )
+            build_status_line(&format!("INSERT{}", dirty), right_side, width)
         }
-        crate::app::Mode::Magnifier => {
-            build_status_line("MAGNIFIER", &right_side, area.width as usize)
-        }
+        crate::app::Mode::Magnifier => build_status_line("MAGNIFIER", right_side, width),
         crate::app::Mode::HeaderEdit => {
             let left = format!("HEADER EDIT: {}", col_name);
-            build_status_line(&left, &right_side, area.width as usize)
+            build_status_line(&left, right_side, width)
         }
         crate::app::Mode::VisualBlock => {
             let dirty = if app.document.is_dirty { "*" } else { "" };
@@ -305,8 +281,8 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             };
             build_status_line(
                 &format!("VISUAL{}{}", selection_info, dirty),
-                &right_side,
-                area.width as usize,
+                right_side,
+                width,
             )
         }
         crate::app::Mode::VisualLine => {
@@ -319,8 +295,8 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             };
             build_status_line(
                 &format!("VISUAL{}{}", selection_info, dirty),
-                &right_side,
-                area.width as usize,
+                right_side,
+                width,
             )
         }
         crate::app::Mode::VisualColumn => {
@@ -337,8 +313,8 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             };
             build_status_line(
                 &format!("VISUAL{}{}", selection_info, dirty),
-                &right_side,
-                area.width as usize,
+                right_side,
+                width,
             )
         }
         crate::app::Mode::SqlEditor => {
@@ -347,7 +323,7 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             } else {
                 "SQL EDITOR".to_string()
             };
-            build_status_line(&left, &right_side, area.width as usize)
+            build_status_line(&left, right_side, width)
         }
         crate::app::Mode::FileList => {
             // Show file list with cursor indicator and filter
@@ -410,9 +386,26 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
                 )
             };
 
-            build_status_line(&left, "", area.width as usize)
+            build_status_line(&left, "", width)
         }
-    };
+    }
+}
+
+/// Render the main status bar showing position and cell information.
+///
+/// Displays current row/column position, column name, total rows/columns,
+/// current cell value (truncated if too long), and help/quit keybinding hints.
+/// Also shows any pending status messages.
+///
+/// # Arguments
+///
+/// * `frame` - The Ratatui frame to render into
+/// * `app` - Application state containing cursor position and document data
+/// * `area` - The rectangle area to render the status bar within
+pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
+    let right_side = build_right_side(app);
+    let pending_indicator = build_pending_indicator(app);
+    let status_text = build_status_text(app, &right_side, &pending_indicator, area.width as usize);
 
     let style = if app.external_modification_pending {
         Style::default().fg(Color::Black).bg(Color::Green)
@@ -421,6 +414,5 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     };
 
     let status = Paragraph::new(status_text).style(style);
-
     frame.render_widget(status, area);
 }

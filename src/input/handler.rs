@@ -65,8 +65,8 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         Mode::Magnifier => handle_magnifier_mode(app, key),
         Mode::Search => handle_search_mode(app, key),
         Mode::VisualBlock | Mode::VisualLine | Mode::VisualColumn => handle_visual_mode(app, key),
-        // TODO: Implement handlers for new modes in future versions
         Mode::HeaderEdit => {
+            // HeaderEdit mode is not fully implemented yet (planned for future version)
             // For now, Esc returns to Normal mode
             if key.code == KeyCode::Esc {
                 app.mode = Mode::Normal;
@@ -643,9 +643,9 @@ fn handle_multi_key_command(
         // gv - Reselect last visual selection
         (PendingCommand::G, KeyCode::Char('v')) => {
             app.input_state.clear_pending_command();
-            if let Some(last_sel) = app.last_visual_selection.clone() {
+            if let Some(last_sel) = app.last_visual_selection {
                 // Restore the selection
-                app.visual_selection = Some(last_sel.clone());
+                app.visual_selection = Some(last_sel);
                 // Enter the appropriate visual mode
                 app.mode = match last_sel.mode {
                     crate::app::VisualMode::Block => Mode::VisualBlock,
@@ -1009,45 +1009,11 @@ fn handle_command_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
 fn handle_search_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     match key.code {
         KeyCode::Esc => {
-            // Cancel search input, preserve existing search_state
             app.mode = Mode::Normal;
         }
-
         KeyCode::Enter => {
-            let buffer = app.search_buffer.clone();
-            app.mode = Mode::Normal;
-
-            if buffer.is_empty() {
-                return Ok(InputResult::Continue);
-            }
-
-            let matches = crate::search::find_matches(&app.document, &buffer);
-            if matches.is_empty() {
-                app.search_state = None;
-                app.status_message = Some(StatusMessage::new_owned(format!(
-                    "Pattern not found: {}",
-                    buffer
-                )));
-                return Ok(InputResult::Continue);
-            }
-
-            let mut state = crate::search::SearchState::new(buffer.clone(), matches);
-            let cursor_row = app.get_selected_row().unwrap_or(RowIndex::new(0));
-            let cursor_col = app.view_state.selected_column;
-
-            if let Some(((row, col), _wrapped)) = state.jump_to_next(cursor_row, cursor_col) {
-                app.view_state.table_state.select(Some(row.get()));
-                app.view_state.selected_column = col;
-                app.status_message = Some(StatusMessage::new_owned(format!(
-                    "/{} {}",
-                    buffer,
-                    state.display_position()
-                )));
-            }
-
-            app.search_state = Some(state);
+            execute_search(app);
         }
-
         KeyCode::Backspace => {
             if app.search_buffer.is_empty() {
                 app.mode = Mode::Normal;
@@ -1055,15 +1021,48 @@ fn handle_search_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                 app.search_buffer.pop();
             }
         }
-
         KeyCode::Char(c) => {
             app.search_buffer.push(c);
         }
-
         _ => {}
     }
-
     Ok(InputResult::Continue)
+}
+
+/// Execute search and jump to first match
+fn execute_search(app: &mut App) {
+    let buffer = app.search_buffer.clone();
+    app.mode = Mode::Normal;
+
+    if buffer.is_empty() {
+        return;
+    }
+
+    let matches = crate::search::find_matches(&app.document, &buffer);
+    if matches.is_empty() {
+        app.search_state = None;
+        app.status_message = Some(StatusMessage::new_owned(format!(
+            "Pattern not found: {}",
+            buffer
+        )));
+        return;
+    }
+
+    let mut state = crate::search::SearchState::new(buffer.clone(), matches);
+    let cursor_row = app.get_selected_row().unwrap_or(RowIndex::new(0));
+    let cursor_col = app.view_state.selected_column;
+
+    if let Some(((row, col), _wrapped)) = state.jump_to_next(cursor_row, cursor_col) {
+        app.view_state.table_state.select(Some(row.get()));
+        app.view_state.selected_column = col;
+        app.status_message = Some(StatusMessage::new_owned(format!(
+            "/{} {}",
+            buffer,
+            state.display_position()
+        )));
+    }
+
+    app.search_state = Some(state);
 }
 
 /// Handle visual mode input (Visual Block, Visual Line, Visual Column)
@@ -1291,7 +1290,7 @@ fn handle_visual_yank(app: &mut App) -> Result<InputResult> {
     use crate::app::{Mode, VisualMode};
 
     let selection = match &app.visual_selection {
-        Some(sel) => sel.clone(),
+        Some(sel) => *sel,
         None => {
             app.mode = Mode::Normal;
             return Ok(InputResult::Continue);
@@ -1546,10 +1545,11 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<In
                 let yanked = app
                     .document
                     .get_rows(RowIndex::new(1), RowIndex::new(row_count));
-                // TODO: Store in clipboard when clipboard system is implemented
+                let count = yanked.len();
+                app.clipboard.yank_rows(yanked);
                 app.status_message = Some(StatusMessage::from(format!(
-                    "Yanked {} row(s)",
-                    yanked.len()
+                    "Yanked {} row(s) to clipboard",
+                    count
                 )));
 
                 return Some(Ok(InputResult::Continue));
@@ -1598,8 +1598,8 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<In
                 if let Some(row_idx) = app.get_selected_row() {
                     let yanked = app.document.get_rows(row_idx, row_idx);
                     if !yanked.is_empty() {
-                        // TODO: Store in clipboard when clipboard system is implemented
-                        app.status_message = Some(StatusMessage::from("Yanked 1 row"));
+                        app.clipboard.yank_rows(yanked);
+                        app.status_message = Some(StatusMessage::from("Yanked 1 row to clipboard"));
                     } else {
                         app.status_message = Some(StatusMessage::from("Failed to yank row"));
                     }
@@ -1657,8 +1657,8 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<In
                     .document
                     .get_rows(RowIndex::new(row_count), RowIndex::new(row_count));
                 if !yanked.is_empty() {
-                    // TODO: Store in clipboard when clipboard system is implemented
-                    app.status_message = Some(StatusMessage::from("Yanked 1 row"));
+                    app.clipboard.yank_rows(yanked);
+                    app.status_message = Some(StatusMessage::from("Yanked 1 row to clipboard"));
                 } else {
                     app.status_message = Some(StatusMessage::from("Failed to yank row"));
                 }
@@ -1757,10 +1757,11 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<In
                                     "No rows yanked (range out of bounds)",
                                 ));
                             } else {
-                                // TODO: Store in clipboard when clipboard system is implemented
+                                let count = yanked.len();
+                                app.clipboard.yank_rows(yanked);
                                 app.status_message = Some(StatusMessage::from(format!(
-                                    "Yanked {} row(s)",
-                                    yanked.len()
+                                    "Yanked {} row(s) to clipboard",
+                                    count
                                 )));
                             }
 
@@ -1960,10 +1961,11 @@ fn parse_and_execute_range_command(app: &mut App, cmd: &str) -> Option<Result<In
                                         "No columns yanked (range out of bounds)",
                                     ));
                                 } else {
-                                    // TODO: Store in clipboard when clipboard system is implemented
+                                    let count = yanked.len();
+                                    app.clipboard.yank_columns(yanked);
                                     app.status_message = Some(StatusMessage::from(format!(
-                                        "Yanked {} column(s)",
-                                        yanked.len()
+                                        "Yanked {} column(s) to clipboard",
+                                        count
                                     )));
                                 }
 
@@ -2358,120 +2360,119 @@ fn execute_command(app: &mut App) -> Result<InputResult> {
 fn handle_file_list_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     match key.code {
         KeyCode::Esc => {
-            // Cancel file picker
-            app.mode = Mode::Normal;
-            app.status_message = None;
-            app.input_state.clear_file_filter();
-            app.view_state.file_list_selected = 0;
+            file_list_cancel(app);
             Ok(InputResult::Continue)
         }
         KeyCode::Backspace => {
-            // Delete character from filter
             app.input_state.pop_file_filter_char();
-            // Reset selection to 0 when filter changes
             app.view_state.file_list_selected = 0;
             Ok(InputResult::Continue)
         }
         KeyCode::Up | KeyCode::Char('k') => {
-            // Move selection up
             if app.view_state.file_list_selected > 0 {
                 app.view_state.file_list_selected -= 1;
             }
             Ok(InputResult::Continue)
         }
         KeyCode::Down | KeyCode::Char('j') => {
-            // Move selection down
-            let filter = app.input_state.file_filter_buffer.to_lowercase();
-            let files = app.session.files();
-
-            let filtered_count = files
-                .iter()
-                .filter(|path| {
-                    if filter.is_empty() {
-                        true
-                    } else {
-                        path.file_name()
-                            .and_then(|n| n.to_str())
-                            .map(|s| s.to_lowercase().contains(&filter))
-                            .unwrap_or(false)
-                    }
-                })
-                .count();
-
-            if app.view_state.file_list_selected + 1 < filtered_count {
-                app.view_state.file_list_selected += 1;
-            }
+            file_list_move_down(app);
             Ok(InputResult::Continue)
         }
-        KeyCode::Enter => {
-            // Select current file
-            let filter = app.input_state.file_filter_buffer.to_lowercase();
-            let files = app.session.files();
-
-            // Get filtered file list
-            let filtered_files: Vec<(usize, &std::path::PathBuf)> = files
-                .iter()
-                .enumerate()
-                .filter(|(_, path)| {
-                    if filter.is_empty() {
-                        true
-                    } else {
-                        path.file_name()
-                            .and_then(|n| n.to_str())
-                            .map(|s| s.to_lowercase().contains(&filter))
-                            .unwrap_or(false)
-                    }
-                })
-                .collect();
-
-            if filtered_files.is_empty() {
-                app.status_message = Some(StatusMessage::from("No matching files"));
-                return Ok(InputResult::Continue);
-            }
-
-            // Get the actual file index from filtered list
-            let selected_idx = app
-                .view_state
-                .file_list_selected
-                .min(filtered_files.len() - 1);
-            let target_index = filtered_files[selected_idx].0;
-
-            // Switch to selected file
-            let current = app.session.active_file_index();
-            if target_index != current {
-                let file_count = app.session.file_count();
-                let diff = if target_index > current {
-                    target_index - current
-                } else {
-                    file_count - current + target_index
-                };
-
-                for _ in 0..diff {
-                    app.session.next_file();
-                }
-            }
-
-            app.mode = Mode::Normal;
-            app.input_state.clear_file_filter();
-            app.view_state.file_list_selected = 0;
-
-            if target_index != current {
-                Ok(InputResult::ReloadFile)
-            } else {
-                Ok(InputResult::Continue)
-            }
-        }
+        KeyCode::Enter => file_list_select_file(app),
         KeyCode::Char(c) => {
-            // Add character to filter
             app.input_state.push_file_filter_char(c);
-            // Reset selection to 0 when filter changes
             app.view_state.file_list_selected = 0;
             Ok(InputResult::Continue)
         }
-        _ => {
-            // Ignore other keys
-            Ok(InputResult::Continue)
-        }
+        _ => Ok(InputResult::Continue),
+    }
+}
+
+/// Cancel file list mode and return to normal
+fn file_list_cancel(app: &mut App) {
+    app.mode = Mode::Normal;
+    app.status_message = None;
+    app.input_state.clear_file_filter();
+    app.view_state.file_list_selected = 0;
+}
+
+/// Move file list selection down
+fn file_list_move_down(app: &mut App) {
+    let filtered_count = count_filtered_files(app);
+    if app.view_state.file_list_selected + 1 < filtered_count {
+        app.view_state.file_list_selected += 1;
+    }
+}
+
+/// Count files matching current filter
+fn count_filtered_files(app: &App) -> usize {
+    let filter = app.input_state.file_filter_buffer.to_lowercase();
+    app.session
+        .files()
+        .iter()
+        .filter(|path| file_matches_filter(path, &filter))
+        .count()
+}
+
+/// Check if file matches filter
+fn file_matches_filter(path: &std::path::Path, filter: &str) -> bool {
+    if filter.is_empty() {
+        true
+    } else {
+        path.file_name()
+            .and_then(|n| n.to_str())
+            .map(|s| s.to_lowercase().contains(filter))
+            .unwrap_or(false)
+    }
+}
+
+/// Select file from filtered list
+fn file_list_select_file(app: &mut App) -> Result<InputResult> {
+    let filter = app.input_state.file_filter_buffer.to_lowercase();
+    let filtered_files: Vec<(usize, &std::path::PathBuf)> = app
+        .session
+        .files()
+        .iter()
+        .enumerate()
+        .filter(|(_, path)| file_matches_filter(path, &filter))
+        .collect();
+
+    if filtered_files.is_empty() {
+        app.status_message = Some(StatusMessage::from("No matching files"));
+        return Ok(InputResult::Continue);
+    }
+
+    let selected_idx = app
+        .view_state
+        .file_list_selected
+        .min(filtered_files.len() - 1);
+    let target_index = filtered_files[selected_idx].0;
+    let current = app.session.active_file_index();
+
+    if target_index != current {
+        file_list_switch_to_index(app, target_index, current);
+    }
+
+    file_list_cancel(app);
+
+    if target_index != current {
+        Ok(InputResult::ReloadFile)
+    } else {
+        Ok(InputResult::Continue)
+    }
+}
+
+/// Switch to file at target index
+fn file_list_switch_to_index(app: &mut App, target: usize, current: usize) {
+    let file_count = app.session.file_count();
+    let diff = if target > current {
+        target - current
+    } else {
+        file_count - current + target
+    };
+
+    for _ in 0..diff {
+        app.session.next_file();
     }
 }
 
@@ -2713,128 +2714,123 @@ fn move_sql_cursor_down(buffer: &str, cursor: usize) -> usize {
 /// Handle keyboard input in SQL editor mode
 fn handle_sql_editor_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     match (key.code, key.modifiers) {
-        // Escape → return to Normal mode
         (KeyCode::Esc, _) => {
             app.mode = Mode::Normal;
         }
-
-        // Shift+Enter → insert newline
         (KeyCode::Enter, KeyModifiers::SHIFT) => {
-            let byte_pos = app
-                .sql_buffer
-                .char_indices()
-                .nth(app.sql_cursor)
-                .map(|(i, _)| i)
-                .unwrap_or(app.sql_buffer.len());
-            app.sql_buffer.insert(byte_pos, '\n');
-            app.sql_cursor += 1;
+            sql_insert_char(app, '\n');
         }
-
-        // Enter → execute query (deferred to main loop for UI feedback)
         (KeyCode::Enter, KeyModifiers::NONE) => {
-            let query = app.sql_buffer.trim().to_string();
-            if query.is_empty() {
-                app.status_message = Some(StatusMessage::new_owned("Empty query".to_string()));
-                app.mode = Mode::Normal;
-                return Ok(InputResult::Continue);
-            }
-
-            return Ok(InputResult::ExecuteQuery { query });
+            return sql_execute_query(app);
         }
-
-        // Type character
         (KeyCode::Char(c), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
             app.sql_error = None;
-            let byte_pos = app
-                .sql_buffer
-                .char_indices()
-                .nth(app.sql_cursor)
-                .map(|(i, _)| i)
-                .unwrap_or(app.sql_buffer.len());
-            app.sql_buffer.insert(byte_pos, c);
-            app.sql_cursor += 1;
+            sql_insert_char(app, c);
         }
-
-        // Backspace
         (KeyCode::Backspace, _) => {
-            if app.sql_cursor > 0 {
-                app.sql_cursor -= 1;
-                let byte_pos = app
-                    .sql_buffer
-                    .char_indices()
-                    .nth(app.sql_cursor)
-                    .map(|(i, _)| i)
-                    .unwrap_or(0);
-                app.sql_buffer.remove(byte_pos);
-            }
+            sql_delete_before_cursor(app);
         }
-
-        // Delete
         (KeyCode::Delete, _) => {
-            let char_count = app.sql_buffer.chars().count();
-            if app.sql_cursor < char_count {
-                let byte_pos = app
-                    .sql_buffer
-                    .char_indices()
-                    .nth(app.sql_cursor)
-                    .map(|(i, _)| i)
-                    .unwrap_or(0);
-                app.sql_buffer.remove(byte_pos);
-            }
+            sql_delete_at_cursor(app);
         }
-
-        // Ctrl+u → clear buffer
         (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
             app.sql_buffer.clear();
             app.sql_cursor = 0;
         }
-
-        // Left arrow
         (KeyCode::Left, _) => {
             app.sql_cursor = app.sql_cursor.saturating_sub(1);
         }
-
-        // Right arrow
         (KeyCode::Right, _) => {
             let char_count = app.sql_buffer.chars().count();
             app.sql_cursor = (app.sql_cursor + 1).min(char_count);
         }
-
-        // Up arrow → move cursor up one line
         (KeyCode::Up, _) => {
             app.sql_cursor = move_sql_cursor_up(&app.sql_buffer, app.sql_cursor);
         }
-
-        // Down arrow → move cursor down one line
         (KeyCode::Down, _) => {
             app.sql_cursor = move_sql_cursor_down(&app.sql_buffer, app.sql_cursor);
         }
-
-        // Home → start of current line
         (KeyCode::Home, _) => {
-            let chars: Vec<char> = app.sql_buffer.chars().collect();
-            let mut pos = app.sql_cursor;
-            while pos > 0 && chars[pos - 1] != '\n' {
-                pos -= 1;
-            }
-            app.sql_cursor = pos;
+            app.sql_cursor = sql_cursor_to_line_start(&app.sql_buffer, app.sql_cursor);
         }
-
-        // End → end of current line
         (KeyCode::End, _) => {
-            let chars: Vec<char> = app.sql_buffer.chars().collect();
-            let total = chars.len();
-            let mut pos = app.sql_cursor;
-            while pos < total && chars[pos] != '\n' {
-                pos += 1;
-            }
-            app.sql_cursor = pos;
+            app.sql_cursor = sql_cursor_to_line_end(&app.sql_buffer, app.sql_cursor);
         }
-
         _ => {}
     }
-
     Ok(InputResult::Continue)
+}
+
+/// Insert a character at the SQL cursor position
+fn sql_insert_char(app: &mut App, c: char) {
+    let byte_pos = app
+        .sql_buffer
+        .char_indices()
+        .nth(app.sql_cursor)
+        .map(|(i, _)| i)
+        .unwrap_or(app.sql_buffer.len());
+    app.sql_buffer.insert(byte_pos, c);
+    app.sql_cursor += 1;
+}
+
+/// Delete character before cursor in SQL buffer
+fn sql_delete_before_cursor(app: &mut App) {
+    if app.sql_cursor > 0 {
+        app.sql_cursor -= 1;
+        let byte_pos = app
+            .sql_buffer
+            .char_indices()
+            .nth(app.sql_cursor)
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+        app.sql_buffer.remove(byte_pos);
+    }
+}
+
+/// Delete character at cursor in SQL buffer
+fn sql_delete_at_cursor(app: &mut App) {
+    let char_count = app.sql_buffer.chars().count();
+    if app.sql_cursor < char_count {
+        let byte_pos = app
+            .sql_buffer
+            .char_indices()
+            .nth(app.sql_cursor)
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+        app.sql_buffer.remove(byte_pos);
+    }
+}
+
+/// Execute SQL query from buffer
+fn sql_execute_query(app: &mut App) -> Result<InputResult> {
+    let query = app.sql_buffer.trim().to_string();
+    if query.is_empty() {
+        app.status_message = Some(StatusMessage::new_owned("Empty query".to_string()));
+        app.mode = Mode::Normal;
+        return Ok(InputResult::Continue);
+    }
+    Ok(InputResult::ExecuteQuery { query })
+}
+
+/// Move cursor to start of current line
+fn sql_cursor_to_line_start(buffer: &str, cursor: usize) -> usize {
+    let chars: Vec<char> = buffer.chars().collect();
+    let mut pos = cursor;
+    while pos > 0 && chars[pos - 1] != '\n' {
+        pos -= 1;
+    }
+    pos
+}
+
+/// Move cursor to end of current line
+fn sql_cursor_to_line_end(buffer: &str, cursor: usize) -> usize {
+    let chars: Vec<char> = buffer.chars().collect();
+    let total = chars.len();
+    let mut pos = cursor;
+    while pos < total && chars[pos] != '\n' {
+        pos += 1;
+    }
+    pos
 }
 
 // ============================================================================
