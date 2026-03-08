@@ -129,15 +129,13 @@ LazyCSV treats CSV files in the same directory like Excel sheets. Open one file,
 | **v0.1.0** | Foundation - viewing, navigation, multi-file |
 | **v0.2.0** | Type safety refactor (internal) |
 | **v0.3.0** | Advanced navigation - column jumps, command mode, word motion |
-| **v0.3.1** | UI/UX polish - mode indicator, transient messages, help redesign |
-| **v0.3.2** | Pre-edit polish - minimal UI, vim-like status line |
-| **v0.4.0** | Insert mode - quick cell editing, row operations |
-| **v0.4.1** | Persistence - `:w`, `:W`, multi-file dirty tracking, command ranges  |
+| **v0.4.0** | Cell editing - Insert mode, row operations |
 | **v0.5.0** | Column operations - `,o`, `,O`, `,dd`, `,yy`, `,p`, visual mode |
 | **v0.6.0** | Magnifier Mode - multi-line cell editing with full vim  |
-| **v0.7.0** | Search - `/`, `n`, `N` fuzzy cell search |
-| **v0.8.0** | Undo/redo - `u`, `Ctrl+r`, `.` dot command |
-| **v0.9.0** | Transforms - `:sort`, `:filter`, data operations |
+| **v0.7.0** | Search & Filtering - `/`, `n`, `N`, `*`, `:noh` fuzzy search |
+| **v0.8.0** | SQL Query Mode - `:q SELECT...`, JOINs, multi-table queries |
+| **v0.8.1** | SQL Polish - refactoring, tests, benchmarks, error messages ✨ **Current** |
+| **v0.9.0** | Undo/redo - `u`, `Ctrl+r`, `.` dot command |
 | **v1.0.0** | Stable release - polish, performance, docs |
 
 ### Post-v1.0 Features
@@ -173,31 +171,48 @@ See [docs/development.md](docs/development.md) for contributing guidelines.
 
 ## Status
 
-**v0.4.0 Complete!** Fast CSV editing with vim keys. Insert mode for cell editing, row operations, and full keyboard control.
+**v0.8.1 Complete!** SQL query mode with comprehensive testing, benchmarks, and polished error handling.
 
 - Fast CSV viewer and editor with vim navigation
 - Multi-file switching with `[` `]`
-- Row/column numbering (A, B, C...)
-- Column jumping with `:B` syntax (`:B`, `:AA`, `:A5`)
-- Command mode with reserved commands (`:q`, `:w`, `:h`)
-- Word motion (w/b/e for sparse data)
-- Viewport control (zt/zz/zb)
-- Minimal vim-like UI (no heavy borders, clean status line)
-- Auto-width columns based on content
-- Pending command display (shows `g_`, `z_`, `5_`)
-- Out-of-bounds errors (not silent clamping)
-- **NEW v0.4.0:** Insert mode - `i`, `a`, `I`, `A`, `s` for cell editing
-- **NEW v0.4.0:** Text editing - Backspace, Delete, Ctrl+h, Ctrl+w, Ctrl+u
-- **NEW v0.4.0:** Row operations - `o`, `O`, `dd`, `yy`, `p` for rows
-- **NEW v0.4.0:** Clear cells with `Delete` key in Normal mode
-- Comprehensive test suite (408+ tests passing)
-- Search and persistence coming in v0.4.1+
+- Full vim editing (Insert mode, Magnifier mode with hjkl, motions, operators)
+- Column operations (`,dd`, `,yy`, `,p`, `,o`, `,O`)
+- Visual mode (v, V, ,v) for rectangular selections
+- Search & filtering (`/`, `n`, `N`, `*`, `:noh`)
+- **SQL Query Mode:**
+  - `:q SELECT...` to run SQL queries on CSVs
+  - Multi-table JOINs (automatically loads sibling CSVs)
+  - GROUP BY, ORDER BY, aggregations
+  - Query caching for instant re-execution
+  - 555+ tests (30 SQL edge cases, comprehensive coverage)
+  - Performance benchmarks (SQL operations benchmarked)
+- Row operations (`o`, `O`, `dd`, `yy`, `p`)
+- Comprehensive test suite (555+ tests passing)
 
-**Current:** v0.4.0 Complete | **Performance:** 60 FPS on 100K+ rows | **Architecture:** Clean, type-safe, well-tested
+**Current:** v0.8.1 Complete | **Performance:** 60 FPS on 100K+ rows | **Architecture:** Clean, type-safe, well-tested
 
-### What's New in v0.4.0
+### What's New in v0.8.1
 
-**v0.4.0 - Insert Mode:**
+**v0.8.1 - SQL & Data Operations Polish:**
+- **Code Quality:**
+  - Refactored `execute_sql_query_cancellable`: 164 → 53 lines (67.7% reduction)
+  - Refactored `render_sql_editor_overlay`: 118 → 35 lines (70% reduction)
+  - Created `src/app/sql_execution.rs` helper module (239 lines)
+  - Created `src/ui/sql_editor_helpers.rs` rendering helpers (99 lines)
+  - Zero clippy warnings
+- **Testing:**
+  - Added 30 comprehensive SQL edge case tests (`tests/sql_edge_cases_test.rs`)
+  - Tests cover: error handling, empty results, large datasets, NULLs, complex queries
+  - Total: 555 tests passing (514 lib + 11 SQL integration + 30 edge cases)
+- **Benchmarks:**
+  - Created `benches/sql.rs` with 13 benchmark groups
+  - Benchmarks: CSV loading, SELECT, WHERE, ORDER BY, JOIN (2-way, 3-way), GROUP BY
+  - Result size impact testing (10 rows, 1K, 50K)
+  - Performance targets met: <50ms for 100K row SELECT, <200ms for 10K row JOIN
+
+### What's New in v0.8.0
+
+**v0.8.0 - SQL Query Mode:**
 - **Enter Insert mode:** `i`, `a`, `I`, `A`, `s`, or `F2` on any cell
   - `i` - edit at cursor position
   - `a` - edit at end of cell

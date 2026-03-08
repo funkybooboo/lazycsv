@@ -1,8 +1,9 @@
-mod help;
+pub mod help;
 pub mod magnifier;
-mod sql_editor;
-mod status;
-mod table;
+pub mod sql_editor;
+mod sql_editor_helpers;
+pub mod status;
+pub mod table;
 pub mod utils;
 pub mod view_state;
 
