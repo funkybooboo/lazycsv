@@ -248,28 +248,40 @@ lazycsv ./data/
 **Philosophy:**
 Clean up technical debt from initial implementation. Focus on improving code organization, test coverage, and documentation based on lessons learned from v0.1.0.
 
-**Audit Phase:**
-Start with comprehensive audit of foundation code:
-- Review core viewing and navigation logic
-- Identify code duplication and complexity
-- Check test coverage gaps
-- Verify error handling completeness
-- Review module boundaries
+**Audit Findings (Completed):**
+- [x] Total codebase: 17,744 lines across 17 modules
+- [x] Current tests: 420 passing (100% pass rate)
+- [x] Clippy warnings: 9 total (4 lib, 5 test)
+- [x] Functions >50 lines: 35 (largest: 491 lines)
+- [x] Unwrap/expect calls: 592 instances
+- [x] Stale TODOs: 6 (all clipboard-related)
+- [x] Largest file: input/handler.rs (3,257 lines = 18% of codebase)
+
+**Tasks:**
+- [ ] Install cargo-tarpaulin for coverage measurement
+- [ ] Measure baseline code coverage
+- [ ] Fix all clippy warnings (run `cargo clippy --fix`)
+- [ ] Remove/update 6 stale TODOs in handler.rs
+- [ ] Refactor main.rs::run() (295 lines → <50 lines)
+- [ ] Refactor ui/status.rs::render_status_bar() (233 lines → <50 lines)
+- [ ] Add rustdoc for all public APIs in root modules
+- [ ] Document acceptable unwrap() uses vs. ones needing fixes
+- [ ] Add tests for core viewing functionality (target: >80% coverage)
+- [ ] Update docs/architecture.md with current module structure
 
 **Success Criteria:**
-- Zero clippy warnings
-- Code coverage > 80%
-- All functions < 50 lines
-- Performance benchmarks met
-- Module structure documented
-- Cyclomatic complexity reduced
-- All tests pass with no panics
+- [x] Zero clippy warnings (currently 9)
+- [ ] Code coverage > 80% (baseline unknown)
+- [ ] All functions < 50 lines (currently 35 over limit)
+- [ ] Performance benchmarks established
+- [ ] Module structure documented
+- [ ] All tests pass with no panics (currently 420 passing)
 
 **Testing Strategy:**
-- Full regression test suite
+- Full regression test suite (maintain 420+ passing)
 - Increase test coverage for core viewing
 - Edge case testing for navigation
-- Property-based testing where appropriate
+- Add tests before refactoring large functions (TDD)
 
 **Documentation Requirements:**
 - Architecture documentation for core modules
@@ -305,34 +317,44 @@ Start with comprehensive audit of foundation code:
 **Philosophy:**
 Build on v0.2.0's architectural improvements by refining type safety, improving module boundaries, and ensuring all abstractions are clean and maintainable.
 
-**Audit Phase:**
-Start with comprehensive audit of type system:
-- Review newtype implementations (RowIndex, ColIndex)
-- Check action abstraction consistency
-- Verify module separation of concerns
-- Identify remaining type safety improvements
-- Review naming conventions
+**Audit Findings:**
+- [x] Domain module: 251 lines (well-sized)
+- [x] CSV module: 1,548 lines (document.rs: 1,329 lines)
+- [x] Newtype implementations exist (RowIndex, ColIndex)
+- [x] Action abstractions in place (UserAction, NavigateAction, ViewportAction)
+- [x] Clippy warnings: 3 unnecessary clones on Copy types (VisualSelection)
+
+**Tasks:**
+- [ ] Fix unnecessary clones in input/handler.rs (lines 646, 648, 1294)
+- [ ] Review and refine RowIndex/ColIndex newtype implementations
+- [ ] Add property-based tests for position types (use proptest)
+- [ ] Refactor csv/document.rs large functions (if any >50 lines)
+- [ ] Document acceptable unwrap() uses in CSV parsing
+- [ ] Replace critical unwraps in csv/ module with proper error handling
+- [ ] Add comprehensive rustdoc for domain types
+- [ ] Add code examples to domain type documentation
+- [ ] Verify module boundaries (domain/ should have zero UI dependencies)
+- [ ] Add integration tests for type conversions
 
 **Success Criteria:**
-- Zero clippy warnings
-- Code coverage > 80%
-- All functions < 50 lines
-- Performance benchmarks met
-- Module structure documented
-- Cyclomatic complexity reduced
-- All tests pass with no panics
+- [ ] Zero clippy warnings in domain/ and csv/ modules
+- [ ] Code coverage > 90% for domain types
+- [ ] All functions < 50 lines in domain/ and csv/
+- [ ] All public types have rustdoc with examples
+- [ ] Property-based tests for position arithmetic
+- [ ] All tests pass with no panics
 
 **Testing Strategy:**
-- Type safety property tests
+- Property-based tests for type safety (proptest)
 - Module integration tests
-- Boundary condition testing
+- Boundary condition testing (overflow, underflow)
 - Regression test suite
 
 **Documentation Requirements:**
 - Architecture documentation for type system
-- Module responsibility documentation
-- Rustdoc for all public types
-- Design decision documentation
+- Module responsibility documentation (domain/ vs csv/ vs ui/)
+- Rustdoc for all public types with examples
+- Design decision documentation (why newtypes, why these abstractions)
 
 ---
 
@@ -370,33 +392,48 @@ Start with comprehensive audit of type system:
 **Philosophy:**
 Improve navigation code quality, optimize rendering performance, and ensure all navigation features are maintainable and well-tested.
 
-**Audit Phase:**
-Start with comprehensive audit of navigation code:
-- Review navigation command implementations
-- Check viewport management efficiency
-- Verify UI rendering performance
-- Identify code duplication in navigation logic
-- Review jump command consistency
+**Audit Findings:**
+- [x] Navigation module: 887 lines (commands.rs: 873 lines)
+- [x] UI module: 3,274 lines (table.rs: 723 lines, status.rs: 426 lines)
+- [x] Large functions in navigation/commands.rs (need analysis)
+- [x] render_status_bar: 233 lines (CRITICAL)
+- [x] render_file_switcher: 132 lines
+- [x] build_data_rows: 110 lines
+- [x] render_table: 108 lines
+
+**Tasks:**
+- [ ] Refactor navigation/commands.rs large functions
+- [ ] Extract command parsing logic to separate functions
+- [ ] Refactor ui/status.rs::render_status_bar (233 lines → <50 lines)
+  - Extract mode indicator rendering
+  - Extract position display rendering
+  - Extract message rendering
+- [ ] Refactor ui/status.rs::render_file_switcher (132 lines → <50 lines)
+- [ ] Refactor ui/table.rs::build_data_rows (110 lines → <50 lines)
+- [ ] Refactor ui/table.rs::render_table (108 lines → <50 lines)
+- [ ] Add rendering performance benchmarks (60 FPS at 100K rows)
+- [ ] Add viewport calculation tests
+- [ ] Document rendering pipeline in docs/architecture.md
+- [ ] Add rustdoc for navigation command functions
 
 **Success Criteria:**
-- Zero clippy warnings
-- Code coverage > 80%
-- All functions < 50 lines
-- Performance benchmarks met
-- Module structure documented
-- Cyclomatic complexity reduced
-- All tests pass with no panics
+- [ ] Zero clippy warnings in navigation/ and ui/
+- [ ] Code coverage > 80% for navigation logic
+- [ ] All functions < 50 lines
+- [ ] Rendering at 60 FPS for 100K rows (verified by benchmarks)
+- [ ] Module structure documented
+- [ ] All tests pass with no panics
 
 **Testing Strategy:**
 - Navigation command regression tests
-- Viewport boundary condition tests
-- UI rendering performance tests
-- Jump command integration tests
+- Viewport boundary condition tests (edge of data, scrolling)
+- UI rendering performance tests (criterion benchmarks)
+- Jump command integration tests (:cA, :cB, 5g, gg, G)
 
 **Documentation Requirements:**
 - Navigation architecture documentation
-- Viewport management documentation
-- UI rendering pipeline documentation
+- Viewport management documentation (how scrolling works)
+- UI rendering pipeline documentation (table → status → help)
 - Performance optimization notes
 
 ---
@@ -497,35 +534,50 @@ Start with comprehensive audit of navigation code:
 **Philosophy:**
 Improve editing system robustness, ensure persistence is reliable, and handle all edge cases gracefully. Focus on data integrity and user experience.
 
-**Audit Phase:**
-Start with comprehensive audit of editing system:
-- Review Insert mode implementation
-- Check file persistence reliability
-- Verify header toggle functionality
-- Identify edge cases in editing workflow
-- Review dirty state tracking
+**Audit Findings:**
+- [x] Session module: 618 lines (dirty tracking, file management)
+- [x] Input/handler.rs::handle_insert_mode: 183 lines (CRITICAL)
+- [x] File persistence logic spread across session/ and csv/writer.rs
+- [x] Clippy warning: assert_eq with literal bool (session/mod.rs:577)
+- [x] Unwrap calls in file I/O operations (need proper error handling)
+
+**Tasks:**
+- [ ] Refactor handle_insert_mode (183 lines → <50 lines)
+  - Extract text editing operations
+  - Extract cursor movement logic
+  - Extract commit/cancel logic
+- [ ] Fix clippy warning in session/mod.rs:577 (assert_eq with bool)
+- [ ] Review and improve dirty state tracking
+- [ ] Add error handling for file I/O operations (replace unwraps)
+- [ ] Add tests for edge cases:
+  - Editing empty cells
+  - Editing cells with special characters
+  - Editing with header mode ON/OFF
+  - Concurrent edits across multiple files
+- [ ] Add integration tests for persistence workflow
+- [ ] Document header toggle behavior in code comments
+- [ ] Add rustdoc for session management functions
 
 **Success Criteria:**
-- Zero clippy warnings
-- Code coverage > 80%
-- All functions < 50 lines
-- Performance benchmarks met
-- Module structure documented
-- Cyclomatic complexity reduced
-- All tests pass with no panics
+- [ ] Zero clippy warnings in session/ and editing code
+- [ ] Code coverage > 85% for editing operations
+- [ ] All functions < 50 lines
+- [ ] All file I/O has proper error handling
+- [ ] Data integrity tests pass (no data loss scenarios)
+- [ ] All tests pass with no panics
 
 **Testing Strategy:**
-- Insert mode edge case tests
-- File persistence integration tests
-- Header toggle scenario tests
-- Dirty state tracking tests
-- Data integrity tests
+- Insert mode edge case tests (empty, special chars, unicode)
+- File persistence integration tests (write, reload, verify)
+- Header toggle scenario tests (toggle on/off, edit header row)
+- Dirty state tracking tests (multi-file, unsaved changes)
+- Data integrity tests (CSV escaping, newlines, quotes)
 
 **Documentation Requirements:**
 - Editing system architecture documentation
-- Persistence strategy documentation
+- Persistence strategy documentation (atomic writes, temp files)
 - Header toggle behavior documentation
-- Edge case handling documentation
+- Edge case handling documentation (empty docs, header-only files)
 
 ---
 
@@ -579,34 +631,52 @@ Start with comprehensive audit of editing system:
 **Philosophy:**
 Improve column operation code quality, ensure visual mode is robust, and handle all clipboard operations reliably. Focus on maintaining data integrity during column manipulations.
 
-**Audit Phase:**
-Start with comprehensive audit of column operations:
-- Review column clipboard implementation
-- Check visual mode selection logic
-- Verify column operation correctness
-- Identify edge cases in column reordering
-- Review operator-motion composability
+**Audit Findings:**
+- [x] Clipboard module: 291 lines (well-sized)
+- [x] Clippy warning: doc list item without indentation (clipboard/mod.rs:7)
+- [x] Visual mode handlers in input/handler.rs:
+  - handle_visual_delete: 118 lines
+  - handle_visual_paste: 115 lines
+- [x] Stale TODOs about clipboard (6 instances - clipboard IS implemented!)
+- [x] Tests: 43 dual clipboard tests, 32 visual mode tests
+
+**Tasks:**
+- [ ] Fix clippy warning in clipboard/mod.rs:7 (doc formatting)
+- [ ] Remove/update 6 stale clipboard TODOs in handler.rs:
+  - Lines 1549, 1601, 1660, 1760, 1963
+  - Update to reflect that clipboard IS implemented
+- [ ] Refactor handle_visual_delete (118 lines → <50 lines)
+  - Extract region deletion logic
+  - Extract row deletion logic
+  - Extract column deletion logic
+- [ ] Refactor handle_visual_paste (115 lines → <50 lines)
+  - Extract region paste logic
+  - Extract row paste logic
+  - Extract column paste logic
+- [ ] Add tests for triple clipboard isolation (no cross-pasting)
+- [ ] Add tests for column reordering edge cases
+- [ ] Document triple clipboard system in docs/architecture.md
+- [ ] Add rustdoc for clipboard operations
 
 **Success Criteria:**
-- Zero clippy warnings
-- Code coverage > 80%
-- All functions < 50 lines
-- Performance benchmarks met
-- Module structure documented
-- Cyclomatic complexity reduced
-- All tests pass with no panics
+- [ ] Zero clippy warnings in clipboard/ and visual mode code
+- [ ] Code coverage > 85% for column operations
+- [ ] All functions < 50 lines
+- [ ] Zero stale TODOs
+- [ ] Triple clipboard isolation verified by tests
+- [ ] All tests pass with no panics
 
 **Testing Strategy:**
-- Column operation regression tests
-- Visual mode selection tests
-- Column clipboard integration tests
-- Column reordering edge case tests
-- Multi-column operation tests
+- Column operation regression tests (,dd, ,yy, ,p)
+- Visual mode selection tests (v, V, ,v)
+- Column clipboard integration tests (verify isolation)
+- Column reordering edge case tests (:D,E m A)
+- Multi-column operation tests (3,dd, 5,yy)
 
 **Documentation Requirements:**
 - Column operation architecture documentation
-- Visual mode behavior documentation
-- Clipboard system documentation
+- Visual mode behavior documentation (block, line, column)
+- Triple clipboard system documentation (row, column, region buffers)
 - Operator-motion composition documentation
 
 ---
@@ -691,35 +761,57 @@ Start with comprehensive audit of column operations:
 **Philosophy:**
 Improve magnifier mode performance, ensure all vim operations are efficient and correct, and maintain high code quality. Focus on user experience and editor responsiveness.
 
-**Audit Phase:**
-Start with comprehensive audit of magnifier mode:
-- Review vim operation implementations
-- Check editor rendering performance
-- Verify undo/redo correctness
-- Identify performance bottlenecks
-- Review modal state management
+**Audit Findings:**
+- [x] Magnifier module: 2,020 lines (magnifier/mod.rs is the entire module)
+- [x] UI magnifier rendering: ui/magnifier.rs (482 lines)
+- [x] Large functions:
+  - handle_magnifier_normal: 154 lines (in input/handler.rs)
+  - render_magnifier: 100 lines (in ui/magnifier.rs)
+- [x] Tests: 12 integration tests, 33 advanced tests
+
+**Tasks:**
+- [ ] Refactor handle_magnifier_normal (154 lines → <50 lines)
+  - Extract vim motion handling
+  - Extract vim operator handling
+  - Extract search handling
+  - Extract mode transition logic
+- [ ] Refactor render_magnifier (100 lines → <50 lines)
+  - Extract title bar rendering
+  - Extract content rendering
+  - Extract status bar rendering
+  - Extract help bar rendering
+- [ ] Review magnifier/mod.rs for large functions
+- [ ] Add performance benchmarks for magnifier operations:
+  - Large text rendering (1K, 10K lines)
+  - Vim motion performance
+  - Undo/redo performance
+- [ ] Add tests for edge cases:
+  - Very long lines (>1000 chars)
+  - Many lines (>10K)
+  - Unicode and emoji handling
+- [ ] Document vim operation implementation
+- [ ] Add rustdoc for magnifier public API
 
 **Success Criteria:**
-- Zero clippy warnings
-- Code coverage > 80%
-- All functions < 50 lines
-- Performance benchmarks met
-- Module structure documented
-- Cyclomatic complexity reduced
-- All tests pass with no panics
+- [ ] Zero clippy warnings in magnifier/ and ui/magnifier.rs
+- [ ] Code coverage > 80% for magnifier operations
+- [ ] All functions < 50 lines
+- [ ] Magnifier responsive for large text (>10K lines)
+- [ ] All vim operations work correctly
+- [ ] All tests pass with no panics
 
 **Testing Strategy:**
-- Vim operation regression tests
-- Performance benchmarks for editing
-- Undo/redo correctness tests
-- Modal state transition tests
-- Large text handling tests
+- Vim operation regression tests (motions, operators, visual mode)
+- Performance benchmarks for editing large text
+- Undo/redo correctness tests (unlimited history)
+- Modal state transition tests (normal ↔ insert ↔ visual)
+- Large text handling tests (10K+ lines)
 
 **Documentation Requirements:**
-- Magnifier architecture documentation
-- Vim operation implementation notes
+- Magnifier architecture documentation (how it integrates with main app)
+- Vim operation implementation notes (which vim features supported)
 - Performance optimization documentation
-- Modal state machine documentation
+- Modal state machine documentation (mode transitions)
 
 ---
 
@@ -758,35 +850,51 @@ Start with comprehensive audit of magnifier mode:
 **Philosophy:**
 Improve search system performance, ensure filtering is efficient for large datasets, and maintain clean, testable code. Focus on search responsiveness and accuracy.
 
-**Audit Phase:**
-Start with comprehensive audit of search system:
-- Review search algorithm efficiency
-- Check filtering implementation
-- Verify highlight rendering performance
-- Identify optimization opportunities
-- Review regex pattern handling
+**Audit Findings:**
+- [x] Search module: 398 lines (search/mod.rs)
+- [x] Tests: 27 passing search tests
+- [x] Search features: regex support, case-insensitive, wrap-around
+- [x] Highlight rendering integrated in ui/table.rs
+
+**Tasks:**
+- [ ] Review search/mod.rs for functions >50 lines
+- [ ] Add performance benchmarks for search:
+  - Search in small dataset (1K rows)
+  - Search in medium dataset (10K rows)
+  - Search in large dataset (100K rows)
+  - Regex vs literal search performance
+- [ ] Optimize search algorithm if needed (consider caching)
+- [ ] Add tests for edge cases:
+  - Empty search pattern
+  - Pattern not found
+  - Pattern in every cell
+  - Very long regex patterns
+  - Invalid regex fallback
+- [ ] Add tests for highlight rendering performance
+- [ ] Document search algorithm in code comments
+- [ ] Add rustdoc for search public API
+- [ ] Document regex pattern handling and fallback behavior
 
 **Success Criteria:**
-- Zero clippy warnings
-- Code coverage > 80%
-- All functions < 50 lines
-- Performance benchmarks met
-- Module structure documented
-- Cyclomatic complexity reduced
-- All tests pass with no panics
+- [ ] Zero clippy warnings in search/
+- [ ] Code coverage > 85% for search operations
+- [ ] All functions < 50 lines
+- [ ] Search responsive for 100K+ rows (<100ms)
+- [ ] Regex compilation errors handled gracefully
+- [ ] All tests pass with no panics
 
 **Testing Strategy:**
-- Search performance benchmarks
-- Filtering correctness tests
-- Regex pattern edge case tests
-- Large dataset search tests
-- Highlight rendering tests
+- Search performance benchmarks (1K, 10K, 100K rows)
+- Filtering correctness tests (regex, literal, case-insensitive)
+- Regex pattern edge case tests (invalid, empty, special chars)
+- Large dataset search tests (verify wrap-around, match counter)
+- Highlight rendering tests (current match vs other matches)
 
 **Documentation Requirements:**
-- Search algorithm documentation
+- Search algorithm documentation (how matches are found and stored)
 - Filtering strategy documentation
-- Performance characteristics documentation
-- Regex pattern handling documentation
+- Performance characteristics documentation (O(n) search, caching strategy)
+- Regex pattern handling documentation (compilation, fallback to literal)
 
 ---
 
@@ -853,35 +961,64 @@ SELECT country, COUNT(*) as count FROM customers GROUP BY country ORDER BY count
 **Philosophy:**
 Improve SQL query mode robustness, ensure data operations are reliable, and maintain high performance for complex queries. Focus on query correctness and error handling.
 
-**Audit Phase:**
-Start with comprehensive audit of SQL system:
-- Review SQL query parsing and execution
-- Check DuckDB integration efficiency
-- Verify data operation correctness
-- Identify query optimization opportunities
-- Review error handling for invalid queries
+**Audit Findings:**
+- [x] Query module: 576 lines (query/mod.rs)
+- [x] App module: 2,653 lines (app/mod.rs contains SQL execution)
+- [x] Large functions:
+  - execute_sql_query_cancellable: 164 lines (in app/mod.rs)
+  - handle_sql_editor_mode: 125 lines (in input/handler.rs)
+  - render_sql_editor_overlay: 118 lines (in ui/sql_editor.rs)
+- [x] Tests: 19 lib tests, 11 integration tests
+- [x] Uses SQLite (not DuckDB as roadmap mentioned)
+
+**Tasks:**
+- [ ] Refactor execute_sql_query_cancellable (164 lines → <50 lines)
+  - Extract CSV to SQLite loading logic
+  - Extract query execution logic
+  - Extract result conversion logic
+  - Extract error handling logic
+- [ ] Refactor handle_sql_editor_mode (125 lines → <50 lines)
+  - Extract input handling
+  - Extract query execution trigger
+  - Extract editor state management
+- [ ] Refactor render_sql_editor_overlay (118 lines → <50 lines)
+  - Extract editor rendering
+  - Extract status rendering
+  - Extract help text rendering
+- [ ] Add performance benchmarks for SQL operations:
+  - Load CSV into SQLite (1K, 10K, 100K rows)
+  - Simple SELECT query
+  - Complex JOIN query
+  - Aggregation query (GROUP BY, COUNT)
+- [ ] Add tests for SQL edge cases:
+  - Invalid SQL syntax
+  - Misspelled column names
+  - Empty result sets
+  - Very large result sets
+- [ ] Improve error messages for SQL errors
+- [ ] Document SQLite integration in docs/architecture.md
+- [ ] Add rustdoc for query public API
 
 **Success Criteria:**
-- Zero clippy warnings
-- Code coverage > 80%
-- All functions < 50 lines
-- Performance benchmarks met
-- Module structure documented
-- Cyclomatic complexity reduced
-- All tests pass with no panics
+- [ ] Zero clippy warnings in query/ and SQL-related code
+- [ ] Code coverage > 80% for SQL operations
+- [ ] All functions < 50 lines
+- [ ] SQL queries responsive for 100K+ rows
+- [ ] Error messages are user-friendly
+- [ ] All tests pass with no panics
 
 **Testing Strategy:**
-- SQL query correctness tests
+- SQL query correctness tests (SELECT, JOIN, GROUP BY, ORDER BY)
 - Complex query performance benchmarks
-- Error handling tests for invalid SQL
-- Data operation integration tests
-- Large dataset query tests
+- Error handling tests for invalid SQL (syntax errors, missing columns)
+- Data operation integration tests (sort, filter via SQL)
+- Large dataset query tests (100K+ rows)
 
 **Documentation Requirements:**
-- SQL query mode architecture documentation
-- DuckDB integration documentation
+- SQL query mode architecture documentation (how CSVs become SQLite tables)
+- SQLite integration documentation (connection caching, table naming)
 - Query performance optimization notes
-- Error handling strategy documentation
+- Error handling strategy documentation (user-friendly SQL error messages)
 
 ---
 
