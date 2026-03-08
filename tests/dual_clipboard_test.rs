@@ -667,10 +667,10 @@ fn test_5dd_stores_in_row_buffer_as_region() {
     app.handle_key(key(KeyCode::Char('d'))).unwrap();
     app.handle_key(key(KeyCode::Char('d'))).unwrap();
 
-    let region = app.clipboard.as_region().expect("region should exist");
-    assert_eq!(region.len(), 5);
-    assert_eq!(region[0][0], "R1A");
-    assert_eq!(region[4][0], "R5A");
+    let rows = app.clipboard.get_rows().expect("rows should exist");
+    assert_eq!(rows.len(), 5);
+    assert_eq!(rows[0][0], "R1A");
+    assert_eq!(rows[4][0], "R5A");
     // Column buffer should be unaffected
     assert!(app.clipboard.column_buffer_empty());
 }
@@ -692,10 +692,10 @@ fn test_5yy_yanks_5_rows() {
     assert_eq!(app.document.row_count(), 11);
     assert!(!app.document.is_dirty);
 
-    let region = app.clipboard.as_region().expect("region should exist");
-    assert_eq!(region.len(), 5);
-    assert_eq!(region[0][0], "R1A");
-    assert_eq!(region[4][0], "R5A");
+    let rows = app.clipboard.get_rows().expect("rows should exist");
+    assert_eq!(rows.len(), 5);
+    assert_eq!(rows[0][0], "R1A");
+    assert_eq!(rows[4][0], "R5A");
     assert!(app
         .status_message
         .as_ref()
@@ -718,10 +718,10 @@ fn test_yy_count_clamps_to_available_rows() {
     app.handle_key(key(KeyCode::Char('y'))).unwrap();
     app.handle_key(key(KeyCode::Char('y'))).unwrap();
 
-    let region = app.clipboard.as_region().expect("region should exist");
-    assert_eq!(region.len(), 2);
-    assert_eq!(region[0][0], "R9A");
-    assert_eq!(region[1][0], "R10A");
+    let rows = app.clipboard.get_rows().expect("rows should exist");
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0][0], "R9A");
+    assert_eq!(rows[1][0], "R10A");
     assert!(app
         .status_message
         .as_ref()

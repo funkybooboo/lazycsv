@@ -24,8 +24,12 @@ pub enum Mode {
     Magnifier,
     /// Edit column header names (entered via gh)
     HeaderEdit,
-    /// Select rows/cells/blocks (entered via v, V, Ctrl+v)
-    Visual,
+    /// Visual Block mode - rectangular cell selection (entered via v)
+    VisualBlock,
+    /// Visual Line mode - whole row selection (entered via V)
+    VisualLine,
+    /// Visual Column mode - whole column selection (entered via ,v)
+    VisualColumn,
     /// Execute commands (entered via :)
     Command,
     /// File list picker (entered via :files)
@@ -34,6 +38,62 @@ pub enum Mode {
     SqlEditor,
     /// Search input (entered via /)
     Search,
+}
+
+/// Visual mode selection anchor and type
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct VisualSelection {
+    /// Starting position of the selection
+    pub anchor: (RowIndex, ColIndex),
+    /// Current cursor position (end of selection)
+    pub cursor: (RowIndex, ColIndex),
+    /// Type of visual selection
+    pub mode: VisualMode,
+}
+
+/// Type of visual selection
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum VisualMode {
+    /// Rectangular block selection
+    Block,
+    /// Whole row selection
+    Line,
+    /// Whole column selection
+    Column,
+}
+
+impl VisualSelection {
+    /// Create a new visual selection starting at the given position
+    pub fn new(row: RowIndex, col: ColIndex, mode: VisualMode) -> Self {
+        Self {
+            anchor: (row, col),
+            cursor: (row, col),
+            mode,
+        }
+    }
+
+    /// Update the cursor position
+    pub fn update_cursor(&mut self, row: RowIndex, col: ColIndex) {
+        self.cursor = (row, col);
+    }
+
+    /// Get the selection bounds as (start_row, end_row, start_col, end_col)
+    /// Returns normalized bounds (start <= end)
+    pub fn bounds(&self) -> (RowIndex, RowIndex, ColIndex, ColIndex) {
+        let (start_row, end_row) = if self.anchor.0 <= self.cursor.0 {
+            (self.anchor.0, self.cursor.0)
+        } else {
+            (self.cursor.0, self.anchor.0)
+        };
+
+        let (start_col, end_col) = if self.anchor.1 <= self.cursor.1 {
+            (self.anchor.1, self.cursor.1)
+        } else {
+            (self.cursor.1, self.anchor.1)
+        };
+
+        (start_row, end_row, start_col, end_col)
+    }
 }
 
 /// Edit buffer for cell editing
@@ -66,8 +126,7 @@ impl std::fmt::Debug for SqliteCache {
 impl SqliteCache {
     /// Create a new in-memory SQLite connection with performance pragmas.
     fn new() -> Self {
-        let conn = rusqlite::Connection::open_in_memory()
-            .expect("Failed to open in-memory SQLite");
+        let conn = rusqlite::Connection::open_in_memory().expect("Failed to open in-memory SQLite");
         conn.execute_batch(
             "PRAGMA journal_mode=OFF;
              PRAGMA synchronous=OFF;
@@ -100,20 +159,27 @@ impl SqliteCache {
     ) -> std::result::Result<(), anyhow::Error> {
         // Drop existing table (ignore error if it doesn't exist)
         let _ = self.conn.execute(
-            &format!("DROP TABLE IF EXISTS \"{}\"", table_name.replace('"', "\"\"")),
+            &format!(
+                "DROP TABLE IF EXISTS \"{}\"",
+                table_name.replace('"', "\"\"")
+            ),
             [],
         );
         self.loaded_generations.remove(path);
 
         crate::query::load_csv_into_sqlite_cancellable(&self.conn, doc, table_name, cancelled)?;
-        self.loaded_generations.insert(path.to_path_buf(), generation);
+        self.loaded_generations
+            .insert(path.to_path_buf(), generation);
         Ok(())
     }
 
     /// Remove a single table from the cache.
     fn remove_table(&mut self, path: &Path, table_name: &str) {
         let _ = self.conn.execute(
-            &format!("DROP TABLE IF EXISTS \"{}\"", table_name.replace('"', "\"\"")),
+            &format!(
+                "DROP TABLE IF EXISTS \"{}\"",
+                table_name.replace('"', "\"\"")
+            ),
             [],
         );
         self.loaded_generations.remove(path);
@@ -181,6 +247,12 @@ pub struct App {
 
     /// Search input buffer (typed text during / search prompt)
     pub search_buffer: String,
+
+    /// Visual mode selection state (None when not in visual mode)
+    pub visual_selection: Option<VisualSelection>,
+
+    /// Last visual selection (for gv command to reselect)
+    pub last_visual_selection: Option<VisualSelection>,
 }
 
 impl App {
@@ -234,12 +306,7 @@ impl App {
         )
         .context(messages::failed_to_load_csv(file_path))?;
 
-        let mut app = Self::new(
-            csv_data,
-            csv_files,
-            current_file_index,
-            file_config,
-        );
+        let mut app = Self::new(csv_data, csv_files, current_file_index, file_config);
         app.session.record_file_mtime(file_path);
         Ok(app)
     }
@@ -299,6 +366,8 @@ impl App {
             external_modification_pending: false,
             search_state: None,
             search_buffer: String::new(),
+            visual_selection: None,
+            last_visual_selection: None,
         }
     }
 
@@ -572,12 +641,7 @@ impl App {
         )
         .context(messages::failed_to_load_csv(file_path))?;
 
-        let mut app = Self::new(
-            csv_data,
-            csv_files,
-            current_file_index,
-            file_config,
-        );
+        let mut app = Self::new(csv_data, csv_files, current_file_index, file_config);
         app.session.record_file_mtime(file_path);
         Ok(app)
     }
@@ -728,13 +792,7 @@ impl App {
                     continue;
                 }
                 let gen = cached_doc.generation;
-                match cache.reload_table(
-                    &file_path,
-                    &table_name,
-                    cached_doc,
-                    gen,
-                    cancelled,
-                ) {
+                match cache.reload_table(&file_path, &table_name, cached_doc, gen, cancelled) {
                     Ok(()) => {}
                     Err(e) => {
                         if e.downcast_ref::<cancel::CancelledError>().is_some() {

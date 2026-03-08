@@ -26,6 +26,29 @@ const ROW_NUMBER_COLUMN_WIDTH: u16 = 5;
 /// Offset added to selected position to account for column letters and header rows
 const HEADER_ROW_OFFSET: usize = 2;
 
+/// Check if a cell is within the current visual selection
+fn is_in_visual_selection(app: &App, row: RowIndex, col: ColIndex) -> bool {
+    if let Some(sel) = &app.visual_selection {
+        let (start_row, end_row, start_col, end_col) = sel.bounds();
+        match sel.mode {
+            crate::app::VisualMode::Block => {
+                // Rectangular block: both row and column must be in range
+                row >= start_row && row <= end_row && col >= start_col && col <= end_col
+            }
+            crate::app::VisualMode::Line => {
+                // Whole rows: only row needs to be in range
+                row >= start_row && row <= end_row
+            }
+            crate::app::VisualMode::Column => {
+                // Whole columns: only column needs to be in range
+                col >= start_col && col <= end_col
+            }
+        }
+    } else {
+        false
+    }
+}
+
 /// Calculate the visible column range based on horizontal scroll offset
 fn calculate_visible_columns(start_col: usize, total_cols: usize) -> (usize, usize) {
     let end_col = (start_col + MAX_VISIBLE_COLS).min(total_cols);
@@ -107,6 +130,9 @@ fn build_header_row(
                 .bg(Color::White)
                 .fg(Color::Black)
                 .add_modifier(Modifier::BOLD)
+        } else if is_in_visual_selection(app, ri, ci) {
+            // Cell in visual selection: dark gray background
+            Style::default().bg(Color::DarkGray).fg(Color::White)
         } else if search_state
             .map(|s| s.is_current_match(ri, ci))
             .unwrap_or(false)
@@ -270,6 +296,9 @@ fn build_data_rows(
                 let ci = ColIndex::new(col_idx);
                 let style = if is_selected {
                     Style::default().bg(Color::White).fg(Color::Black)
+                } else if is_in_visual_selection(app, ri, ci) {
+                    // Cell in visual selection: dark gray background
+                    Style::default().bg(Color::DarkGray).fg(Color::White)
                 } else if search_state
                     .map(|s| s.is_current_match(ri, ci))
                     .unwrap_or(false)
@@ -278,10 +307,7 @@ fn build_data_rows(
                         .bg(Color::Yellow)
                         .fg(Color::Black)
                         .add_modifier(Modifier::BOLD)
-                } else if search_state
-                    .map(|s| s.is_match(ri, ci))
-                    .unwrap_or(false)
-                {
+                } else if search_state.map(|s| s.is_match(ri, ci)).unwrap_or(false) {
                     Style::default().bg(Color::DarkGray).fg(Color::Yellow)
                 } else {
                     Style::default()

@@ -1,8 +1,10 @@
-//! Dual clipboard system for LazyCSV.
+//! Triple clipboard system for LazyCSV.
 //!
-//! Two independent buffers — a row buffer and a column buffer — with no
-//! cross-buffer pasting. Row operations (yy/dd/p/P/o/O) use the row buffer;
-//! column operations (,yy/,dd/,p/,P/,o/,O) use the column buffer.
+//! Three independent buffers:
+//! - Row buffer: for row operations (yy/dd/p/P/o/O, Visual Line)
+//! - Column buffer: for column operations (,yy/,dd/,p/,P/,o/,O, Visual Column)  
+//! - Region buffer: for rectangular selections (Visual Block)
+//! No cross-buffer pasting between the three buffers.
 
 /// Internal buffer shared by both row and column clipboards
 #[derive(Debug, Clone)]
@@ -36,19 +38,21 @@ impl ClipboardBuffer {
     }
 }
 
-/// Dual clipboard with independent row and column buffers
+/// Triple clipboard with independent row, column, and region buffers
 #[derive(Debug, Clone)]
 pub struct DualClipboard {
     row_buffer: ClipboardBuffer,
     column_buffer: ClipboardBuffer,
+    region_buffer: ClipboardBuffer,
 }
 
 impl DualClipboard {
-    /// Create a new empty dual clipboard
+    /// Create a new empty triple clipboard
     pub fn new() -> Self {
         Self {
             row_buffer: ClipboardBuffer::new(),
             column_buffer: ClipboardBuffer::new(),
+            region_buffer: ClipboardBuffer::new(),
         }
     }
 
@@ -59,14 +63,14 @@ impl DualClipboard {
         self.row_buffer.store(vec![row]);
     }
 
+    /// Store multiple rows in the row buffer
+    pub fn yank_rows(&mut self, rows: Vec<Vec<String>>) {
+        self.row_buffer.store(rows);
+    }
+
     /// Store a single cell in the row buffer (treated as a 1-cell row)
     pub fn yank_cell(&mut self, cell: String) {
         self.row_buffer.store(vec![vec![cell]]);
-    }
-
-    /// Store a rectangular region in the row buffer
-    pub fn yank_region(&mut self, region: Vec<Vec<String>>) {
-        self.row_buffer.store(region);
     }
 
     /// Get the first row from the row buffer
@@ -74,8 +78,8 @@ impl DualClipboard {
         self.row_buffer.get().and_then(|d| d.first().cloned())
     }
 
-    /// Get all rows from the row buffer (for region paste)
-    pub fn as_region(&self) -> Option<Vec<Vec<String>>> {
+    /// Get all rows from the row buffer
+    pub fn get_rows(&self) -> Option<Vec<Vec<String>>> {
         self.row_buffer.get().cloned()
     }
 
@@ -106,22 +110,50 @@ impl DualClipboard {
         self.column_buffer.get().cloned()
     }
 
+    /// Get all columns from the column buffer (alias for compatibility)
+    pub fn get_columns(&self) -> Option<Vec<Vec<String>>> {
+        self.as_columns()
+    }
+
     /// Check if the column buffer is empty
     pub fn column_buffer_empty(&self) -> bool {
         self.column_buffer.is_empty()
     }
 
-    // ── General methods ──
+    // ── Region buffer methods (Visual Block) ──
 
-    /// Check if both buffers are empty
-    pub fn is_empty(&self) -> bool {
-        self.row_buffer.is_empty() && self.column_buffer.is_empty()
+    /// Store a rectangular region in the region buffer
+    pub fn yank_region(&mut self, region: Vec<Vec<String>>) {
+        self.region_buffer.store(region);
     }
 
-    /// Clear both buffers
+    /// Get the region from the region buffer
+    pub fn get_region(&self) -> Option<Vec<Vec<String>>> {
+        self.region_buffer.get().cloned()
+    }
+
+    /// Get the region from the region buffer (alias for compatibility)
+    pub fn as_region(&self) -> Option<Vec<Vec<String>>> {
+        self.get_region()
+    }
+
+    /// Check if the region buffer is empty
+    pub fn region_buffer_empty(&self) -> bool {
+        self.region_buffer.is_empty()
+    }
+
+    // ── General methods ──
+
+    /// Check if all buffers are empty
+    pub fn is_empty(&self) -> bool {
+        self.row_buffer.is_empty() && self.column_buffer.is_empty() && self.region_buffer.is_empty()
+    }
+
+    /// Clear all buffers
     pub fn clear(&mut self) {
         self.row_buffer.clear();
         self.column_buffer.clear();
+        self.region_buffer.clear();
     }
 }
 

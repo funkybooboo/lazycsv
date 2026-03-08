@@ -64,8 +64,9 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         Mode::SqlEditor => handle_sql_editor_mode(app, key),
         Mode::Magnifier => handle_magnifier_mode(app, key),
         Mode::Search => handle_search_mode(app, key),
+        Mode::VisualBlock | Mode::VisualLine | Mode::VisualColumn => handle_visual_mode(app, key),
         // TODO: Implement handlers for new modes in future versions
-        Mode::HeaderEdit | Mode::Visual => {
+        Mode::HeaderEdit => {
             // For now, Esc returns to Normal mode
             if key.code == KeyCode::Esc {
                 app.mode = Mode::Normal;
@@ -337,10 +338,8 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                             pattern, pos
                         )));
                     } else {
-                        app.status_message = Some(StatusMessage::new_owned(format!(
-                            "/{} {}",
-                            pattern, pos
-                        )));
+                        app.status_message =
+                            Some(StatusMessage::new_owned(format!("/{} {}", pattern, pos)));
                     }
                 }
             }
@@ -363,10 +362,8 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                             pattern, pos
                         )));
                     } else {
-                        app.status_message = Some(StatusMessage::new_owned(format!(
-                            "/{} {}",
-                            pattern, pos
-                        )));
+                        app.status_message =
+                            Some(StatusMessage::new_owned(format!("/{} {}", pattern, pos)));
                     }
                 }
             }
@@ -382,11 +379,9 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             if !cell_content.is_empty() {
                 let matches = crate::search::find_matches(&app.document, &cell_content);
                 if !matches.is_empty() {
-                    let mut state =
-                        crate::search::SearchState::new(cell_content.clone(), matches);
+                    let mut state = crate::search::SearchState::new(cell_content.clone(), matches);
                     // Jump to next match (skips the current cell)
-                    if let Some(((row, col), _wrapped)) =
-                        state.jump_to_next(cursor_row, cursor_col)
+                    if let Some(((row, col), _wrapped)) = state.jump_to_next(cursor_row, cursor_col)
                     {
                         app.view_state.table_state.select(Some(row.get()));
                         app.view_state.selected_column = col;
@@ -404,6 +399,32 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                     )));
                 }
             }
+            return Ok(InputResult::Continue);
+        }
+
+        // Enter Visual Block mode (v)
+        KeyCode::Char('v') if is_navigation_allowed(app) => {
+            let row = app.get_selected_row().unwrap_or(RowIndex::new(0));
+            let col = app.view_state.selected_column;
+            app.visual_selection = Some(crate::app::VisualSelection::new(
+                row,
+                col,
+                crate::app::VisualMode::Block,
+            ));
+            app.mode = Mode::VisualBlock;
+            return Ok(InputResult::Continue);
+        }
+
+        // Enter Visual Line mode (V)
+        KeyCode::Char('V') if is_navigation_allowed(app) => {
+            let row = app.get_selected_row().unwrap_or(RowIndex::new(0));
+            let col = app.view_state.selected_column;
+            app.visual_selection = Some(crate::app::VisualSelection::new(
+                row,
+                col,
+                crate::app::VisualMode::Line,
+            ));
+            app.mode = Mode::VisualLine;
             return Ok(InputResult::Continue);
         }
 
@@ -487,10 +508,10 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
 
         // Row operations: 'P' - paste row(s) above
         KeyCode::Char('P') if is_navigation_allowed(app) => {
-            if let Some(region) = app.clipboard.as_region() {
+            if let Some(rows) = app.clipboard.get_rows() {
                 if let Some(row_idx) = app.get_selected_row() {
-                    let pasted_count = region.len();
-                    for (i, clipboard_row) in region.iter().enumerate() {
+                    let pasted_count = rows.len();
+                    for (i, clipboard_row) in rows.iter().enumerate() {
                         let insert_idx = RowIndex::new(row_idx.get() + i);
                         app.document.insert_row(insert_idx);
                         for (col_idx, value) in clipboard_row.iter().enumerate() {
@@ -516,10 +537,10 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
 
         // Row operations: 'p' - paste row(s) below
         KeyCode::Char('p') if is_navigation_allowed(app) => {
-            if let Some(region) = app.clipboard.as_region() {
+            if let Some(rows) = app.clipboard.get_rows() {
                 if let Some(row_idx) = app.get_selected_row() {
-                    let pasted_count = region.len();
-                    for (i, clipboard_row) in region.iter().enumerate() {
+                    let pasted_count = rows.len();
+                    for (i, clipboard_row) in rows.iter().enumerate() {
                         let insert_idx = RowIndex::new(row_idx.get() + 1 + i);
                         app.document.insert_row(insert_idx);
                         for (col_idx, value) in clipboard_row.iter().enumerate() {
@@ -619,6 +640,29 @@ fn handle_multi_key_command(
             app.status_message = Some(StatusMessage::from(messages::JUMPED_TO_FIRST_ROW));
         }
 
+        // gv - Reselect last visual selection
+        (PendingCommand::G, KeyCode::Char('v')) => {
+            app.input_state.clear_pending_command();
+            if let Some(last_sel) = app.last_visual_selection.clone() {
+                // Restore the selection
+                app.visual_selection = Some(last_sel.clone());
+                // Enter the appropriate visual mode
+                app.mode = match last_sel.mode {
+                    crate::app::VisualMode::Block => Mode::VisualBlock,
+                    crate::app::VisualMode::Line => Mode::VisualLine,
+                    crate::app::VisualMode::Column => Mode::VisualColumn,
+                };
+                // Move cursor to the selection cursor position
+                app.view_state
+                    .table_state
+                    .select(Some(last_sel.cursor.0.get()));
+                app.view_state.selected_column = last_sel.cursor.1;
+                app.status_message = Some(StatusMessage::from("Reselected"));
+            } else {
+                app.status_message = Some(StatusMessage::from("No previous visual selection"));
+            }
+        }
+
         // g + letter - Start column jump (e.g., gA, gB)
         (PendingCommand::G, KeyCode::Char(c)) if c.is_ascii_alphabetic() => {
             let new_pending = first.append_letter(c);
@@ -683,7 +727,7 @@ fn handle_multi_key_command(
                 let deleted = app.document.delete_rows(row_idx, end_idx);
                 let deleted_count = deleted.len();
                 if deleted_count > 0 {
-                    app.clipboard.yank_region(deleted);
+                    app.clipboard.yank_rows(deleted);
                     // Adjust selection if needed
                     let row_count = app.document.row_count();
                     if row_count == 0 {
@@ -721,7 +765,7 @@ fn handle_multi_key_command(
                 let rows = app.document.get_rows(row_idx, end_idx);
                 let yanked_count = rows.len();
                 if yanked_count > 0 {
-                    app.clipboard.yank_region(rows);
+                    app.clipboard.yank_rows(rows);
                     app.status_message = Some(StatusMessage::new_owned(format!(
                         "{} row(s) yanked",
                         yanked_count
@@ -757,6 +801,20 @@ fn handle_multi_key_command(
         // ,y - transition to CommaY (for ,yy)
         (PendingCommand::Comma, KeyCode::Char('y')) => {
             app.input_state.set_pending_command(PendingCommand::CommaY);
+            return Ok(InputResult::Continue);
+        }
+
+        // ,v - enter Visual Column mode
+        (PendingCommand::Comma, KeyCode::Char('v')) => {
+            app.input_state.clear_pending_command();
+            let row = app.get_selected_row().unwrap_or(RowIndex::new(0));
+            let col = app.view_state.selected_column;
+            app.visual_selection = Some(crate::app::VisualSelection::new(
+                row,
+                col,
+                crate::app::VisualMode::Column,
+            ));
+            app.mode = Mode::VisualColumn;
             return Ok(InputResult::Continue);
         }
 
@@ -1004,6 +1062,437 @@ fn handle_search_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
 
         _ => {}
     }
+
+    Ok(InputResult::Continue)
+}
+
+/// Handle visual mode input (Visual Block, Visual Line, Visual Column)
+fn handle_visual_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
+    use crate::app::Mode;
+    use crossterm::event::KeyCode;
+
+    // Get current visual selection or initialize if missing
+    if app.visual_selection.is_none() {
+        // Should not happen, but handle gracefully
+        app.mode = Mode::Normal;
+        return Ok(InputResult::Continue);
+    }
+
+    match key.code {
+        // Exit visual mode
+        KeyCode::Esc => {
+            // Save selection for gv
+            app.last_visual_selection = app.visual_selection.take();
+            app.mode = Mode::Normal;
+        }
+
+        // Movement keys - extend selection
+        KeyCode::Char('h') | KeyCode::Left => {
+            let current_col = app.view_state.selected_column;
+            let current_row = app.get_selected_row();
+            if let Some(sel) = &mut app.visual_selection {
+                if current_col.get() > 0 {
+                    let new_col = ColIndex::new(current_col.get() - 1);
+                    app.view_state.selected_column = new_col;
+                    if let Some(row) = current_row {
+                        sel.update_cursor(row, new_col);
+                    }
+                }
+            }
+        }
+
+        KeyCode::Char('j') | KeyCode::Down => {
+            let current_row = app.get_selected_row();
+            let row_count = app.document.row_count();
+            let selected_col = app.view_state.selected_column;
+            if let Some(sel) = &mut app.visual_selection {
+                if let Some(current_row) = current_row {
+                    if current_row.get() + 1 < row_count {
+                        let new_row = RowIndex::new(current_row.get() + 1);
+                        app.view_state.table_state.select(Some(new_row.get()));
+                        sel.update_cursor(new_row, selected_col);
+                    }
+                }
+            }
+        }
+
+        KeyCode::Char('k') | KeyCode::Up => {
+            let current_row = app.get_selected_row();
+            let selected_col = app.view_state.selected_column;
+            if let Some(sel) = &mut app.visual_selection {
+                if let Some(current_row) = current_row {
+                    if current_row.get() > 0 {
+                        let new_row = RowIndex::new(current_row.get() - 1);
+                        app.view_state.table_state.select(Some(new_row.get()));
+                        sel.update_cursor(new_row, selected_col);
+                    }
+                }
+            }
+        }
+
+        KeyCode::Char('l') | KeyCode::Right => {
+            let current_col = app.view_state.selected_column;
+            let col_count = app.document.column_count();
+            let current_row = app.get_selected_row();
+            if let Some(sel) = &mut app.visual_selection {
+                if current_col.get() + 1 < col_count {
+                    let new_col = ColIndex::new(current_col.get() + 1);
+                    app.view_state.selected_column = new_col;
+                    if let Some(row) = current_row {
+                        sel.update_cursor(row, new_col);
+                    }
+                }
+            }
+        }
+
+        // Delete operation
+        KeyCode::Char('d') => {
+            handle_visual_delete(app)?;
+        }
+
+        // Yank operation
+        KeyCode::Char('y') => {
+            handle_visual_yank(app)?;
+        }
+
+        // Paste operation
+        KeyCode::Char('p') => {
+            handle_visual_paste(app)?;
+        }
+
+        _ => {}
+    }
+
+    Ok(InputResult::Continue)
+}
+
+/// Delete the visual selection
+fn handle_visual_delete(app: &mut App) -> Result<InputResult> {
+    use crate::app::{Mode, VisualMode};
+
+    let selection = match app.visual_selection.take() {
+        Some(sel) => sel,
+        None => {
+            app.mode = Mode::Normal;
+            return Ok(InputResult::Continue);
+        }
+    };
+
+    let (start_row, end_row, start_col, end_col) = selection.bounds();
+
+    match selection.mode {
+        VisualMode::Block => {
+            // Yank rectangular region to region buffer before deleting
+            let mut region = Vec::new();
+            for row_idx in start_row.get()..=end_row.get() {
+                let mut row = Vec::new();
+                for col_idx in start_col.get()..=end_col.get() {
+                    let cell = app
+                        .document
+                        .get_cell(RowIndex::new(row_idx), ColIndex::new(col_idx))
+                        .to_string();
+                    row.push(cell);
+                }
+                region.push(row);
+            }
+            app.clipboard.yank_region(region);
+
+            // Clear cells in rectangular region (preserve structure)
+            for row_idx in start_row.get()..=end_row.get() {
+                for col_idx in start_col.get()..=end_col.get() {
+                    app.document.set_cell(
+                        RowIndex::new(row_idx),
+                        ColIndex::new(col_idx),
+                        String::new(),
+                    );
+                }
+            }
+            let row_count = end_row.get() - start_row.get() + 1;
+            let col_count = end_col.get() - start_col.get() + 1;
+            app.status_message = Some(StatusMessage::from(format!(
+                "Cleared {}x{} cells",
+                row_count, col_count
+            )));
+        }
+
+        VisualMode::Line => {
+            // Yank entire rows to row buffer before deleting
+            let rows: Vec<Vec<String>> = (start_row.get()..=end_row.get())
+                .map(|row_idx| {
+                    (0..app.document.column_count())
+                        .map(|col_idx| {
+                            app.document
+                                .get_cell(RowIndex::new(row_idx), ColIndex::new(col_idx))
+                                .to_string()
+                        })
+                        .collect()
+                })
+                .collect();
+            app.clipboard.yank_rows(rows);
+
+            // Delete entire rows
+            let deleted = app.document.delete_rows(start_row, end_row);
+            app.status_message = Some(StatusMessage::from(format!(
+                "Deleted {} row(s)",
+                deleted.len()
+            )));
+
+            // Adjust cursor position
+            if app.document.data_row_count() > 0 {
+                let new_row = start_row.get().min(app.document.row_count() - 1);
+                app.view_state.table_state.select(Some(new_row));
+            } else {
+                app.view_state.table_state.select(Some(0));
+            }
+        }
+
+        VisualMode::Column => {
+            // Yank entire columns to column buffer before deleting
+            let mut columns = Vec::new();
+            for col_idx in start_col.get()..=end_col.get() {
+                let column: Vec<String> = (0..app.document.row_count())
+                    .map(|row_idx| {
+                        app.document
+                            .get_cell(RowIndex::new(row_idx), ColIndex::new(col_idx))
+                            .to_string()
+                    })
+                    .collect();
+                columns.push(column);
+            }
+            app.clipboard.yank_columns(columns);
+
+            // Delete entire columns
+            let col_count = end_col.get() - start_col.get() + 1;
+            for _ in 0..col_count {
+                app.document.delete_column(start_col);
+            }
+            app.status_message = Some(StatusMessage::from(format!(
+                "Deleted {} column(s)",
+                col_count
+            )));
+
+            // Adjust cursor position
+            if start_col.get() >= app.document.column_count() {
+                app.view_state.selected_column =
+                    ColIndex::new(app.document.column_count().saturating_sub(1));
+            }
+        }
+    }
+
+    // Save selection for gv
+    app.last_visual_selection = Some(selection);
+    app.mode = Mode::Normal;
+
+    Ok(InputResult::Continue)
+}
+
+/// Yank the visual selection
+fn handle_visual_yank(app: &mut App) -> Result<InputResult> {
+    use crate::app::{Mode, VisualMode};
+
+    let selection = match &app.visual_selection {
+        Some(sel) => sel.clone(),
+        None => {
+            app.mode = Mode::Normal;
+            return Ok(InputResult::Continue);
+        }
+    };
+
+    let (start_row, end_row, start_col, end_col) = selection.bounds();
+
+    match selection.mode {
+        VisualMode::Block => {
+            // Yank rectangular region to region buffer
+            let mut region = Vec::new();
+            for row_idx in start_row.get()..=end_row.get() {
+                let mut row = Vec::new();
+                for col_idx in start_col.get()..=end_col.get() {
+                    let cell = app
+                        .document
+                        .get_cell(RowIndex::new(row_idx), ColIndex::new(col_idx))
+                        .to_string();
+                    row.push(cell);
+                }
+                region.push(row);
+            }
+            app.clipboard.yank_region(region);
+
+            let row_count = end_row.get() - start_row.get() + 1;
+            let col_count = end_col.get() - start_col.get() + 1;
+            app.status_message = Some(StatusMessage::from(format!(
+                "Yanked {}x{} cells",
+                row_count, col_count
+            )));
+        }
+
+        VisualMode::Line => {
+            // Yank entire rows to row buffer
+            let rows: Vec<Vec<String>> = (start_row.get()..=end_row.get())
+                .map(|row_idx| {
+                    (0..app.document.column_count())
+                        .map(|col_idx| {
+                            app.document
+                                .get_cell(RowIndex::new(row_idx), ColIndex::new(col_idx))
+                                .to_string()
+                        })
+                        .collect()
+                })
+                .collect();
+            app.clipboard.yank_rows(rows);
+            let row_count = end_row.get() - start_row.get() + 1;
+            app.status_message = Some(StatusMessage::from(format!("Yanked {} row(s)", row_count)));
+        }
+
+        VisualMode::Column => {
+            // Yank entire columns to column buffer
+            let mut columns = Vec::new();
+            for col_idx in start_col.get()..=end_col.get() {
+                let column: Vec<String> = (0..app.document.row_count())
+                    .map(|row_idx| {
+                        app.document
+                            .get_cell(RowIndex::new(row_idx), ColIndex::new(col_idx))
+                            .to_string()
+                    })
+                    .collect();
+                columns.push(column);
+            }
+            app.clipboard.yank_columns(columns);
+            let col_count = end_col.get() - start_col.get() + 1;
+            app.status_message = Some(StatusMessage::from(format!(
+                "Yanked {} column(s)",
+                col_count
+            )));
+        }
+    }
+
+    // Move cursor to the start of the selection (minimum coordinates) like vim
+    let (anchor_row, cursor_row) = (selection.anchor.0, selection.cursor.0);
+    let (anchor_col, cursor_col) = (selection.anchor.1, selection.cursor.1);
+    let start_row = anchor_row.min(cursor_row);
+    let start_col = anchor_col.min(cursor_col);
+    app.view_state.table_state.select(Some(start_row.get()));
+    app.view_state.selected_column = start_col;
+
+    // Save selection for gv and exit visual mode
+    app.last_visual_selection = app.visual_selection.take();
+    app.mode = Mode::Normal;
+
+    Ok(InputResult::Continue)
+}
+
+/// Paste over the visual selection
+fn handle_visual_paste(app: &mut App) -> Result<InputResult> {
+    use crate::app::{Mode, VisualMode};
+
+    let selection = match app.visual_selection.take() {
+        Some(sel) => sel,
+        None => {
+            app.mode = Mode::Normal;
+            return Ok(InputResult::Continue);
+        }
+    };
+
+    let (start_row, end_row, start_col, end_col) = selection.bounds();
+
+    match selection.mode {
+        VisualMode::Block => {
+            // Paste region buffer over selection
+            if let Some(region) = app.clipboard.get_region() {
+                // Clear the selection area first
+                for row_idx in start_row.get()..=end_row.get() {
+                    for col_idx in start_col.get()..=end_col.get() {
+                        app.document.set_cell(
+                            RowIndex::new(row_idx),
+                            ColIndex::new(col_idx),
+                            String::new(),
+                        );
+                    }
+                }
+
+                let region_rows = region.len();
+                let max_cols = region.iter().map(|r| r.len()).max().unwrap_or(0);
+
+                for (r_offset, row_data) in region.iter().enumerate() {
+                    let target_row = start_row.get() + r_offset;
+
+                    // Extend table if needed
+                    while target_row >= app.document.row_count() {
+                        app.document
+                            .insert_row(RowIndex::new(app.document.row_count()));
+                    }
+
+                    for (c_offset, cell_value) in row_data.iter().enumerate() {
+                        let target_col = start_col.get() + c_offset;
+                        if target_col < app.document.column_count() {
+                            app.document.set_cell(
+                                RowIndex::new(target_row),
+                                ColIndex::new(target_col),
+                                cell_value.clone(),
+                            );
+                        }
+                    }
+                }
+                app.status_message = Some(StatusMessage::from(format!(
+                    "Pasted {}x{} region",
+                    region_rows, max_cols
+                )));
+            } else {
+                app.status_message = Some(StatusMessage::from("Nothing to paste"));
+            }
+        }
+
+        VisualMode::Line => {
+            // Paste row buffer over selected rows
+            if let Some(rows) = app.clipboard.get_rows() {
+                // Delete selected rows first
+                app.document.delete_rows(start_row, end_row);
+                // Insert rows at start position
+                for (offset, row_data) in rows.iter().enumerate() {
+                    let insert_row = RowIndex::new(start_row.get() + offset);
+                    app.document.insert_row(insert_row);
+                    for (col_idx, cell_value) in row_data.iter().enumerate() {
+                        if col_idx < app.document.column_count() {
+                            app.document.set_cell(
+                                insert_row,
+                                ColIndex::new(col_idx),
+                                cell_value.clone(),
+                            );
+                        }
+                    }
+                }
+                app.status_message =
+                    Some(StatusMessage::from(format!("Pasted {} row(s)", rows.len())));
+            } else {
+                app.status_message = Some(StatusMessage::from("Nothing to paste"));
+            }
+        }
+
+        VisualMode::Column => {
+            // Paste column buffer over selected columns
+            if let Some(columns) = app.clipboard.get_columns() {
+                // Delete selected columns first
+                let col_count = end_col.get() - start_col.get() + 1;
+                for _ in 0..col_count {
+                    app.document.delete_column(start_col);
+                }
+                // Insert columns at start position
+                for (offset, col_data) in columns.iter().enumerate() {
+                    let insert_col = ColIndex::new(start_col.get() + offset);
+                    app.document.insert_column(insert_col, col_data.clone());
+                }
+                app.status_message = Some(StatusMessage::from(format!(
+                    "Pasted {} column(s)",
+                    columns.len()
+                )));
+            } else {
+                app.status_message = Some(StatusMessage::from("Nothing to paste"));
+            }
+        }
+    }
+
+    // Save selection for gv
+    app.last_visual_selection = Some(selection);
+    app.mode = Mode::Normal;
 
     Ok(InputResult::Continue)
 }

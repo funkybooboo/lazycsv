@@ -289,10 +289,54 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             let left = format!("HEADER EDIT: {}", col_name);
             build_status_line(&left, &right_side, area.width as usize)
         }
-        crate::app::Mode::Visual => {
+        crate::app::Mode::VisualBlock => {
             let dirty = if app.document.is_dirty { "*" } else { "" };
+            let selection_info = if let Some(sel) = &app.visual_selection {
+                let (start_row, end_row, start_col, end_col) = sel.bounds();
+                format!(
+                    " {}-{},{}-{}",
+                    start_row.get() + 1,
+                    end_row.get() + 1,
+                    crate::ui::utils::column_to_excel_letter(start_col.get()),
+                    crate::ui::utils::column_to_excel_letter(end_col.get())
+                )
+            } else {
+                String::new()
+            };
             build_status_line(
-                &format!("VISUAL{}", dirty),
+                &format!("VISUAL{}{}", selection_info, dirty),
+                &right_side,
+                area.width as usize,
+            )
+        }
+        crate::app::Mode::VisualLine => {
+            let dirty = if app.document.is_dirty { "*" } else { "" };
+            let selection_info = if let Some(sel) = &app.visual_selection {
+                let (start_row, end_row, _, _) = sel.bounds();
+                format!(" LINE {}-{}", start_row.get() + 1, end_row.get() + 1)
+            } else {
+                String::new()
+            };
+            build_status_line(
+                &format!("VISUAL{}{}", selection_info, dirty),
+                &right_side,
+                area.width as usize,
+            )
+        }
+        crate::app::Mode::VisualColumn => {
+            let dirty = if app.document.is_dirty { "*" } else { "" };
+            let selection_info = if let Some(sel) = &app.visual_selection {
+                let (_, _, start_col, end_col) = sel.bounds();
+                format!(
+                    " COLUMN {}-{}",
+                    crate::ui::utils::column_to_excel_letter(start_col.get()),
+                    crate::ui::utils::column_to_excel_letter(end_col.get())
+                )
+            } else {
+                String::new()
+            };
+            build_status_line(
+                &format!("VISUAL{}{}", selection_info, dirty),
                 &right_side,
                 area.width as usize,
             )
