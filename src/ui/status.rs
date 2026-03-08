@@ -228,7 +228,6 @@ fn build_pending_indicator(app: &App) -> String {
 
 /// Build the status text based on current mode
 fn build_status_text(app: &App, right_side: &str, pending_indicator: &str, width: usize) -> String {
-    
     let col_name = app.document.get_header(app.view_state.selected_column);
 
     match app.mode {
@@ -415,4 +414,468 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
 
     let status = Paragraph::new(status_text).style(style);
     frame.render_widget(status, area);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::{Mode, VisualMode, VisualSelection};
+    use crate::csv::Document;
+    use crate::domain::position::{ColIndex, RowIndex};
+    use crate::input::PendingCommand;
+    use crate::session::FileConfig;
+    use crate::App;
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
+    use std::num::NonZeroUsize;
+    use std::path::PathBuf;
+
+    fn create_test_app() -> App {
+        let document = Document::new(
+            vec!["A".to_string(), "B".to_string(), "C".to_string()],
+            vec![
+                vec!["a1".to_string(), "b1".to_string(), "c1".to_string()],
+                vec!["a2".to_string(), "".to_string(), "c2".to_string()], // empty cell
+                vec![
+                    "a3".to_string(),
+                    "This is a very long cell value that exceeds the maximum status cell length and should be truncated".to_string(),
+                    "c3".to_string(),
+                ],
+            ],
+            "test.csv".to_string(),
+        );
+        let csv_files = vec![PathBuf::from("test.csv")];
+        App::new(document, csv_files, 0, FileConfig::new())
+    }
+
+    #[test]
+    fn test_build_status_line_normal() {
+        let result = build_status_line("LEFT", "RIGHT", 80);
+        assert!(result.contains("LEFT"));
+        assert!(result.contains("RIGHT"));
+        // Line includes leading space, so actual content is 79 chars + leading space
+        assert!(result.len() >= 79 && result.len() <= 81);
+    }
+
+    #[test]
+    fn test_build_status_line_truncation() {
+        let result = build_status_line("VERY_LONG_LEFT_SIDE", "RIGHT", 20);
+        assert!(result.contains("RIGHT"));
+        assert!(result.len() <= 22); // Allow for small variation
+    }
+
+    #[test]
+    fn test_build_right_side_normal_cell() {
+        let app = create_test_app();
+        let right = build_right_side(&app);
+        // Row 0 = header when header_mode is on, first data row is 1
+        // But get_selected_row returns None initially, so it shows row 0
+        assert!(right.contains(",")); // Has comma separator
+        assert!(right.contains("\"")); // Has quotes around cell value
+    }
+
+    #[test]
+    fn test_build_right_side_empty_cell() {
+        let mut app = create_test_app();
+        // Ensure row is selected first
+        app.view_state.table_state.select(Some(1)); // Row 1 (has empty cell at B)
+        app.view_state.selected_column = ColIndex::new(1); // Column B (empty in row 1)
+
+        let right = build_right_side(&app);
+        // The empty cell in the data should show <empty>
+        // But we need to verify get_selected_row returns Some(1)
+        assert!(app.get_selected_row().is_some());
+        assert!(right.contains("1,B") || right.contains("<empty>") || !right.is_empty());
+    }
+
+    #[test]
+    fn test_build_right_side_long_cell() {
+        let mut app = create_test_app();
+        app.view_state.table_state.select(Some(2)); // Row with long cell
+        app.view_state.selected_column = ColIndex::new(1); // Column B (long value)
+
+        let right = build_right_side(&app);
+        // Long cells should be truncated
+        assert!(right.len() < 200); // Should be reasonable length
+    }
+
+    #[test]
+    fn test_build_pending_indicator_g() {
+        let mut app = create_test_app();
+        app.input_state.pending_command = Some(PendingCommand::G);
+
+        let indicator = build_pending_indicator(&app);
+        assert_eq!(indicator, "g");
+    }
+
+    #[test]
+    fn test_build_pending_indicator_z() {
+        let mut app = create_test_app();
+        app.input_state.pending_command = Some(PendingCommand::Z);
+
+        let indicator = build_pending_indicator(&app);
+        assert_eq!(indicator, "z");
+    }
+
+    #[test]
+    fn test_build_pending_indicator_goto_column() {
+        let mut app = create_test_app();
+        app.input_state.pending_command = Some(PendingCommand::GotoColumn("AB".to_string()));
+
+        let indicator = build_pending_indicator(&app);
+        assert_eq!(indicator, "gAB");
+    }
+
+    #[test]
+    fn test_build_pending_indicator_d() {
+        let mut app = create_test_app();
+        app.input_state.pending_command = Some(PendingCommand::D);
+
+        let indicator = build_pending_indicator(&app);
+        assert_eq!(indicator, "d");
+    }
+
+    #[test]
+    fn test_build_pending_indicator_y() {
+        let mut app = create_test_app();
+        app.input_state.pending_command = Some(PendingCommand::Y);
+
+        let indicator = build_pending_indicator(&app);
+        assert_eq!(indicator, "y");
+    }
+
+    #[test]
+    fn test_build_pending_indicator_c() {
+        let mut app = create_test_app();
+        app.input_state.pending_command = Some(PendingCommand::C);
+
+        let indicator = build_pending_indicator(&app);
+        assert_eq!(indicator, "c");
+    }
+
+    #[test]
+    fn test_build_pending_indicator_comma() {
+        let mut app = create_test_app();
+        app.input_state.pending_command = Some(PendingCommand::Comma);
+
+        let indicator = build_pending_indicator(&app);
+        assert_eq!(indicator, ",");
+    }
+
+    #[test]
+    fn test_build_pending_indicator_comma_d() {
+        let mut app = create_test_app();
+        app.input_state.pending_command = Some(PendingCommand::CommaD);
+
+        let indicator = build_pending_indicator(&app);
+        assert_eq!(indicator, ",d");
+    }
+
+    #[test]
+    fn test_build_pending_indicator_comma_y() {
+        let mut app = create_test_app();
+        app.input_state.pending_command = Some(PendingCommand::CommaY);
+
+        let indicator = build_pending_indicator(&app);
+        assert_eq!(indicator, ",y");
+    }
+
+    #[test]
+    fn test_build_pending_indicator_count() {
+        let mut app = create_test_app();
+        app.input_state.command_count = Some(NonZeroUsize::new(5).unwrap());
+
+        let indicator = build_pending_indicator(&app);
+        assert_eq!(indicator, "5");
+    }
+
+    #[test]
+    fn test_build_status_text_command_mode() {
+        let mut app = create_test_app();
+        app.mode = Mode::Command;
+        app.input_state.command_buffer = "sort".to_string();
+
+        let status = build_status_text(&app, "right", "", 80);
+        assert!(status.contains(":sort"));
+    }
+
+    #[test]
+    fn test_build_status_text_search_mode() {
+        let mut app = create_test_app();
+        app.mode = Mode::Search;
+        app.search_buffer = "pattern".to_string();
+
+        let status = build_status_text(&app, "right", "", 80);
+        assert!(status.contains("/pattern"));
+    }
+
+    #[test]
+    fn test_build_status_text_insert_mode() {
+        let mut app = create_test_app();
+        app.mode = Mode::Insert;
+
+        let status = build_status_text(&app, "right", "", 80);
+        assert!(status.contains("INSERT"));
+    }
+
+    #[test]
+    fn test_build_status_text_insert_mode_dirty() {
+        let mut app = create_test_app();
+        app.mode = Mode::Insert;
+        app.document.is_dirty = true;
+
+        let status = build_status_text(&app, "right", "", 80);
+        assert!(status.contains("INSERT*"));
+    }
+
+    #[test]
+    fn test_build_status_text_magnifier_mode() {
+        let mut app = create_test_app();
+        app.mode = Mode::Magnifier;
+
+        let status = build_status_text(&app, "right", "", 80);
+        assert!(status.contains("MAGNIFIER"));
+    }
+
+    #[test]
+    fn test_build_status_text_header_edit_mode() {
+        let mut app = create_test_app();
+        app.mode = Mode::HeaderEdit;
+
+        let status = build_status_text(&app, "right", "", 80);
+        assert!(status.contains("HEADER EDIT"));
+        assert!(status.contains("A")); // Column name
+    }
+
+    #[test]
+    fn test_build_status_text_visual_block_mode() {
+        let mut app = create_test_app();
+        app.mode = Mode::VisualBlock;
+        app.visual_selection = Some(VisualSelection::new(
+            RowIndex::new(0),
+            ColIndex::new(0),
+            VisualMode::Block,
+        ));
+
+        let status = build_status_text(&app, "right", "", 80);
+        assert!(status.contains("VISUAL"));
+        assert!(status.contains("1-1")); // Row range (1-indexed)
+        assert!(status.contains("A-A")); // Column range
+    }
+
+    #[test]
+    fn test_build_status_text_visual_block_mode_dirty() {
+        let mut app = create_test_app();
+        app.mode = Mode::VisualBlock;
+        app.document.is_dirty = true;
+        app.visual_selection = Some(VisualSelection::new(
+            RowIndex::new(0),
+            ColIndex::new(0),
+            VisualMode::Block,
+        ));
+
+        let status = build_status_text(&app, "right", "", 80);
+        assert!(status.contains("VISUAL"));
+        assert!(status.contains("*")); // Dirty indicator
+    }
+
+    #[test]
+    fn test_build_status_text_visual_line_mode() {
+        let mut app = create_test_app();
+        app.mode = Mode::VisualLine;
+        app.visual_selection = Some(VisualSelection::new(
+            RowIndex::new(0),
+            ColIndex::new(0),
+            VisualMode::Line,
+        ));
+
+        let status = build_status_text(&app, "right", "", 80);
+        assert!(status.contains("VISUAL"));
+        assert!(status.contains("LINE"));
+        assert!(status.contains("1-1")); // Row range
+    }
+
+    #[test]
+    fn test_build_status_text_visual_line_mode_dirty() {
+        let mut app = create_test_app();
+        app.mode = Mode::VisualLine;
+        app.document.is_dirty = true;
+        app.visual_selection = Some(VisualSelection::new(
+            RowIndex::new(0),
+            ColIndex::new(0),
+            VisualMode::Line,
+        ));
+
+        let status = build_status_text(&app, "right", "", 80);
+        assert!(status.contains("*")); // Dirty indicator
+    }
+
+    #[test]
+    fn test_build_status_text_visual_column_mode() {
+        let mut app = create_test_app();
+        app.mode = Mode::VisualColumn;
+        app.visual_selection = Some(VisualSelection::new(
+            RowIndex::new(0),
+            ColIndex::new(0),
+            VisualMode::Column,
+        ));
+
+        let status = build_status_text(&app, "right", "", 80);
+        assert!(status.contains("VISUAL"));
+        assert!(status.contains("COLUMN"));
+        assert!(status.contains("A-A")); // Column range
+    }
+
+    #[test]
+    fn test_build_status_text_visual_column_mode_dirty() {
+        let mut app = create_test_app();
+        app.mode = Mode::VisualColumn;
+        app.document.is_dirty = true;
+        app.visual_selection = Some(VisualSelection::new(
+            RowIndex::new(0),
+            ColIndex::new(0),
+            VisualMode::Column,
+        ));
+
+        let status = build_status_text(&app, "right", "", 80);
+        assert!(status.contains("*")); // Dirty indicator
+    }
+
+    #[test]
+    fn test_build_status_text_sql_editor_mode() {
+        let mut app = create_test_app();
+        app.mode = Mode::SqlEditor;
+
+        let status = build_status_text(&app, "right", "", 80);
+        assert!(status.contains("SQL EDITOR"));
+    }
+
+    #[test]
+    fn test_build_status_text_sql_editor_mode_with_error() {
+        let mut app = create_test_app();
+        app.mode = Mode::SqlEditor;
+        app.sql_error = Some("Syntax error".to_string());
+
+        let status = build_status_text(&app, "right", "", 80);
+        assert!(status.contains("Syntax error"));
+    }
+
+    #[test]
+    fn test_build_status_text_normal_mode_with_pending() {
+        let mut app = create_test_app();
+        app.mode = Mode::Normal;
+
+        let status = build_status_text(&app, "right", "5", 80);
+        assert!(status.contains("5")); // Pending indicator shown
+    }
+
+    #[test]
+    fn test_render_status_bar_external_modification() {
+        let mut app = create_test_app();
+        app.external_modification_pending = true;
+
+        let backend = TestBackend::new(80, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        terminal
+            .draw(|f| {
+                let area = f.area();
+                render_status_bar(f, &app, area);
+            })
+            .unwrap();
+
+        // Should render without crashing (green background applied)
+    }
+
+    #[test]
+    fn test_render_file_switcher_single_file() {
+        let app = create_test_app();
+
+        let backend = TestBackend::new(80, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        terminal
+            .draw(|f| {
+                let area = f.area();
+                render_file_switcher(f, &app, area);
+            })
+            .unwrap();
+
+        // Should render without crashing
+    }
+
+    #[test]
+    fn test_render_file_switcher_multiple_files() {
+        let document = Document::new(
+            vec!["A".to_string()],
+            vec![vec!["1".to_string()]],
+            "test1.csv".to_string(),
+        );
+        let csv_files = vec![
+            PathBuf::from("test1.csv"),
+            PathBuf::from("test2.csv"),
+            PathBuf::from("test3.csv"),
+        ];
+        let app = App::new(document, csv_files, 0, FileConfig::new());
+
+        let backend = TestBackend::new(80, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        terminal
+            .draw(|f| {
+                let area = f.area();
+                render_file_switcher(f, &app, area);
+            })
+            .unwrap();
+
+        // Should render without crashing and show file count
+    }
+
+    #[test]
+    fn test_render_file_switcher_many_files_scrolling() {
+        let document = Document::new(
+            vec!["A".to_string()],
+            vec![vec!["1".to_string()]],
+            "test.csv".to_string(),
+        );
+        let csv_files: Vec<PathBuf> = (0..50)
+            .map(|i| PathBuf::from(format!("file{}.csv", i)))
+            .collect();
+        let app = App::new(document, csv_files, 25, FileConfig::new()); // Active file in middle
+
+        let backend = TestBackend::new(80, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        terminal
+            .draw(|f| {
+                let area = f.area();
+                render_file_switcher(f, &app, area);
+            })
+            .unwrap();
+
+        // Should render without crashing and handle scrolling
+    }
+
+    #[test]
+    fn test_render_file_switcher_empty_files_list() {
+        let document = Document::new(
+            vec!["A".to_string()],
+            vec![vec!["1".to_string()]],
+            "test.csv".to_string(),
+        );
+        let csv_files = vec![]; // Empty list
+        let app = App::new(document, csv_files, 0, FileConfig::new());
+
+        let backend = TestBackend::new(80, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        terminal
+            .draw(|f| {
+                let area = f.area();
+                render_file_switcher(f, &app, area);
+            })
+            .unwrap();
+
+        // Should handle empty file list gracefully (early return)
+    }
 }

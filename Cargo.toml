@@ -30,3 +30,12 @@ codegen-units = 1
 [dev-dependencies]
 tempfile = "3.10.1"
 proptest = "1.4"
+criterion = "0.5"
+
+[[bench]]
+name = "navigation"
+harness = false
+
+[[bench]]
+name = "rendering"
+harness = false

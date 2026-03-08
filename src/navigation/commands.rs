@@ -21,35 +21,65 @@ pub fn handle_navigation(app: &mut App, code: KeyCode) -> Result<()> {
         .take()
         .map(|n| n.get())
         .unwrap_or(1);
+
     match code {
-        // Move up (with count: 5k moves up 5 rows)
-        KeyCode::Up | KeyCode::Char('k') => {
-            move_up_by(app, count);
+        // Directional movement with count
+        KeyCode::Up
+        | KeyCode::Char('k')
+        | KeyCode::Down
+        | KeyCode::Char('j')
+        | KeyCode::Left
+        | KeyCode::Char('h')
+        | KeyCode::Right
+        | KeyCode::Char('l') => {
+            handle_directional_movement(app, code, count);
         }
 
-        // Move down (with count: 5j moves down 5 rows)
-        KeyCode::Down | KeyCode::Char('j') => {
-            move_down_by(app, count);
+        // Jump to column boundaries
+        KeyCode::Char('0') | KeyCode::Char('$') => {
+            handle_column_boundary(app, code);
         }
 
-        // Move left (with count: 3h moves left 3 columns)
-        KeyCode::Left | KeyCode::Char('h') => {
-            move_left_by(app, count);
+        // Page navigation
+        KeyCode::PageDown | KeyCode::PageUp => {
+            handle_page_navigation(app, code);
         }
 
-        // Move right (with count: 3l moves right 3 columns)
-        KeyCode::Right | KeyCode::Char('l') => {
-            move_right_by(app, count);
+        // Row jumps (Home, End, G with count)
+        KeyCode::Home | KeyCode::End | KeyCode::Char('G') => {
+            handle_row_jump(app, code, count);
         }
 
-        // First column
+        // Word motion
+        KeyCode::Char('w') | KeyCode::Char('b') | KeyCode::Char('e') => {
+            handle_word_motion(app, code);
+        }
+
+        _ => {}
+    }
+
+    Ok(())
+}
+
+/// Handle directional movement (hjkl/arrows) with count prefix
+fn handle_directional_movement(app: &mut App, code: KeyCode, count: usize) {
+    match code {
+        KeyCode::Up | KeyCode::Char('k') => move_up_by(app, count),
+        KeyCode::Down | KeyCode::Char('j') => move_down_by(app, count),
+        KeyCode::Left | KeyCode::Char('h') => move_left_by(app, count),
+        KeyCode::Right | KeyCode::Char('l') => move_right_by(app, count),
+        _ => {}
+    }
+}
+
+/// Handle column boundary jumps (0, $)
+fn handle_column_boundary(app: &mut App, code: KeyCode) {
+    match code {
         KeyCode::Char('0') => {
             app.view_state.selected_column = ColIndex::new(0);
             app.view_state.column_scroll_offset = 0;
             app.view_state.viewport_mode = ViewportMode::Auto;
         }
-
-        // Last column
         KeyCode::Char('$') => {
             app.view_state.selected_column =
                 ColIndex::new(app.document.column_count().saturating_sub(1));
@@ -60,23 +90,23 @@ pub fn handle_navigation(app: &mut App, code: KeyCode) -> Result<()> {
             }
             app.view_state.viewport_mode = ViewportMode::Auto;
         }
+        _ => {}
+    }
+}
 
-        // Page down (Ctrl+d is handled in handler.rs)
-        KeyCode::PageDown => {
-            select_next_page(app);
-        }
+/// Handle page navigation (PageUp, PageDown)
+fn handle_page_navigation(app: &mut App, code: KeyCode) {
+    match code {
+        KeyCode::PageDown => select_next_page(app),
+        KeyCode::PageUp => select_previous_page(app),
+        _ => {}
+    }
+}
 
-        // Page up (Ctrl+u is handled in handler.rs)
-        KeyCode::PageUp => {
-            select_previous_page(app);
-        }
-
-        // Home (first row) - will be handled by gg multi-key
-        KeyCode::Home => {
-            goto_first_row(app);
-        }
-
-        // End/G - Go to last row, or specific line with count (5G goes to line 5)
+/// Handle row jumps (Home, End, G with count)
+fn handle_row_jump(app: &mut App, code: KeyCode, count: usize) {
+    match code {
+        KeyCode::Home => goto_first_row(app),
         KeyCode::End | KeyCode::Char('G') => {
             if count > 1 {
                 // goto_line sets its own status message on success or error
@@ -85,26 +115,18 @@ pub fn handle_navigation(app: &mut App, code: KeyCode) -> Result<()> {
                 goto_last_row(app);
             }
         }
-
-        // Word motion: next non-empty cell
-        KeyCode::Char('w') => {
-            next_word(app);
-        }
-
-        // Word motion: previous non-empty cell
-        KeyCode::Char('b') => {
-            prev_word(app);
-        }
-
-        // Word motion: last non-empty cell
-        KeyCode::Char('e') => {
-            end_word(app);
-        }
-
         _ => {}
     }
+}
 
-    Ok(())
+/// Handle word motion (w, b, e)
+fn handle_word_motion(app: &mut App, code: KeyCode) {
+    match code {
+        KeyCode::Char('w') => next_word(app),
+        KeyCode::Char('b') => prev_word(app),
+        KeyCode::Char('e') => end_word(app),
+        _ => {}
+    }
 }
 
 fn select_next_page(app: &mut App) {

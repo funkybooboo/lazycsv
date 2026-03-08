@@ -94,5 +94,8 @@ criterion/
 *.profraw
 *.profdata
 coverage/
+coverage_baseline.txt
 tarpaulin-report.html
 cobertura.xml
+lcov.info
+*.lcov

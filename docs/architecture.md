@@ -460,6 +460,174 @@ Return to event loop
 ui::render() draws new file
 ```
 
+### Navigation Pipeline (v0.3.1 - Detailed)
+
+The navigation system is designed for sub-microsecond response times with count prefix support.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ User Input: "5j" (move down 5 rows)                         │
+└────────────────────────┬────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────┐
+│ input::handler::handle_normal_mode()                         │
+│  • Detects '5' → stores in input_state.command_count        │
+│  • Detects 'j' → calls handle_navigation(KeyCode::Char('j'))│
+└────────────────────────┬────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────┐
+│ navigation::commands::handle_navigation()                    │
+│  • Consumes count prefix: count = input_state.take()        │
+│  • Routes to handler based on key code                       │
+└────────────────────────┬────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────┐
+│ navigation::commands::handle_directional_movement()          │
+│  • Matches KeyCode::Char('j') → move_down_by(app, count)   │
+└────────────────────────┬────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────┐
+│ navigation::commands::move_down_by(app, 5)                   │
+│  • current = app.view_state.table_state.selected()          │
+│  • target = (current + 5).min(max_row)                      │
+│  • app.view_state.table_state.select(Some(target))          │
+│  • app.view_state.viewport_mode = ViewportMode::Auto        │
+│                                                               │
+│  Performance: ~1.4 nanoseconds (O(1) regardless of CSV size) │
+└────────────────────────┬────────────────────────────────────┘
+                         ↓
+                   Return to event loop
+                         ↓
+                   Render updated UI
+```
+
+**Navigation Helper Functions (v0.3.1 Refactor):**
+- `handle_directional_movement()` - hjkl/arrow keys with count
+- `handle_column_boundary()` - 0 and $ keys for first/last column
+- `handle_page_navigation()` - PageUp/PageDown
+- `handle_row_jump()` - Home/End/G with count support
+- `handle_word_motion()` - w/b/e for non-empty cell navigation
+
+**Count Prefix Behavior:**
+- Count is consumed once at the top level
+- If no count provided, defaults to 1
+- Count applies to all compatible navigation commands
+- Invalid counts (0) are rejected with error message
+
+**Viewport Coordination:**
+After navigation, viewport mode determines scroll behavior:
+- `ViewportMode::Auto` - Keep cursor centered when possible
+- `ViewportMode::Top` - Selected row at top (zt command)
+- `ViewportMode::Center` - Selected row centered (zz command)
+- `ViewportMode::Bottom` - Selected row at bottom (zb command)
+
+### Rendering Pipeline (v0.3.1 - Detailed)
+
+The rendering system uses virtual scrolling to maintain constant-time performance.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ main::run() - Event Loop                                     │
+│   terminal.draw(|f| ui::render(f, app))                     │
+└────────────────────────┬────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────┐
+│ ui::render(frame, app)                                       │
+│  • Splits terminal into 3 areas:                             │
+│    - Table area (Constraint::Min(0))                         │
+│    - File switcher (Constraint::Length(2))                   │
+│    - Status bar (Constraint::Length(1))                      │
+│  • Calls specialized renderers for each area                 │
+└────────────────────────┬────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────┐
+│ ui::table::render_table(frame, app, area)                    │
+│  1. Calculate visible viewport dimensions                    │
+│     • table_height = area.height - TABLE_HEADER_HEIGHT      │
+│     • visible_cols = min(MAX_VISIBLE_COLS, total_cols)      │
+│                                                               │
+│  2. Calculate scroll offsets                                 │
+│     • vertical: calculate_scroll_offset(selected, height)    │
+│     • horizontal: based on selected_column and scroll_offset │
+│                                                               │
+│  3. Calculate column widths                                  │
+│     • Measure header lengths for visible columns             │
+│     • Terminal width / visible_cols with min/max bounds      │
+│                                                               │
+│  4. Build visible rows                                       │
+│     • Extract only visible rows from document                │
+│     • visible_rows = document.rows[offset..offset+height]   │
+│                                                               │
+│  5. Build row components                                     │
+│     • build_column_letters_row() - A, B, C...                │
+│     • build_header_row() - Column names                      │
+│     • build_data_rows() - Visible data with styling          │
+│                                                               │
+│  6. Apply cell styling                                       │
+│     • Selected cell: white background                        │
+│     • Visual selection: dark gray background                 │
+│     • Search matches: yellow highlight                       │
+│     • Insert mode: show edit buffer with cursor              │
+│                                                               │
+│  7. Render Table widget to frame                             │
+│     • Ratatui Table widget with calculated constraints       │
+│     • frame.render_stateful_widget(table, area, state)      │
+│                                                               │
+│  Performance: ~389 µs for 100K rows (43x faster than 60 FPS) │
+└────────────────────────┬────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────┐
+│ ui::status::render_file_switcher(frame, app, area)           │
+│  • Display file list with scroll indicators                  │
+│  • Show active file with highlight                           │
+│  • Calculate scroll to keep active file visible              │
+└────────────────────────┬────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────┐
+│ ui::status::render_status_bar(frame, app, area)              │
+│  • Left: mode indicator (NORMAL, INSERT, VISUAL, etc.)       │
+│  • Center: position (Row 5, Col B)                           │
+│  • Right: flags (DIRTY, RO, ...)                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Key Rendering Optimizations:**
+
+1. **Virtual Scrolling**: Only renders visible cells (~40 rows × 10 cols = 400 cells)
+   - Rendering time independent of CSV size
+   - Performance: O(visible cells), not O(total cells)
+
+2. **O(1) Cell Access**: Direct Vec indexing via RowIndex/ColIndex
+   - Single cell access: ~1.4 ns
+   - Sequential access (400 cells): ~360 ns
+
+3. **Minimal Allocations**: Reuses buffers, no unnecessary cloning
+   - Cell strings returned as `&str` references
+   - Row data accessed via slice views
+
+4. **CPU Cache Friendly**: Sequential memory access patterns
+   - Rows stored as Vec<Vec<String>>
+   - Visible rows accessed sequentially
+
+5. **Lazy Computation**: Only calculates what's visible
+   - Column widths: only for visible columns
+   - Styling: only for visible cells
+   - Scroll offsets: calculated once per frame
+
+**Performance Characteristics (v0.3.1 Benchmarks):**
+
+| Dataset Size | Render Time | FPS Equivalent | Margin vs 60 FPS |
+|--------------|-------------|----------------|------------------|
+| 1,000 rows   | 394 µs      | 2,538 FPS      | 42x faster       |
+| 10,000 rows  | 397 µs      | 2,518 FPS      | 42x faster       |
+| 100,000 rows | 389 µs      | 2,571 FPS      | 43x faster       |
+
+**Why Constant Performance?**
+- Virtual scrolling means only ~400 cells rendered regardless of CSV size
+- Cell access is O(1) via direct indexing
+- No iteration over non-visible data
+- Terminal I/O (~390µs) is the bottleneck, not data processing (<1µs)
+
 ## Module Dependencies (v0.2.0)
 
 ```
@@ -658,25 +826,77 @@ anyhow displays: "Failed to load file.csv: No such file or directory"
 | Operation | Complexity | Notes |
 |-----------|------------|-------|
 | Load file | O(n) | n = total cells |
-| Navigate | O(1) | Just update index |
-| Render | O(v) | v = visible cells (~200) |
-| Search (v1.1.0) | O(n) | Full table scan |
-| Sort (v1.2.0) | O(n log n) | Standard sort |
+| Navigate | O(1) | Just update index (1-80 ns) |
+| Render | O(v) | v = visible cells (~400) |
+| Cell access | O(1) | Direct Vec indexing (~1.4 ns) |
+| Search (v0.7.0) | O(n) | Full table scan |
+| Sort (future) | O(n log n) | Standard sort |
 
 ### Space Complexity
 
 | Structure | Memory | Notes |
 |-----------|--------|-------|
-| CSV data | O(n) | n = total cells |
-| UI state | O(1) | Fixed size |
-| Render buffer | O(v) | v = visible cells |
+| CSV data | O(n) | n = total cells, fully in RAM |
+| UI state | O(1) | Fixed size ViewState |
+| Render buffer | O(v) | v = visible cells (~400) |
+| Navigation state | O(1) | Cursor position, scroll offsets |
 
-### Performance Targets
+### Performance Targets (v0.3.1 Benchmarks)
 
- Achieved in v0.1.0:
-- File loading: < 100ms for 10K rows
-- Frame rendering: < 16ms (60 FPS)
-- Navigation: < 10ms response
+✅ **All targets exceeded by 40x+**
+
+**Rendering Performance:**
+- Target: <16.67 ms per frame (60 FPS)
+- Actual: ~389 µs per frame (2,571 FPS)
+- **Result: 43x faster than target** ✅
+
+| Dataset Size | Render Time | vs Target | Status |
+|--------------|-------------|-----------|--------|
+| 1K rows      | 394 µs      | 2.4% used | ✅ PASS |
+| 10K rows     | 397 µs      | 2.4% used | ✅ PASS |
+| 100K rows    | 389 µs      | 2.3% used | ✅ PASS |
+
+**Navigation Performance:**
+- Target: <100 ns per operation
+- Actual: 1-80 ns per operation
+- **Result: Sub-nanosecond to sub-100ns** ✅
+
+| Operation | Time | Notes |
+|-----------|------|-------|
+| move_down/up | 1.4 ns | With count prefix |
+| move_left/right | 1.4 ns | Horizontal movement |
+| goto_first_row | 0.9 ns | Jump to top |
+| goto_last_row | 0.9 ns | Jump to bottom |
+| goto_line | 30 ns | Jump to specific row |
+| next_word | 3.1 ns | Non-empty cell search |
+| goto_column | 50 ns | Excel-style column jump |
+
+**Cell Access Performance:**
+- Single cell: ~1.4 ns (O(1) Vec indexing)
+- Sequential 400 cells: ~360 ns (typical viewport)
+- **No performance degradation** with dataset size
+
+**Why So Fast?**
+1. **Virtual Scrolling**: Only renders visible cells (~400)
+2. **O(1) Indexing**: Direct Vec access, no iteration
+3. **Minimal Allocations**: Reuses buffers, returns references
+4. **CPU Cache Friendly**: Sequential memory access
+5. **Lazy Computation**: Only calculates visible data
+
+**Bottleneck Analysis:**
+- Terminal I/O: ~390 µs (ratatui rendering)
+- Data processing: <1 µs (navigation + cell access)
+- **Conclusion**: Terminal rendering is bottleneck, not data operations
+
+**Performance Margin:**
+With 43x performance margin, LazyCSV can:
+- Add rich styling/colors without FPS impact
+- Implement complex visual modes
+- Add search highlighting
+- Support larger viewports
+- Handle real-time data updates
+
+For detailed benchmark results, see `docs/v0.3.1-benchmarks.md`.
 
 ## Thread Model
 
