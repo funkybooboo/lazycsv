@@ -48,15 +48,23 @@ This documentation is structured to guide you from high-level concepts to low-le
   - v0.2.6: Testing & validation
 
 ### Roadmap to v1.0
-- **v0.2.0** - Type safety refactor  Complete (All 6 phases)
-- **v0.3.0** - Advanced navigation (gg, G, counts, column jumps)
-- **v0.4.0** - Quick editing (Insert mode)
-- **v0.5.0** - **Vim magnifier** (full vim editor embedded)
-- **v0.6.0** - Save/quit guards
-- **v0.7.0** - Row operations (o, O, dd, yy, p)
-- **v0.8.0** - Column operations (:addcol, :delcol)
-- **v0.9.0** - Header management (gh to edit headers)
-- **v1.0.0** - Undo/redo system (u, Ctrl+r)
+
+**Completed (v0.1.0 - v0.8.1):**
+- Foundation, navigation, vim editing, row/column operations
+- Magnifier mode (full vim editor for cells)
+- Search and filtering
+- SQL query mode with multi-file support
+
+**Next Major Versions:**
+- **v0.9.0** - Configuration system (themes, keybindings)
+- **v0.10.0** - Undo/redo system (u, Ctrl+r, .)
+- **v0.11.0** - SQL editor vim editing (full modal editing)
+- **v0.14.0** - Cell transforms (case toggle, sort, filter)
+- **v0.18.0** - SQL IntelliSense (auto-completion)
+- **v0.22.0** - Macros (command recording)
+- **v1.0.0** - First stable release
+
+See [../plans/roadmap.md](../plans/roadmap.md) for complete details.
 
 ## Support
 

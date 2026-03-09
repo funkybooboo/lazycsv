@@ -31,145 +31,92 @@ This document translates the functionality described in the [Features Guide](fea
 
 ### Default View (v0.1.0)
 
-```
-┌─ lazycsv: sales_data.csv ────────────────────────────┐
-│     │  A          │ ►B         │  C           │  D    │ ← Column letters (► shows selected)
-├─────┼─────────────┼────────────┼──────────────┼───────┤
-│  #  │  ID         │  Date      │  Product     │  Qty  │ ← Headers
-├─────┼─────────────┼────────────┼──────────────┼───────┤
-│  1  │  001        │ 2024-01-15 │ Widget A     │  100  │
-│  2  │  002        │ 2024-01-16 │ Gadget B     │   50  │
-│►3   │  003        │[2024-01-17]│ Doohickey C  │   75  │ ← Current cell
-│  4  │  004        │ 2024-01-18 │ Thingamajig  │  200  │
-│  5  │  005        │ 2024-01-19 │ Whatchama... │  125  │
-│ ... │                                                  │
-├──────────────────────────────────────────────────────┤
-│ ? help │ q quit │ [ ] files │                        │ ← Status (left: controls,
-│ Row 3/1,234 │ Col B: Date (2/4) │                    │           right: info)
-│ Cell: "2024-01-17"                                   │
-├──────────────────────────────────────────────────────┤
-│ Files (1/2): ► sales_data.csv | customers.csv       │ ← File switcher
-└──────────────────────────────────────────────────────┘
-```
+<!-- Screenshot: screenshots/design-default-view.png -->
+**Normal mode showing CSV table with navigation**
 
-**Legend:**
+**Key UI Elements:**
 - `►` - Row indicator (left gutter) AND column indicator (top row)
-- `[text]` - Current cell (reversed video / highlighted)
+- Current cell - highlighted/reversed video
 - `...` - Truncated text (cell width limit ~20 chars)
 - Column letters: A, B, C, D... (like Excel)
 - Row numbers: 1, 2, 3... (not 0-indexed for user)
 - Status bar shows current cell value on bottom line
+- File switcher at bottom shows all CSV files in directory
 
 ### With Help Overlay (Press ?)
 
-```
-┌─ lazycsv: sales_data.csv ────────────────────────────┐
-│     │  A     │  B     ╔═══ Help ════════════════╗    │
-├─────┼────────┼────────║ Navigation   │ Editing  ║────┤
-│  #  │  ID    │  Date  ║  hjkl/arrows │ i Edit   ║    │
-├─────┼────────┼────────║  gg/G First/ │ Esc Cncl ║────┤
-│  3  │  003   │  2024..║  0/$ First/l │          ║    │
-│  3  │  003   │  2024..║  PageUp/Down │ Rows/Col ║    │
-│  4  │  004   │  2024..║              │ o Add ro ║    │
-│ ... │                 ║ File Switch  │ O Add ro ║    │
-├─────────────────────  ║  [/] Switch  │ dd Delet ║────┤
-│ Row 2/1,234 │ Col 2/5║              │          ║    │
-├─────────────────────  ║ Other        │          ║────┤
-│ Files (1/2): ► sales.║  ?   Help    │          ║    │
-└─────────────────────  ║  q   Quit    │          ║    │
-                        ║  Esc to close           ║
-                        ╚═════════════════════════╝
-```
+<!-- Screenshot: screenshots/design-help-overlay.png -->
+**Help menu showing all keybindings**
 
 **Help Overlay:**
 - Centered (60% width, 70% height)
-- Two-column layout (Navigation | Editing)
-- Organized by function
+- Multi-column layout organized by function
 - Dimmed background (table still visible)
 - Close with `?` or `Esc`
+- Scrollable for all keybindings
 
-### Edit Mode (v0.4.0)
+### Insert Mode (v0.4.0)
 
-```
-┌─ lazycsv: sales_data.csv [EDIT] * ────────────────────┐
-│     │  A          │  B         │  C           │  D    │
-├─────┼─────────────┼────────────┼──────────────┼───────┤
-│  #  │  ID         │  Date      │  Product     │  Qty  │
-├─────┼─────────────┼────────────┼──────────────┼───────┤
-│  1  │  001        │ 2024-01-15 │ Widget A     │  100  │
-│  2  │  002        │ 2024-01-16 │ Gadget B     │   50  │
-│►3   │  003        │ 2024-01-17 │►Doohickey C█ │   75  │ ← Editing
-│  4  │  004        │ 2024-01-18 │ Thingamajig  │  200  │
-│  5  │  005        │ 2024-01-19 │ Whatchama... │  125  │
-├──────────────────────────────────────────────────────┤
-│ EDIT: "Doohickey C" │ Enter save │ Esc cancel       │
-├──────────────────────────────────────────────────────┤
-│ Files (1/2): ► sales_data.csv | customers.csv       │
-└──────────────────────────────────────────────────────┘
-```
+<!-- Screenshot: screenshots/design-insert-mode.png -->
+**Quick cell editing with Insert mode**
 
-**Edit Mode Indicators:**
-- `[EDIT]` mode in title bar
+**Insert Mode Indicators:**
+- `-- INSERT --` mode indicator in status bar
 - `*` dirty indicator (unsaved changes)
-- `►` edit cursor before text
-- `█` blinking cursor at end
+- Blinking cursor in cell
 - Status bar shows edit instructions
 - All text selected by default (type to replace)
 
-### Visual Selection Mode (v1.1.0)
+### Visual Selection Mode (v0.5.0)
 
-```
-┌─ lazycsv: sales_data.csv [VISUAL] ─ 3 rows selected ─┐
-│     │  A          │  B         │  C           │  D    │
-├─────┼─────────────┼────────────┼──────────────┼───────┤
-│  #  │  ID         │  Date      │  Product     │  Qty  │
-├─────┼─────────────┼────────────┼──────────────┼───────┤
-│  1  │  001        │ 2024-01-15 │ Widget A     │  100  │
-│══2  │  002        │ 2024-01-16 │ Gadget B     │   50  │ ← Start
-│══3  │  003        │ 2024-01-17 │ Doohickey C  │   75  │ ← Selected
-│►4   │  004        │ 2024-01-18 │ Thingamajig  │  200  │ ← Current
-│  5  │  005        │ 2024-01-19 │ Whatchama... │  125  │
-├──────────────────────────────────────────────────────┤
-│ VISUAL: 3 rows │ d delete │ y copy │ Esc cancel    │
-├──────────────────────────────────────────────────────┤
-│ Files (1/2): ► sales_data.csv | customers.csv       │
-└──────────────────────────────────────────────────────┘
-```
+<!-- Screenshot: screenshots/design-visual-mode.png -->
+**Visual selection for multiple rows/cells**
 
 **Visual Mode Indicators:**
-- `[VISUAL]` mode in title bar
-- `══` selection markers on selected rows
+- `-- VISUAL --` or `-- VISUAL LINE --` in status bar
+- Selection markers on selected rows/cells
 - `►` current cursor position
-- Row count in status: "3 rows selected"
-- Available operations in status
+- Selection count in status: "3 rows selected"
+- Available operations shown in status
 
-### Fuzzy Search Overlay (v1.1.0)
+### Fuzzy Search Overlay (v0.7.0)
 
-```
-┌─ lazycsv: sales_data.csv ────────────────────────────┐
-│     │  A     │  B     ╔═══ Search ══════════════╗    │
-├─────┼────────┼────────║ Query: eml█             ║────┤
-│  #  │  ID    │  Date  ║                         ║    │
-├─────┼────────┼────────║ Results (3):            ║────┤
-│  1  │  001   │  2024..║ ► [Col C: Email]        ║    │
-│►2   │  002   │  2024..║   [Cell B5: emily@...]  ║    │
-│  3  │  003   │  2024..║   [Cell B7: emma@...]   ║    │
-│  4  │  004   │  2024..║                         ║    │
-│ ... │                 ║ j/k navigate            ║    │
-├─────────────────────  ║ Enter jump              ║────┤
-│ Row 2/1,234 │ Col 2/5║ Esc cancel              ║    │
-├─────────────────────  ╚═════════════════════════╝────┤
-│ Files (1/2): ► sales_data.csv | customers.csv       │
-└──────────────────────────────────────────────────────┘
-```
+<!-- Screenshot: screenshots/design-search-overlay.png -->
+**Fuzzy search finding matches in cells and headers**
 
 **Fuzzy Search:**
 - Centered overlay (50% width)
 - Live results as you type
-- Shows match type: [Row], [Col], [Cell]
-- `j`/`k` to navigate results
-- `Enter` to jump, `Esc` to cancel
+- Shows match type and location
+- Navigate results with `n`/`N`
+- `Esc` to cancel
 - Fuzzy matching with scoring
+
+### SQL Editor Mode (v0.8.0)
+
+<!-- Screenshot: screenshots/design-sql-editor.png -->
+**SQL editor overlay for querying CSV data**
+
+**SQL Editor Features:**
+- Centered overlay (80% width, 60% height)
+- Multi-line query input
+- Syntax highlighting for SQL keywords
+- Auto-complete for table name, columns, and SQL keywords
+- `Ctrl+Enter` to execute query
+- Results displayed in new virtual table view
+- Error messages with fuzzy column name suggestions
+- Query history navigation with `Up`/`Down`
+- Status bar shows available commands
+
+<!-- Screenshot: screenshots/design-sql-results.png -->
+**SQL query results displayed as virtual table**
+
+**SQL Results View:**
+- Results shown as read-only virtual table
+- Can navigate results like normal table view
+- `:sql` to edit query again
+- `Esc` to return to original table
+- Status shows result count
 
 ## Visual Design Specification
 
@@ -276,7 +223,7 @@ If colors are added as an option:
 8. Show feedback: Cell updated, * in title
 ```
 
-### Row Operations (v0.7.0)
+### Row Operations (v0.4.0)
 ```
 Add row below (o):
   1. Navigate to row
@@ -295,7 +242,7 @@ Delete row (dd):
   6. * dirty indicator appears
 ```
 
-### Copy/Paste (v0.7.0)
+### Copy/Paste (v0.4.0)
 ```
 1. Navigate to row
 2. Press yy (yank)
@@ -307,7 +254,7 @@ Delete row (dd):
 8. Can paste multiple times
 ```
 
-### Undo (v1.0.0)
+### Undo (v0.10.0)
 ```
 1. Perform operation (edit, delete, sort, etc.)
 2. Press u
@@ -383,52 +330,19 @@ LazyCSV prioritizes instant response over smooth animation:
 ## Error States
 
 ### File Not Found
-```
-┌──────────────────────────────────────────┐
-│ lazycsv: ERROR                           │
-├──────────────────────────────────────────┤
-│                                          │
-│          ⚠ Failed to load file          │
-│                                          │
-│          File: sales_data.csv            │
-│          Error: File not found           │
-│                                          │
-│          Press q to quit                 │
-│                                          │
-├──────────────────────────────────────────┤
-│ q quit                                   │
-└──────────────────────────────────────────┘
-```
+
+<!-- Screenshot: screenshots/design-error-file-not-found.png -->
+**Error screen when file doesn't exist**
 
 ### Empty CSV
-```
-┌──────────────────────────────────────────┐
-│ lazycsv: empty.csv                       │
-├──────────────────────────────────────────┤
-│     │  A      │  B      │  C      │      │
-├─────┼─────────┼─────────┼─────────┼──────┤
-│  #  │  Name   │  Email  │  Age    │      │
-├─────┼─────────┼─────────┼─────────┼──────┤
-│                                          │
-│         (No data rows)                   │
-│                                          │
-├──────────────────────────────────────────┤
-│ 0 rows │ 3 columns │ ? help │ q quit    │
-└──────────────────────────────────────────┘
-```
 
-### Unsaved Changes Warning (v0.6.0)
-```
-┌──────────────────────────────────────────┐
-│          ⚠ Unsaved Changes               │
-│                                          │
-│  You have unsaved changes.               │
-│  Press :q! to quit without saving        │
-│                                          │
-│  Or press Ctrl+S to save first           │
-│                                          │
-└──────────────────────────────────────────┘
-```
+<!-- Screenshot: screenshots/design-empty-csv.png -->
+**View of CSV file with headers but no data rows**
+
+### Unsaved Changes Warning (v0.4.1)
+
+<!-- Screenshot: screenshots/design-unsaved-warning.png -->
+**Warning dialog when trying to quit with unsaved changes**
 
 ## Status Messages
 
@@ -443,16 +357,19 @@ Normal mode:
   sales_data.csv │ Row 5/100 │ Col 2/5 Email │ ? help │ q quit
 
 Multiple files:
-  sales_data.csv │ Row 5/100 │ Col 2/5 Email │ [/]] files │ ? help
+  sales_data.csv │ Row 5/100 │ Col 2/5 Email │ []] files │ ? help
 
 Edit mode:
   EDIT: "Widget A" │ Enter save │ Esc cancel
 
-After save (v0.6.0):
+After save (v0.4.1):
   ✓ Saved successfully │ Row 10/100 │ Col 2/5
 
 After operation:
   Row added below │ Row 11/101 │ Col 1/5
+
+SQL mode (v0.8.0):
+  SQL: Ctrl+Enter execute │ Tab complete │ Esc close
 
 Error:
   Error: Permission denied │ Press q to quit

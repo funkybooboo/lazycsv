@@ -14,7 +14,7 @@ LazyCSV is designed around these core principles:
 4. **Simple** - Clean, minimal interface
 5. **Powerful** - Complex operations with simple keystrokes
 
-## Implemented Features (v0.1.0 - v0.3.1)
+## Implemented Features (v0.1.0 - v0.8.1)
 
 This section details all features currently available in the application.
 
@@ -68,66 +68,82 @@ All navigation is keyboard-driven with vim-inspired keys.
 ### Application Features
 -  **Help System**: A toggleable overlay (`?`) shows available keybindings.
 -  **Status Bar**: Provides contextual information about the file, position, and mode.
--  **Quit Protection**: Warns on quit if there are unsaved changes (partial implementation of v0.6.0). Note: Editing is not yet implemented, so the `is_dirty` flag can only be set for testing purposes.
+-  **Quit Protection**: Warns on quit if there are unsaved changes.
 
-## Planned Features
+### v0.4.0: Insert Mode & Row Operations
 
-The following features are on the roadmap and are **not yet implemented**.
+**Cell Editing:**
+-  Multiple entry modes: `i` (insert at cursor), `a` / `A` (append), `I` (insert at start), `s` (substitute)
+-  `F2` for Excel-style editing
+-  Navigation within cell: arrow keys, Home/End
+-  Vim-style editing: `Ctrl+h` (delete char), `Ctrl+w` (delete word), `Ctrl+u` (delete line)
+-  Smart save-and-move: `Enter` (down), `Shift+Enter` (up), `Tab` (right), `Shift+Tab` (left)
+-  `Esc` to cancel changes
+
+**Row Operations:**
+-  `o` / `O` - Add new row below/above and enter Insert mode
+-  `dd` - Delete current row (stored in clipboard)
+-  `yy` - Copy (yank) current row
+-  `p` / `P` - Paste row below/above
+-  `Delete` - Clear current cell content
 
 ### v0.4.1: Persistence & Multi-File Workflow
 
 **File Operations:**
-- 📋 `:w` - Save current file
-- 📋 `:W` - Save all dirty files
-- 📋 `:wq` - Save and quit (checks other files for dirty state)
-- 📋 `:q` - Quit (blocks if any file has unsaved changes)
-- 📋 `:q!` - Force quit, discard all changes
+-  `:w` - Save current file
+-  `:W` - Save all dirty files
+-  `:wq` - Save and quit (checks other files for dirty state)
+-  `:q` - Quit (blocks if any file has unsaved changes)
+-  `:q!` - Force quit, discard all changes
 
 **Command Ranges:**
-- 📋 Row ranges: `:5,10d`, `:%d`, `:.d`, `:$d`
-- 📋 Column ranges: `:B,D`, `:B,Dd`, `:B,Dy`
-- 📋 Combined ranges: `:B,D@5,10d` (rectangular regions)
+-  Row ranges: `:5,10d`, `:%d`, `:.d`, `:$d`
+-  Column ranges: `:B,D`, `:B,Dd`, `:B,Dy`
+-  Combined ranges: `:B,D@5,10d` (rectangular regions)
 
 **Multi-File Dirty Tracking:**
-- 📋 Session caches dirty documents
-- 📋 File switcher shows `*` for unsaved files
-- 📋 Switching preserves edits in cache
-- 📋 After `:w`, file removed from cache
+-  Session caches dirty documents
+-  File switcher shows `*` for unsaved files
+-  Switching preserves edits in cache
+-  After `:w`, file removed from cache
 
 ### v0.5.0: Column Operations & Visual Mode
 
 **Semicolon Leader for Column Ops:**
-- 📋 `;o` / `;O` - Insert column right/left (enters HeaderEdit mode)
-- 📋 `;dd` - Delete column
-- 📋 `;yy` - Yank column (includes header)
-- 📋 `;p` / `;P` - Paste column right/left
+-  `;o` / `;O` - Insert column right/left (enters HeaderEdit mode)
+-  `;dd` - Delete column
+-  `;yy` - Yank column (includes header)
+-  `;p` / `;P` - Paste column right/left
 
 **Visual Selection:**
-- 📋 `v` - Cell-by-cell visual selection (free movement)
-- 📋 `V` - Row visual selection (whole rows)
-- 📋 `;v` - Column cell visual (free movement, column intent)
-- 📋 `;V` - Column visual line (whole columns)
-- 📋 Operations: `d` (delete/clear), `y` (yank), `c` (change), `p` (paste)
+-  `v` - Cell-by-cell visual selection (free movement)
+-  `V` - Row visual selection (whole rows)
+-  `;v` - Column cell visual (free movement, column intent)
+-  `;V` - Column visual line (whole columns)
+-  Operations: `d` (delete/clear), `y` (yank), `c` (change), `p` (paste)
 
 **HeaderEdit Mode:**
-- 📋 `gh` - Edit column header name
-- 📋 Enter to save, Esc to cancel
+-  `gh` - Edit column header name
+-  Enter to save, Esc to cancel
 
 **Count Prefixes:**
-- 📋 `5dd` - Delete 5 rows
-- 📋 `5yy` - Yank 5 rows
-- 📋 `P` - Paste row above
-- 📋 `cc` - Clear row and enter Insert mode
+-  `5dd` - Delete 5 rows
+-  `5yy` - Yank 5 rows
+-  `cc` - Clear row and enter Insert mode
 
 ### v0.6.0: Vim Magnifier
 
 **Full Vim Editor for Cells:**
-- 📋 `Enter` - Open Magnifier for current cell
-- 📋 Full vim editing (multi-line, word motion, etc.)
-- 📋 `:w` - Save cell content
-- 📋 `:wq` or `ZZ` - Save and close
-- 📋 `:q!` - Close without saving
-- 📋 `Alt+hjkl` or `Alt+arrows` - Navigate to adjacent cells (prompts if dirty)
+-  `Enter` - Open Magnifier for current cell
+-  Full vim editing (multi-line, word motion, operators, visual mode)
+-  `:w` - Save cell content
+-  `:wq` or `ZZ` - Save and close
+-  `:q!` - Close without saving
+-  `Alt+hjkl` or `Alt+arrows` - Navigate to adjacent cells (prompts if dirty)
+-  Unlimited undo/redo history
+-  Search with `/`, `n`, `N`, `*`
+-  All vim motions: `w`, `b`, `e`, `f`, `t`, `0`, `$`, `^`, `gg`, `G`
+-  All vim operators: `d`, `c`, `y`, `p`, `r`, `x`, `>>`, `<<`, `J`
 
 **Use Cases:**
 - Editing JSON data in cells
@@ -138,47 +154,112 @@ The following features are on the roadmap and are **not yet implemented**.
 ### v0.7.0: Search
 
 **Fuzzy Search:**
-- 📋 `/` - Open search
-- 📋 `n` / `N` - Next/previous match
-- 📋 `*` - Search current cell content
-- 📋 `:noh` - Clear highlighting
+-  `/` - Open search overlay
+-  `n` / `N` - Next/previous match
+-  `*` - Search current cell content
+-  `:noh` - Clear highlighting
+-  Fuzzy matching on cell content and column headers
+-  Live results as you type
 
-### v0.8.0: Undo/Redo
+### v0.8.0: SQL Query Mode
+
+**SQL Editor:**
+-  `:sql` - Open SQL editor
+-  Write SQL queries against current CSV data
+-  Auto-complete for table name, column names, and SQL keywords
+-  Syntax highlighting for SQL
+-  `Ctrl+Enter` - Execute query
+-  Results displayed in new virtual table view
+-  Error messages with fuzzy column name suggestions (Levenshtein distance)
+-  Query history and navigation
+
+**Supported SQL Features:**
+-  `SELECT` with column expressions
+-  `WHERE` clause with comparison operators
+-  `ORDER BY` with ASC/DESC
+-  `LIMIT` and `OFFSET`
+-  Aggregate functions: COUNT, SUM, AVG, MIN, MAX
+-  `GROUP BY` with aggregates
+-  String functions: UPPER, LOWER, LENGTH, TRIM, SUBSTR
+-  Math operators: +, -, *, /, %
+-  Logical operators: AND, OR, NOT
+
+### v0.8.1: SQL & Data Operations Polish
+
+**Refactoring & Code Quality:**
+-  Refactored SQL execution code (164 → 53 lines, 67.7% reduction)
+-  Refactored SQL editor rendering (118 → 35 lines, 70% reduction)
+-  Created `src/app/sql_execution.rs` helper module (239 lines)
+-  Created `src/ui/sql_editor_helpers.rs` rendering helpers (99 lines)
+-  Enhanced error messages with fuzzy matching suggestions
+-  30 comprehensive SQL edge case tests
+-  13 SQL benchmark groups for performance monitoring
+
+**Test Coverage:**
+-  555 total tests (514 lib + 11 SQL integration + 30 edge cases)
+-  All tests passing
+-  Benchmarks for performance validation
+
+## Planned Features
+
+The following features are on the roadmap and are **not yet implemented**.
+
+### v0.9.0: Configuration System
+
+**Configuration File (~/.config/lazycsv/config.toml):**
+- Color scheme customization
+- Key binding remapping
+- Default behavior settings
+- Column width preferences
+- Theme selection
+
+### v0.10.0: Undo/Redo
 
 **History Management:**
-- 📋 `u` - Undo last operation
-- 📋 `Ctrl+r` - Redo
-- 📋 `.` - Repeat last edit (dot command)
-- 📋 Up to 100 operations in history
-- 📋 Works for: cell edits, row/column ops, sorts
+- `u` - Undo last operation
+- `Ctrl+r` - Redo
+- `.` - Repeat last edit (dot command)
+- Up to 1000 operations in history
+- Works for: cell edits, row/column ops, sorts
 
-### v0.9.0: Transforms & Polish
+### v0.11.0: SQL Editor Vim Editing
+
+**Full Vim Integration in SQL Editor:**
+- Complete vim motions (hjkl, w/b/e, f/t, gg/G, etc.)
+- Visual mode for query text selection
+- Operators: d, c, y, p for query manipulation
+- Text objects: iw, aw, i", a", etc.
+- Search within query: /, n, N
+- Undo/redo in editor: u, Ctrl+r
+- Line operations: dd, yy, cc, o, O
+
+### v0.14.0: Cell Transforms
 
 **Cell Transforms:**
-- 📋 `~` - Toggle case (UPPER ↔ lower)
-- 📋 `gU` - Uppercase cell
-- 📋 `gu` - Lowercase cell
-- 📋 `g~` - Title Case cell
-- 📋 `g.` - Toggle boolean (yes↔no, true↔false, 1↔0)
+- `~` - Toggle case (UPPER ↔ lower)
+- `gU` - Uppercase cell
+- `gu` - Lowercase cell
+- `g~` - Title Case cell
+- `g.` - Toggle boolean (yes↔no, true↔false, 1↔0)
 
 **Row Movement:**
-- 📋 `gj` - Swap row with row below
-- 📋 `gk` - Swap row with row above
+- `gj` - Swap row with row below
+- `gk` - Swap row with row above
 
 **Data Operations:**
-- 📋 `:sort` - Sort by current column (ascending)
-- 📋 `:sort!` - Sort by current column (descending)
-- 📋 `:filter <expr>` - Filter rows (e.g., `:filter Age>30`)
-- 📋 `:nof` - Clear all filters
+- `:sort` - Sort by current column (ascending)
+- `:sort!` - Sort by current column (descending)
+- `:filter <expr>` - Filter rows (e.g., `:filter Age>30`)
+- `:nof` - Clear all filters
 
 ### v1.0.0: First Stable Release
 
 **Polish & Performance:**
-- 📋 All core features working
-- 📋 Stable command interface
-- 📋 500+ tests passing
-- 📋 Complete documentation
-- 📋 Performance targets met
+- All core features working
+- Stable command interface
+- 500+ tests passing
+- Complete documentation
+- Performance targets met
 
 ## Performance Requirements
 
@@ -186,22 +267,23 @@ LazyCSV is designed for speed:
 
 | Operation | Target | Status |
 |-----------|--------|--------|
-| File loading | < 100ms for 10K rows |  Achieved |
-| Render frame | < 16ms (60 FPS) |  Achieved |
-| Navigation | < 10ms response |  Achieved |
-| Search | < 200ms for 10K rows | 📋 v1.1.0 |
-| Sort | < 500ms for 10K rows | 📋 v1.2.0 |
-| Save | < 200ms for 10K rows | 📋 v0.6.0 |
+| File loading | < 100ms for 10K rows | Achieved |
+| Render frame | < 16ms (60 FPS) | Achieved |
+| Navigation | < 10ms response | Achieved |
+| SQL queries | < 100ms for 10K rows | Achieved (v0.8.0) |
+| Search | < 200ms for 10K rows | Achieved (v0.7.0) |
+| Sort | < 500ms for 10K rows | Planned (v0.14.0) |
+| Save | < 200ms for 10K rows | Achieved (v0.4.1) |
 
 ## Constraints & Limitations
 
-### Current (v0.1.0):
-- **Read-only** - No editing yet (v0.4.0)
+### Current (v0.8.1):
 - **Memory-bounded**: The entire file is loaded into memory. This is fast for small to medium files (up to 100K rows), but makes it unsuitable for very large datasets that don't fit in RAM. True lazy-loading is a top priority for future development.
 - **~10 columns visible** - Horizontal scroll for more
-- **20 char cell limit** - Longer text truncated with `...`
+- **20 char cell limit** - Longer text truncated with `...` (use Magnifier for full editing)
 - **Monochrome** - No colors (design decision)
 - **English only** - No i18n (for now)
+- **SQL read-only** - SQL queries create virtual views, don't modify data
 
 ### Future Improvements:
 - Virtual scrolling for massive files (1M+ rows)
@@ -302,10 +384,11 @@ LazyCSV is designed for speed:
 | Keyboard-first |  |  |  |  |
 | Vim navigation |  |  | Partial |  |
 | Fast (10K+ rows) |  |  |  |  |
-| In-place editing | v0.4.0 |  |  |  |
+| In-place editing |  |  |  |  |
 | Multi-file nav |  |  |  |  |
 | Clean UI |  |  |  |  |
 | Built-in help |  |  |  |  |
+| SQL queries |  |  |  |  |
 
 **LazyCSV's Niche:**
 - Faster than Excel for viewing

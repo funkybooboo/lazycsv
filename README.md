@@ -4,20 +4,8 @@ A blazingly fast terminal UI for CSV files. Navigate huge datasets with vim keys
 
 Inspired by [lazygit](https://github.com/jesseduffield/lazygit), [lazydocker](https://github.com/jesseduffield/lazydocker), and [lazysql](https://github.com/jorgerojas26/lazysql).
 
-```
- lazycsv: sales_data.csv                                              2/100
-──────────────────────────────────────────────────────────────────────────
-      A           B              C              D           E
-  #   ID          Date           Product        Qty         Price
-  1   001         2024-01-15     Widget A       100         $25.00
-> 2   002         2024-01-16     Gadget B       50          $42.50
-  3   003         2024-01-17     Doohickey      75          $18.75
-  4   004         2024-01-18     Thingamajig    200         $12.00
-  5   005         2024-01-19     Whatchamacal   150         $35.00
-──────────────────────────────────────────────────────────────────────────
-sales.csv | customers.csv | orders.csv                               [1/3]
-NORMAL                                                    2,B "2024-01-16"
-```
+<!-- Screenshot: Main table view showing CSV data with vim-style navigation -->
+![LazyCSV Main View](screenshots/main-view.png)
 
 ## Why LazyCSV?
 
@@ -56,8 +44,10 @@ lazycsv data.csv --delimiter ';' --no-headers
 # hjkl or arrows  -> navigate
 # [ or ]          -> switch between CSV files
 # gg or G         -> jump to top/bottom
-# :cB or 5g       -> jump to column B or row 5
-# i or m          -> edit cell (quick or magnifier)
+# :B or :5        -> jump to column B or row 5
+# i or Enter      -> edit cell (quick or magnifier)
+# /               -> search
+# :sql            -> SQL query mode
 # ?               -> show help
 # :q              -> quit
 ```
@@ -69,13 +59,17 @@ That's it! Press `?` in the app for full keybindings.
 | Key | Action |
 |-----|--------|
 | `hjkl` or arrows | Move around (with count: `5j`, `10h`) |
-| `gg` / `G` / `5g` | Jump to first/last/row 5 |
-| `:cB` / `:cA` | Jump to column B or A |
+| `gg` / `G` / `5G` | Jump to first/last/row 5 |
+| `:B` / `:A5` | Jump to column B or cell A5 |
 | `w` / `b` / `e` | Next/prev/last non-empty cell |
 | `i` / `a` / `s` | Quick edit cell (Insert mode) |
-| `m` | Magnifier mode (full vim editor) |
+| `Enter` | Magnifier mode (full vim editor for multi-line) |
 | `o` / `O` | Insert row below/above |
 | `dd` / `yy` / `p` | Delete/yank/paste row |
+| `;dd` / `;yy` / `;p` | Delete/yank/paste column |
+| `v` / `V` | Visual selection (cell/row) |
+| `/` | Search (fuzzy) |
+| `:sql` | SQL query mode |
 | `zt` / `zz` / `zb` | Position row at top/center/bottom |
 | `[` / `]` | Switch CSV files |
 | `?` | Show help |
@@ -98,15 +92,15 @@ s     -> Replace cell (clear + edit)
 Exit with `Enter` (save + move down), `Tab` (save + move right), or `Esc` (cancel).
 
 ### Magnifier Mode (Complex Edits)
-Press `m` to open a full vim editor for complex multi-line cell editing. Perfect for JSON, descriptions, or any content that needs vim power.
+Press `Enter` to open a full vim editor for complex multi-line cell editing. Perfect for JSON, descriptions, or any content that needs vim power.
 
 ```
-m                  -> Open magnifier on current cell
+Enter              -> Open magnifier on current cell
 hjkl / w/b/e       -> Vim motions
 i/a/o/O            -> Enter insert mode
 dd / yy / p        -> Delete/yank/paste lines
 x / s              -> Delete/substitute character
-ZZ or :wq          -> Save and close
+:wq or ZZ          -> Save and close
 :q!                -> Close without saving
 Alt+hjkl/arrows    -> Navigate to adjacent cells
 ```
@@ -122,28 +116,29 @@ Alt+hjkl/arrows    -> Navigate to adjacent cells
 
 LazyCSV treats CSV files in the same directory like Excel sheets. Open one file, instantly switch between all of them with `[` and `]` keys. No more `cd` and reopening!
 
-## Roadmap to v1.0
+## Current Status
 
-| Version | Features |
-|---------|----------|
-| **v0.1.0** | Foundation - viewing, navigation, multi-file |
-| **v0.2.0** | Type safety refactor (internal) |
-| **v0.3.0** | Advanced navigation - column jumps, command mode, word motion |
-| **v0.4.0** | Cell editing - Insert mode, row operations |
-| **v0.5.0** | Column operations - `,o`, `,O`, `,dd`, `,yy`, `,p`, visual mode |
-| **v0.6.0** | Magnifier Mode - multi-line cell editing with full vim  |
-| **v0.7.0** | Search & Filtering - `/`, `n`, `N`, `*`, `:noh` fuzzy search |
-| **v0.8.0** | SQL Query Mode - `:q SELECT...`, JOINs, multi-table queries |
-| **v0.8.1** | SQL Polish - refactoring, tests, benchmarks, error messages ✨ **Current** |
-| **v0.9.0** | Undo/redo - `u`, `Ctrl+r`, `.` dot command |
-| **v1.0.0** | Stable release - polish, performance, docs |
+**v0.8.1 Complete** (March 2026) - SQL query mode with comprehensive testing, benchmarks, and polished error handling.
 
-### Post-v1.0 Features
+**Completed Features:**
+- Fast CSV viewer/editor with vim navigation
+- Multi-file switching (`[` `]`)
+- Full vim editing (Insert mode + Magnifier mode)
+- Row operations (`o`, `O`, `dd`, `yy`, `p`)
+- Column operations (`;dd`, `;yy`, `;p`, `;o`)
+- Visual mode (`v`, `V`, `;v`, `;V`)
+- Search (`/`, `n`, `N`)
+- SQL query mode (`:sql` with full SELECT/WHERE/JOIN/GROUP BY)
+- File persistence (`:w`, `:wq`, `:q`)
+- 555+ tests passing
 
-Future considerations (not committed):
-- Column resize & freeze
-- Advanced features - macros, tab completion
-- Data export - JSON, Markdown, HTML
+**Next Up:**
+- **v0.9.0** - Configuration system (config file, themes)
+- **v0.10.0** - Undo/redo system (`u`, `Ctrl+r`, `.`)
+- **v0.11.0** - SQL editor vim editing (full modal editing)
+- **v0.14.0** - Cell transforms (case toggle, sort, filter)
+- **v0.18.0** - SQL IntelliSense (auto-completion)
+- **v1.0.0** - Stable release
 
 See [plans/roadmap.md](plans/roadmap.md) for the complete detailed roadmap.
 
@@ -169,106 +164,43 @@ cargo test
 
 See [docs/development.md](docs/development.md) for contributing guidelines.
 
-## Status
+## Screenshots
 
-**v0.8.1 Complete!** SQL query mode with comprehensive testing, benchmarks, and polished error handling.
+### Main View
+<!-- Screenshot: Normal mode navigation -->
+![Normal Mode](screenshots/normal-mode.png)
 
-- Fast CSV viewer and editor with vim navigation
-- Multi-file switching with `[` `]`
-- Full vim editing (Insert mode, Magnifier mode with hjkl, motions, operators)
-- Column operations (`,dd`, `,yy`, `,p`, `,o`, `,O`)
-- Visual mode (v, V, ,v) for rectangular selections
-- Search & filtering (`/`, `n`, `N`, `*`, `:noh`)
-- **SQL Query Mode:**
-  - `:q SELECT...` to run SQL queries on CSVs
-  - Multi-table JOINs (automatically loads sibling CSVs)
-  - GROUP BY, ORDER BY, aggregations
-  - Query caching for instant re-execution
-  - 555+ tests (30 SQL edge cases, comprehensive coverage)
-  - Performance benchmarks (SQL operations benchmarked)
-- Row operations (`o`, `O`, `dd`, `yy`, `p`)
-- Comprehensive test suite (555+ tests passing)
+### Insert Mode
+<!-- Screenshot: Quick cell editing in Insert mode -->
+![Insert Mode](screenshots/insert-mode.png)
 
-**Current:** v0.8.1 Complete | **Performance:** 60 FPS on 100K+ rows | **Architecture:** Clean, type-safe, well-tested
+### Magnifier Mode
+<!-- Screenshot: Full vim editor for multi-line cell content -->
+![Magnifier Mode](screenshots/magnifier-mode.png)
 
-### What's New in v0.8.1
+### Visual Selection
+<!-- Screenshot: Visual mode selecting multiple cells/rows -->
+![Visual Selection](screenshots/visual-mode.png)
 
-**v0.8.1 - SQL & Data Operations Polish:**
-- **Code Quality:**
-  - Refactored `execute_sql_query_cancellable`: 164 → 53 lines (67.7% reduction)
-  - Refactored `render_sql_editor_overlay`: 118 → 35 lines (70% reduction)
-  - Created `src/app/sql_execution.rs` helper module (239 lines)
-  - Created `src/ui/sql_editor_helpers.rs` rendering helpers (99 lines)
-  - Zero clippy warnings
-- **Testing:**
-  - Added 30 comprehensive SQL edge case tests (`tests/sql_edge_cases_test.rs`)
-  - Tests cover: error handling, empty results, large datasets, NULLs, complex queries
-  - Total: 555 tests passing (514 lib + 11 SQL integration + 30 edge cases)
-- **Benchmarks:**
-  - Created `benches/sql.rs` with 13 benchmark groups
-  - Benchmarks: CSV loading, SELECT, WHERE, ORDER BY, JOIN (2-way, 3-way), GROUP BY
-  - Result size impact testing (10 rows, 1K, 50K)
-  - Performance targets met: <50ms for 100K row SELECT, <200ms for 10K row JOIN
+### SQL Query Mode
+<!-- Screenshot: SQL editor with query -->
+![SQL Query Mode](screenshots/sql-editor.png)
 
-### What's New in v0.8.0
+<!-- Screenshot: SQL query results -->
+![SQL Results](screenshots/sql-results.png)
 
-**v0.8.0 - SQL Query Mode:**
-- **Enter Insert mode:** `i`, `a`, `I`, `A`, `s`, or `F2` on any cell
-  - `i` - edit at cursor position
-  - `a` - edit at end of cell
-  - `I` - edit at start of cell
-  - `A` - same as `a`
-  - `s` - clear cell and enter Insert mode
-  - `F2` - edit cell (Excel/Calc style)
-- **Text editing in Insert mode:**
-  - Type to insert characters
-  - `Backspace` or `Ctrl+h` - delete before cursor
-  - `Delete` - delete at cursor
-  - `Ctrl+w` - delete word backward
-  - `Ctrl+u` - delete to start of cell
-  - `Home`/`End` - move to start/end
-  - `Left`/`Right` arrows - move cursor within cell
-- **Commit or cancel:**
-  - `Enter` - save and move down
-  - `Shift+Enter` - save and move up
-  - `Tab` - save and move right
-  - `Shift+Tab` - save and move left
-  - `Esc` - cancel without saving
-- **Row operations in Normal mode:**
-  - `o` - add row below, enter Insert mode
-  - `O` - add row above, enter Insert mode
-  - `dd` - delete current row (stored in clipboard)
-  - `yy` - copy current row
-  - `p` - paste row below
-  - `Delete` - clear current cell content
+### Search
+<!-- Screenshot: Fuzzy search overlay -->
+![Search](screenshots/search.png)
 
-### Previous Versions
+## What's New in v0.8.1
 
-**v0.3.0-v0.3.2 - Navigation & UI Polish:**
-- Row jumping: `gg`, `G`, `5G`
-- Column jumping: `:c A`, `:c 1`, `:c AA`
-- Count prefixes: `5j`, `10h`
-- Word motion: `w`, `b`, `e`
-- Viewport control: `zt`, `zz`, `zb`
-- Status bar with mode indicators
-- Help overlay with `?`
-- No timeout on pending commands
-
-### What's New in v0.3.0 & v0.3.1
-
-**v0.3.0 - Advanced Navigation:**
-- Column jumping with Excel notation (`ga`, `gB`, `gBC`)
-- Vim-style command mode (`:15` for line)
-- Word motion for sparse data (`w`, `b`, `e`)
-- Viewport positioning (`zt`, `zz`, `zb`)
-- Count prefixes (5j, 10h, etc.)
-
-**v0.3.1 - UI/UX Polish:**
-- Mode indicator (-- NORMAL -- / -- COMMAND --)
-- Dirty flag display (*)
-- Transient messages that auto-clear
-- Redesigned help menu with better organization
-- File list horizontal scrolling
+**SQL & Data Operations Polish (March 2026):**
+- **Code Quality:** Refactored SQL execution (67.7% reduction) and rendering (70% reduction)
+- **Testing:** 30 new SQL edge case tests, 555 total tests passing
+- **Benchmarks:** 13 SQL benchmark groups for performance validation
+- **Error Messages:** Enhanced with fuzzy column name suggestions (Levenshtein distance)
+- **Zero Warnings:** Clean clippy run
 
 ## Philosophy
 

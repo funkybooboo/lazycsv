@@ -98,9 +98,9 @@ row.to_line_number()              // Convert to 1-based NonZeroUsize
 ```
 
 **Type Safety Benefits:**
-- ✅ Compiler prevents swapping row/column parameters
-- ✅ Self-documenting APIs (clear which parameter is which)
-- ✅ Zero runtime cost (newtypes are compile-time only)
+- [ACHIEVED] Compiler prevents swapping row/column parameters
+- [ACHIEVED] Self-documenting APIs (clear which parameter is which)
+- [ACHIEVED] Zero runtime cost (newtypes are compile-time only)
 
 **Design Decisions (v0.2.1):**
 
@@ -112,7 +112,7 @@ type ColIndex = usize;
 fn get_cell(row: RowIndex, col: ColIndex) { }
 get_cell(col, row);  // ❌ Compiles! Bug at runtime!
 
-// ✅ Newtype - compile-time safety
+// [ACHIEVED] Newtype - compile-time safety
 struct RowIndex(usize);
 struct ColIndex(usize);
 fn get_cell(row: RowIndex, col: ColIndex) { }
@@ -776,7 +776,7 @@ pub enum Mode {
     Normal,      // Default mode for navigation
     Insert,      // Quick single-cell editing (v0.4.0)
     Magnifier,   // Full vim editor for cell (v0.5.0)
-    HeaderEdit,  // Edit column headers (v0.9.0)
+    HeaderEdit,  // Edit column headers (v0.12.0)
     Visual,      // Select rows/cells/blocks (v0.6.0)
     Command,     // Execute commands via `:` prefix
 }
@@ -1312,7 +1312,7 @@ let style = if search_state.map(|s| s.is_current_match(ri, ci)).unwrap_or(false)
 | 100K rows | **18.1 ms** | **20.9 ms** | 67.2 ms | 196 ms |
 
 **Analysis:**
-- ✅ **Target achieved**: 100K row search in ~18ms (well under 100ms target)
+- [ACHIEVED] **Target achieved**: 100K row search in ~18ms (well under 100ms target)
 - Regex adds ~15% overhead vs literal search
 - No matches case faster due to early termination in regex
 - All match case (worst) still under 200ms for 100K rows
@@ -1387,17 +1387,17 @@ let style = if search_state.map(|s| s.is_current_match(ri, ci)).unwrap_or(false)
 ### Code Quality
 
 **Function sizes:**
-- All functions <50 lines ✅
+- All functions <50 lines [ACHIEVED]
 - Longest function: `find_matches()` at 24 lines
 - Average function size: ~15 lines
 
 **Documentation:**
-- Comprehensive rustdoc on public API ✅
+- Comprehensive rustdoc on public API [ACHIEVED]
 - Usage examples in module docs
 - Performance characteristics documented
 - Algorithm details explained
 
-**Clippy warnings:** 0 ✅
+**Clippy warnings:** 0 [ACHIEVED]
 
 **Code organization:**
 - Single module (398 lines) - appropriately sized
@@ -1408,15 +1408,15 @@ let style = if search_state.map(|s| s.is_current_match(ri, ci)).unwrap_or(false)
 
 **Potential improvements for later versions:**
 
-1. **Incremental search** (v0.9.0+)
+1. **Incremental search**
    - Update matches on document changes instead of full re-search
    - Track dirty regions and re-scan only affected cells
 
-2. **Parallel search** (v0.10.1+)
+2. **Parallel search**
    - Use rayon for multi-threaded search on very large datasets (>1M rows)
    - Split document into chunks and search concurrently
 
-3. **Search history** (v0.9.0 undo/redo)
+3. **Search history** (integrate with v0.10.0 undo/redo)
    - Store recent search patterns for quick re-use
    - Integrate with command history (`.` repeat, etc.)
 
@@ -1425,7 +1425,7 @@ let style = if search_state.map(|s| s.is_current_match(ri, ci)).unwrap_or(false)
    - Expand to full document in background
    - Only implement if user testing shows >100ms feels slow
 
-5. **Search indexing** (v0.15.0+)
+5. **Search indexing**
    - Pre-index frequently searched columns for O(1) lookup
    - Build inverted index for common patterns
    - Useful for very large datasets or repeated searches
@@ -1714,8 +1714,8 @@ conn.prepare(query).map_err(|e| enhance_sql_error(e, conn, query))?
 | GROUP BY | 1.2ms | 8ms | 65ms |
 
 **Targets (from roadmap):**
-- ✅ Simple SELECT <50ms for 100K rows (achieved: 18ms)
-- ✅ JOIN <200ms for 10K rows (achieved: 12ms for 2-way, 18ms for 3-way)
+- [ACHIEVED] Simple SELECT <50ms for 100K rows (achieved: 18ms)
+- [ACHIEVED] JOIN <200ms for 10K rows (achieved: 12ms for 2-way, 18ms for 3-way)
 
 **Optimization:**
 - Single transaction for bulk INSERT (50x faster than row-by-row)
@@ -1830,17 +1830,17 @@ SELECT * FROM orders WHERE price > '100'  -- Works, coerces to number
 
 4. **No Persistent Database:**
    - SQLite database destroyed on exit
-   - Query history not saved (feature for v0.19.0)
+   - Query history not saved (feature for v1.0.0+)
    - No SQL scripts or stored procedures
 
 ### Future Enhancements
 
-**v0.8.2 - SQL Editor Vim Editing:**
+**v0.11.0 - SQL Editor Vim Editing:**
 - Full vim modal editing in SQL editor
 - Multi-line query support with proper navigation
 - Syntax highlighting (SQL keywords, table names)
 
-**v0.19.0 - SQL IntelliSense:**
+**v0.18.0 - SQL IntelliSense:**
 - Auto-completion for table names, column names, SQL keywords
 - Context-aware suggestions (after FROM → table names)
 - Real-time syntax error detection
@@ -1909,23 +1909,23 @@ anyhow displays: "Failed to load file.csv: No such file or directory"
 
 ### Performance Targets (v0.3.1 Benchmarks)
 
-✅ **All targets exceeded by 40x+**
+[ACHIEVED] **All targets exceeded by 40x+**
 
 **Rendering Performance:**
 - Target: <16.67 ms per frame (60 FPS)
 - Actual: ~389 µs per frame (2,571 FPS)
-- **Result: 43x faster than target** ✅
+- **Result: 43x faster than target** [ACHIEVED]
 
 | Dataset Size | Render Time | vs Target | Status |
 |--------------|-------------|-----------|--------|
-| 1K rows      | 394 µs      | 2.4% used | ✅ PASS |
-| 10K rows     | 397 µs      | 2.4% used | ✅ PASS |
-| 100K rows    | 389 µs      | 2.3% used | ✅ PASS |
+| 1K rows      | 394 µs      | 2.4% used | PASS |
+| 10K rows     | 397 µs      | 2.4% used | PASS |
+| 100K rows    | 389 µs      | 2.3% used | PASS |
 
 **Navigation Performance:**
 - Target: <100 ns per operation
 - Actual: 1-80 ns per operation
-- **Result: Sub-nanosecond to sub-100ns** ✅
+- **Result: Sub-nanosecond to sub-100ns** [ACHIEVED]
 
 | Operation | Time | Notes |
 |-----------|------|-------|

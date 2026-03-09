@@ -125,22 +125,20 @@ The current mode is always shown in the status bar:
 
 ## v0.3.1 - UI/UX Polish ( Complete)
 
-*User interface improvements - no new keybindings*
+*User interface improvements and command mode enhancements*
 
-**Features:**
+**UI Features:**
 - Mode indicator (-- NORMAL -- / -- COMMAND --)
 - Dirty flag display (*)
 - Transient messages that auto-clear on keypress
 - Enhanced help menu with better organization
 - File list horizontal scrolling
+- Minimal borders (horizontal rules replace heavy box borders)
+- Vim-like status line: `NORMAL 3,C "cell value"` format
+- Auto-width columns (sized to content, 8-50 char range)
+- Row indicator: `>` marks current row
 
----
-
-## v0.3.2 - Pre-Edit Polish ( Complete)
-
-*Minimal vim-like UI, command mode improvements*
-
-### Column Navigation (New)
+### Column Navigation
 
 | Command | Action |
 |---------|--------|
@@ -176,16 +174,9 @@ Commands show clear error messages instead of silently clamping:
 - `:999` on 10-row file → "Row 999 does not exist (max: 10)"
 - `:c Z` on 5-column file → "Column Z does not exist (max: E)"
 
-### UI Changes
-
-- **Minimal borders:** Horizontal rules replace heavy box borders
-- **Vim-like status line:** `NORMAL 3,C "cell value"` format
-- **Auto-width columns:** Columns sized to content (8-50 char range)
-- **Row indicator:** `>` marks current row
-
 ---
 
-## v0.4.0 - Insert Mode ( Complete)
+## v0.4.0 - Insert Mode & Row Operations ( Complete)
 
 ### Entering Insert Mode
 
@@ -231,7 +222,7 @@ Commands show clear error messages instead of silently clamping:
 
 ---
 
-## v0.4.1 - Persistence & Multi-File Workflow
+## v0.4.1 - Persistence & Multi-File Workflow ( Complete)
 
 ### File Operations
 
@@ -287,7 +278,7 @@ Commands show clear error messages instead of silently clamping:
 
 ---
 
-## v0.5.0 - Column Operations & Visual Mode
+## v0.5.0 - Column Operations & Visual Mode ( Complete)
 
 ### Semicolon Leader for Column Operations
 
@@ -370,7 +361,7 @@ The semicolon `;` key acts as a leader for all column-level operations, followin
 
 ---
 
-## v0.6.0 - Vim Magnifier
+## v0.6.0 - Vim Magnifier ( Complete)
 
 ### Opening Magnifier
 
@@ -473,7 +464,7 @@ The Magnifier embeds a comprehensive vim editor for editing cells with complex c
 
 ---
 
-## v0.7.0 - Search
+## v0.7.0 - Search ( Complete)
 
 ### Fuzzy Search
 
@@ -497,7 +488,68 @@ The Magnifier embeds a comprehensive vim editor for editing cells with complex c
 
 ---
 
-## v0.8.0 - Undo/Redo
+## v0.8.0 - SQL Query Mode
+
+### SQL Editor
+
+| Command | Action |
+|---------|--------|
+| `:sql` | Open SQL editor |
+
+**In SQL Editor:**
+| Key | Action |
+|-----|--------|
+| Type | Write SQL query |
+| `Ctrl+Enter` | Execute query and display results |
+| `Esc` | Close SQL editor without executing |
+| `Tab` | Auto-complete (table, columns, keywords) |
+| `Up` / `Down` | Navigate query history |
+
+**Supported SQL Features:**
+- `SELECT` with column expressions
+- `WHERE` clause with comparison operators  
+- `ORDER BY` with ASC/DESC
+- `LIMIT` and `OFFSET`
+- Aggregate functions: COUNT, SUM, AVG, MIN, MAX
+- `GROUP BY` with aggregates
+- String functions: UPPER, LOWER, LENGTH, TRIM, SUBSTR
+- Math operators: +, -, *, /, %
+- Logical operators: AND, OR, NOT
+
+**Notes:**
+- Query results displayed in new virtual table view
+- Error messages include fuzzy column name suggestions
+- Syntax highlighting for SQL keywords
+- Auto-complete for table name and column names
+
+---
+
+## v0.8.1 - SQL & Data Operations Polish
+
+*Refactoring and code quality improvements - no new user-facing keybindings*
+
+**Improvements:**
+- Enhanced error messages with fuzzy matching suggestions (Levenshtein distance)
+- Refactored SQL execution code (67.7% reduction)
+- Refactored SQL editor rendering (70% reduction)
+- 30 comprehensive SQL edge case tests
+- 13 SQL benchmark groups
+- 555 total tests passing
+
+---
+
+## v0.9.0 - Configuration System
+
+### Configuration File
+
+Configuration support (~/.config/lazycsv/config.toml):
+- Color scheme customization
+- Key binding remapping
+- Default behavior settings
+
+---
+
+## v0.10.0 - Undo/Redo
 
 ### History Management
 
@@ -511,11 +563,31 @@ The Magnifier embeds a comprehensive vim editor for editing cells with complex c
 - Cell edits (Insert mode and Magnifier)
 - Row operations (add, delete, paste)
 - Column operations (delete, yank, paste)
-- Up to 100 operations in history
+- Sorts and filters
+- Up to 1000 operations in history
 
 ---
 
-## v0.9.0 - Transforms
+## v0.11.0 - SQL Editor Vim Editing
+
+### Full Vim Modal Editing in SQL Editor
+
+**Normal Mode:**
+- All standard vim motions (hjkl, w/b/e, f/t, gg/G, etc.)
+- Operators: d, c, y, p
+- Visual mode: v (character), V (line)
+- Search: /, n, N
+
+**Insert Mode:**
+- Enter with i, a, I, A, o, O
+- Exit with Esc
+
+**Special:**
+- `Ctrl+Enter` - Execute query (works in any mode)
+
+---
+
+## v0.14.0 - Cell Transforms
 
 ### Data Operations
 
@@ -596,24 +668,25 @@ status_bar = "blue"
 
 | Version | Features Added |
 |---------|----------------|
-| v0.1.0 |  Foundation - viewing, basic navigation |
+| v0.1.0 |  Foundation - viewing, basic navigation, file switching |
 | v0.2.0 |  Type safety refactor (internal) |
-| v0.3.0 |  Advanced navigation (column jumps, command mode, word motion) |
-| v0.3.1 |  UI/UX polish (mode indicator, transient messages, help redesign) |
-| v0.3.2 |  Pre-edit polish (minimal UI, `:c` command, pending display) |
-| v0.4.0 | Quick editing (Insert mode) |
-| v0.5.0 | Vim magnifier (power editing) |
-| v0.6.0 | Save/quit guards |
-| v0.7.0 | Row operations |
-| v0.8.0 | Column operations |
-| v0.9.0 | Header management |
-| v1.0.0 | Undo/redo system |
-| v1.1.0 | Search & visual selection |
-| v1.2.0 | Sorting & filtering |
-| v1.3.0 | Multi-file guards |
-| v1.4.0 | Advanced viewing (freeze, themes) |
-| v1.5.0 | Data analysis (stats, plotting) |
-| v1.6.0 | Final polish |
+| v0.3.0 |  Advanced navigation (column jumps, command mode, word motion, viewport control) |
+| v0.3.1 |  UI/UX polish (mode indicator, transient messages, help redesign, minimal UI, command improvements) |
+| v0.4.0 |  Insert mode & row operations (cell editing, add/delete/copy/paste rows) |
+| v0.4.1 |  Persistence & multi-file workflow (save, command ranges, dirty tracking) |
+| v0.5.0 |  Column operations & visual mode (column add/delete/yank/paste, visual selection) |
+| v0.6.0 |  Vim Magnifier (full vim editor for cells, multi-line editing) |
+| v0.7.0 |  Search (fuzzy search overlay, match navigation) |
+| v0.8.0 |  SQL Query Mode (SQL editor, query execution, multi-file queries) |
+| v0.8.1 |  SQL & Data Operations Polish (refactoring, error improvements, tests) |
+| v0.9.0 | Configuration System (config file, themes, keybindings) |
+| v0.10.0 | Undo/Redo (history management, dot command) |
+| v0.11.0 | SQL Editor Vim Editing (full vim modal editing in SQL editor) |
+| v0.12.0 | UI Consistency & HeaderEdit Mode (standardized UI, gh command for header editing) |
+| v0.14.0 | Cell Transforms (case toggle, row swap, sort, filter) |
+| v0.18.0 | SQL IntelliSense (auto-completion, context-aware suggestions) |
+| v0.22.0 | Macros (command recording and replay) |
+| v1.0.0 | First Stable Release (polish, performance, documentation) |
 
 ---
 

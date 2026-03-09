@@ -17,39 +17,44 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.5.0 | Column Operations & Visual Mode | [x] | 515+ |
 | v0.5.1 | Column Operations Cleanup | [x] | 967 |
 | v0.6.0 | Magnifier Mode (Full Vim Editor) | [x] | 415 |
-| v0.6.1 | Magnifier Performance & Quality | [ ] | TBD |
+| v0.6.1 | Magnifier Performance & Quality | [x] | 1,003 |
 | v0.7.0 | Search & Filtering | [x] | 27 |
-| v0.7.1 | Search System Optimization | [ ] | TBD |
+| v0.7.1 | Search System Optimization | [x] | 27 |
 | v0.8.0 | SQL Query Mode & Data Operations | [x] | 30 |
 | v0.8.1 | SQL & Data Operations Polish | [x] | 555 |
-| v0.8.2 | SQL Editor Vim Editing | [ ] | TBD |
-| v0.8.3 | UI Consistency & Standardization | [ ] | TBD |
-| v0.8.4 | Repository Organization & Structure | [ ] | TBD |
-| v0.9.0 | Undo/Redo & Command History | [ ] | - |
-| v0.9.1 | Code Quality & Architecture Refactor | [ ] | TBD |
-| v0.10.0 | Cell Transforms & Data Cleanup | [ ] | - |
-| v0.10.1 | Performance Optimization & Profiling | [ ] | TBD |
-| v0.11.0 | System Clipboard & External Integration | [ ] | - |
-| v0.11.1 | Testing & Reliability Improvements | [ ] | TBD |
-| v0.12.0 | Bulk Operations & Find/Replace | [ ] | - |
-| v0.12.1 | Error Handling & Robustness | [ ] | TBD |
-| v0.13.0 | Advanced Filtering & Conditional Views | [ ] | - |
+| v0.9.0 | Configuration System | [ ] | TBD |
+| v0.9.1 | Configuration Testing & Polish | [ ] | TBD |
+| v0.10.0 | Undo/Redo & Command History | [ ] | TBD |
+| v0.10.1 | Undo System Testing & Reliability | [ ] | TBD |
+| v0.11.0 | SQL Editor Vim Editing | [ ] | TBD |
+| v0.11.1 | SQL Editor Refactoring & Quality | [ ] | TBD |
+| v0.12.0 | UI Consistency & Standardization | [ ] | TBD |
+| v0.12.1 | UI System Testing | [ ] | TBD |
+| v0.13.0 | Repository Organization & Structure | [ ] | TBD |
 | v0.13.1 | Module Organization & Cleanup | [ ] | TBD |
-| v0.14.0 | Column Resize & Advanced Column Operations | [ ] | - |
-| v0.14.1 | Documentation & Maintainability | [ ] | TBD |
-| v0.15.0 | Data Analysis & Statistics | [ ] | - |
-| v0.15.1 | Technical Debt Reduction | [ ] | TBD |
-| v0.16.0 | Export & Import (JSON, Markdown, TSV) | [ ] | - |
-| v0.16.1 | Code Coverage & Test Quality | [ ] | TBD |
-| v0.17.0 | Configuration System | [ ] | - |
-| v0.17.1 | Performance Benchmarking & Tuning | [ ] | TBD |
-| v0.18.0 | Macros & Command Recording | [ ] | - |
-| v0.18.1 | Final Architecture Polish | [ ] | TBD |
-| v0.19.0 | SQL IntelliSense & Auto-completion | [ ] | - |
-| v0.19.1 | SQL IntelliSense Polish & Testing | [ ] | TBD |
+| v0.14.0 | Cell Transforms & Data Cleanup | [ ] | TBD |
+| v0.14.1 | Performance Optimization & Profiling | [ ] | TBD |
+| v0.15.0 | System Clipboard & External Integration | [ ] | TBD |
+| v0.15.1 | Testing & Reliability Improvements | [ ] | TBD |
+| v0.16.0 | Bulk Operations & Find/Replace | [ ] | TBD |
+| v0.16.1 | Error Handling & Robustness | [ ] | TBD |
+| v0.17.0 | Advanced Filtering & Conditional Views | [ ] | TBD |
+| v0.17.1 | Module Organization & Cleanup | [ ] | TBD |
+| v0.18.0 | SQL IntelliSense & Auto-completion | [ ] | TBD |
+| v0.18.1 | SQL IntelliSense Polish & Testing | [ ] | TBD |
+| v0.19.0 | Column Resize & Advanced Column Operations | [ ] | TBD |
+| v0.19.1 | Documentation & Maintainability | [ ] | TBD |
+| v0.20.0 | Data Analysis & Statistics | [ ] | TBD |
+| v0.20.1 | Technical Debt Reduction | [ ] | TBD |
+| v0.21.0 | Export & Import (JSON, Markdown, TSV) | [ ] | TBD |
+| v0.21.1 | Code Coverage & Test Quality | [ ] | TBD |
+| v0.22.0 | Macros & Command Recording | [ ] | TBD |
+| v0.22.1 | Performance Benchmarking & Tuning | [ ] | TBD |
+| v0.23.0 | Final Architecture Review | [ ] | TBD |
+| v0.23.1 | Final Architecture Polish | [ ] | TBD |
 | v1.0.0 | Stable Release & Polish | [ ] | - |
 
-**Total Tests Passing:** 420+ library tests + integration tests
+**Total Tests Passing:** 555 tests (518 lib + 37 integration)
 
 ---
 
@@ -1028,7 +1033,7 @@ SELECT country, COUNT(*) as count FROM customers GROUP BY country ORDER BY count
 
 ---
 
-### v0.8.1 - SQL & Data Operations Polish [X]
+### v0.8.1 - SQL & Data Operations Polish [x]
 
 **Focus:** Refine SQL query mode and data operations  
 **Status:** [X] COMPLETE  
@@ -1104,7 +1109,191 @@ Improve SQL query mode robustness, ensure data operations are reliable, and main
 
 ---
 
-### v0.8.2 - SQL Editor Vim Editing [ ]
+### v0.9.0 - Configuration System [ ]
+
+**Focus:** User customization via config files  
+**Status:** [ ]  
+**Target Tests:** 20+
+
+**Features:**
+
+**Config File Support:**
+- [ ] Load config from ~/.config/lazycsv/config.toml
+- [ ] Per-directory config (./.lazycsv/config.toml)
+- [ ] Default settings (delimiter, header_mode, undo_limit)
+- [ ] Color customization
+- [ ] Keybinding remapping (advanced)
+
+**Config Options:**
+```toml
+[defaults]
+delimiter = ","
+header_mode = true
+undo_limit = 1000
+
+[colors]
+header_bg = "blue"
+cursor_fg = "yellow"
+dirty_indicator = "red"
+
+[keybindings]
+quit = ":q"
+save_all = ":w"
+```
+
+**Implementation Plan:**
+- File: src/config/mod.rs (new file)
+  - [ ] Create config module
+  - [ ] Define Config struct
+  - [ ] Implement load_config()
+  - [ ] Parse TOML with `toml` crate
+  - [ ] Merge global + directory configs
+
+- File: src/app/mod.rs
+  - [ ] Load config on startup
+  - [ ] Apply config settings
+
+**Tests:**
+- [ ] test_load_global_config
+- [ ] test_load_directory_config
+- [ ] test_config_merge
+- [ ] test_invalid_config_handling
+
+---
+
+
+### v0.9.1 - Configuration Testing & Polish [ ]
+
+**Focus:** Ensure configuration system is robust and well-tested  
+**Status:** [ ]  
+**Primary Focus:** Configuration quality and reliability
+
+**Philosophy:**
+The configuration system is foundational for many features. Ensure it's rock-solid, well-documented, and handles edge cases gracefully before building features that depend on it.
+
+**Tasks:**
+- [ ] Review config parsing error handling
+- [ ] Add comprehensive tests for config loading (50+ tests)
+- [ ] Test invalid TOML handling (malformed files, missing keys)
+- [ ] Test default config fallback behavior
+- [ ] Add config validation (type checking, range validation)
+- [ ] Document all config options in docs/configuration.md
+- [ ] Add config migration support (for future config format changes)
+- [ ] Test config file watching (live reload if supported)
+- [ ] Benchmark config loading performance
+- [ ] Zero clippy warnings in config module
+
+**Success Criteria:**
+- [ ] 50+ config tests passing
+- [ ] Config documentation complete
+- [ ] Invalid config handled gracefully (no panics)
+- [ ] Config loading < 10ms
+- [ ] All config options validated
+
+---
+
+### v0.10.0 - Undo/Redo & Command History [ ]
+
+**Focus:** Complete command history for all mutations  
+**Status:** [ ]  
+**Target Tests:** 50+
+
+**Features:**
+- [ ] u - Undo last operation
+- [ ] Ctrl+r - Redo last undone operation
+- [ ] . - Repeat last edit (dot command)
+- [ ] Per-file undo history (preserved across file switches)
+- [ ] Max undo levels: 1000 per file (configurable)
+- [ ] Undo stack preserved after :w (save doesn't clear history)
+- [ ] Single-step granularity (5dd = 1 undo step, not 5)
+
+**Undo Granularity:**
+- Single operations: edit cell (i), delete row (dd), insert row (o) = 1 undo step
+- Compound operations: 5dd (delete 5 rows) = 1 undo step (NOT 5 separate steps)
+- Visual mode operations: delete selection = 1 undo step
+- Range operations: :5,10d = 1 undo step
+
+**History Management:**
+- `:w` saves file but PRESERVES undo history
+- File switching preserves undo history per file (stored in session)
+- Undo/redo only works within current file (can't undo across files)
+
+**Limitations:**
+- Cannot undo file switch
+- Cannot undo :w (file write)
+- Cannot undo :q (quit)
+
+**Implementation Plan:**
+- File: src/history/mod.rs (new file)
+  - [ ] Create history module
+  - [ ] Define EditCommand enum (variants for all mutation types)
+  - [ ] Define History struct with undo/redo stacks
+  - [ ] Implement push_command() method
+  - [ ] Implement undo() method
+  - [ ] Implement redo() method
+  - [ ] Implement clear_redo_stack() on new command
+  - [ ] Respect max undo limit
+
+- File: src/app/mod.rs
+  - [ ] Add history: History field
+  - [ ] Record all mutations to history
+  - [ ] Add last_edit_command: Option<EditCommand> for dot command
+
+- File: src/session/mod.rs
+  - [ ] Store per-file history in HashMap<PathBuf, History>
+  - [ ] Preserve history across file switches
+
+- File: src/input/handler.rs
+  - [ ] Add u handler
+  - [ ] Add Ctrl+r handler
+  - [ ] Add . handler (repeat last edit)
+
+**Tests:**
+- [ ] test_u_undoes_cell_edit
+- [ ] test_u_undoes_row_delete
+- [ ] test_u_undoes_column_delete
+- [ ] test_5dd_creates_single_undo_step
+- [ ] test_ctrl_r_redoes
+- [ ] test_dot_repeats_last_edit
+- [ ] test_undo_limit_respected
+- [ ] test_w_preserves_undo_history
+- [ ] test_file_switch_preserves_history
+- [ ] test_new_command_clears_redo_stack
+
+---
+
+
+### v0.10.1 - Undo System Testing & Reliability [ ]
+
+**Focus:** Ensure undo/redo system is bulletproof  
+**Status:** [ ]  
+**Primary Focus:** Undo system quality and edge case handling
+
+**Philosophy:**
+Undo is critical for user confidence in destructive operations. Must handle edge cases, large operations, and complex scenarios without data loss or corruption.
+
+**Tasks:**
+- [ ] Add comprehensive undo/redo tests (100+ tests)
+- [ ] Test undo/redo for all operations (cell edit, row delete, column delete, transforms)
+- [ ] Test undo stack limits (max operations, memory management)
+- [ ] Test undo across mode transitions
+- [ ] Test redo after multiple undos
+- [ ] Test undo with large datasets (10K+ rows)
+- [ ] Benchmark undo/redo performance
+- [ ] Document undo implementation in code
+- [ ] Add rustdoc for undo API
+- [ ] Zero clippy warnings in undo module
+
+**Success Criteria:**
+- [ ] 100+ undo tests passing
+- [ ] Undo works for all destructive operations
+- [ ] No data loss or corruption in undo/redo
+- [ ] Undo/redo < 50ms for large operations
+- [ ] Documentation complete
+
+---
+
+### v0.11.0 - SQL Editor Vim Editing [ ]
 
 **Focus:** Full vim editing capabilities in SQL editor panel  
 **Status:** [ ]  
@@ -1193,11 +1382,45 @@ Bring the same powerful vim editing experience from Magnifier mode to the SQL ed
 
 ---
 
-### v0.8.3 - UI Consistency & Standardization [ ]
 
-**Focus:** Standardize UI/UX across all panels and modes  
+### v0.11.1 - SQL Editor Refactoring & Quality [ ]
+
+**Focus:** Polish SQL editor implementation and vim_editor module  
 **Status:** [ ]  
-**Target Tests:** 30+
+**Primary Focus:** SQL editor code quality and testing
+
+**Philosophy:**
+The vim_editor module is now shared between Magnifier and SQL editor. Ensure the abstraction is clean, well-tested, and maintainable.
+
+**Audit Phase:**
+- [ ] Review vim_editor module structure (mod.rs, motions.rs, operators.rs, etc.)
+- [ ] Identify any code duplication between Magnifier and SQL editor
+- [ ] Check test coverage for vim_editor module (target 90%+)
+- [ ] Review SQL editor-specific logic (Ctrl+Enter, query execution flow)
+
+**Tasks:**
+- [ ] Refactor any functions > 50 lines in vim_editor/
+- [ ] Add missing vim_editor tests (ensure 90%+ coverage)
+- [ ] Add SQL editor integration tests (25+ tests)
+- [ ] Document vim_editor public API with rustdoc
+- [ ] Create docs/vim-editor-architecture.md
+- [ ] Benchmark vim_editor performance (compare to Magnifier baseline)
+- [ ] Zero clippy warnings in vim_editor/ and sql editor code
+
+**Success Criteria:**
+- [ ] All functions < 50 lines
+- [ ] vim_editor module 90%+ test coverage
+- [ ] SQL editor 90%+ test coverage
+- [ ] No performance regression vs Magnifier
+- [ ] Documentation complete
+
+---
+
+### v0.12.0 - UI Consistency & Standardization [ ]
+
+**Focus:** Standardize UI/UX across all panels and modes, implement HeaderEdit mode  
+**Status:** [ ]  
+**Target Tests:** 50+ (30 UI tests + 20 HeaderEdit tests)
 
 **Philosophy:**
 Ensure a consistent look, feel, and behavior across the entire application. Every panel, mode, and UI element should follow the same design language and interaction patterns. Users should never be surprised by inconsistent keybindings or visual styling.
@@ -1267,9 +1490,19 @@ Ensure a consistent look, feel, and behavior across the entire application. Ever
   - [ ] Document component usage patterns
   - [ ] Add inline code comments for UI consistency rules
 
+**HeaderEdit Mode Implementation:**
+- [ ] Implement `gh` command to enter HeaderEdit mode for current column header
+- [ ] Create dedicated header editing interface (similar to Insert mode but for headers)
+- [ ] Support Tab/Shift+Tab to navigate between headers while in HeaderEdit mode
+- [ ] Support hjkl navigation between headers
+- [ ] Enter to save header changes, Esc to cancel
+- [ ] Integrate with column operations (`;o` should create new column and enter HeaderEdit for naming)
+- [ ] Update status bar to show "-- HEADER EDIT --" mode indicator
+- [ ] Add tests for HeaderEdit mode (20+ tests)
+
 **Specific Inconsistencies to Fix:**
 - [ ] Magnifier and SQL editor should have identical border styles
-- [ ] All mode indicators should use same color scheme
+- [ ] All mode indicators should use same color scheme (including new HeaderEdit mode)
 - [ ] Help text should follow same format across all modes
 - [ ] Error messages should have consistent styling and placement
 - [ ] Visual selection should use same colors in table and editors
@@ -1291,7 +1524,31 @@ Ensure a consistent look, feel, and behavior across the entire application. Ever
 
 ---
 
-### v0.8.4 - Repository Organization & Structure [ ]
+
+### v0.12.1 - UI System Testing [ ]
+
+**Focus:** Test UI consistency and theme system  
+**Status:** [ ]  
+**Primary Focus:** UI quality and rendering reliability
+
+**Tasks:**
+- [ ] Add UI rendering tests (snapshot tests if possible)
+- [ ] Test theme system (all color definitions work)
+- [ ] Test overlay rendering consistency
+- [ ] Test UI across different terminal sizes
+- [ ] Test UI with different color depths
+- [ ] Document theme customization in docs/themes.md
+- [ ] Add example themes (gruvbox, solarized, nord)
+- [ ] Zero clippy warnings in ui/ module
+
+**Success Criteria:**
+- [ ] UI renders consistently across all modes
+- [ ] Theme system fully functional
+- [ ] Documentation complete with examples
+
+---
+
+### v0.13.0 - Repository Organization & Structure [ ]
 
 **Focus:** Reorganize codebase for clarity and maintainability  
 **Status:** [ ]  
@@ -1422,126 +1679,51 @@ src/
 
 ---
 
-### v0.9.0 - Undo/Redo & Command History [ ]
 
-**Focus:** Complete command history for all mutations  
-**Status:** [ ]  
-**Target Tests:** 50+
+### v0.13.1 - Module Organization & Cleanup [ ]
 
-**Features:**
-- [ ] u - Undo last operation
-- [ ] Ctrl+r - Redo last undone operation
-- [ ] . - Repeat last edit (dot command)
-- [ ] Per-file undo history (preserved across file switches)
-- [ ] Max undo levels: 1000 per file (configurable)
-- [ ] Undo stack preserved after :w (save doesn't clear history)
-- [ ] Single-step granularity (5dd = 1 undo step, not 5)
-
-**Undo Granularity:**
-- Single operations: edit cell (i), delete row (dd), insert row (o) = 1 undo step
-- Compound operations: 5dd (delete 5 rows) = 1 undo step (NOT 5 separate steps)
-- Visual mode operations: delete selection = 1 undo step
-- Range operations: :5,10d = 1 undo step
-
-**History Management:**
-- `:w` saves file but PRESERVES undo history
-- File switching preserves undo history per file (stored in session)
-- Undo/redo only works within current file (can't undo across files)
-
-**Limitations:**
-- Cannot undo file switch
-- Cannot undo :w (file write)
-- Cannot undo :q (quit)
-
-**Implementation Plan:**
-- File: src/history/mod.rs (new file)
-  - [ ] Create history module
-  - [ ] Define EditCommand enum (variants for all mutation types)
-  - [ ] Define History struct with undo/redo stacks
-  - [ ] Implement push_command() method
-  - [ ] Implement undo() method
-  - [ ] Implement redo() method
-  - [ ] Implement clear_redo_stack() on new command
-  - [ ] Respect max undo limit
-
-- File: src/app/mod.rs
-  - [ ] Add history: History field
-  - [ ] Record all mutations to history
-  - [ ] Add last_edit_command: Option<EditCommand> for dot command
-
-- File: src/session/mod.rs
-  - [ ] Store per-file history in HashMap<PathBuf, History>
-  - [ ] Preserve history across file switches
-
-- File: src/input/handler.rs
-  - [ ] Add u handler
-  - [ ] Add Ctrl+r handler
-  - [ ] Add . handler (repeat last edit)
-
-**Tests:**
-- [ ] test_u_undoes_cell_edit
-- [ ] test_u_undoes_row_delete
-- [ ] test_u_undoes_column_delete
-- [ ] test_5dd_creates_single_undo_step
-- [ ] test_ctrl_r_redoes
-- [ ] test_dot_repeats_last_edit
-- [ ] test_undo_limit_respected
-- [ ] test_w_preserves_undo_history
-- [ ] test_file_switch_preserves_history
-- [ ] test_new_command_clears_redo_stack
-
----
-
-### v0.9.1 - Code Quality & Architecture Refactor [ ]
-
-**Focus:** Improve code organization, reduce complexity, and establish quality baselines  
+**Focus:** Improve module structure, reduce coupling, clean interfaces  
 **Status:** Refactoring milestone  
-**Type:** Maintenance & Quality
+**Type:** Architecture & Organization
 
 **Audit Phase (Complete First):**
-- [ ] Run `cargo clippy --all-targets` and document all warnings
-- [ ] Measure current code coverage with `cargo tarpaulin` or `cargo llvm-cov`
-- [ ] Identify all functions > 50 lines
-- [ ] Profile performance with `cargo flamegraph` or `perf`
-- [ ] Review module dependencies and coupling
-- [ ] Calculate cyclomatic complexity for complex functions
-- [ ] Review error handling patterns (find all `unwrap()`, `expect()`)
-- [ ] Document technical debt items
+- [ ] Review module dependencies with `cargo modules` or similar
+- [ ] Identify circular dependencies
+- [ ] Find modules with too many responsibilities
+- [ ] Review public API surface area
+- [ ] Check for leaky abstractions
+- [ ] Identify overly-coupled modules
 
 **Success Criteria:**
-- [ ] Zero clippy warnings
-- [ ] Code coverage > 80%
-- [ ] All functions < 50 lines (or documented exceptions)
-- [ ] Performance benchmarks established and met
-- [ ] Module structure documented in docs/architecture.md
-- [ ] Cyclomatic complexity reduced for flagged functions
-- [ ] All tests pass with no panics or unwrap failures
-- [ ] Error handling follows consistent patterns
+- [ ] Clear module responsibilities documented
+- [ ] No circular dependencies
+- [ ] Reduced coupling between modules
+- [ ] Clean public APIs with minimal surface area
+- [ ] Logical module hierarchy
+- [ ] Updated architecture documentation
 
 **Testing Strategy:**
-- [ ] All existing tests pass (regression testing)
-- [ ] Add tests to reach coverage target
-- [ ] Consider property-based tests for complex logic
-- [ ] Create benchmark suite for performance tracking
+- [ ] Ensure all tests pass after reorganization
+- [ ] Add tests for new module boundaries
+- [ ] Verify integration points work correctly
 
 **Documentation Updates:**
 - [ ] Update docs/architecture.md with module structure
-- [ ] Add inline comments for complex logic
-- [ ] Ensure all public APIs have rustdoc comments
-- [ ] Document refactoring decisions and trade-offs
-- [ ] Record performance improvements with metrics
+- [ ] Document module responsibilities
+- [ ] Add module dependency diagram
+- [ ] Update API documentation
 
-**Common Refactoring Patterns:**
-- Extract large functions into smaller, testable units
-- Reduce code duplication through abstractions
-- Simplify complex conditional logic
+**Organization Improvements:**
+- Split large modules into focused sub-modules
+- Extract shared code into utility modules
+- Clarify module boundaries and responsibilities
+- Reduce public API surface where possible
 - Improve naming consistency across modules
-- Replace `unwrap()` with proper error handling
-- Reduce coupling between modules
 
 ---
 
-### v0.10.0 - Cell Transforms & Data Cleanup [ ]
+
+### v0.14.0 - Cell Transforms & Data Cleanup [ ]
 
 **Focus:** Case transformations, boolean toggles, and row movement  
 **Status:** [ ]  
@@ -1591,7 +1773,8 @@ src/
 
 ---
 
-### v0.10.1 - Performance Optimization & Profiling [ ]
+
+### v0.14.1 - Performance Optimization & Profiling [ ]
 
 **Focus:** Profile hot paths, optimize rendering, reduce allocations  
 **Status:** Refactoring milestone  
@@ -1635,7 +1818,8 @@ src/
 
 ---
 
-### v0.11.0 - System Clipboard & External Integration [ ]
+
+### v0.15.0 - System Clipboard & External Integration [ ]
 
 **Focus:** Integration with system clipboard for copy/paste with external tools  
 **Status:** [ ]  
@@ -1673,7 +1857,8 @@ src/
 
 ---
 
-### v0.11.1 - Testing & Reliability Improvements [ ]
+
+### v0.15.1 - Testing & Reliability Improvements [ ]
 
 **Focus:** Increase test coverage, add property-based tests, improve reliability  
 **Status:** Refactoring milestone  
@@ -1718,7 +1903,8 @@ src/
 
 ---
 
-### v0.12.0 - Bulk Operations & Find/Replace [ ]
+
+### v0.16.0 - Bulk Operations & Find/Replace [ ]
 
 **Focus:** Find and replace across cells, rows, and columns  
 **Status:** [ ]  
@@ -1763,7 +1949,8 @@ src/
 
 ---
 
-### v0.12.1 - Error Handling & Robustness [ ]
+
+### v0.16.1 - Error Handling & Robustness [ ]
 
 **Focus:** Consistent error handling, better error messages, resilience  
 **Status:** Refactoring milestone  
@@ -1807,7 +1994,8 @@ src/
 
 ---
 
-### v0.13.0 - Advanced Filtering & Conditional Views [ ]
+
+### v0.17.0 - Advanced Filtering & Conditional Views [ ]
 
 **Focus:** Show/hide rows based on conditions, highlight cells  
 **Status:** [ ]  
@@ -1851,7 +2039,8 @@ src/
 
 ---
 
-### v0.13.1 - Module Organization & Cleanup [ ]
+
+### v0.17.1 - Module Organization & Cleanup [ ]
 
 **Focus:** Improve module structure, reduce coupling, clean interfaces  
 **Status:** Refactoring milestone  
@@ -1893,456 +2082,8 @@ src/
 
 ---
 
-### v0.14.0 - Column Resize & Advanced Column Operations [ ]
 
-**Focus:** Manual column width control, column pinning, and metadata  
-**Status:** [ ]  
-**Target Tests:** 30+
-
-**Features:**
-
-**Column Width:**
-- [ ] :width A 20 - Set column A width to 20 characters
-- [ ] :width B auto - Auto-size column B
-- [ ] :width * auto - Auto-size all columns
-- [ ] Manual resize with mouse or keybindings
-- [ ] Per-file column width memory (session)
-
-**Column Pinning:**
-- [ ] :freeze A,B - Freeze columns A and B (always visible)
-- [ ] :unfreeze - Unfreeze all columns
-- [ ] Visual indicator for frozen columns
-
-**Column Metadata:**
-- [ ] :type A number - Mark column A as numeric
-- [ ] :type B date - Mark column B as date
-- [ ] Type validation on edit
-- [ ] Type-aware sorting (numbers sort numerically)
-
-**Implementation Plan:**
-- File: src/column/metadata.rs (new file)
-  - [ ] Define ColumnMetadata struct
-  - [ ] Track column widths, types, frozen state
-  - [ ] Per-file metadata storage in Session
-
-- File: src/ui/table.rs
-  - [ ] Implement frozen column rendering
-  - [ ] Use custom widths instead of auto-sizing
-
-**Tests:**
-- [ ] test_set_column_width
-- [ ] test_auto_size_column
-- [ ] test_freeze_columns
-- [ ] test_column_type_validation
-- [ ] test_numeric_sort
-
----
-
-### v0.14.1 - Documentation & Maintainability [ ]
-
-**Focus:** Comprehensive documentation, code comments, maintainability  
-**Status:** Refactoring milestone  
-**Type:** Documentation & Maintainability
-
-**Audit Phase (Complete First):**
-- [ ] Run `cargo doc` and review for missing docs
-- [ ] Find complex functions lacking comments
-- [ ] Review public API documentation quality
-- [ ] Check architecture docs for accuracy
-- [ ] Review inline comments for clarity
-- [ ] Identify undocumented design decisions
-
-**Success Criteria:**
-- [ ] All public items have rustdoc comments
-- [ ] Complex algorithms have explanatory comments
-- [ ] Architecture docs up-to-date and comprehensive
-- [ ] API examples provided where helpful
-- [ ] Design decisions documented
-- [ ] Contributing guide updated
-
-**Testing Strategy:**
-- [ ] Ensure doc tests pass (`cargo test --doc`)
-- [ ] Add examples to documentation
-- [ ] Verify doc coverage meets standards
-
-**Documentation Updates:**
-- [ ] Complete API documentation (rustdoc)
-- [ ] Add code examples to docs
-- [ ] Update docs/architecture.md comprehensively
-- [ ] Document design patterns and idioms used
-- [ ] Add inline comments for complex logic
-- [ ] Update docs/development.md for contributors
-
-**Maintainability Improvements:**
-- Improve function and variable naming
-- Add high-level module documentation
-- Document non-obvious code patterns
-- Add TODO/FIXME tracking
-- Clarify ownership and lifetime patterns
-
----
-
-### v0.15.0 - Data Analysis & Statistics [ ]
-
-**Focus:** Basic statistical analysis and aggregation  
-**Status:** [ ]  
-**Target Tests:** 25+
-
-**Features:**
-
-**Column Statistics:**
-- [ ] :stats A - Show statistics for column A (sum, avg, min, max, count)
-- [ ] :sum A - Show sum of column A
-- [ ] :avg A - Show average of column A
-- [ ] :count A - Count non-empty cells in column A
-- [ ] :distinct A - Count distinct values in column A
-
-**Aggregation:**
-- [ ] Visual mode selection statistics
-- [ ] Footer row showing column totals (optional)
-- [ ] Statistics overlay/popup
-
-**Implementation Plan:**
-- File: src/stats/mod.rs (new file)
-  - [ ] Create statistics module
-  - [ ] Implement calculate_stats() function
-  - [ ] Handle numeric vs text columns
-  - [ ] Parse numeric values safely
-
-- File: src/ui/stats_overlay.rs (new file)
-  - [ ] Create statistics display overlay
-  - [ ] Format statistics nicely
-
-**Tests:**
-- [ ] test_stats_numeric_column
-- [ ] test_stats_text_column
-- [ ] test_sum_column
-- [ ] test_avg_column
-- [ ] test_count_non_empty
-- [ ] test_distinct_values
-
----
-
-### v0.15.1 - Technical Debt Reduction [ ]
-
-**Focus:** Address accumulated TODOs, simplify complex code, pay down debt  
-**Status:** Refactoring milestone  
-**Type:** Technical Debt & Simplification
-
-**Audit Phase (Complete First):**
-- [ ] Find all TODO, FIXME, HACK, XXX comments
-- [ ] Identify complex functions (high cyclomatic complexity)
-- [ ] Review code duplication with tools
-- [ ] Find deprecated patterns still in use
-- [ ] Identify over-engineered solutions
-- [ ] Review dead code and unused features
-
-**Success Criteria:**
-- [ ] All critical TODOs addressed
-- [ ] Complex functions simplified or documented
-- [ ] Code duplication significantly reduced
-- [ ] No deprecated patterns in use
-- [ ] Dead code removed
-- [ ] Consistent coding patterns throughout
-
-**Testing Strategy:**
-- [ ] Ensure refactoring doesn't break functionality
-- [ ] Add tests for previously untested areas
-- [ ] Remove tests for removed functionality
-
-**Documentation Updates:**
-- [ ] Document resolved technical debt items
-- [ ] Update known issues list
-- [ ] Document remaining acceptable debt
-- [ ] Add lessons learned
-
-**Debt Reduction Targets:**
-- Resolve high-priority TODOs
-- Simplify overly complex functions
-- Extract duplicated code
-- Remove unused code and features
-- Standardize inconsistent patterns
-- Update deprecated API usage
-
----
-
-### v0.16.0 - Export & Import (JSON, Markdown, TSV) [ ]
-
-**Focus:** Export CSV to other formats, import from TSV  
-**Status:** [ ]  
-**Target Tests:** 30+
-
-**Features:**
-
-**Export:**
-- [ ] :export json - Export current file to JSON
-- [ ] :export markdown - Export to Markdown table
-- [ ] :export html - Export to HTML table
-- [ ] :export tsv - Export to TSV
-- [ ] Visual selection export
-- [ ] Output file path prompt
-
-**Import:**
-- [ ] :import file.tsv - Import TSV file
-- [ ] :import file.json - Import JSON (array of objects)
-- [ ] Auto-detect format on file open
-
-**Implementation Plan:**
-- File: src/export/mod.rs (new file)
-  - [ ] Create export module
-  - [ ] Implement export_json()
-  - [ ] Implement export_markdown()
-  - [ ] Implement export_html()
-  - [ ] Implement export_tsv()
-
-- File: src/import/mod.rs (new file)
-  - [ ] Create import module
-  - [ ] Implement import_tsv()
-  - [ ] Implement import_json()
-
-**Tests:**
-- [ ] test_export_json
-- [ ] test_export_markdown
-- [ ] test_export_html
-- [ ] test_export_tsv
-- [ ] test_import_tsv
-- [ ] test_import_json
-
----
-
-### v0.16.1 - Code Coverage & Test Quality [ ]
-
-**Focus:** Maximize test coverage, improve test quality and organization  
-**Status:** Refactoring milestone  
-**Type:** Testing Excellence
-
-**Audit Phase (Complete First):**
-- [ ] Generate detailed coverage report
-- [ ] Identify untested branches and paths
-- [ ] Review test organization and naming
-- [ ] Find slow or flaky tests
-- [ ] Check test duplication
-- [ ] Review test assertions quality
-
-**Success Criteria:**
-- [ ] Code coverage > 85% (stretch: 90%+)
-- [ ] All critical paths have tests
-- [ ] Fast test suite (< 30s for full run)
-- [ ] No flaky tests
-- [ ] Well-organized test modules
-- [ ] Meaningful test names and assertions
-
-**Testing Strategy:**
-- [ ] Add tests for all uncovered code paths
-- [ ] Improve test organization by feature area
-- [ ] Add edge case and boundary tests
-- [ ] Ensure error paths are tested
-- [ ] Add integration tests for workflows
-- [ ] Remove or fix flaky tests
-
-**Documentation Updates:**
-- [ ] Document test organization patterns
-- [ ] Add testing best practices guide
-- [ ] Document coverage requirements
-- [ ] Update CI test documentation
-
-**Test Quality Improvements:**
-- Improve test naming conventions
-- Add descriptive assertion messages
-- Organize tests by feature/module
-- Remove duplicate test code
-- Speed up slow tests
-- Add missing edge case tests
-
----
-
-### v0.17.0 - Configuration System [ ]
-
-**Focus:** User customization via config files  
-**Status:** [ ]  
-**Target Tests:** 20+
-
-**Features:**
-
-**Config File Support:**
-- [ ] Load config from ~/.config/lazycsv/config.toml
-- [ ] Per-directory config (./.lazycsv/config.toml)
-- [ ] Default settings (delimiter, header_mode, undo_limit)
-- [ ] Color customization
-- [ ] Keybinding remapping (advanced)
-
-**Config Options:**
-```toml
-[defaults]
-delimiter = ","
-header_mode = true
-undo_limit = 1000
-
-[colors]
-header_bg = "blue"
-cursor_fg = "yellow"
-dirty_indicator = "red"
-
-[keybindings]
-quit = ":q"
-save_all = ":w"
-```
-
-**Implementation Plan:**
-- File: src/config/mod.rs (new file)
-  - [ ] Create config module
-  - [ ] Define Config struct
-  - [ ] Implement load_config()
-  - [ ] Parse TOML with `toml` crate
-  - [ ] Merge global + directory configs
-
-- File: src/app/mod.rs
-  - [ ] Load config on startup
-  - [ ] Apply config settings
-
-**Tests:**
-- [ ] test_load_global_config
-- [ ] test_load_directory_config
-- [ ] test_config_merge
-- [ ] test_invalid_config_handling
-
----
-
-### v0.17.1 - Performance Benchmarking & Tuning [ ]
-
-**Focus:** Establish benchmarks, tune critical paths, validate performance  
-**Status:** Refactoring milestone  
-**Type:** Performance Validation
-
-**Audit Phase (Complete First):**
-- [ ] Create comprehensive benchmark suite
-- [ ] Profile with real-world datasets (10K, 100K, 1M rows)
-- [ ] Identify performance regressions since last version
-- [ ] Measure memory usage patterns
-- [ ] Test with various CSV sizes and complexities
-- [ ] Profile startup time and file loading
-
-**Success Criteria:**
-- [ ] Comprehensive benchmark suite in place
-- [ ] 60 FPS maintained for 100K+ row files
-- [ ] File loading < 100ms for 10MB files
-- [ ] Memory usage within acceptable bounds
-- [ ] No performance regressions
-- [ ] Performance characteristics documented
-
-**Testing Strategy:**
-- [ ] Add criterion benchmarks for critical paths
-- [ ] Test performance with large datasets
-- [ ] Add memory usage tests
-- [ ] Create performance regression tests
-- [ ] Benchmark against previous versions
-
-**Documentation Updates:**
-- [ ] Document performance characteristics
-- [ ] Add benchmark results to docs
-- [ ] Document performance optimization decisions
-- [ ] Update performance goals and targets
-
-**Performance Validation:**
-- Navigation responsiveness (hjkl, gg, G, searches)
-- Rendering performance (viewport updates, redraws)
-- File operations (load, save, switch)
-- Search and filter operations
-- Large dataset handling
-- Memory efficiency
-
----
-
-### v0.18.0 - Macros & Command Recording [ ]
-
-**Focus:** Record and replay command sequences  
-**Status:** [ ]  
-**Target Tests:** 25+
-
-**Features:**
-
-**Macro Recording:**
-- [ ] qa - Start recording macro into register 'a'
-- [ ] q - Stop recording
-- [ ] @a - Replay macro from register 'a'
-- [ ] @@ - Replay last macro
-- [ ] Support for multiple registers (a-z)
-
-**Command History:**
-- [ ] :history - Show command history
-- [ ] Up/Down arrows in command mode to navigate history
-- [ ] Persistent command history across sessions
-
-**Implementation Plan:**
-- File: src/macro/mod.rs (new file)
-  - [ ] Create macro module
-  - [ ] Define Macro struct
-  - [ ] Implement record_action()
-  - [ ] Implement replay_macro()
-  - [ ] Store macros in HashMap<char, Vec<Action>>
-
-- File: src/input/handler.rs
-  - [ ] Add q handler for recording
-  - [ ] Add @ handler for replay
-
-**Tests:**
-- [ ] test_record_macro
-- [ ] test_replay_macro
-- [ ] test_replay_last_macro
-- [ ] test_multiple_registers
-- [ ] test_command_history
-
----
-
-### v0.18.1 - Final Architecture Polish [ ]
-
-**Focus:** Pre-release code quality and architecture finalization  
-**Status:** [ ]  
-**Primary Focus:** Final architecture polish and 1.0 readiness
-
-**Philosophy:**
-This is the final refactoring pass before v1.0.0. Focus on polishing the entire codebase to ensure it's maintainable, well-documented, and ready for stable release. Address any remaining architectural concerns and ensure all modules are production-ready.
-
-**Audit Phase:**
-Start with comprehensive audit of entire codebase:
-- Review all module boundaries and public APIs
-- Identify any remaining technical debt
-- Check consistency across all features
-- Verify documentation completeness
-- Ensure performance targets are met
-- Review test coverage gaps
-
-**Success Criteria:**
-- Zero clippy warnings
-- Code coverage > 80%
-- All functions < 50 lines
-- Performance benchmarks met
-- Module structure documented
-- Cyclomatic complexity reduced
-- All tests pass with no panics
-- All public APIs have rustdoc
-- Architecture docs complete
-- Ready for 1.0 release
-
-**Testing Strategy:**
-- Full regression test suite
-- Integration tests for all features
-- Performance benchmark validation
-- Edge case verification
-- User workflow testing
-- Documentation accuracy checks
-
-**Documentation Requirements:**
-- Complete rustdoc for all public APIs
-- Architecture documentation finalized
-- User guide comprehensive
-- Developer documentation complete
-- Migration guide if needed
-- Performance characteristics documented
-
----
-
-### v0.19.0 - SQL IntelliSense & Auto-completion [ ]
+### v0.18.0 - SQL IntelliSense & Auto-completion [ ]
 
 **Focus:** Add intelligent auto-completion and suggestions to SQL editor  
 **Status:** [ ]  
@@ -2486,7 +2227,8 @@ show_function_suggestions = true # Show SQL functions
 
 ---
 
-### v0.19.1 - SQL IntelliSense Polish & Testing [ ]
+
+### v0.18.1 - SQL IntelliSense Polish & Testing [ ]
 
 **Focus:** Refine IntelliSense UX and ensure rock-solid reliability  
 **Status:** [ ]  
@@ -2569,6 +2311,469 @@ The IntelliSense system must feel natural and helpful, never intrusive or annoyi
 
 ---
 
+
+### v0.19.0 - Column Resize & Advanced Column Operations [ ]
+
+**Focus:** Manual column width control, column pinning, and metadata  
+**Status:** [ ]  
+**Target Tests:** 30+
+
+**Features:**
+
+**Column Width:**
+- [ ] :width A 20 - Set column A width to 20 characters
+- [ ] :width B auto - Auto-size column B
+- [ ] :width * auto - Auto-size all columns
+- [ ] Manual resize with mouse or keybindings
+- [ ] Per-file column width memory (session)
+
+**Column Pinning:**
+- [ ] :freeze A,B - Freeze columns A and B (always visible)
+- [ ] :unfreeze - Unfreeze all columns
+- [ ] Visual indicator for frozen columns
+
+**Column Metadata:**
+- [ ] :type A number - Mark column A as numeric
+- [ ] :type B date - Mark column B as date
+- [ ] Type validation on edit
+- [ ] Type-aware sorting (numbers sort numerically)
+
+**Implementation Plan:**
+- File: src/column/metadata.rs (new file)
+  - [ ] Define ColumnMetadata struct
+  - [ ] Track column widths, types, frozen state
+  - [ ] Per-file metadata storage in Session
+
+- File: src/ui/table.rs
+  - [ ] Implement frozen column rendering
+  - [ ] Use custom widths instead of auto-sizing
+
+**Tests:**
+- [ ] test_set_column_width
+- [ ] test_auto_size_column
+- [ ] test_freeze_columns
+- [ ] test_column_type_validation
+- [ ] test_numeric_sort
+
+---
+
+
+### v0.19.1 - Documentation & Maintainability [ ]
+
+**Focus:** Comprehensive documentation, code comments, maintainability  
+**Status:** Refactoring milestone  
+**Type:** Documentation & Maintainability
+
+**Audit Phase (Complete First):**
+- [ ] Run `cargo doc` and review for missing docs
+- [ ] Find complex functions lacking comments
+- [ ] Review public API documentation quality
+- [ ] Check architecture docs for accuracy
+- [ ] Review inline comments for clarity
+- [ ] Identify undocumented design decisions
+
+**Success Criteria:**
+- [ ] All public items have rustdoc comments
+- [ ] Complex algorithms have explanatory comments
+- [ ] Architecture docs up-to-date and comprehensive
+- [ ] API examples provided where helpful
+- [ ] Design decisions documented
+- [ ] Contributing guide updated
+
+**Testing Strategy:**
+- [ ] Ensure doc tests pass (`cargo test --doc`)
+- [ ] Add examples to documentation
+- [ ] Verify doc coverage meets standards
+
+**Documentation Updates:**
+- [ ] Complete API documentation (rustdoc)
+- [ ] Add code examples to docs
+- [ ] Update docs/architecture.md comprehensively
+- [ ] Document design patterns and idioms used
+- [ ] Add inline comments for complex logic
+- [ ] Update docs/development.md for contributors
+
+**Maintainability Improvements:**
+- Improve function and variable naming
+- Add high-level module documentation
+- Document non-obvious code patterns
+- Add TODO/FIXME tracking
+- Clarify ownership and lifetime patterns
+
+---
+
+
+### v0.20.0 - Data Analysis & Statistics [ ]
+
+**Focus:** Basic statistical analysis and aggregation  
+**Status:** [ ]  
+**Target Tests:** 25+
+
+**Features:**
+
+**Column Statistics:**
+- [ ] :stats A - Show statistics for column A (sum, avg, min, max, count)
+- [ ] :sum A - Show sum of column A
+- [ ] :avg A - Show average of column A
+- [ ] :count A - Count non-empty cells in column A
+- [ ] :distinct A - Count distinct values in column A
+
+**Aggregation:**
+- [ ] Visual mode selection statistics
+- [ ] Footer row showing column totals (optional)
+- [ ] Statistics overlay/popup
+
+**Implementation Plan:**
+- File: src/stats/mod.rs (new file)
+  - [ ] Create statistics module
+  - [ ] Implement calculate_stats() function
+  - [ ] Handle numeric vs text columns
+  - [ ] Parse numeric values safely
+
+- File: src/ui/stats_overlay.rs (new file)
+  - [ ] Create statistics display overlay
+  - [ ] Format statistics nicely
+
+**Tests:**
+- [ ] test_stats_numeric_column
+- [ ] test_stats_text_column
+- [ ] test_sum_column
+- [ ] test_avg_column
+- [ ] test_count_non_empty
+- [ ] test_distinct_values
+
+---
+
+
+### v0.20.1 - Technical Debt Reduction [ ]
+
+**Focus:** Address accumulated TODOs, simplify complex code, pay down debt  
+**Status:** Refactoring milestone  
+**Type:** Technical Debt & Simplification
+
+**Audit Phase (Complete First):**
+- [ ] Find all TODO, FIXME, HACK, XXX comments
+- [ ] Identify complex functions (high cyclomatic complexity)
+- [ ] Review code duplication with tools
+- [ ] Find deprecated patterns still in use
+- [ ] Identify over-engineered solutions
+- [ ] Review dead code and unused features
+
+**Success Criteria:**
+- [ ] All critical TODOs addressed
+- [ ] Complex functions simplified or documented
+- [ ] Code duplication significantly reduced
+- [ ] No deprecated patterns in use
+- [ ] Dead code removed
+- [ ] Consistent coding patterns throughout
+
+**Testing Strategy:**
+- [ ] Ensure refactoring doesn't break functionality
+- [ ] Add tests for previously untested areas
+- [ ] Remove tests for removed functionality
+
+**Documentation Updates:**
+- [ ] Document resolved technical debt items
+- [ ] Update known issues list
+- [ ] Document remaining acceptable debt
+- [ ] Add lessons learned
+
+**Debt Reduction Targets:**
+- Resolve high-priority TODOs
+- Simplify overly complex functions
+- Extract duplicated code
+- Remove unused code and features
+- Standardize inconsistent patterns
+- Update deprecated API usage
+
+---
+
+
+### v0.21.0 - Export & Import (JSON, Markdown, TSV) [ ]
+
+**Focus:** Export CSV to other formats, import from TSV  
+**Status:** [ ]  
+**Target Tests:** 30+
+
+**Features:**
+
+**Export:**
+- [ ] :export json - Export current file to JSON
+- [ ] :export markdown - Export to Markdown table
+- [ ] :export html - Export to HTML table
+- [ ] :export tsv - Export to TSV
+- [ ] Visual selection export
+- [ ] Output file path prompt
+
+**Import:**
+- [ ] :import file.tsv - Import TSV file
+- [ ] :import file.json - Import JSON (array of objects)
+- [ ] Auto-detect format on file open
+
+**Implementation Plan:**
+- File: src/export/mod.rs (new file)
+  - [ ] Create export module
+  - [ ] Implement export_json()
+  - [ ] Implement export_markdown()
+  - [ ] Implement export_html()
+  - [ ] Implement export_tsv()
+
+- File: src/import/mod.rs (new file)
+  - [ ] Create import module
+  - [ ] Implement import_tsv()
+  - [ ] Implement import_json()
+
+**Tests:**
+- [ ] test_export_json
+- [ ] test_export_markdown
+- [ ] test_export_html
+- [ ] test_export_tsv
+- [ ] test_import_tsv
+- [ ] test_import_json
+
+---
+
+
+### v0.21.1 - Code Coverage & Test Quality [ ]
+
+**Focus:** Maximize test coverage, improve test quality and organization  
+**Status:** Refactoring milestone  
+**Type:** Testing Excellence
+
+**Audit Phase (Complete First):**
+- [ ] Generate detailed coverage report
+- [ ] Identify untested branches and paths
+- [ ] Review test organization and naming
+- [ ] Find slow or flaky tests
+- [ ] Check test duplication
+- [ ] Review test assertions quality
+
+**Success Criteria:**
+- [ ] Code coverage > 85% (stretch: 90%+)
+- [ ] All critical paths have tests
+- [ ] Fast test suite (< 30s for full run)
+- [ ] No flaky tests
+- [ ] Well-organized test modules
+- [ ] Meaningful test names and assertions
+
+**Testing Strategy:**
+- [ ] Add tests for all uncovered code paths
+- [ ] Improve test organization by feature area
+- [ ] Add edge case and boundary tests
+- [ ] Ensure error paths are tested
+- [ ] Add integration tests for workflows
+- [ ] Remove or fix flaky tests
+
+**Documentation Updates:**
+- [ ] Document test organization patterns
+- [ ] Add testing best practices guide
+- [ ] Document coverage requirements
+- [ ] Update CI test documentation
+
+**Test Quality Improvements:**
+- Improve test naming conventions
+- Add descriptive assertion messages
+- Organize tests by feature/module
+- Remove duplicate test code
+- Speed up slow tests
+- Add missing edge case tests
+
+---
+
+
+### v0.22.0 - Macros & Command Recording [ ]
+
+**Focus:** Record and replay command sequences  
+**Status:** [ ]  
+**Target Tests:** 25+
+
+**Features:**
+
+**Macro Recording:**
+- [ ] qa - Start recording macro into register 'a'
+- [ ] q - Stop recording
+- [ ] @a - Replay macro from register 'a'
+- [ ] @@ - Replay last macro
+- [ ] Support for multiple registers (a-z)
+
+**Command History:**
+- [ ] :history - Show command history
+- [ ] Up/Down arrows in command mode to navigate history
+- [ ] Persistent command history across sessions
+
+**Implementation Plan:**
+- File: src/macro/mod.rs (new file)
+  - [ ] Create macro module
+  - [ ] Define Macro struct
+  - [ ] Implement record_action()
+  - [ ] Implement replay_macro()
+  - [ ] Store macros in HashMap<char, Vec<Action>>
+
+- File: src/input/handler.rs
+  - [ ] Add q handler for recording
+  - [ ] Add @ handler for replay
+
+**Tests:**
+- [ ] test_record_macro
+- [ ] test_replay_macro
+- [ ] test_replay_last_macro
+- [ ] test_multiple_registers
+- [ ] test_command_history
+
+---
+
+
+### v0.22.1 - Performance Benchmarking & Tuning [ ]
+
+**Focus:** Establish benchmarks, tune critical paths, validate performance  
+**Status:** Refactoring milestone  
+**Type:** Performance Validation
+
+**Audit Phase (Complete First):**
+- [ ] Create comprehensive benchmark suite
+- [ ] Profile with real-world datasets (10K, 100K, 1M rows)
+- [ ] Identify performance regressions since last version
+- [ ] Measure memory usage patterns
+- [ ] Test with various CSV sizes and complexities
+- [ ] Profile startup time and file loading
+
+**Success Criteria:**
+- [ ] Comprehensive benchmark suite in place
+- [ ] 60 FPS maintained for 100K+ row files
+- [ ] File loading < 100ms for 10MB files
+- [ ] Memory usage within acceptable bounds
+- [ ] No performance regressions
+- [ ] Performance characteristics documented
+
+**Testing Strategy:**
+- [ ] Add criterion benchmarks for critical paths
+- [ ] Test performance with large datasets
+- [ ] Add memory usage tests
+- [ ] Create performance regression tests
+- [ ] Benchmark against previous versions
+
+**Documentation Updates:**
+- [ ] Document performance characteristics
+- [ ] Add benchmark results to docs
+- [ ] Document performance optimization decisions
+- [ ] Update performance goals and targets
+
+**Performance Validation:**
+- Navigation responsiveness (hjkl, gg, G, searches)
+- Rendering performance (viewport updates, redraws)
+- File operations (load, save, switch)
+- Search and filter operations
+- Large dataset handling
+- Memory efficiency
+
+---
+
+
+### v0.23.0 - Final Architecture Review [ ]
+
+**Focus:** Comprehensive pre-release architecture audit  
+**Status:** [ ]  
+**Primary Focus:** Final architecture validation before v1.0.0
+
+**Philosophy:**
+This is the final major feature checkpoint before v1.0.0. Conduct a thorough audit of the entire codebase to ensure architectural consistency, identify any remaining technical debt, and validate that all features work together cohesively.
+
+**Comprehensive Audit:**
+- [ ] Review all module boundaries and dependencies
+- [ ] Validate public API stability (no breaking changes before v1.0)
+- [ ] Check feature completeness (all planned features implemented)
+- [ ] Review error handling consistency across modules
+- [ ] Verify performance targets met for all operations
+- [ ] Check documentation completeness (user docs + API docs)
+- [ ] Review test coverage (target 85%+ overall)
+- [ ] Identify any security concerns
+
+**Architecture Validation:**
+- [ ] Module cohesion analysis (single responsibility principle)
+- [ ] Dependency graph review (no circular dependencies)
+- [ ] Data flow validation (clean state management)
+- [ ] Error propagation review (proper error handling everywhere)
+- [ ] Resource management audit (no memory leaks, proper cleanup)
+
+**User Experience Review:**
+- [ ] Consistency across all modes (Normal, Insert, Magnifier, SQL, etc.)
+- [ ] Keyboard shortcut conflicts check
+- [ ] Help system completeness
+- [ ] Error message quality (helpful, actionable)
+- [ ] Performance feels snappy (no laggy operations)
+
+**Technical Debt Assessment:**
+- [ ] List all TODO/FIXME comments in code
+- [ ] Identify deferred features or workarounds
+- [ ] Document known limitations
+- [ ] Create issues for post-1.0 improvements
+
+**Pre-Release Checklist:**
+- [ ] All planned v0.x.x features complete
+- [ ] Zero clippy warnings
+- [ ] Zero failing tests
+- [ ] Benchmarks meet targets
+- [ ] Documentation complete (README, docs/, rustdoc)
+- [ ] Examples work (sample CSV files included)
+
+**Success Criteria:**
+- [ ] Architecture audit complete with findings documented
+- [ ] No critical issues blocking v1.0.0
+- [ ] Technical debt documented for post-1.0 planning
+- [ ] All modules pass architectural review
+- [ ] Ready for v0.23.1 final polish
+
+---
+
+### v0.23.1 - Final Architecture Polish [ ]
+
+**Focus:** Pre-release code quality and architecture finalization  
+**Status:** [ ]  
+**Primary Focus:** Final architecture polish and 1.0 readiness
+
+**Philosophy:**
+This is the final refactoring pass before v1.0.0. Focus on polishing the entire codebase to ensure it's maintainable, well-documented, and ready for stable release. Address any remaining architectural concerns and ensure all modules are production-ready.
+
+**Audit Phase:**
+Start with comprehensive audit of entire codebase:
+- Review all module boundaries and public APIs
+- Identify any remaining technical debt
+- Check consistency across all features
+- Verify documentation completeness
+- Ensure performance targets are met
+- Review test coverage gaps
+
+**Success Criteria:**
+- Zero clippy warnings
+- Code coverage > 80%
+- All functions < 50 lines
+- Performance benchmarks met
+- Module structure documented
+- Cyclomatic complexity reduced
+- All tests pass with no panics
+- All public APIs have rustdoc
+- Architecture docs complete
+- Ready for 1.0 release
+
+**Testing Strategy:**
+- Full regression test suite
+- Integration tests for all features
+- Performance benchmark validation
+- Edge case verification
+- User workflow testing
+- Documentation accuracy checks
+
+**Documentation Requirements:**
+- Complete rustdoc for all public APIs
+- Architecture documentation finalized
+- User guide comprehensive
+- Developer documentation complete
+- Migration guide if needed
+- Performance characteristics documented
+
+---
+
+
 ### v1.0.0 - Stable Release & Polish [ ]
 
 **Focus:** All core features working, stable command interface, comprehensive documentation  
@@ -2637,3 +2842,4 @@ The IntelliSense system must feel natural and helpful, never intrusive or annoyi
 ---
 
 **End of Roadmap**
+
