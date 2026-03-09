@@ -22,6 +22,9 @@ This section details all features currently available in the application.
 -  Load CSV files from the command line (`lazycsv file.csv`).
 -  Discover and load files from a directory (`lazycsv .`).
 -  Support for custom delimiters, encodings, and files with no headers.
+-  Non-interactive query mode (`lazycsv --query "SELECT * FROM data"`) for piping/automation.
+-  Locale-aware number formatting with `--format` flag.
+-  Cancellable file loading with `Esc` key.
 -  Graceful error handling for invalid files or paths.
 
 ### Table Display
@@ -64,6 +67,8 @@ All navigation is keyboard-driven with vim-inspired keys.
 -  **Auto-discovery**: Automatically finds all `.csv` files in the same directory.
 -  **File Switcher**: A persistent panel at the bottom shows all available files.
 -  **Quick Switching**: Use `[` and `]` to cycle between files.
+-  **File Picker**: `:files` command opens an interactive file selection dialog.
+-  **External Modification Detection**: Polls files every 2 seconds, prompts to reload if changed externally.
 
 ### Application Features
 -  **Help System**: A toggleable overlay (`?`) shows available keybindings.
@@ -96,11 +101,6 @@ All navigation is keyboard-driven with vim-inspired keys.
 -  `:q` - Quit (blocks if any file has unsaved changes)
 -  `:q!` - Force quit, discard all changes
 
-**Command Ranges:**
--  Row ranges: `:5,10d`, `:%d`, `:.d`, `:$d`
--  Column ranges: `:B,D`, `:B,Dd`, `:B,Dy`
--  Combined ranges: `:B,D@5,10d` (rectangular regions)
-
 **Multi-File Dirty Tracking:**
 -  Session caches dirty documents
 -  File switcher shows `*` for unsaved files
@@ -109,22 +109,17 @@ All navigation is keyboard-driven with vim-inspired keys.
 
 ### v0.5.0: Column Operations & Visual Mode
 
-**Semicolon Leader for Column Ops:**
--  `;o` / `;O` - Insert column right/left (enters HeaderEdit mode)
--  `;dd` - Delete column
--  `;yy` - Yank column (includes header)
--  `;p` / `;P` - Paste column right/left
+**Comma Leader for Column Ops:**
+-  `,o` / `,O` - Insert column right/left (enters HeaderEdit mode)
+-  `,dd` - Delete column
+-  `,yy` - Yank column (includes header)
+-  `,p` / `,P` - Paste column right/left
 
 **Visual Selection:**
 -  `v` - Cell-by-cell visual selection (free movement)
 -  `V` - Row visual selection (whole rows)
--  `;v` - Column cell visual (free movement, column intent)
--  `;V` - Column visual line (whole columns)
+-  `,v` - Column cell visual (free movement, column intent)
 -  Operations: `d` (delete/clear), `y` (yank), `c` (change), `p` (paste)
-
-**HeaderEdit Mode:**
--  `gh` - Edit column header name
--  Enter to save, Esc to cancel
 
 **Count Prefixes:**
 -  `5dd` - Delete 5 rows
@@ -153,12 +148,13 @@ All navigation is keyboard-driven with vim-inspired keys.
 
 ### v0.7.0: Search
 
-**Fuzzy Search:**
+**Regex Search:**
 -  `/` - Open search overlay
 -  `n` / `N` - Next/previous match
 -  `*` - Search current cell content
 -  `:noh` - Clear highlighting
--  Fuzzy matching on cell content and column headers
+-  Regex pattern matching with automatic fallback to literal substring search
+-  Case-insensitive by default
 -  Live results as you type
 
 ### v0.8.0: SQL Query Mode
@@ -169,6 +165,7 @@ All navigation is keyboard-driven with vim-inspired keys.
 -  Auto-complete for table name, column names, and SQL keywords
 -  Syntax highlighting for SQL
 -  `Ctrl+Enter` - Execute query
+-  `Esc` - Cancel long-running queries
 -  Results displayed in new virtual table view
 -  Error messages with fuzzy column name suggestions (Levenshtein distance)
 -  Query history and navigation
@@ -183,6 +180,12 @@ All navigation is keyboard-driven with vim-inspired keys.
 -  String functions: UPPER, LOWER, LENGTH, TRIM, SUBSTR
 -  Math operators: +, -, *, /, %
 -  Logical operators: AND, OR, NOT
+
+**Column Sort Commands:**
+-  `:sort <col,...>` - Sort by column(s) ascending (e.g., `:sort Name`, `:sort Dept,Name`)
+-  `:sort! <col,...>` - Sort by column(s) descending
+-  Supports multiple columns for stable sorting
+-  In-place modification (sets dirty flag, undoable in v0.10.0+)
 
 ### v0.8.1: SQL & Data Operations Polish
 
@@ -213,7 +216,7 @@ The following features are on the roadmap and are **not yet implemented**.
 - Column width preferences
 - Theme selection
 
-### v0.10.0: Undo/Redo
+### v0.10.0: Undo/Redo & Command Ranges
 
 **History Management:**
 - `u` - Undo last operation
@@ -221,6 +224,11 @@ The following features are on the roadmap and are **not yet implemented**.
 - `.` - Repeat last edit (dot command)
 - Up to 1000 operations in history
 - Works for: cell edits, row/column ops, sorts
+
+**Command Ranges (Planned):**
+- Row ranges: `:5,10d`, `:%d`, `:.d`, `:$d`
+- Column ranges: `:B,D`, `:B,Dd`, `:B,Dy`
+- Combined ranges: `:B,D@5,10d` (rectangular regions)
 
 ### v0.11.0: SQL Editor Vim Editing
 
@@ -233,7 +241,7 @@ The following features are on the roadmap and are **not yet implemented**.
 - Undo/redo in editor: u, Ctrl+r
 - Line operations: dd, yy, cc, o, O
 
-### v0.14.0: Cell Transforms
+### v0.14.0: Cell Transforms & Advanced Data Operations
 
 **Cell Transforms:**
 - `~` - Toggle case (UPPER ↔ lower)
@@ -246,9 +254,7 @@ The following features are on the roadmap and are **not yet implemented**.
 - `gj` - Swap row with row below
 - `gk` - Swap row with row above
 
-**Data Operations:**
-- `:sort` - Sort by current column (ascending)
-- `:sort!` - Sort by current column (descending)
+**Advanced Filtering:**
 - `:filter <expr>` - Filter rows (e.g., `:filter Age>30`)
 - `:nof` - Clear all filters
 
@@ -272,7 +278,7 @@ LazyCSV is designed for speed:
 | Navigation | < 10ms response | Achieved |
 | SQL queries | < 100ms for 10K rows | Achieved (v0.8.0) |
 | Search | < 200ms for 10K rows | Achieved (v0.7.0) |
-| Sort | < 500ms for 10K rows | Planned (v0.14.0) |
+| Sort | < 500ms for 10K rows | Achieved (v0.8.0) |
 | Save | < 200ms for 10K rows | Achieved (v0.4.1) |
 
 ## Constraints & Limitations
@@ -315,7 +321,7 @@ LazyCSV is designed for speed:
 - Regular `v` already provides rectangular cell selection
 - CSV data is naturally rectangular (cells align to grid)
 - Reduces complexity, maintains simplicity
-- `;v` and `;V` provide column-specific selection
+- `,v` provides column-specific selection
 
 ### Why No Confirmations for Delete?
 - Faster workflow for power users

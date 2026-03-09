@@ -859,7 +859,7 @@ buffer.content.insert(byte_pos, new_char);
 ```
 
 **Why this matters:**
-- Emoji like "🚀" is 1 character but 4 bytes
+- Emoji characters are 1 character but 4 bytes
 - Japanese characters like "こんにちは" are 5 characters but 15 bytes
 - Cursor position must match user's visual perception (characters)
 - String mutations must use byte offsets (Rust requirement)
@@ -1854,6 +1854,131 @@ SELECT * FROM orders WHERE price > '100'  -- Works, coerces to number
 
 ---
 
+## Additional Specialized Modules
+
+### Vim Editor Module (`src/vim_editor/`)
+
+**Responsibility:** Standalone vim engine for text editing within cells
+
+The `vim_editor` module provides a complete vim implementation used by both Magnifier mode and the SQL editor. It's a self-contained vim engine with normal, insert, visual, and command modes.
+
+**Core Components:**
+- `vim_state.rs` - Mode management (Normal, Insert, Visual, Command)
+- `buffer.rs` - Text buffer with line-based storage
+- `cursor.rs` - Cursor positioning and movement
+- `operators.rs` - Vim operators (d, y, c, p)
+- `motions.rs` - Vim motions (hjkl, w/b/e, f/t, gg/G)
+- `visual.rs` - Visual mode selection
+- `undo.rs` - Undo/redo stack
+
+**Features:**
+- Full vim modal editing (Normal, Insert, Visual, Command)
+- Vim motions: hjkl, w/b/e, f/t/F/T, gg/G, 0/$, %
+- Operators: d (delete), y (yank), c (change), p/P (paste)
+- Visual mode: character and line selection
+- Search: /, n, N with regex support
+- Undo/redo: u, Ctrl+r
+- Count prefixes: 5j, 3dd, 2w
+- Text objects: iw, aw, i", a" (partial support)
+
+**Usage:**
+- Magnifier mode: Full-screen vim editing for complex cell content
+- SQL editor: Multi-line SQL query editing with vim keybindings
+
+### Magnifier Module (`src/magnifier/`)
+
+**Responsibility:** Wrapper for vim editor in cell editing context
+
+The `magnifier` module provides the integration layer between the vim editor and cell editing. It manages the transition between Normal mode and Magnifier mode, handles cell content loading/saving, and coordinates the UI rendering.
+
+**Key Responsibilities:**
+- Load cell content into vim buffer
+- Save edited content back to cell
+- Handle mode transitions (Normal ↔ Magnifier)
+- Render magnifier UI with borders and status line
+- Coordinate with vim_editor module
+
+**Typical Flow:**
+```
+User presses Enter in Normal mode
+    ↓
+Enter Magnifier mode
+    ↓
+Load cell content into VimBuffer
+    ↓
+User edits with vim commands
+    ↓
+User saves (Esc → :w or :wq)
+    ↓
+Save content back to cell
+    ↓
+Exit to Normal mode
+```
+
+### Query Module (`src/query/`)
+
+**Responsibility:** SQL query execution and CSV-to-SQLite integration
+
+Documented in detail in the "SQL Query System" section above. Key responsibilities:
+- Load CSV files into SQLite tables
+- Execute SQL queries with cancellation support
+- Convert query results back to Document format
+- Cache database connections for performance
+- Enhance error messages with fuzzy column name matching
+
+### Cancel Module (`src/cancel.rs`)
+
+**Responsibility:** Cancellation system for long-running operations
+
+The `cancel` module provides a thread-safe cancellation mechanism for operations that may take a long time, such as file loading or SQL queries.
+
+**Key Components:**
+```rust
+pub struct CancellationToken {
+    cancelled: Arc<AtomicBool>,
+}
+
+impl CancellationToken {
+    pub fn new() -> Self
+    pub fn cancel(&self)
+    pub fn is_cancelled(&self) -> bool
+}
+```
+
+**Usage:**
+- File loading: Cancel with Esc during large file operations
+- SQL queries: Cancel with Esc during long-running queries
+- Background thread polls `AtomicBool` every iteration
+- Main thread sets flag when Esc pressed
+
+**Implementation Details:**
+- Uses `Arc<AtomicBool>` for thread-safe cancellation
+- Zero overhead when not cancelled (single atomic check)
+- Graceful shutdown with partial results where possible
+
+### Clipboard Module (Triple Clipboard System)
+
+**Responsibility:** Isolated clipboard buffers for different operation types
+
+Documented in detail in the "Visual Mode Architecture" section above. LazyCSV maintains three independent clipboard buffers:
+
+1. **Row clipboard** - Stores entire rows with all cells
+2. **Column clipboard** - Stores columns with headers
+3. **Cell clipboard** - Stores individual cell contents or cell ranges
+
+**Why Separate Clipboards:**
+- Prevents type confusion (can't paste row where column expected)
+- Allows holding different data types simultaneously
+- Each operation targets appropriate clipboard
+- Clear mental model for users
+
+**Testing:**
+- 11 dedicated tests in `tests/clipboard_isolation.rs`
+- Verifies complete isolation between clipboard types
+- Ensures no cross-contamination
+
+---
+
 ## Error Handling Strategy
 
 LazyCSV uses `anyhow` for error handling:
@@ -2156,7 +2281,7 @@ impl CommandHistory {
 ### Version 1.1.0-1.1.1: Search & Visual
 ```rust
 // New modules
-mod search;   // Fuzzy search with fuzzy-matcher
+mod search;   // Regex search with literal fallback
 
 pub struct SearchState {
     query: String,

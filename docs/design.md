@@ -11,7 +11,7 @@ This document translates the functionality described in the [Features Guide](fea
 - Prefer vim motions (hjkl) over arrows
 - Support vim-style operators: `dd`, `yy`, `p`, etc.
 - Modal editing: Normal/Insert/Magnifier/HeaderEdit/Visual/Command modes
-- **Three-tier operator system**: Cell (`x`) → Row (`dd`) → Column (`;dd`)
+- **Three-tier operator system**: Cell (`x`) → Row (`dd`) → Column (`,dd`)
 - **Command ranges**: Vim-style ranges for batch operations (`:5,10d`, `:B,D@5,10`)
 
 ### 2. Lazy Tools Aesthetic
@@ -79,18 +79,18 @@ This document translates the functionality described in the [Features Guide](fea
 - Selection count in status: "3 rows selected"
 - Available operations shown in status
 
-### Fuzzy Search Overlay (v0.7.0)
+### Regex Search Overlay (v0.7.0)
 
 <!-- Screenshot: screenshots/design-search-overlay.png -->
-**Fuzzy search finding matches in cells and headers**
+**Regex search finding matches in cells and headers**
 
-**Fuzzy Search:**
+**Regex Search:**
 - Centered overlay (50% width)
 - Live results as you type
 - Shows match type and location
 - Navigate results with `n`/`N`
 - `Esc` to cancel
-- Fuzzy matching with scoring
+- Regex pattern matching with automatic fallback to literal search
 
 ### SQL Editor Mode (v0.8.0)
 
@@ -363,7 +363,7 @@ Edit mode:
   EDIT: "Widget A" │ Enter save │ Esc cancel
 
 After save (v0.4.1):
-  ✓ Saved successfully │ Row 10/100 │ Col 2/5
+   Saved successfully │ Row 10/100 │ Col 2/5
 
 After operation:
   Row added below │ Row 11/101 │ Col 1/5

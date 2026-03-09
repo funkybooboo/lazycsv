@@ -40,6 +40,12 @@ lazycsv ./data/
 # With options
 lazycsv data.csv --delimiter ';' --no-headers
 
+# Non-interactive query mode
+lazycsv data.csv --query "SELECT * FROM data WHERE amount > 100"
+
+# Locale-aware number formatting
+lazycsv data.csv --format
+
 # In the app:
 # hjkl or arrows  -> navigate
 # [ or ]          -> switch between CSV files
@@ -48,6 +54,8 @@ lazycsv data.csv --delimiter ';' --no-headers
 # i or Enter      -> edit cell (quick or magnifier)
 # /               -> search
 # :sql            -> SQL query mode
+# :files          -> file picker (same as [ and ])
+# Esc             -> cancel loading/queries
 # ?               -> show help
 # :q              -> quit
 ```
@@ -66,10 +74,12 @@ That's it! Press `?` in the app for full keybindings.
 | `Enter` | Magnifier mode (full vim editor for multi-line) |
 | `o` / `O` | Insert row below/above |
 | `dd` / `yy` / `p` | Delete/yank/paste row |
-| `;dd` / `;yy` / `;p` | Delete/yank/paste column |
+| `,dd` / `,yy` / `,p` | Delete/yank/paste column |
 | `v` / `V` | Visual selection (cell/row) |
-| `/` | Search (fuzzy) |
+| `/` | Search (regex) |
 | `:sql` | SQL query mode |
+| `:files` | File picker dialog |
+| `Esc` | Cancel loading/queries |
 | `zt` / `zz` / `zb` | Position row at top/center/bottom |
 | `[` / `]` | Switch CSV files |
 | `?` | Show help |
@@ -122,13 +132,17 @@ LazyCSV treats CSV files in the same directory like Excel sheets. Open one file,
 
 **Completed Features:**
 - Fast CSV viewer/editor with vim navigation
-- Multi-file switching (`[` `]`)
+- Multi-file switching (`[` `]` or `:files`)
 - Full vim editing (Insert mode + Magnifier mode)
 - Row operations (`o`, `O`, `dd`, `yy`, `p`)
-- Column operations (`;dd`, `;yy`, `;p`, `;o`)
-- Visual mode (`v`, `V`, `;v`, `;V`)
-- Search (`/`, `n`, `N`)
+- Column operations (`,dd`, `,yy`, `,p`, `,o`)
+- Visual mode (`v`, `V`, `,v`)
+- Search (`/`, `n`, `N`) with regex support
 - SQL query mode (`:sql` with full SELECT/WHERE/JOIN/GROUP BY)
+- Non-interactive query mode (`--query` flag)
+- Locale-aware formatting (`--format` flag)
+- External file modification detection
+- Cancellable operations (`Esc` during loading/queries)
 - File persistence (`:w`, `:wq`, `:q`)
 - 555+ tests passing
 
@@ -190,7 +204,7 @@ See [docs/development.md](docs/development.md) for contributing guidelines.
 ![SQL Results](screenshots/sql-results.png)
 
 ### Search
-<!-- Screenshot: Fuzzy search overlay -->
+<!-- Screenshot: Regex search overlay -->
 ![Search](screenshots/search.png)
 
 ## What's New in v0.8.1

@@ -13,7 +13,7 @@ LazyCSV keybindings follow vim conventions:
 - **Efficient**: Common actions are single keystrokes
 - **Consistent**: Same patterns across operations (cell → row → column)
 - **Vim-First**: Every action accessible via vim-style keys
-- **Three-tier scope**: Cell (`x`) → Row (`dd`) → Column (`;dd`)
+- **Three-tier scope**: Cell (`x`) → Row (`dd`) → Column (`,dd`)
 
 ## Mode Indicators
 
@@ -21,8 +21,8 @@ The current mode is always shown in the status bar:
 - `-- NORMAL --` - Navigation mode
 - `-- INSERT --` - Quick cell editing
 - `-- MAGNIFIER --` - Vim editor for power editing (multi-line cells)
-- `-- HEADER EDIT --` - Editing column header names
-- `-- VISUAL --` / `-- VISUAL LINE --` / `-- COLUMN VISUAL --` / `-- COLUMN VISUAL LINE --` - Selection modes
+- `-- HEADER EDIT --` - Editing column header names (accessed via `,o`/`,O`)
+- `-- VISUAL --` / `-- VISUAL LINE --` / `-- COLUMN VISUAL --` - Selection modes
 - `-- COMMAND --` - Command input mode
 
 ---
@@ -234,32 +234,6 @@ Commands show clear error messages instead of silently clamping:
 | `:q` | Quit (blocks if ANY file has unsaved changes) |
 | `:q!` | Force quit (discard all unsaved changes) |
 
-### Command Ranges
-
-**Row ranges (vim-style):**
-| Range | Action |
-|-------|--------|
-| `:5d` | Delete row 5 |
-| `:5,10d` | Delete rows 5-10 |
-| `:5,10y` | Yank rows 5-10 |
-| `:%d` | Delete all rows |
-| `:.d` | Delete current row |
-| `:.,+5d` | Delete current row and next 5 |
-| `:$d` | Delete last row |
-
-**Column ranges:**
-| Range | Action |
-|-------|--------|
-| `:B,D` | Operate on columns B through D |
-| `:B,Dd` | Delete columns B through D |
-| `:B,Dy` | Yank columns B through D |
-
-**Combined ranges (row AND column):**
-| Range | Action |
-|-------|--------|
-| `:B,D@5,10d` | Delete cells in rows 5-10, columns B-D |
-| `:B,D@5,10y` | Yank cells in rows 5-10, columns B-D |
-
 ### Multi-File Dirty Tracking
 
 | Indicator | Meaning |
@@ -280,28 +254,28 @@ Commands show clear error messages instead of silently clamping:
 
 ## v0.5.0 - Column Operations & Visual Mode ( Complete)
 
-### Semicolon Leader for Column Operations
+### Comma Leader for Column Operations
 
-The semicolon `;` key acts as a leader for all column-level operations, following the three-tier operator system:
+The comma `,` key acts as a leader for all column-level operations, following the three-tier operator system:
 - **Cell scope**: `x` (delete cell content)
 - **Row scope**: `dd` (delete row)
-- **Column scope**: `;dd` (delete column)
+- **Column scope**: `,dd` (delete column)
 
 | Key | Action |
 |-----|--------|
-| `;o` | Insert new column to the right (enters HeaderEdit mode) |
-| `;O` | Insert new column to the left (enters HeaderEdit mode) |
-| `;dd` | Delete current column (including header) |
-| `;yy` | Yank (copy) current column (including header) |
-| `;p` | Paste column to the right of current |
-| `;P` | Paste column to the left of current |
+| `,o` | Insert new column to the right (enters HeaderEdit mode) |
+| `,O` | Insert new column to the left (enters HeaderEdit mode) |
+| `,dd` | Delete current column (including header) |
+| `,yy` | Yank (copy) current column (including header) |
+| `,p` | Paste column to the right of current |
+| `,P` | Paste column to the left of current |
 
 **Notes:**
-- Semicolon is a silent leader (no visual feedback, vim standard)
+- Comma is a silent leader (no visual feedback, vim standard)
 - After paste, cursor moves to the new column
 - Yanked columns include the header row
 - Column operations work on entire columns (all rows + header)
-- `;o` and `;O` automatically enter HeaderEdit mode to name the new column
+- `,o` and `,O` automatically enter HeaderEdit mode to name the new column
 
 ### Visual Selection
 
@@ -309,8 +283,7 @@ The semicolon `;` key acts as a leader for all column-level operations, followin
 |-----|------|-----------|
 | `v` | Visual | Cell-by-cell selection (free movement) |
 | `V` | Visual Line | Whole rows |
-| `;v` | Column Visual | Cell-by-cell selection (free movement, column intent) |
-| `;V` | Column Visual Line | Whole columns |
+| `,v` | Column Visual | Cell-by-cell selection (free movement, column intent) |
 
 **Operations in Visual mode:**
 | Key | Action |
@@ -332,23 +305,7 @@ The semicolon `;` key acts as a leader for all column-level operations, followin
 
 **Notes:**
 - `Ctrl+v` is NOT implemented (redundant with `v` for rectangular selection)
-- `;v` has same behavior as `v` but signals column intent
-
-### HeaderEdit Mode
-
-| Key | Action |
-|-----|--------|
-| `gh` | Enter HeaderEdit mode for current column header |
-
-**In HeaderEdit Mode:**
-| Key | Action |
-|-----|--------|
-| Type | Edit header text |
-| `Backspace` / `Delete` | Delete characters |
-| `←` `→` | Move cursor |
-| `Home` / `End` | Jump to start/end |
-| `Enter` | Save header and return to Normal |
-| `Esc` | Cancel changes and return to Normal |
+- `,v` has same behavior as `v` but signals column intent
 
 ### Count Prefixes
 
@@ -466,11 +423,11 @@ The Magnifier embeds a comprehensive vim editor for editing cells with complex c
 
 ## v0.7.0 - Search ( Complete)
 
-### Fuzzy Search
+### Regex Search
 
 | Key | Action |
 |-----|--------|
-| `/` | Open fuzzy search overlay |
+| `/` | Open regex search overlay |
 | `n` | Jump to next match |
 | `N` | Jump to previous match |
 | `Esc` | Close search overlay |
@@ -478,13 +435,13 @@ The Magnifier embeds a comprehensive vim editor for editing cells with complex c
 **In Search Mode:**
 | Key | Action |
 |-----|--------|
-| Type | Enter search query (fuzzy matching) |
+| Type | Enter search query (regex pattern with literal fallback) |
 | `Enter` | Jump to first match |
 | `Esc` | Cancel search |
 
 **What search finds:**
-- Cell data (fuzzy match on content)
-- Column names (fuzzy match on headers)
+- Cell data (regex or literal substring match)
+- Column names (regex or literal substring match)
 
 ---
 
@@ -522,6 +479,24 @@ The Magnifier embeds a comprehensive vim editor for editing cells with complex c
 - Syntax highlighting for SQL keywords
 - Auto-complete for table name and column names
 
+### Column Sort Commands
+
+| Command | Action |
+|---------|--------|
+| `:sort <col,...>` | Sort by column(s) ascending (e.g., `:sort Name` or `:sort Dept,Name`) |
+| `:sort! <col,...>` | Sort by column(s) descending |
+
+**Examples:**
+- `:sort 1` - Sort by first column (ascending)
+- `:sort Name` - Sort by "Name" column (ascending)
+- `:sort! Age` - Sort by "Age" column (descending)
+- `:sort Dept,Name` - Sort by Department, then Name (multi-column stable sort)
+
+**Notes:**
+- In-place modification (sets dirty flag)
+- Supports multiple columns for stable sorting
+- Will be undoable in v0.10.0
+
 ---
 
 ## v0.8.1 - SQL & Data Operations Polish
@@ -549,7 +524,7 @@ Configuration support (~/.config/lazycsv/config.toml):
 
 ---
 
-## v0.10.0 - Undo/Redo
+## v0.10.0 - Undo/Redo & Command Ranges
 
 ### History Management
 
@@ -566,35 +541,151 @@ Configuration support (~/.config/lazycsv/config.toml):
 - Sorts and filters
 - Up to 1000 operations in history
 
+### Command Ranges
+
+⚠️ **Planned for v0.10.0 - Not yet implemented**
+
+**Row ranges (vim-style):**
+| Range | Action |
+|-------|--------|
+| `:5d` | Delete row 5 |
+| `:5,10d` | Delete rows 5-10 |
+| `:5,10y` | Yank rows 5-10 |
+| `:%d` | Delete all rows |
+| `:.d` | Delete current row |
+| `:.,+5d` | Delete current row and next 5 |
+| `:$d` | Delete last row |
+
+**Column ranges:**
+| Range | Action |
+|-------|--------|
+| `:B,D` | Operate on columns B through D |
+| `:B,Dd` | Delete columns B through D |
+| `:B,Dy` | Yank columns B through D |
+
+**Combined ranges (row AND column):**
+| Range | Action |
+|-------|--------|
+| `:B,D@5,10d` | Delete cells in rows 5-10, columns B-D |
+| `:B,D@5,10y` | Yank cells in rows 5-10, columns B-D |
+
 ---
 
-## v0.11.0 - SQL Editor Vim Editing
+## v0.11.0 - SQL Editor Vim Editing ( Complete)
 
 ### Full Vim Modal Editing in SQL Editor
 
-**Normal Mode:**
-- All standard vim motions (hjkl, w/b/e, f/t, gg/G, etc.)
-- Operators: d, c, y, p
-- Visual mode: v (character), V (line)
-- Search: /, n, N
+The SQL editor now supports complete vim modal editing with Normal, Insert, Visual, and Command modes.
+
+**Opening SQL Editor:**
+| Command | Action |
+|---------|--------|
+| `:sql` | Open SQL editor with vim editing |
+
+**Normal Mode Navigation:**
+| Key | Action |
+|-----|--------|
+| `hjkl` or arrows | Character movement |
+| `w` / `b` / `e` | Word motions (next/previous/end word) |
+| `0` / `$` | Line start/end |
+| `gg` / `G` | First/last line |
+| `Home` / `End` | Line start/end |
+| `{number}j` / `{number}k` | Move multiple lines with count |
+
+**Normal Mode Editing:**
+| Key | Action |
+|-----|--------|
+| `x` | Delete character under cursor |
+| `dd` | Delete line |
+| `yy` | Yank (copy) line |
+| `p` / `P` | Paste below/above cursor |
+| `u` | Undo last change |
+| `Ctrl+r` | Redo last undone change |
 
 **Insert Mode:**
-- Enter with i, a, I, A, o, O
-- Exit with Esc
+| Key | Action |
+|-----|--------|
+| `i` | Insert before cursor |
+| `a` | Insert after cursor |
+| `A` | Insert at end of line |
+| `o` | Insert new line below |
+| `O` | Insert new line above |
+| `Esc` | Return to Normal mode |
+| Type characters | Insert text |
+| `Backspace` / `Delete` | Delete characters |
+| `Enter` | Create new line |
 
-**Special:**
-- `Ctrl+Enter` - Execute query (works in any mode)
+**Visual Mode:**
+| Key | Action |
+|-----|--------|
+| `v` | Character-wise visual selection |
+| `V` | Line-wise visual selection |
+| `y` | Yank selection |
+| `d` | Delete selection |
+| `Esc` | Exit visual mode |
+
+**Search in SQL Query:**
+| Key | Action |
+|-----|--------|
+| `/` | Start search (enter pattern in command mode) |
+| `n` | Jump to next match |
+| `N` | Jump to previous match |
+| `*` | Search for word under cursor |
+| `:noh` | Clear search highlighting |
+
+**Ex Commands:**
+| Command | Action |
+|---------|--------|
+| `:w` | Execute query (same as Ctrl+Enter) |
+| `:wq` | Execute query and close editor |
+| `:q` | Close editor without executing |
+| `:q!` | Force close without executing |
+| `:noh` | Clear search highlighting |
+
+**Special Keybindings:**
+| Key | Action |
+|-----|--------|
+| `Ctrl+Enter` | Execute query (works in any vim mode) |
+| `Esc` (in Normal mode) | Exit SQL editor without executing |
+
+**UI Features:**
+- Multi-line SQL query editing with line numbers
+- Mode indicator shows current mode: NORMAL, INSERT, VISUAL, COMMAND
+- Cursor position display (line:col)
+- Syntax highlighting for SQL keywords (future enhancement)
+
+**Notes:**
+- All vim commands work within the SQL query text
+- Undo/redo is local to the SQL editor session
+- Search is case-sensitive by default
+- Line numbers are displayed on the left
+- The SQL editor shares the same vim engine as Magnifier mode
 
 ---
 
-## v0.14.0 - Cell Transforms
+## v0.14.0 - Cell Transforms & Advanced Data Operations
 
-### Data Operations
+### Cell Transforms
+
+| Key | Action |
+|-----|--------|
+| `~` | Toggle case of current cell (UPPER ↔ lower) |
+| `gU` | Uppercase current cell |
+| `gu` | Lowercase current cell |
+| `g~` | Title Case current cell |
+| `g.` | Toggle boolean (yes↔no, true↔false, 1↔0) |
+
+### Row Movement
+
+| Key | Action |
+|-----|--------|
+| `gj` | Swap current row with row below |
+| `gk` | Swap current row with row above |
+
+### Advanced Filtering
 
 | Command | Action |
 |---------|--------|
-| `:sort` | Sort by current column (ascending) |
-| `:sort!` | Sort by current column (descending) |
 | `:filter <expr>` | Filter rows (e.g., `:filter Age>30`) |
 | `:nof` | Clear all filters |
 
@@ -628,10 +719,10 @@ The following features were removed from the roadmap to maintain simplicity:
 - Old `:c` command - Replaced with direct `:B`, `:A5` syntax
 
 **Kept (Essential Features):**
--  **Visual mode** (`v`, `V`, `;v`, `;V`) - Essential for selecting regions to copy/paste/delete
--  **HeaderEdit mode** (`gh`) - Essential for editing column header names
+-  **Visual mode** (`v`, `V`, `,v`) - Essential for selecting regions to copy/paste/delete
+-  **HeaderEdit mode** (accessed via `,o`/`,O`) - Essential for editing column header names
 -  **Magnifier mode** (`Enter`) - Essential for multi-line cell editing (JSON, descriptions)
--  **Command ranges** (`:5,10d`, `:B,D`, `:B,D@5,10`) - Essential for batch operations
+-  **Command ranges** (`:5,10d`, `:B,D`, `:B,D@5,10`) - Planned for v0.10.0+
 
 **Note:** `Ctrl+v` (block visual) was skipped as redundant - regular `v` already provides rectangular cell selection.
 
@@ -676,14 +767,14 @@ status_bar = "blue"
 | v0.4.1 |  Persistence & multi-file workflow (save, command ranges, dirty tracking) |
 | v0.5.0 |  Column operations & visual mode (column add/delete/yank/paste, visual selection) |
 | v0.6.0 |  Vim Magnifier (full vim editor for cells, multi-line editing) |
-| v0.7.0 |  Search (fuzzy search overlay, match navigation) |
+| v0.7.0 |  Search (regex search overlay, match navigation) |
 | v0.8.0 |  SQL Query Mode (SQL editor, query execution, multi-file queries) |
 | v0.8.1 |  SQL & Data Operations Polish (refactoring, error improvements, tests) |
 | v0.9.0 | Configuration System (config file, themes, keybindings) |
 | v0.10.0 | Undo/Redo (history management, dot command) |
 | v0.11.0 | SQL Editor Vim Editing (full vim modal editing in SQL editor) |
-| v0.12.0 | UI Consistency & HeaderEdit Mode (standardized UI, gh command for header editing) |
-| v0.14.0 | Cell Transforms (case toggle, row swap, sort, filter) |
+| v0.12.0 | UI Consistency & HeaderEdit Mode (standardized UI) |
+| v0.14.0 | Cell Transforms (case toggle, row swap, advanced filtering) |
 | v0.18.0 | SQL IntelliSense (auto-completion, context-aware suggestions) |
 | v0.22.0 | Macros (command recording and replay) |
 | v1.0.0 | First Stable Release (polish, performance, documentation) |
