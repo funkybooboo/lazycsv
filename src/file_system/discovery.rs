@@ -12,6 +12,15 @@ pub fn scan_directory(dir: &Path) -> Result<Vec<PathBuf>> {
         let entry = entry.context("Failed to read directory entry")?;
         let path = entry.path();
 
+        // Skip hidden files (names starting with '.')
+        let is_hidden = entry
+            .file_name()
+            .to_str()
+            .map_or(false, |name| name.starts_with('.'));
+        if is_hidden {
+            continue;
+        }
+
         // Check if it's a CSV file
         if path.is_file() {
             if let Some(ext) = path.extension() {
@@ -38,6 +47,16 @@ pub fn scan_directory_for_csvs(file_path: &Path) -> Result<Vec<PathBuf>> {
     };
 
     let mut csv_files = scan_directory(dir)?;
+
+    // Ensure the explicitly-opened file is always included, even if hidden
+    let canonical = file_path.canonicalize().unwrap_or_else(|_| file_path.to_path_buf());
+    let already_included = csv_files.iter().any(|p| {
+        p.canonicalize().unwrap_or_else(|_| p.clone()) == canonical
+    });
+    if !already_included && file_path.is_file() {
+        csv_files.push(file_path.to_path_buf());
+        csv_files.sort();
+    }
 
     // If no CSV files found (shouldn't happen), at least include the current file
     if csv_files.is_empty() {
@@ -232,7 +251,7 @@ mod tests {
     }
 
     #[test]
-    fn test_scan_directory_hidden_files() {
+    fn test_scan_directory_hidden_files_excluded() {
         let temp_dir = TempDir::new().unwrap();
         File::create(temp_dir.path().join("visible.csv")).unwrap();
         File::create(temp_dir.path().join(".hidden.csv")).unwrap();
@@ -242,8 +261,27 @@ mod tests {
         assert!(result.is_ok());
 
         let csv_files = result.unwrap();
-        // Hidden files should still be included
-        assert!(!csv_files.is_empty());
+        // Hidden files should be excluded from directory scan
+        assert_eq!(csv_files.len(), 1);
+        assert!(csv_files[0].file_name().unwrap().to_str().unwrap() == "visible.csv");
+    }
+
+    #[test]
+    fn test_scan_directory_hidden_file_included_when_explicit() {
+        let temp_dir = TempDir::new().unwrap();
+        File::create(temp_dir.path().join("visible.csv")).unwrap();
+        File::create(temp_dir.path().join(".hidden.csv")).unwrap();
+
+        // User explicitly opens the hidden file
+        let target_file = temp_dir.path().join(".hidden.csv");
+        let result = scan_directory_for_csvs(&target_file);
+        assert!(result.is_ok());
+
+        let csv_files = result.unwrap();
+        // Should include both: the explicitly-opened hidden file and the visible sibling
+        assert_eq!(csv_files.len(), 2);
+        assert!(csv_files.iter().any(|p| p.file_name().unwrap() == ".hidden.csv"));
+        assert!(csv_files.iter().any(|p| p.file_name().unwrap() == "visible.csv"));
     }
 
     #[test]
@@ -399,8 +437,9 @@ mod tests {
         assert!(result.is_ok());
 
         let csv_files = result.unwrap();
-        // Both visible and hidden CSV files should be included
-        assert!(!csv_files.is_empty());
+        // Hidden files should be excluded
+        assert_eq!(csv_files.len(), 1);
+        assert!(csv_files[0].file_name().unwrap().to_str().unwrap() == "visible.csv");
     }
 
     #[test]

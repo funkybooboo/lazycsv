@@ -87,7 +87,6 @@ mod tests {
     use super::*;
     use crate::{App, Document};
     use ratatui::{backend::TestBackend, Terminal};
-    use std::io;
     use std::path::PathBuf;
 
     // from ui_rendering_test.rs
@@ -116,17 +115,17 @@ mod tests {
     }
 
     #[test]
-    fn test_ui_renders_table() -> io::Result<()> {
+    fn test_ui_renders_table() {
         let csv_data = create_test_csv();
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
 
         // Get the rendered buffer
         let buffer = terminal.backend().buffer();
@@ -153,11 +152,10 @@ mod tests {
             "Should show row data"
         );
 
-        Ok(())
     }
 
     #[test]
-    fn test_ui_renders_help_overlay() -> io::Result<()> {
+    fn test_ui_renders_help_overlay() {
         let csv_data = create_test_csv();
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
@@ -166,11 +164,11 @@ mod tests {
         app.view_state.help_overlay_visible = true;
 
         let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
 
         let buffer = terminal.backend().buffer();
         let content = buffer
@@ -185,11 +183,10 @@ mod tests {
             "Should show help overlay with navigation info"
         );
 
-        Ok(())
     }
 
     #[test]
-    fn test_ui_renders_multi_file_switcher() -> io::Result<()> {
+    fn test_ui_renders_multi_file_switcher() {
         let csv_data = create_test_csv();
         let csv_files = vec![
             PathBuf::from("file1.csv"),
@@ -199,11 +196,11 @@ mod tests {
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
 
         let buffer = terminal.backend().buffer();
         let content = buffer
@@ -218,21 +215,20 @@ mod tests {
             "Should show file switcher with file list"
         );
 
-        Ok(())
     }
 
     #[test]
-    fn test_ui_shows_status_bar() -> io::Result<()> {
+    fn test_ui_shows_status_bar() {
         let csv_data = create_test_csv();
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
 
         let buffer = terminal.backend().buffer();
         let content = buffer
@@ -247,21 +243,20 @@ mod tests {
             "Should show status bar with mode and position info"
         );
 
-        Ok(())
     }
 
     #[test]
-    fn test_ui_column_letters_displayed() -> io::Result<()> {
+    fn test_ui_column_letters_displayed() {
         let csv_data = create_test_csv();
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
 
         let buffer = terminal.backend().buffer();
         let content = buffer
@@ -277,22 +272,21 @@ mod tests {
             "Should show column letters (A, B, C...)"
         );
 
-        Ok(())
     }
 
     #[test]
-    fn test_ui_shows_dirty_indicator() -> io::Result<()> {
+    fn test_ui_shows_dirty_indicator() {
         let mut csv_data = create_test_csv();
         csv_data.is_dirty = true;
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
 
         let buffer = terminal.backend().buffer();
         let content = buffer
@@ -307,7 +301,6 @@ mod tests {
             "Should show asterisk for unsaved changes"
         );
 
-        Ok(())
     }
 
     // from ui_state_test.rs
@@ -339,34 +332,33 @@ mod tests {
     }
 
     #[test]
-    fn test_ui_renders_with_empty_data() -> io::Result<()> {
+    fn test_ui_renders_with_empty_data() {
         let csv_data = create_empty_csv();
         let csv_files = vec![PathBuf::from("empty.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         // Should render without crashing
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
 
-        Ok(())
     }
 
     #[test]
-    fn test_ui_renders_with_single_cell() -> io::Result<()> {
+    fn test_ui_renders_with_single_cell() {
         let csv_data = create_single_cell_csv();
         let csv_files = vec![PathBuf::from("single.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
 
         let buffer = terminal.backend().buffer();
         let content = buffer
@@ -377,57 +369,54 @@ mod tests {
 
         assert!(content.contains("single.csv"));
 
-        Ok(())
     }
 
     #[test]
-    fn test_ui_renders_with_small_terminal() -> io::Result<()> {
+    fn test_ui_renders_with_small_terminal() {
         let csv_data = create_small_csv();
         let csv_files = vec![PathBuf::from("small.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Very small terminal
         let backend = TestBackend::new(20, 10);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         // Should render without crashing
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
 
-        Ok(())
     }
 
     #[test]
-    fn test_ui_renders_with_large_terminal() -> io::Result<()> {
+    fn test_ui_renders_with_large_terminal() {
         let csv_data = create_small_csv();
         let csv_files = vec![PathBuf::from("small.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Large terminal
         let backend = TestBackend::new(200, 100);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
 
-        Ok(())
     }
 
     #[test]
-    fn test_ui_state_after_navigation() -> io::Result<()> {
+    fn test_ui_state_after_navigation() {
         let csv_data = create_small_csv();
         let csv_files = vec![PathBuf::from("small.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         // Initial render
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
 
         // Navigate
         let _ = app.handle_key(crossterm::event::KeyEvent::new(
@@ -438,31 +427,30 @@ mod tests {
         // Render again
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
 
-        Ok(())
     }
 
     #[test]
-    fn test_ui_state_transitions_help_toggle() -> io::Result<()> {
+    fn test_ui_state_transitions_help_toggle() {
         let csv_data = create_small_csv();
         let csv_files = vec![PathBuf::from("small.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         // Render without help
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
         let buffer1 = terminal.backend().buffer().clone();
 
         // Toggle help on
         app.view_state.help_overlay_visible = true;
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
         let buffer2 = terminal.backend().buffer().clone();
 
         // Buffers should be different
@@ -472,28 +460,27 @@ mod tests {
         app.view_state.help_overlay_visible = false;
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
         let buffer3 = terminal.backend().buffer().clone();
 
         // Should match initial state
         assert_eq!(buffer1.content, buffer3.content);
 
-        Ok(())
     }
 
     #[test]
-    fn test_ui_status_bar_updates() -> io::Result<()> {
+    fn test_ui_status_bar_updates() {
         let csv_data = create_small_csv();
         let csv_files = vec![PathBuf::from("small.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         // Render with no status message
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
         let content1 = terminal
             .backend()
             .buffer()
@@ -506,7 +493,7 @@ mod tests {
         app.status_message = Some("Test message".into());
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
         let content2 = terminal
             .backend()
             .buffer()
@@ -519,21 +506,20 @@ mod tests {
         assert_ne!(content1, content2);
         assert!(content2.contains("Test message"));
 
-        Ok(())
     }
 
     #[test]
-    fn test_ui_file_switcher_single_file() -> io::Result<()> {
+    fn test_ui_file_switcher_single_file() {
         let csv_data = create_small_csv();
         let csv_files = vec![PathBuf::from("only.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
 
         let content = terminal
             .backend()
@@ -546,11 +532,10 @@ mod tests {
         // Should show file info
         assert!(content.contains("only.csv"));
 
-        Ok(())
     }
 
     #[test]
-    fn test_ui_file_switcher_multiple_files() -> io::Result<()> {
+    fn test_ui_file_switcher_multiple_files() {
         let csv_data = create_small_csv();
         let csv_files = vec![
             PathBuf::from("first.csv"),
@@ -560,11 +545,11 @@ mod tests {
         let mut app = App::new(csv_data, csv_files, 1, crate::session::FileConfig::new()); // Start at second file
 
         let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
 
         let content = terminal
             .backend()
@@ -577,30 +562,29 @@ mod tests {
         // Should show file count
         assert!(content.contains("2/3") || content.contains("Files"));
 
-        Ok(())
     }
 
     #[test]
-    fn test_ui_dirty_indicator() -> io::Result<()> {
+    fn test_ui_dirty_indicator() {
         let mut csv_data = create_small_csv();
         csv_data.is_dirty = false;
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         // Render clean state
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
         let buffer1 = terminal.backend().buffer().clone();
 
         // Make dirty
         app.document.is_dirty = true;
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
         let buffer2 = terminal.backend().buffer().clone();
 
         // The dirty state should cause a different render
@@ -608,21 +592,20 @@ mod tests {
         // Just verify the buffers are different when dirty flag changes
         assert_ne!(buffer1.content, buffer2.content);
 
-        Ok(())
     }
 
     #[test]
-    fn test_ui_column_letters() -> io::Result<()> {
+    fn test_ui_column_letters() {
         let csv_data = create_small_csv();
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
 
         let content = terminal
             .backend()
@@ -636,21 +619,20 @@ mod tests {
         assert!(content.contains("A"));
         assert!(content.contains("B"));
 
-        Ok(())
     }
 
     #[test]
-    fn test_ui_row_numbers() -> io::Result<()> {
+    fn test_ui_row_numbers() {
         let csv_data = create_small_csv();
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
 
         let content = terminal
             .backend()
@@ -664,101 +646,96 @@ mod tests {
         assert!(content.contains("1"));
         assert!(content.contains("2"));
 
-        Ok(())
     }
 
     #[test]
-    fn test_ui_responsive_to_selection() -> io::Result<()> {
+    fn test_ui_responsive_to_selection() {
         let csv_data = create_small_csv();
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         // Render with row 1 selected (initial position with header_mode=true)
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
         let buffer1 = terminal.backend().buffer().clone();
 
         // Change selection to row 2
         app.view_state.table_state.select(Some(2));
         terminal.draw(|frame| {
             render(frame, &mut app);
-        })?;
+        }).unwrap();
         let buffer2 = terminal.backend().buffer().clone();
 
         // Buffers should be different due to selection change
         assert_ne!(buffer1.content, buffer2.content);
 
-        Ok(())
     }
 
     // ===== Priority 2: UI Stress Tests =====
 
     #[test]
-    fn test_ui_extremely_narrow_terminal_20_columns() -> io::Result<()> {
+    fn test_ui_extremely_narrow_terminal_20_columns() {
         let csv_data = create_test_csv();
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(20, 10); // Very narrow: 20 columns
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|f| {
             render(f, &mut app);
-        })?;
+        }).unwrap();
 
         // Should render without crashing
         let buffer = terminal.backend().buffer().clone();
         assert!(buffer.area.width == 20);
 
-        Ok(())
     }
 
     #[test]
-    fn test_ui_extremely_wide_terminal_500_columns() -> io::Result<()> {
+    fn test_ui_extremely_wide_terminal_500_columns() {
         let csv_data = create_test_csv();
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(500, 30); // Very wide: 500 columns
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|f| {
             render(f, &mut app);
-        })?;
+        }).unwrap();
 
         // Should render without crashing
         let buffer = terminal.backend().buffer().clone();
         assert!(buffer.area.width == 500);
 
-        Ok(())
     }
 
     #[test]
-    fn test_ui_very_tall_terminal_100_rows() -> io::Result<()> {
+    fn test_ui_very_tall_terminal_100_rows() {
         let csv_data = create_test_csv();
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(80, 100); // Very tall: 100 rows
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|f| {
             render(f, &mut app);
-        })?;
+        }).unwrap();
 
         // Should render without crashing
         let buffer = terminal.backend().buffer().clone();
         assert!(buffer.area.height == 100);
 
-        Ok(())
     }
 
     #[test]
-    fn test_ui_unicode_emoji_in_cells() -> io::Result<()> {
+    fn test_ui_unicode_emoji_in_cells() {
         let csv_data = Document::new(
             vec!["Name".to_string(), "Status".to_string()],
             vec![
@@ -771,36 +748,34 @@ mod tests {
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|f| {
             render(f, &mut app);
-        })?;
+        }).unwrap();
 
         // Should render without crashing
-        Ok(())
     }
 
     #[test]
-    fn test_ui_very_long_filename_200_chars() -> io::Result<()> {
+    fn test_ui_very_long_filename_200_chars() {
         let csv_data = create_test_csv();
         let long_filename = format!("{}.csv", "a".repeat(200));
         let csv_files = vec![PathBuf::from(&long_filename)];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|f| {
             render(f, &mut app);
-        })?;
+        }).unwrap();
 
         // Should render without crashing (filename should be truncated)
-        Ok(())
     }
 
     #[test]
-    fn test_ui_cell_with_very_long_content() -> io::Result<()> {
+    fn test_ui_cell_with_very_long_content() {
         let long_text = "A".repeat(10000);
         let csv_data = Document::new(
             vec!["Name".to_string(), "Data".to_string()],
@@ -811,18 +786,17 @@ mod tests {
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|f| {
             render(f, &mut app);
-        })?;
+        }).unwrap();
 
         // Should render without crashing (content should be truncated)
-        Ok(())
     }
 
     #[test]
-    fn test_ui_special_characters_in_cells() -> io::Result<()> {
+    fn test_ui_special_characters_in_cells() {
         let csv_data = Document::new(
             vec!["Col1".to_string(), "Col2".to_string()],
             vec![
@@ -835,41 +809,39 @@ mod tests {
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|f| {
             render(f, &mut app);
-        })?;
+        }).unwrap();
 
         // Should render special characters without crashing
-        Ok(())
     }
 
     #[test]
-    fn test_ui_minimum_viable_terminal_10x5() -> io::Result<()> {
+    fn test_ui_minimum_viable_terminal_10x5() {
         let csv_data = create_test_csv();
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(10, 5); // Minimal terminal
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|f| {
             render(f, &mut app);
-        })?;
+        }).unwrap();
 
         // Should handle gracefully even with tiny terminal
-        Ok(())
     }
 
     #[test]
-    fn test_ui_extreme_terminal_1x1() -> io::Result<()> {
+    fn test_ui_extreme_terminal_1x1() {
         let csv_data = create_test_csv();
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(1, 1); // Extreme case: 1x1 terminal
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         // Should not panic even with 1x1 terminal
         let result = terminal.draw(|f| {
@@ -880,43 +852,40 @@ mod tests {
             result.is_ok(),
             "Should handle 1x1 terminal without panicking"
         );
-        Ok(())
     }
 
     #[test]
-    fn test_ui_extreme_width_1x24() -> io::Result<()> {
+    fn test_ui_extreme_width_1x24() {
         let csv_data = create_test_csv();
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(1, 24); // Very narrow terminal
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|f| {
             render(f, &mut app);
-        })?;
+        }).unwrap();
 
-        Ok(())
     }
 
     #[test]
-    fn test_ui_extreme_height_80x1() -> io::Result<()> {
+    fn test_ui_extreme_height_80x1() {
         let csv_data = create_test_csv();
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(80, 1); // Very short terminal
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|f| {
             render(f, &mut app);
-        })?;
+        }).unwrap();
 
-        Ok(())
     }
 
     #[test]
-    fn test_ui_multi_byte_unicode_rendering() -> io::Result<()> {
+    fn test_ui_multi_byte_unicode_rendering() {
         let csv_data = Document::new(
             vec![
                 "Japanese".to_string(),
@@ -933,11 +902,11 @@ mod tests {
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|f| {
             render(f, &mut app);
-        })?;
+        }).unwrap();
 
         // Should render emoji (multi-byte Unicode) without crashing
         let buffer = terminal.backend().buffer();
@@ -955,11 +924,10 @@ mod tests {
             "Should render headers"
         );
 
-        Ok(())
     }
 
     #[test]
-    fn test_ui_very_long_cell_truncation() -> io::Result<()> {
+    fn test_ui_very_long_cell_truncation() {
         let long_text = "A".repeat(1000); // Very long cell content
         let csv_data = Document::new(
             vec!["Col1".to_string(), "Col2".to_string()],
@@ -973,13 +941,12 @@ mod tests {
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend)?;
+        let mut terminal = Terminal::new(backend).unwrap();
 
         terminal.draw(|f| {
             render(f, &mut app);
-        })?;
+        }).unwrap();
 
         // Should handle long content with truncation
-        Ok(())
     }
 }

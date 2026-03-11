@@ -6,6 +6,8 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+type Term = ratatui::Terminal<ratatui::backend::CrosstermBackend<std::io::Stdout>>;
+
 fn main() -> Result<()> {
     let cli_args = cli::parse_args();
 
@@ -125,7 +127,7 @@ fn main() -> Result<()> {
 }
 
 fn run(
-    terminal: &mut ratatui::Terminal<impl ratatui::backend::Backend>,
+    terminal: &mut Term,
     mut app: App,
 ) -> Result<()> {
     let mut needs_redraw = true;
@@ -167,7 +169,7 @@ fn run(
 
 /// Dispatch input results to appropriate handlers
 fn handle_input_result(
-    terminal: &mut ratatui::Terminal<impl ratatui::backend::Backend>,
+    terminal: &mut Term,
     app: &mut App,
     result: InputResult,
 ) -> Result<()> {
@@ -188,7 +190,7 @@ fn handle_input_result(
 
 /// Handle file reload with cancellation support
 fn handle_reload_file(
-    terminal: &mut ratatui::Terminal<impl ratatui::backend::Backend>,
+    terminal: &mut Term,
     app: &mut App,
 ) -> Result<()> {
     app.external_modification_pending = false;
@@ -233,7 +235,7 @@ fn handle_reload_file(
 
 /// Handle switching to a different document (from query results or file switch)
 fn handle_switch_document(
-    terminal: &mut ratatui::Terminal<impl ratatui::backend::Backend>,
+    terminal: &mut Term,
     app: &mut App,
     doc: lazycsv::csv::Document,
 ) -> Result<()> {
@@ -269,6 +271,11 @@ fn handle_switch_document(
     std::thread::spawn(move || drop(old_rows));
     app.document = doc;
 
+    // Mark query result as unsaved so the tab shows (*)
+    app.document.is_dirty = true;
+    let result_path = app.get_current_file().clone();
+    app.session.mark_dirty(&result_path);
+
     app.view_state = lazycsv::ui::ViewState::default();
     let initial_row = if app.document.header_mode && app.document.row_count() > 1 {
         1
@@ -281,7 +288,7 @@ fn handle_switch_document(
 
 /// Handle document sorting
 fn handle_sort_document(
-    terminal: &mut ratatui::Terminal<impl ratatui::backend::Backend>,
+    terminal: &mut Term,
     app: &mut App,
     col_indices: Vec<usize>,
     ascending: bool,
@@ -308,7 +315,7 @@ fn handle_sort_document(
 
 /// Handle SQL query execution with cancellation support
 fn handle_execute_query(
-    terminal: &mut ratatui::Terminal<impl ratatui::backend::Backend>,
+    terminal: &mut Term,
     app: &mut App,
     query: String,
 ) -> Result<()> {
@@ -341,8 +348,12 @@ fn handle_execute_query(
 
     let cancelled = Arc::new(AtomicBool::new(false));
     let watcher = lazycsv::cancel::EscWatcher::spawn(&cancelled);
+    let mut on_progress = |msg: &str| {
+        let full_msg = format!("{} (Esc to cancel)", msg);
+        let _ = terminal.draw(|frame| ui::render_loading(frame, &full_msg));
+    };
     let (query_result, was_cancelled) =
-        app.execute_sql_query_cancellable(&query, &output_name, &cancelled);
+        app.execute_sql_query_cancellable(&query, &output_name, &cancelled, &mut on_progress);
     watcher.stop();
 
     if was_cancelled {

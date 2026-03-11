@@ -60,6 +60,7 @@
 //!
 //! All operations check for cancellation every 1000 rows, allowing responsive Ctrl+C handling.
 
+mod date_detection;
 mod error_enhancer;
 
 use crate::cancel::{self, CancelledError};
@@ -107,6 +108,201 @@ pub fn table_name_from_path(path: &Path) -> String {
             }
         })
         .collect()
+}
+
+/// Determine which session files are referenced by a SQL query.
+///
+/// Extracts identifiers from the query (including double-quoted identifiers)
+/// and matches them against table names derived from the given file paths.
+/// Returns only the files whose table names appear in the query.
+///
+/// If no files match (e.g. query uses a subquery or expression with no table),
+/// returns all files as a safe fallback so the query can still execute.
+pub fn files_referenced_by_query<'a>(query: &str, files: &'a [PathBuf]) -> Vec<&'a PathBuf> {
+    let query_lower = query.to_ascii_lowercase();
+
+    // Extract all identifiers from the query: bare words and "quoted identifiers"
+    let identifiers = extract_sql_identifiers(&query_lower);
+
+    let mut matched: Vec<&PathBuf> = files
+        .iter()
+        .filter(|path| {
+            let table = table_name_from_path(path).to_ascii_lowercase();
+            identifiers.contains(&table)
+        })
+        .collect();
+
+    // Fallback: if nothing matched, load everything so the query can still run
+    if matched.is_empty() {
+        matched = files.iter().collect();
+    }
+
+    matched
+}
+
+/// Extract identifiers (bare words and double-quoted names) from SQL text.
+/// Returns a set of lowercase identifier strings.
+fn extract_sql_identifiers(sql: &str) -> std::collections::HashSet<String> {
+    let mut ids = std::collections::HashSet::new();
+    let bytes = sql.as_bytes();
+    let len = bytes.len();
+    let mut i = 0;
+
+    while i < len {
+        let ch = bytes[i];
+
+        // Skip string literals (single-quoted)
+        if ch == b'\'' {
+            i += 1;
+            while i < len {
+                if bytes[i] == b'\'' {
+                    i += 1;
+                    // Escaped quote ''
+                    if i < len && bytes[i] == b'\'' {
+                        i += 1;
+                        continue;
+                    }
+                    break;
+                }
+                i += 1;
+            }
+            continue;
+        }
+
+        // Double-quoted identifier
+        if ch == b'"' {
+            i += 1;
+            let start = i;
+            while i < len && bytes[i] != b'"' {
+                i += 1;
+            }
+            if i > start {
+                let ident = String::from_utf8_lossy(&bytes[start..i]).to_string();
+                ids.insert(ident);
+            }
+            if i < len {
+                i += 1; // skip closing quote
+            }
+            continue;
+        }
+
+        // Bare identifier (word)
+        if ch.is_ascii_alphabetic() || ch == b'_' {
+            let start = i;
+            while i < len && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
+                i += 1;
+            }
+            let word = String::from_utf8_lossy(&bytes[start..i]).to_string();
+            ids.insert(word);
+            continue;
+        }
+
+        i += 1;
+    }
+
+    ids
+}
+
+/// Strip `.csv` (and other common extensions) from table references in a SQL query.
+///
+/// Users may write `SELECT * FROM myfile.csv WHERE ...` — this rewrites the query
+/// to `SELECT * FROM myfile WHERE ...` so SQLite can find the table.
+///
+/// Handles bare identifiers (`myfile.csv`) and double-quoted identifiers
+/// (`"myfile.csv"`). Preserves string literals unchanged.
+pub fn strip_csv_extensions(sql: &str) -> String {
+    let extensions: &[&str] = &[".csv", ".tsv", ".txt"];
+    let bytes = sql.as_bytes();
+    let len = bytes.len();
+    let mut result = String::with_capacity(len);
+    let mut i = 0;
+
+    while i < len {
+        let ch = bytes[i];
+
+        // Preserve single-quoted string literals as-is
+        if ch == b'\'' {
+            result.push('\'');
+            i += 1;
+            while i < len {
+                result.push(bytes[i] as char);
+                if bytes[i] == b'\'' {
+                    i += 1;
+                    // Escaped quote ''
+                    if i < len && bytes[i] == b'\'' {
+                        result.push('\'');
+                        i += 1;
+                        continue;
+                    }
+                    break;
+                }
+                i += 1;
+            }
+            continue;
+        }
+
+        // Double-quoted identifier — strip extension inside quotes
+        if ch == b'"' {
+            result.push('"');
+            i += 1;
+            let start = i;
+            while i < len && bytes[i] != b'"' {
+                i += 1;
+            }
+            let ident = &sql[start..i];
+            let stripped = strip_extension(ident, extensions);
+            result.push_str(&stripped);
+            if i < len {
+                result.push('"');
+                i += 1; // skip closing quote
+            }
+            continue;
+        }
+
+        // Bare identifier (word) possibly followed by .csv
+        if ch.is_ascii_alphabetic() || ch == b'_' {
+            let start = i;
+            while i < len && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
+                i += 1;
+            }
+            let word = &sql[start..i];
+
+            // Check for trailing .ext (e.g. "myfile.csv")
+            let mut matched_ext = false;
+            for ext in extensions {
+                let ext_bytes = ext.as_bytes();
+                if i + ext_bytes.len() <= len && sql[i..i + ext_bytes.len()].eq_ignore_ascii_case(ext) {
+                    // Make sure the extension isn't followed by more identifier chars
+                    // (e.g. "myfile.csvdata" should NOT be stripped)
+                    let after = i + ext_bytes.len();
+                    if after >= len || (!bytes[after].is_ascii_alphanumeric() && bytes[after] != b'_') {
+                        result.push_str(word);
+                        i = after;
+                        matched_ext = true;
+                        break;
+                    }
+                }
+            }
+            if !matched_ext {
+                result.push_str(word);
+            }
+            continue;
+        }
+
+        result.push(ch as char);
+        i += 1;
+    }
+
+    result
+}
+
+fn strip_extension(ident: &str, extensions: &[&str]) -> String {
+    for ext in extensions {
+        if ident.len() > ext.len() && ident[ident.len() - ext.len()..].eq_ignore_ascii_case(ext) {
+            return ident[..ident.len() - ext.len()].to_string();
+        }
+    }
+    ident.to_string()
 }
 
 /// Resolve which CSV files to load for a query.
@@ -165,7 +361,7 @@ pub fn resolve_csv_files(path: &Path) -> Result<Vec<PathBuf>> {
 
 /// Load a parsed CSV Document into a SQLite table.
 ///
-/// Creates a SQLite table with the document's column names (all TEXT type) and
+/// Creates a SQLite table with the document's column names (all NUMERIC affinity) and
 /// inserts all rows using a prepared statement within a single transaction for
 /// optimal performance.
 ///
@@ -225,10 +421,22 @@ pub fn load_csv_into_sqlite(conn: &Connection, doc: &Document, table_name: &str)
         bail!("Document has no columns");
     }
 
-    // Build CREATE TABLE with all TEXT columns, quoting column names
+    let col_count = headers.len();
+
+    // Detect column types (date vs numeric) by sampling data rows
+    let col_types = date_detection::detect_column_types(&doc.rows[1..], col_count);
+    let has_date_cols = col_types
+        .iter()
+        .any(|ct| matches!(ct, date_detection::ColumnType::Date(_)));
+
+    // Build CREATE TABLE with detected affinities
     let col_defs: Vec<String> = headers
         .iter()
-        .map(|h| format!("\"{}\" TEXT", h.replace('"', "\"\"")))
+        .enumerate()
+        .map(|(i, h)| {
+            let affinity = date_detection::sqlite_affinity(&col_types[i]);
+            format!("\"{}\" {}", h.replace('"', "\"\""), affinity)
+        })
         .collect();
 
     let create_sql = format!(
@@ -240,8 +448,6 @@ pub fn load_csv_into_sqlite(conn: &Connection, doc: &Document, table_name: &str)
         .context(format!("Failed to create table '{}'", table_name))?;
 
     // Use a prepared single-row INSERT inside a transaction.
-    // Binds &str refs directly — no heap allocation per cell.
-    let col_count = headers.len();
     let placeholders: Vec<&str> = vec!["?"; col_count];
     let insert_sql = format!(
         "INSERT INTO \"{}\" VALUES ({})",
@@ -254,11 +460,30 @@ pub fn load_csv_into_sqlite(conn: &Connection, doc: &Document, table_name: &str)
 
     let mut stmt = conn.prepare_cached(&insert_sql)?;
 
-    for row in doc.rows.iter().skip(1) {
-        let params: Vec<&str> = (0..col_count)
-            .map(|i| row.get(i).map(|s| s.as_str()).unwrap_or(""))
-            .collect();
-        stmt.execute(rusqlite::params_from_iter(params))?;
+    if has_date_cols {
+        // Date normalization path — allocates for date columns
+        for row in doc.rows.iter().skip(1) {
+            let params: Vec<String> = (0..col_count)
+                .map(|i| {
+                    let val = row.get(i).map(|s| s.as_str()).unwrap_or("");
+                    match &col_types[i] {
+                        date_detection::ColumnType::Date(fmt) => {
+                            date_detection::normalize_to_iso(val, *fmt)
+                        }
+                        date_detection::ColumnType::Numeric => val.to_string(),
+                    }
+                })
+                .collect();
+            stmt.execute(rusqlite::params_from_iter(params.iter().map(|s| s.as_str())))?;
+        }
+    } else {
+        // Fast zero-copy path — binds &str refs directly
+        for row in doc.rows.iter().skip(1) {
+            let params: Vec<&str> = (0..col_count)
+                .map(|i| row.get(i).map(|s| s.as_str()).unwrap_or(""))
+                .collect();
+            stmt.execute(rusqlite::params_from_iter(params))?;
+        }
     }
 
     drop(stmt);
@@ -302,10 +527,36 @@ fn load_csv_file_into_sqlite(
         bail!("CSV file has no columns");
     }
 
-    // CREATE TABLE
+    let col_count = headers.len();
+
+    // Buffer initial rows for date detection sampling
+    let mut buffered: Vec<csv::StringRecord> = Vec::new();
+    for result in reader.records() {
+        let record = result.context("Failed to read CSV record")?;
+        buffered.push(record);
+        if buffered.len() >= 100 {
+            break;
+        }
+    }
+
+    // Detect column types from buffered samples
+    let sample_rows: Vec<Vec<&str>> = buffered
+        .iter()
+        .map(|rec| (0..col_count).map(|i| rec.get(i).unwrap_or("")).collect())
+        .collect();
+    let col_types = date_detection::detect_column_types_from_strs(&sample_rows, col_count);
+    let has_date_cols = col_types
+        .iter()
+        .any(|ct| matches!(ct, date_detection::ColumnType::Date(_)));
+
+    // CREATE TABLE with detected affinities
     let col_defs: Vec<String> = headers
         .iter()
-        .map(|h| format!("\"{}\" TEXT", h.replace('"', "\"\"")))
+        .enumerate()
+        .map(|(i, h)| {
+            let affinity = date_detection::sqlite_affinity(&col_types[i]);
+            format!("\"{}\" {}", h.replace('"', "\"\""), affinity)
+        })
         .collect();
     let escaped_table = table_name.replace('"', "\"\"");
     conn.execute(
@@ -318,10 +569,6 @@ fn load_csv_file_into_sqlite(
     )
     .context(format!("Failed to create table '{}'", table_name))?;
 
-    // Use a prepared single-row INSERT inside a transaction.
-    // This avoids all heap allocation for params — we bind &str refs directly
-    // from the CSV StringRecord into SQLite's prepared statement.
-    let col_count = headers.len();
     let placeholders: Vec<&str> = vec!["?"; col_count];
     let insert_sql = format!(
         "INSERT INTO \"{}\" VALUES ({})",
@@ -334,12 +581,39 @@ fn load_csv_file_into_sqlite(
 
     let mut stmt = conn.prepare_cached(&insert_sql)?;
 
+    // Helper closure to insert a record
+    let insert_record = |stmt: &mut rusqlite::CachedStatement, record: &csv::StringRecord| -> Result<()> {
+        if has_date_cols {
+            let params: Vec<String> = (0..col_count)
+                .map(|i| {
+                    let val = record.get(i).unwrap_or("");
+                    match &col_types[i] {
+                        date_detection::ColumnType::Date(fmt) => {
+                            date_detection::normalize_to_iso(val, *fmt)
+                        }
+                        date_detection::ColumnType::Numeric => val.to_string(),
+                    }
+                })
+                .collect();
+            stmt.execute(rusqlite::params_from_iter(params.iter().map(|s| s.as_str())))?;
+        } else {
+            let params: Vec<&str> = (0..col_count)
+                .map(|i| record.get(i).unwrap_or(""))
+                .collect();
+            stmt.execute(rusqlite::params_from_iter(params))?;
+        }
+        Ok(())
+    };
+
+    // Insert buffered rows first
+    for record in &buffered {
+        insert_record(&mut stmt, record)?;
+    }
+
+    // Continue with remaining rows from reader
     for result in reader.records() {
         let record = result.context("Failed to read CSV record")?;
-        let params: Vec<&str> = (0..col_count)
-            .map(|i| record.get(i).unwrap_or(""))
-            .collect();
-        stmt.execute(rusqlite::params_from_iter(params))?;
+        insert_record(&mut stmt, &record)?;
     }
 
     drop(stmt);
@@ -474,9 +748,21 @@ pub fn load_csv_into_sqlite_cancellable(
         bail!("Document has no columns");
     }
 
+    let col_count = headers.len();
+
+    // Detect column types (date vs numeric) by sampling data rows
+    let col_types = date_detection::detect_column_types(&doc.rows[1..], col_count);
+    let has_date_cols = col_types
+        .iter()
+        .any(|ct| matches!(ct, date_detection::ColumnType::Date(_)));
+
     let col_defs: Vec<String> = headers
         .iter()
-        .map(|h| format!("\"{}\" TEXT", h.replace('"', "\"\"")))
+        .enumerate()
+        .map(|(i, h)| {
+            let affinity = date_detection::sqlite_affinity(&col_types[i]);
+            format!("\"{}\" {}", h.replace('"', "\"\""), affinity)
+        })
         .collect();
 
     let create_sql = format!(
@@ -487,7 +773,6 @@ pub fn load_csv_into_sqlite_cancellable(
     conn.execute(&create_sql, [])
         .context(format!("Failed to create table '{}'", table_name))?;
 
-    let col_count = headers.len();
     let placeholders: Vec<&str> = vec!["?"; col_count];
     let insert_sql = format!(
         "INSERT INTO \"{}\" VALUES ({})",
@@ -506,10 +791,25 @@ pub fn load_csv_into_sqlite_cancellable(
             let _ = conn.execute("ROLLBACK", []);
             bail!(CancelledError);
         }
-        let params: Vec<&str> = (0..col_count)
-            .map(|j| row.get(j).map(|s| s.as_str()).unwrap_or(""))
-            .collect();
-        stmt.execute(rusqlite::params_from_iter(params))?;
+        if has_date_cols {
+            let params: Vec<String> = (0..col_count)
+                .map(|j| {
+                    let val = row.get(j).map(|s| s.as_str()).unwrap_or("");
+                    match &col_types[j] {
+                        date_detection::ColumnType::Date(fmt) => {
+                            date_detection::normalize_to_iso(val, *fmt)
+                        }
+                        date_detection::ColumnType::Numeric => val.to_string(),
+                    }
+                })
+                .collect();
+            stmt.execute(rusqlite::params_from_iter(params.iter().map(|s| s.as_str())))?;
+        } else {
+            let params: Vec<&str> = (0..col_count)
+                .map(|j| row.get(j).map(|s| s.as_str()).unwrap_or(""))
+                .collect();
+            stmt.execute(rusqlite::params_from_iter(params))?;
+        }
     }
 
     drop(stmt);
@@ -600,6 +900,9 @@ pub fn execute_query_to_document_cancellable(
 
 /// Execute a SQL query against CSV files and write results as CSV to stdout.
 pub fn execute_query(path: &Path, query: &str, config: &FileConfig) -> Result<()> {
+    let query = strip_csv_extensions(query);
+    let query = query.as_str();
+
     let csv_files = resolve_csv_files(path)?;
 
     let conn = Connection::open_in_memory().context("Failed to open in-memory SQLite database")?;
@@ -613,8 +916,9 @@ pub fn execute_query(path: &Path, query: &str, config: &FileConfig) -> Result<()
     )
     .context("Failed to set SQLite pragmas")?;
 
-    // Stream each CSV file directly into SQLite, skipping files that can't be parsed
-    for file_path in &csv_files {
+    // Only load CSV files referenced by the query
+    let referenced = files_referenced_by_query(query, &csv_files);
+    for file_path in referenced {
         let table_name = table_name_from_path(file_path);
         if load_csv_file_into_sqlite(&conn, file_path, &table_name, config).is_err() {
             continue;
@@ -724,7 +1028,20 @@ mod tests {
             .unwrap();
         let rows: Vec<(String, String)> = stmt
             .query_map([], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                use rusqlite::types::ValueRef;
+                let col0 = match row.get_ref(0).unwrap_or(ValueRef::Null) {
+                    ValueRef::Text(s) => String::from_utf8_lossy(s).into_owned(),
+                    ValueRef::Integer(n) => n.to_string(),
+                    ValueRef::Real(f) => f.to_string(),
+                    _ => String::new(),
+                };
+                let col1 = match row.get_ref(1).unwrap_or(ValueRef::Null) {
+                    ValueRef::Text(s) => String::from_utf8_lossy(s).into_owned(),
+                    ValueRef::Integer(n) => n.to_string(),
+                    ValueRef::Real(f) => f.to_string(),
+                    _ => String::new(),
+                };
+                Ok((col0, col1))
             })
             .unwrap()
             .map(|r| r.unwrap())
@@ -1042,5 +1359,60 @@ mod tests {
         assert_eq!(result_doc.rows.len(), 2); // 1 header + 1 joined row
         assert_eq!(result_doc.rows[1][0], "Alice");
         assert_eq!(result_doc.rows[1][1], "alice@example.com");
+    }
+
+    #[test]
+    fn test_strip_csv_from_bare_identifier() {
+        assert_eq!(
+            strip_csv_extensions("SELECT * FROM myfile.csv WHERE a = 1"),
+            "SELECT * FROM myfile WHERE a = 1"
+        );
+    }
+
+    #[test]
+    fn test_strip_csv_case_insensitive() {
+        assert_eq!(
+            strip_csv_extensions("SELECT * FROM myfile.CSV"),
+            "SELECT * FROM myfile"
+        );
+    }
+
+    #[test]
+    fn test_strip_tsv_and_txt() {
+        assert_eq!(
+            strip_csv_extensions("SELECT * FROM data.tsv JOIN info.txt"),
+            "SELECT * FROM data JOIN info"
+        );
+    }
+
+    #[test]
+    fn test_strip_csv_from_quoted_identifier() {
+        assert_eq!(
+            strip_csv_extensions("SELECT * FROM \"my-file.csv\" LIMIT 10"),
+            "SELECT * FROM \"my-file\" LIMIT 10"
+        );
+    }
+
+    #[test]
+    fn test_strip_csv_preserves_string_literals() {
+        assert_eq!(
+            strip_csv_extensions("SELECT * FROM myfile WHERE name = 'data.csv'"),
+            "SELECT * FROM myfile WHERE name = 'data.csv'"
+        );
+    }
+
+    #[test]
+    fn test_strip_csv_no_false_positive_on_partial() {
+        // "csvdata" should NOT be stripped — .csv is not at a word boundary
+        assert_eq!(
+            strip_csv_extensions("SELECT * FROM myfile.csvdata"),
+            "SELECT * FROM myfile.csvdata"
+        );
+    }
+
+    #[test]
+    fn test_strip_csv_no_extension_passthrough() {
+        let q = "SELECT * FROM myfile WHERE a = 1";
+        assert_eq!(strip_csv_extensions(q), q);
     }
 }

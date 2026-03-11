@@ -728,18 +728,44 @@ impl App {
         query: &str,
         output_name: &str,
         cancelled: &AtomicBool,
+        on_progress: &mut dyn FnMut(&str),
     ) -> (Option<Document>, bool) {
+        // Strip .csv/.tsv/.txt extensions from table references so users can
+        // write "SELECT * FROM myfile.csv" and have it resolve correctly.
+        let query = crate::query::strip_csv_extensions(query);
+        let query = query.as_str();
+
         // Take the cache out of self for independent borrowing
         let mut cache = self.sqlite_cache.take().unwrap_or_else(SqliteCache::new);
 
         // Clean up stale tables
+        on_progress("Preparing database...");
         if sql_execution::cleanup_stale_tables(&mut cache, self.session.files(), cancelled) {
             self.sqlite_cache = Some(cache);
             return (None, true);
         }
 
-        // Load all session files into SQLite
-        for file_path in self.session.files().to_vec() {
+        // Load only session files referenced by the query
+        let all_files = self.session.files().to_vec();
+        let referenced = crate::query::files_referenced_by_query(query, &all_files);
+        let files: Vec<std::path::PathBuf> = referenced.into_iter().cloned().collect();
+        let total_files = files.len();
+        for (i, file_path) in files.into_iter().enumerate() {
+            let file_label = file_path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("file")
+                .to_string();
+            if total_files > 1 {
+                on_progress(&format!(
+                    "Loading {} into database ({}/{})...",
+                    file_label,
+                    i + 1,
+                    total_files
+                ));
+            } else {
+                on_progress(&format!("Loading {} into database...", file_label));
+            }
             let config = self.session.config();
             let file_config = sql_execution::FileLoadConfig {
                 delimiter: config.delimiter,
@@ -761,6 +787,7 @@ impl App {
         }
 
         // Execute query and convert result
+        on_progress("Running query...");
         let (result_doc, cancelled_flag, error_msg) =
             sql_execution::execute_and_convert_query(&mut cache, query, output_name, cancelled);
 

@@ -85,28 +85,47 @@ fn test_render_large_file_performance() {
     use lazycsv::App;
     use std::path::PathBuf;
 
-    let doc = common::create_large_csv(10_000, 50);
-    let csv_files = vec![PathBuf::from("large.csv")];
-    let mut app = App::new(doc, csv_files, 0, lazycsv::session::FileConfig::new());
+    // Render cost should not scale with total row count — only visible rows matter.
+    // Compare render time for a small file vs a large file; the large file should
+    // take no more than 3x the small file's render time.
+    let small_doc = common::create_large_csv(100, 50);
+    let large_doc = common::create_large_csv(10_000, 50);
 
-    let backend = TestBackend::new(80, 24);
-    let mut terminal = Terminal::new(backend).unwrap();
+    let measure_render = |doc: Document| -> Duration {
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(doc, csv_files, 0, lazycsv::session::FileConfig::new());
 
-    // Render once to warm up
-    terminal.draw(|f| lazycsv::ui::render(f, &mut app)).unwrap();
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
 
-    // Time the actual render
-    let start = Instant::now();
-    terminal.draw(|f| lazycsv::ui::render(f, &mut app)).unwrap();
-    let duration = start.elapsed();
+        // Warm up
+        terminal.draw(|f| lazycsv::ui::render(f, &mut app)).unwrap();
 
-    println!("Rendered 10K row file in {:?}", duration);
+        // Measure
+        let start = Instant::now();
+        for _ in 0..10 {
+            terminal.draw(|f| lazycsv::ui::render(f, &mut app)).unwrap();
+        }
+        start.elapsed()
+    };
 
-    // Target: 16ms for 60 FPS
+    let small_time = measure_render(small_doc);
+    let large_time = measure_render(large_doc);
+
+    println!(
+        "Render 10 frames: 100 rows = {:?}, 10K rows = {:?}, ratio = {:.1}x",
+        small_time,
+        large_time,
+        large_time.as_secs_f64() / small_time.as_secs_f64()
+    );
+
+    // Rendering 10K rows should not be significantly slower than 100 rows
+    // since only ~24 visible rows are drawn either way
     assert!(
-        duration < Duration::from_millis(16),
-        "Rendering took too long: {:?} (target: <16ms for 60 FPS)",
-        duration
+        large_time < small_time * 3,
+        "Render time scales with data size: 100 rows = {:?}, 10K rows = {:?}",
+        small_time,
+        large_time
     );
 }
 

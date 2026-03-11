@@ -46,6 +46,23 @@ impl Document {
             .unwrap_or("unknown")
             .to_string();
 
+        // Fast path: stream from disk with ByteRecord reuse
+        if encoding_label.is_none() {
+            let file_len = path.metadata().map(|m| m.len() as usize).unwrap_or(0);
+            let file = std::fs::File::open(path)
+                .context(format!("Failed to open file: {}", path.display()))?;
+            let reader = std::io::BufReader::with_capacity(256 * 1024, file);
+            let rows = Self::parse_csv_streaming(reader, delimiter, no_headers, file_len)?;
+            return Ok(Document {
+                rows,
+                filename,
+                is_dirty: false,
+                header_mode: true,
+                delimiter: delimiter.map(|d| d as char).unwrap_or(','),
+                generation: 0,
+            });
+        }
+
         let file_bytes =
             fs::read(path).context(format!("Failed to read file: {}", path.display()))?;
 
@@ -53,7 +70,6 @@ impl Document {
         let (headers, data_rows) =
             Self::parse_csv_content(&decoded_content, delimiter, no_headers)?;
 
-        // Combine header and data rows - row 0 is the header
         let mut all_rows = vec![headers];
         all_rows.extend(data_rows);
 
@@ -61,7 +77,7 @@ impl Document {
             rows: all_rows,
             filename,
             is_dirty: false,
-            header_mode: true, // Default to header mode ON
+            header_mode: true,
             delimiter: delimiter.map(|d| d as char).unwrap_or(','),
             generation: 0,
         })
@@ -91,6 +107,29 @@ impl Document {
         no_headers: bool,
         encoding_label: Option<String>,
     ) -> Result<usize> {
+        // Fast path: stream from disk with ByteRecord to avoid full-file read,
+        // UTF-8 decode, and per-row String allocation.
+        if encoding_label.is_none() {
+            let file = std::fs::File::open(path)
+                .context(format!("Failed to open file: {}", path.display()))?;
+            let reader = std::io::BufReader::with_capacity(256 * 1024, file);
+
+            let mut builder = csv::ReaderBuilder::new();
+            builder.has_headers(!no_headers);
+            if let Some(d) = delimiter {
+                builder.delimiter(d);
+            }
+
+            let mut csv_reader = builder.from_reader(reader);
+            let mut count = 0usize;
+            let mut record = csv::ByteRecord::new();
+            while csv_reader.read_byte_record(&mut record)? {
+                count += 1;
+            }
+            return Ok(count);
+        }
+
+        // Slow path: custom encoding requires full decode first
         let file_bytes =
             fs::read(path).context(format!("Failed to read file: {}", path.display()))?;
         let decoded_content = Self::decode_file_bytes(&file_bytes, encoding_label)?;
@@ -102,7 +141,12 @@ impl Document {
         }
 
         let mut reader = builder.from_reader(decoded_content.as_bytes());
-        Ok(reader.records().count())
+        let mut count = 0usize;
+        let mut record = csv::ByteRecord::new();
+        while reader.read_byte_record(&mut record)? {
+            count += 1;
+        }
+        Ok(count)
     }
 
     /// Count columns in a CSV file without storing row data in memory.
@@ -112,6 +156,24 @@ impl Document {
         delimiter: Option<u8>,
         encoding_label: Option<String>,
     ) -> Result<usize> {
+        if encoding_label.is_none() {
+            let file = std::fs::File::open(path)
+                .context(format!("Failed to open file: {}", path.display()))?;
+            let reader = std::io::BufReader::with_capacity(64 * 1024, file);
+
+            let mut builder = csv::ReaderBuilder::new();
+            builder.has_headers(true);
+            if let Some(d) = delimiter {
+                builder.delimiter(d);
+            }
+
+            let mut csv_reader = builder.from_reader(reader);
+            return Ok(csv_reader
+                .byte_headers()
+                .map(|h| h.len())
+                .unwrap_or(0));
+        }
+
         let file_bytes =
             fs::read(path).context(format!("Failed to read file: {}", path.display()))?;
         let decoded_content = Self::decode_file_bytes(&file_bytes, encoding_label)?;
@@ -177,6 +239,29 @@ impl Document {
             .unwrap_or("unknown")
             .to_string();
 
+        // Fast path: stream from disk with ByteRecord reuse
+        if encoding_label.is_none() {
+            let file_len = path.metadata().map(|m| m.len() as usize).unwrap_or(0);
+            let file = std::fs::File::open(path)
+                .context(format!("Failed to open file: {}", path.display()))?;
+            let reader = std::io::BufReader::with_capacity(256 * 1024, file);
+            let rows = Self::parse_csv_streaming_cancellable(
+                reader,
+                delimiter,
+                no_headers,
+                file_len,
+                cancelled,
+            )?;
+            return Ok(Document {
+                rows,
+                filename,
+                is_dirty: false,
+                header_mode: true,
+                delimiter: delimiter.map(|d| d as char).unwrap_or(','),
+                generation: 0,
+            });
+        }
+
         let file_bytes =
             fs::read(path).context(format!("Failed to read file: {}", path.display()))?;
 
@@ -240,6 +325,106 @@ impl Document {
         };
 
         Ok((final_headers, rows))
+    }
+
+    /// Estimate row count from file size (assumes ~50 bytes per row as heuristic).
+    fn estimate_row_count(file_len: usize) -> usize {
+        if file_len == 0 {
+            0
+        } else {
+            file_len / 50
+        }
+    }
+
+    /// Convert a ByteRecord field to String, using lossy UTF-8 conversion.
+    fn field_to_string(field: &[u8]) -> String {
+        // Fast path: valid UTF-8 (avoids allocation from to_string_lossy)
+        match std::str::from_utf8(field) {
+            Ok(s) => s.to_owned(),
+            Err(_) => String::from_utf8_lossy(field).into_owned(),
+        }
+    }
+
+    /// Stream-parse CSV from a reader using ByteRecord reuse.
+    /// Returns all rows (row 0 = header) built in place.
+    fn parse_csv_streaming<R: std::io::Read>(
+        reader: R,
+        delimiter: Option<u8>,
+        no_headers: bool,
+        file_len: usize,
+    ) -> Result<Vec<Vec<String>>> {
+        let mut builder = csv::ReaderBuilder::new();
+        builder.has_headers(!no_headers);
+        if let Some(d) = delimiter {
+            builder.delimiter(d);
+        }
+
+        let mut csv_reader = builder.from_reader(reader);
+
+        // Build header row
+        let header_row: Vec<String> = if no_headers {
+            let byte_headers = csv_reader.byte_headers()?;
+            (1..=byte_headers.len())
+                .map(|i| format!("Column {}", i))
+                .collect()
+        } else {
+            let byte_headers = csv_reader.byte_headers()?;
+            byte_headers.iter().map(Self::field_to_string).collect()
+        };
+
+        let estimated = Self::estimate_row_count(file_len);
+        let mut rows: Vec<Vec<String>> = Vec::with_capacity(estimated + 1);
+        rows.push(header_row);
+
+        let mut record = csv::ByteRecord::new();
+        while csv_reader.read_byte_record(&mut record)? {
+            rows.push(record.iter().map(Self::field_to_string).collect());
+        }
+
+        Ok(rows)
+    }
+
+    /// Stream-parse CSV with cancellation support.
+    fn parse_csv_streaming_cancellable<R: std::io::Read>(
+        reader: R,
+        delimiter: Option<u8>,
+        no_headers: bool,
+        file_len: usize,
+        cancelled: &AtomicBool,
+    ) -> Result<Vec<Vec<String>>> {
+        let mut builder = csv::ReaderBuilder::new();
+        builder.has_headers(!no_headers);
+        if let Some(d) = delimiter {
+            builder.delimiter(d);
+        }
+
+        let mut csv_reader = builder.from_reader(reader);
+
+        let header_row: Vec<String> = if no_headers {
+            let byte_headers = csv_reader.byte_headers()?;
+            (1..=byte_headers.len())
+                .map(|i| format!("Column {}", i))
+                .collect()
+        } else {
+            let byte_headers = csv_reader.byte_headers()?;
+            byte_headers.iter().map(Self::field_to_string).collect()
+        };
+
+        let estimated = Self::estimate_row_count(file_len);
+        let mut rows: Vec<Vec<String>> = Vec::with_capacity(estimated + 1);
+        rows.push(header_row);
+
+        let mut record = csv::ByteRecord::new();
+        let mut i = 0usize;
+        while csv_reader.read_byte_record(&mut record)? {
+            if i % cancel::CHECK_INTERVAL == 0 && cancel::check_esc(cancelled) {
+                anyhow::bail!(CancelledError);
+            }
+            rows.push(record.iter().map(Self::field_to_string).collect());
+            i += 1;
+        }
+
+        Ok(rows)
     }
 
     /// Get total row count (including header row)
@@ -1220,7 +1405,11 @@ mod tests {
 
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("Failed to read file") || err_msg.contains("No such file"));
+        assert!(
+            err_msg.contains("Failed to read file")
+                || err_msg.contains("Failed to open file")
+                || err_msg.contains("No such file")
+        );
     }
 
     #[test]
