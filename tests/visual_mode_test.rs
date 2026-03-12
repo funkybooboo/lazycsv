@@ -243,29 +243,29 @@ fn test_visual_block_d_deletes_cells() {
     // Cells are cleared
     assert_eq!(
         app.document
-            .get_cell(lazycsv::RowIndex::new(1), lazycsv::ColIndex::new(0)),
+            .cell(lazycsv::RowIndex::new(1), lazycsv::ColIndex::new(0)),
         ""
     );
     assert_eq!(
         app.document
-            .get_cell(lazycsv::RowIndex::new(1), lazycsv::ColIndex::new(1)),
+            .cell(lazycsv::RowIndex::new(1), lazycsv::ColIndex::new(1)),
         ""
     );
     assert_eq!(
         app.document
-            .get_cell(lazycsv::RowIndex::new(2), lazycsv::ColIndex::new(0)),
+            .cell(lazycsv::RowIndex::new(2), lazycsv::ColIndex::new(0)),
         ""
     );
     assert_eq!(
         app.document
-            .get_cell(lazycsv::RowIndex::new(2), lazycsv::ColIndex::new(1)),
+            .cell(lazycsv::RowIndex::new(2), lazycsv::ColIndex::new(1)),
         ""
     );
 
     // Adjacent cells unchanged
     assert_eq!(
         app.document
-            .get_cell(lazycsv::RowIndex::new(1), lazycsv::ColIndex::new(2)),
+            .cell(lazycsv::RowIndex::new(1), lazycsv::ColIndex::new(2)),
         "C1"
     );
 
@@ -282,7 +282,7 @@ fn test_visual_block_d_stores_in_region_buffer() {
     app.handle_key(key(KeyCode::Char('j'))).unwrap();
     app.handle_key(key(KeyCode::Char('d'))).unwrap();
 
-    let region = app.clipboard.get_region().expect("region should exist");
+    let region = app.clipboard.region().expect("region should exist");
     assert_eq!(region.len(), 2); // 2 rows
     assert_eq!(region[0].len(), 2); // 2 columns
     assert_eq!(region[0][0], "A1");
@@ -323,7 +323,7 @@ fn test_visual_line_d_stores_in_row_buffer() {
     app.handle_key(key(KeyCode::Char('j'))).unwrap();
     app.handle_key(key(KeyCode::Char('d'))).unwrap();
 
-    let rows = app.clipboard.get_rows().expect("rows should exist");
+    let rows = app.clipboard.rows().expect("rows should exist");
     assert_eq!(rows.len(), 2);
     assert_eq!(rows[0][0], "A1");
     assert_eq!(rows[1][0], "A2");
@@ -349,7 +349,7 @@ fn test_visual_column_d_deletes_columns() {
     assert_eq!(app.document.column_count(), initial_cols - 2);
 
     // First column is now what was column C
-    assert_eq!(app.document.get_header(lazycsv::ColIndex::new(0)), "C");
+    assert_eq!(app.document.header(lazycsv::ColIndex::new(0)), "C");
 
     assert_eq!(app.mode, Mode::Normal);
 }
@@ -363,7 +363,7 @@ fn test_visual_column_d_stores_in_column_buffer() {
     app.handle_key(key(KeyCode::Char('l'))).unwrap();
     app.handle_key(key(KeyCode::Char('d'))).unwrap();
 
-    let cols = app.clipboard.get_columns().expect("columns should exist");
+    let cols = app.clipboard.columns().expect("columns should exist");
     assert_eq!(cols.len(), 2);
     assert_eq!(cols[0][0], "A"); // Header
     assert_eq!(cols[0][1], "A1"); // First data row
@@ -392,7 +392,7 @@ fn test_visual_block_y_yanks_region() {
     assert!(!app.document.is_dirty);
 
     // Region in clipboard
-    let region = app.clipboard.get_region().expect("region should exist");
+    let region = app.clipboard.region().expect("region should exist");
     assert_eq!(region.len(), 2);
     assert_eq!(region[0][0], "A1");
 
@@ -419,7 +419,7 @@ fn test_visual_line_y_yanks_rows() {
     assert!(!app.document.is_dirty);
 
     // Rows in clipboard
-    let rows = app.clipboard.get_rows().expect("rows should exist");
+    let rows = app.clipboard.rows().expect("rows should exist");
     assert_eq!(rows.len(), 2);
 
     assert_eq!(app.mode, Mode::Normal);
@@ -446,7 +446,7 @@ fn test_visual_column_y_yanks_columns() {
     assert!(!app.document.is_dirty);
 
     // Columns in clipboard
-    let cols = app.clipboard.get_columns().expect("columns should exist");
+    let cols = app.clipboard.columns().expect("columns should exist");
     assert_eq!(cols.len(), 2);
 
     assert_eq!(app.mode, Mode::Normal);
@@ -481,22 +481,22 @@ fn test_visual_block_p_pastes_over_selection() {
     // Check pasted content
     assert_eq!(
         app.document
-            .get_cell(lazycsv::RowIndex::new(3), lazycsv::ColIndex::new(2)),
+            .cell(lazycsv::RowIndex::new(3), lazycsv::ColIndex::new(2)),
         "A1"
     );
     assert_eq!(
         app.document
-            .get_cell(lazycsv::RowIndex::new(3), lazycsv::ColIndex::new(3)),
+            .cell(lazycsv::RowIndex::new(3), lazycsv::ColIndex::new(3)),
         "B1"
     );
     assert_eq!(
         app.document
-            .get_cell(lazycsv::RowIndex::new(4), lazycsv::ColIndex::new(2)),
+            .cell(lazycsv::RowIndex::new(4), lazycsv::ColIndex::new(2)),
         "A2"
     );
     assert_eq!(
         app.document
-            .get_cell(lazycsv::RowIndex::new(4), lazycsv::ColIndex::new(3)),
+            .cell(lazycsv::RowIndex::new(4), lazycsv::ColIndex::new(3)),
         "B2"
     );
 }
@@ -613,12 +613,12 @@ fn test_visual_block_single_cell_selection() {
     // Single cell cleared
     assert_eq!(
         app.document
-            .get_cell(lazycsv::RowIndex::new(1), lazycsv::ColIndex::new(0)),
+            .cell(lazycsv::RowIndex::new(1), lazycsv::ColIndex::new(0)),
         ""
     );
     assert_eq!(
         app.document
-            .get_cell(lazycsv::RowIndex::new(1), lazycsv::ColIndex::new(1)),
+            .cell(lazycsv::RowIndex::new(1), lazycsv::ColIndex::new(1)),
         "B1"
     );
 }

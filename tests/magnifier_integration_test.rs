@@ -29,7 +29,7 @@ fn test_magnifier_open_edit_save_close_workflow() {
 
     // Verify initial content
     let magnifier = app.magnifier_state.as_ref().unwrap();
-    assert_eq!(magnifier.get_content(), "Alice");
+    assert_eq!(magnifier.content(), "Alice");
     assert!(!magnifier.is_dirty());
 
     // Edit content
@@ -46,7 +46,7 @@ fn test_magnifier_open_edit_save_close_workflow() {
 
     // Verify dirty state
     assert!(magnifier.is_dirty());
-    assert_eq!(magnifier.get_content(), "Alice Smith");
+    assert_eq!(magnifier.content(), "Alice Smith");
 
     // Save and close
     app.save_and_close_magnifier();
@@ -55,8 +55,8 @@ fn test_magnifier_open_edit_save_close_workflow() {
 
     // Verify cell was updated
     assert_eq!(
-        app.document.get_cell(
-            app.get_selected_row().unwrap(),
+        app.document.cell(
+            app.selected_row().unwrap(),
             app.view_state.selected_column
         ),
         "Alice Smith"
@@ -71,7 +71,7 @@ fn test_magnifier_open_edit_discard_workflow() {
 
     // Open magnifier
     app.open_magnifier();
-    let original_content = app.magnifier_state.as_ref().unwrap().get_content();
+    let original_content = app.magnifier_state.as_ref().unwrap().content();
 
     // Edit content
     let magnifier = app.magnifier_state.as_mut().unwrap();
@@ -89,8 +89,8 @@ fn test_magnifier_open_edit_discard_workflow() {
 
     // Verify cell unchanged
     assert_eq!(
-        app.document.get_cell(
-            app.get_selected_row().unwrap(),
+        app.document.cell(
+            app.selected_row().unwrap(),
             app.view_state.selected_column
         ),
         original_content
@@ -127,14 +127,14 @@ fn test_magnifier_multiline_editing() {
     magnifier.exit_insert_mode();
 
     // Verify content has newlines
-    let content = magnifier.get_content();
+    let content = magnifier.content();
     assert!(content.contains('\n'));
     assert_eq!(content.lines().count(), 3);
 
     // Save and verify
     app.save_and_close_magnifier();
-    let cell_content = app.document.get_cell(
-        app.get_selected_row().unwrap(),
+    let cell_content = app.document.cell(
+        app.selected_row().unwrap(),
         app.view_state.selected_column,
     );
     assert!(cell_content.contains('\n'));
@@ -152,7 +152,7 @@ fn test_magnifier_vim_motions_workflow() {
     app.open_magnifier();
 
     let magnifier = app.magnifier_state.as_mut().unwrap();
-    assert_eq!(magnifier.get_content(), "Engineer");
+    assert_eq!(magnifier.content(), "Engineer");
 
     // Test vim motions
     magnifier.move_to_line_start(); // Cursor at 0
@@ -182,18 +182,18 @@ fn test_magnifier_vim_operators_workflow() {
     app.open_magnifier();
 
     let magnifier = app.magnifier_state.as_mut().unwrap();
-    let original = magnifier.get_content();
+    let original = magnifier.content();
 
     // Test delete character (x)
     magnifier.delete_char();
-    assert_ne!(magnifier.get_content(), original);
+    assert_ne!(magnifier.content(), original);
     assert!(magnifier.is_dirty());
 
     // Close and discard
     app.close_magnifier_discard();
     assert_eq!(
-        app.document.get_cell(
-            app.get_selected_row().unwrap(),
+        app.document.cell(
+            app.selected_row().unwrap(),
             app.view_state.selected_column
         ),
         original
@@ -217,7 +217,7 @@ fn test_magnifier_empty_cell() {
     app.open_magnifier();
 
     let magnifier = app.magnifier_state.as_ref().unwrap();
-    assert_eq!(magnifier.get_content(), "");
+    assert_eq!(magnifier.content(), "");
     assert_eq!(magnifier.lines().len(), 1);
     assert_eq!(magnifier.cursor(), (0, 0));
 
@@ -229,13 +229,13 @@ fn test_magnifier_empty_cell() {
     magnifier.insert_char('w');
     magnifier.exit_insert_mode();
 
-    assert_eq!(magnifier.get_content(), "New");
+    assert_eq!(magnifier.content(), "New");
 
     // Save
     app.save_and_close_magnifier();
     assert_eq!(
-        app.document.get_cell(
-            app.get_selected_row().unwrap(),
+        app.document.cell(
+            app.selected_row().unwrap(),
             app.view_state.selected_column
         ),
         "New"
@@ -261,13 +261,13 @@ fn test_magnifier_long_content() {
     magnifier.exit_insert_mode();
 
     // Verify content length
-    let content = magnifier.get_content();
+    let content = magnifier.content();
     assert!(content.len() > 100);
 
     // Save and verify
     app.save_and_close_magnifier();
-    let cell_content = app.document.get_cell(
-        app.get_selected_row().unwrap(),
+    let cell_content = app.document.cell(
+        app.selected_row().unwrap(),
         app.view_state.selected_column,
     );
     assert!(cell_content.len() > 100);
@@ -284,7 +284,7 @@ fn test_magnifier_unicode_content() {
 
     // Set cell to unicode content
     app.document.set_cell(
-        app.get_selected_row().unwrap(),
+        app.selected_row().unwrap(),
         app.view_state.selected_column,
         "Alice Smith 日本".to_string(),
     );
@@ -294,7 +294,7 @@ fn test_magnifier_unicode_content() {
 
     // Verify unicode content is loaded correctly
     let magnifier = app.magnifier_state.as_ref().unwrap();
-    let content = magnifier.get_content();
+    let content = magnifier.content();
     assert!(content.contains("日本"));
     assert_eq!(content, "Alice Smith 日本");
 
@@ -445,7 +445,7 @@ fn test_magnifier_substitute_char() {
     app.open_magnifier();
 
     let magnifier = app.magnifier_state.as_mut().unwrap();
-    let original = magnifier.get_content();
+    let original = magnifier.content();
 
     // Substitute character (s)
     magnifier.substitute_char();
@@ -456,7 +456,7 @@ fn test_magnifier_substitute_char() {
     magnifier.exit_insert_mode();
 
     // Verify character was substituted
-    assert_ne!(magnifier.get_content(), original);
+    assert_ne!(magnifier.content(), original);
     assert!(magnifier.is_dirty());
 
     app.close_magnifier_discard();

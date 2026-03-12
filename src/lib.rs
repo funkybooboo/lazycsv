@@ -12,6 +12,7 @@ pub mod query;
 pub mod search;
 pub mod session;
 pub mod ui;
+pub mod vim_editor;
 
 pub use app::App;
 pub use clipboard::DualClipboard;

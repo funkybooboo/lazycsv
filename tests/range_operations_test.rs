@@ -47,18 +47,18 @@ fn test_delete_row_range_5_to_10() {
     // Row 1 should still be "1", row 2 should be "2", etc.
     assert_eq!(
         app.document
-            .get_cell(lazycsv::RowIndex::new(1), lazycsv::ColIndex::new(0)),
+            .cell(lazycsv::RowIndex::new(1), lazycsv::ColIndex::new(0)),
         "1"
     );
     assert_eq!(
         app.document
-            .get_cell(lazycsv::RowIndex::new(4), lazycsv::ColIndex::new(0)),
+            .cell(lazycsv::RowIndex::new(4), lazycsv::ColIndex::new(0)),
         "4"
     );
     // Row 5 should now be "11" (what was row 11 before)
     assert_eq!(
         app.document
-            .get_cell(lazycsv::RowIndex::new(5), lazycsv::ColIndex::new(0)),
+            .cell(lazycsv::RowIndex::new(5), lazycsv::ColIndex::new(0)),
         "11"
     );
 }
@@ -87,7 +87,7 @@ fn test_delete_all_rows_percent_d() {
     assert_eq!(app.document.data_row_count(), 0);
 
     // Header should still exist
-    assert_eq!(app.document.get_header(lazycsv::ColIndex::new(0)), "Header");
+    assert_eq!(app.document.header(lazycsv::ColIndex::new(0)), "Header");
 }
 
 #[test]
@@ -118,7 +118,7 @@ fn test_delete_current_row_dot_d() {
     // Row 3 should now contain "4" (what was row 4)
     assert_eq!(
         app.document
-            .get_cell(lazycsv::RowIndex::new(3), lazycsv::ColIndex::new(0)),
+            .cell(lazycsv::RowIndex::new(3), lazycsv::ColIndex::new(0)),
         "4"
     );
 }
@@ -148,7 +148,7 @@ fn test_delete_last_row_dollar_d() {
     // Last row should now be "4"
     let last_row_idx = app.document.data_row_count();
     assert_eq!(
-        app.document.get_cell(
+        app.document.cell(
             lazycsv::RowIndex::new(last_row_idx),
             lazycsv::ColIndex::new(0)
         ),

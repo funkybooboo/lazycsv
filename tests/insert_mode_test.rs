@@ -275,7 +275,7 @@ fn test_ctrl_u_deletes_to_start() {
 #[test]
 fn test_enter_commits_and_moves_down() {
     let mut app = create_test_app();
-    let initial_row = app.get_selected_row().unwrap().get();
+    let initial_row = app.selected_row().unwrap().get();
 
     app.handle_key(key_event(KeyCode::Char('s'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('X'))).unwrap();
@@ -284,7 +284,7 @@ fn test_enter_commits_and_moves_down() {
     // Should be back in Normal mode
     assert_eq!(app.mode, Mode::Normal);
     // Should have moved down
-    let new_row = app.get_selected_row().unwrap().get();
+    let new_row = app.selected_row().unwrap().get();
     assert_eq!(new_row, initial_row + 1);
     // Edit buffer should be cleared
     assert!(app.edit_buffer.is_none());
@@ -308,14 +308,14 @@ fn test_shift_enter_commits_and_moves_up() {
     let mut app = create_test_app();
     // Move down first so we can move up
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-    let initial_row = app.get_selected_row().unwrap().get();
+    let initial_row = app.selected_row().unwrap().get();
     assert!(initial_row > 0);
 
     app.handle_key(key_event(KeyCode::Char('i'))).unwrap();
     app.handle_key(shift_key_event(KeyCode::Enter)).unwrap();
 
     assert_eq!(app.mode, Mode::Normal);
-    let new_row = app.get_selected_row().unwrap().get();
+    let new_row = app.selected_row().unwrap().get();
     assert_eq!(new_row, initial_row - 1);
 }
 
@@ -364,7 +364,7 @@ fn test_commit_unchanged_does_not_set_dirty() {
 #[test]
 fn test_commit_updates_cell_value() {
     let mut app = create_test_app();
-    let row_idx = app.get_selected_row().unwrap();
+    let row_idx = app.selected_row().unwrap();
     let col_idx = app.view_state.selected_column;
 
     app.handle_key(key_event(KeyCode::Char('s'))).unwrap();
@@ -373,7 +373,7 @@ fn test_commit_updates_cell_value() {
     app.handle_key(key_event(KeyCode::Char('W'))).unwrap();
     app.handle_key(key_event(KeyCode::Enter)).unwrap();
 
-    let cell_value = app.document.get_cell(row_idx, col_idx);
+    let cell_value = app.document.cell(row_idx, col_idx);
     assert_eq!(cell_value, "NEW");
 }
 
@@ -384,9 +384,9 @@ fn test_commit_updates_cell_value() {
 #[test]
 fn test_escape_cancels_edit() {
     let mut app = create_test_app();
-    let row_idx = app.get_selected_row().unwrap();
+    let row_idx = app.selected_row().unwrap();
     let col_idx = app.view_state.selected_column;
-    let original_value = app.document.get_cell(row_idx, col_idx).to_string();
+    let original_value = app.document.cell(row_idx, col_idx).to_string();
 
     app.handle_key(key_event(KeyCode::Char('s'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('X'))).unwrap();
@@ -397,7 +397,7 @@ fn test_escape_cancels_edit() {
     // Edit buffer should be cleared
     assert!(app.edit_buffer.is_none());
     // Cell value should be unchanged
-    let new_value = app.document.get_cell(row_idx, col_idx);
+    let new_value = app.document.cell(row_idx, col_idx);
     assert_eq!(new_value, original_value);
     // Document should not be dirty
     assert!(!app.document.is_dirty);
@@ -411,7 +411,7 @@ fn test_escape_cancels_edit() {
 fn test_o_inserts_row_below() {
     let mut app = create_test_app();
     let initial_row_count = app.document.row_count();
-    let initial_row = app.get_selected_row().unwrap().get();
+    let initial_row = app.selected_row().unwrap().get();
 
     app.handle_key(key_event(KeyCode::Char('o'))).unwrap();
 
@@ -420,7 +420,7 @@ fn test_o_inserts_row_below() {
     // Should be in Insert mode
     assert_eq!(app.mode, Mode::Insert);
     // Should be on the new row (one below original)
-    assert_eq!(app.get_selected_row().unwrap().get(), initial_row + 1);
+    assert_eq!(app.selected_row().unwrap().get(), initial_row + 1);
 }
 
 #[test]
@@ -429,7 +429,7 @@ fn test_capital_o_inserts_row_above() {
     // Move down first
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
     let initial_row_count = app.document.row_count();
-    let initial_row = app.get_selected_row().unwrap().get();
+    let initial_row = app.selected_row().unwrap().get();
 
     app.handle_key(key_event(KeyCode::Char('O'))).unwrap();
 
@@ -438,7 +438,7 @@ fn test_capital_o_inserts_row_above() {
     // Should be in Insert mode
     assert_eq!(app.mode, Mode::Insert);
     // Should be on same index (which is now the new row)
-    assert_eq!(app.get_selected_row().unwrap().get(), initial_row);
+    assert_eq!(app.selected_row().unwrap().get(), initial_row);
 }
 
 #[test]
@@ -466,7 +466,7 @@ fn test_dd_deletes_row() {
 #[test]
 fn test_yy_yanks_row() {
     let mut app = create_test_app();
-    let row_idx = app.get_selected_row().unwrap();
+    let row_idx = app.selected_row().unwrap();
     // With new navigation model, row_idx.get() is already absolute index
     let expected_row: Vec<String> = app.document.rows.get(row_idx.get()).unwrap().clone();
 
@@ -495,14 +495,14 @@ fn test_p_pastes_row_below() {
     app.handle_key(key_event(KeyCode::Char('y'))).unwrap();
 
     let initial_row_count = app.document.row_count();
-    let initial_row = app.get_selected_row().unwrap().get();
+    let initial_row = app.selected_row().unwrap().get();
 
     app.handle_key(key_event(KeyCode::Char('p'))).unwrap();
 
     // Row count should increase
     assert_eq!(app.document.row_count(), initial_row_count + 1);
     // Should be on the new row (one below original)
-    assert_eq!(app.get_selected_row().unwrap().get(), initial_row + 1);
+    assert_eq!(app.selected_row().unwrap().get(), initial_row + 1);
     // Document should be dirty
     assert!(app.document.is_dirty);
 }
@@ -525,17 +525,17 @@ fn test_p_without_clipboard_shows_error() {
 #[test]
 fn test_delete_key_clears_cell() {
     let mut app = create_test_app();
-    let row_idx = app.get_selected_row().unwrap();
+    let row_idx = app.selected_row().unwrap();
     let col_idx = app.view_state.selected_column;
 
     // Make sure cell has content
-    let original = app.document.get_cell(row_idx, col_idx).to_string();
+    let original = app.document.cell(row_idx, col_idx).to_string();
     assert!(!original.is_empty());
 
     app.handle_key(key_event(KeyCode::Delete)).unwrap();
 
     // Cell should be empty
-    let new_value = app.document.get_cell(row_idx, col_idx);
+    let new_value = app.document.cell(row_idx, col_idx);
     assert!(new_value.is_empty());
     // Still in Normal mode
     assert_eq!(app.mode, Mode::Normal);
@@ -597,7 +597,7 @@ fn test_dd_on_last_row_adjusts_selection() {
 
     // Move to last row
     app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
-    let last_row = app.get_selected_row().unwrap().get();
+    let last_row = app.selected_row().unwrap().get();
     let initial_count = app.document.row_count();
 
     // Delete the last row
@@ -607,7 +607,7 @@ fn test_dd_on_last_row_adjusts_selection() {
     // Row count should decrease
     assert_eq!(app.document.row_count(), initial_count - 1);
     // Selection should adjust to new last row
-    let new_selection = app.get_selected_row().unwrap().get();
+    let new_selection = app.selected_row().unwrap().get();
     assert!(new_selection < last_row);
     assert_eq!(new_selection, app.document.row_count() - 1);
 }
@@ -734,7 +734,7 @@ fn test_enter_at_last_row() {
 
     // Move to last row
     app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
-    let last_row = app.get_selected_row().unwrap().get();
+    let last_row = app.selected_row().unwrap().get();
 
     app.handle_key(key_event(KeyCode::Char('i'))).unwrap();
     app.handle_key(key_event(KeyCode::Enter)).unwrap();
@@ -742,13 +742,13 @@ fn test_enter_at_last_row() {
     // Should be in Normal mode
     assert_eq!(app.mode, Mode::Normal);
     // Should still be on last row (can't go beyond)
-    assert_eq!(app.get_selected_row().unwrap().get(), last_row);
+    assert_eq!(app.selected_row().unwrap().get(), last_row);
 }
 
 #[test]
 fn test_shift_enter_at_first_row() {
     let mut app = create_test_app();
-    assert_eq!(app.get_selected_row().unwrap().get(), 1); // First data row
+    assert_eq!(app.selected_row().unwrap().get(), 1); // First data row
 
     app.handle_key(key_event(KeyCode::Char('i'))).unwrap();
     app.handle_key(shift_key_event(KeyCode::Enter)).unwrap();
@@ -756,7 +756,7 @@ fn test_shift_enter_at_first_row() {
     // Should be in Normal mode
     assert_eq!(app.mode, Mode::Normal);
     // Should still be on first data row
-    assert_eq!(app.get_selected_row().unwrap().get(), 1);
+    assert_eq!(app.selected_row().unwrap().get(), 1);
 }
 
 #[test]
@@ -842,7 +842,7 @@ fn test_multiple_row_deletes() {
 #[test]
 fn test_edit_then_navigate_then_edit() {
     let mut app = create_test_app();
-    let initial_row = app.get_selected_row().unwrap();
+    let initial_row = app.selected_row().unwrap();
 
     // Edit first cell with Tab (stays on same row, moves right)
     app.handle_key(key_event(KeyCode::Char('s'))).unwrap();
@@ -855,8 +855,8 @@ fn test_edit_then_navigate_then_edit() {
     app.handle_key(key_event(KeyCode::Tab)).unwrap(); // Commits and moves right
 
     // Both cells should be updated on the initial row
-    let cell_a = app.document.get_cell(initial_row, ColIndex::new(0));
-    let cell_b = app.document.get_cell(initial_row, ColIndex::new(1));
+    let cell_a = app.document.cell(initial_row, ColIndex::new(0));
+    let cell_b = app.document.cell(initial_row, ColIndex::new(1));
     assert_eq!(cell_a, "A");
     assert_eq!(cell_b, "B");
 }
@@ -891,7 +891,7 @@ fn test_insert_row_has_correct_column_count() {
     app.handle_key(key_event(KeyCode::Esc)).unwrap();
 
     // New row should have same number of columns
-    let new_row_idx = app.get_selected_row().unwrap();
+    let new_row_idx = app.selected_row().unwrap();
     // With new navigation model, row_idx.get() is already absolute index
     let new_row = app.document.rows.get(new_row_idx.get()).unwrap();
     assert_eq!(new_row.len(), col_count);
@@ -904,7 +904,7 @@ fn test_insert_row_cells_are_empty() {
     app.handle_key(key_event(KeyCode::Char('o'))).unwrap();
     app.handle_key(key_event(KeyCode::Esc)).unwrap();
 
-    let new_row_idx = app.get_selected_row().unwrap();
+    let new_row_idx = app.selected_row().unwrap();
     // With new navigation model, row_idx.get() is already absolute index
     let new_row = app.document.rows.get(new_row_idx.get()).unwrap();
 
@@ -930,7 +930,7 @@ fn test_paste_row_content_matches_yanked() {
     app.handle_key(key_event(KeyCode::Char('p'))).unwrap();
 
     // Get the pasted row using absolute row index
-    let pasted_row_idx = app.get_selected_row().unwrap();
+    let pasted_row_idx = app.selected_row().unwrap();
     let pasted_row = app.document.rows.get(pasted_row_idx.get()).unwrap();
 
     // Content should match
@@ -951,7 +951,7 @@ fn test_cursor_position_after_typing_and_commit() {
     app.handle_key(key_event(KeyCode::Tab)).unwrap();
 
     // Should now be at row 1, col 1
-    assert_eq!(app.get_selected_row().unwrap().get(), 1);
+    assert_eq!(app.selected_row().unwrap().get(), 1);
     assert_eq!(app.view_state.selected_column.get(), 1);
 }
 
@@ -979,13 +979,13 @@ fn test_multiple_enter_commits_traverse_column() {
     // Edit and Enter through rows (stop before last since Enter won't go beyond)
     // Start at row 1 (first data row), so loop from 1 to row_count-1
     for row in 1..(row_count) {
-        assert_eq!(app.get_selected_row().unwrap().get(), row);
+        assert_eq!(app.selected_row().unwrap().get(), row);
         app.handle_key(key_event(KeyCode::Char('i'))).unwrap();
         app.handle_key(key_event(KeyCode::Enter)).unwrap();
     }
 
     // Should be at last row
-    assert_eq!(app.get_selected_row().unwrap().get(), row_count - 1);
+    assert_eq!(app.selected_row().unwrap().get(), row_count - 1);
 }
 
 // ============================================================================
@@ -1031,7 +1031,7 @@ fn test_o_at_last_row_inserts_at_end() {
     // New row should be at end
     assert_eq!(app.document.row_count(), initial_count + 1);
     assert_eq!(
-        app.get_selected_row().unwrap().get(),
+        app.selected_row().unwrap().get(),
         app.document.row_count() - 1
     );
 }
@@ -1042,13 +1042,13 @@ fn test_capital_o_at_first_row_inserts_at_beginning() {
     let initial_count = app.document.row_count();
 
     // Make sure we're at first data row (row 1 with header_mode=true)
-    assert_eq!(app.get_selected_row().unwrap().get(), 1);
+    assert_eq!(app.selected_row().unwrap().get(), 1);
 
     app.handle_key(key_event(KeyCode::Char('O'))).unwrap();
 
     // New row should be inserted at row 1 (before current row)
     assert_eq!(app.document.row_count(), initial_count + 1);
-    assert_eq!(app.get_selected_row().unwrap().get(), 1);
+    assert_eq!(app.selected_row().unwrap().get(), 1);
 }
 
 #[test]

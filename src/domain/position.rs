@@ -249,7 +249,8 @@ impl RowIndex {
     /// Panics if the row index is `usize::MAX`, as adding 1 would overflow.
     /// This is acceptable as no CSV file can realistically have `usize::MAX` rows.
     pub fn to_line_number(self) -> NonZeroUsize {
-        NonZeroUsize::new(self.0 + 1).unwrap()
+        NonZeroUsize::new(self.0 + 1)
+            .expect("row index + 1 cannot overflow for realistic CSV files")
     }
 }
 
@@ -343,7 +344,8 @@ impl ColIndex {
     /// Panics if the column index is `usize::MAX`, as adding 1 would overflow.
     /// This is acceptable as no CSV file can realistically have `usize::MAX` columns.
     pub fn to_column_number(self) -> NonZeroUsize {
-        NonZeroUsize::new(self.0 + 1).unwrap()
+        NonZeroUsize::new(self.0 + 1)
+            .expect("column index + 1 cannot overflow for realistic CSV files")
     }
 }
 

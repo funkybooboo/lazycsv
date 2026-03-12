@@ -60,7 +60,7 @@ impl InputState {
     }
 
     /// Get the current command count, or 1 if none is set
-    pub fn get_count_or_default(&self) -> usize {
+    pub fn count_or_default(&self) -> usize {
         self.command_count.map(|c| c.get()).unwrap_or(1)
     }
 
@@ -125,7 +125,7 @@ mod tests {
     fn test_input_state_default() {
         let state = InputState::new();
         assert!(!state.has_pending_command());
-        assert_eq!(state.get_count_or_default(), 1);
+        assert_eq!(state.count_or_default(), 1);
     }
 
     #[test]
@@ -146,13 +146,13 @@ mod tests {
         let mut state = InputState::new();
 
         state.add_count_digit(5);
-        assert_eq!(state.get_count_or_default(), 5);
+        assert_eq!(state.count_or_default(), 5);
 
         state.add_count_digit(3);
-        assert_eq!(state.get_count_or_default(), 53);
+        assert_eq!(state.count_or_default(), 53);
 
         state.clear_count();
-        assert_eq!(state.get_count_or_default(), 1);
+        assert_eq!(state.count_or_default(), 1);
     }
 
     #[test]
@@ -165,7 +165,7 @@ mod tests {
         }
 
         // Should be clamped
-        assert!(state.get_count_or_default() < 100000);
+        assert!(state.count_or_default() < 100000);
     }
 
     #[test]
@@ -201,7 +201,7 @@ mod tests {
             state.add_count_digit(9);
         }
 
-        let count = state.get_count_or_default();
+        let count = state.count_or_default();
 
         // Should be clamped just below MAX_COMMAND_COUNT
         // The implementation uses `new_value < MAX_COMMAND_COUNT` so it stops at 99999
@@ -216,7 +216,7 @@ mod tests {
         // Add a zero
         state.add_count_digit(0);
 
-        let count = state.get_count_or_default();
+        let count = state.count_or_default();
 
         // Zero should be treated as "no count" (default to 1)
         // or could be special case for "go to first column" (0)
@@ -230,13 +230,13 @@ mod tests {
 
         // Build count: 5
         state.add_count_digit(5);
-        assert_eq!(state.get_count_or_default(), 5);
+        assert_eq!(state.count_or_default(), 5);
 
         // Clear it
         state.clear_count();
 
         // Should be back to default (1)
-        assert_eq!(state.get_count_or_default(), 1);
+        assert_eq!(state.count_or_default(), 1);
     }
 
     #[test]
@@ -248,6 +248,6 @@ mod tests {
         state.add_count_digit(2);
         state.add_count_digit(3);
 
-        assert_eq!(state.get_count_or_default(), 123);
+        assert_eq!(state.count_or_default(), 123);
     }
 }

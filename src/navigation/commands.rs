@@ -341,7 +341,7 @@ pub fn next_word(app: &mut App) {
     for col in (current_col + 1)..=max_col {
         let cell = app
             .document
-            .get_cell(RowIndex::new(current_row), ColIndex::new(col));
+            .cell(RowIndex::new(current_row), ColIndex::new(col));
         if !cell.is_empty() {
             app.view_state.selected_column = ColIndex::new(col);
             update_horizontal_scroll(app, col);
@@ -368,7 +368,7 @@ pub fn prev_word(app: &mut App) {
     for col in (0..current_col).rev() {
         let cell = app
             .document
-            .get_cell(RowIndex::new(current_row), ColIndex::new(col));
+            .cell(RowIndex::new(current_row), ColIndex::new(col));
         if !cell.is_empty() {
             app.view_state.selected_column = ColIndex::new(col);
             update_horizontal_scroll(app, col);
@@ -390,7 +390,7 @@ pub fn end_word(app: &mut App) {
     for col in (0..=max_col).rev() {
         let cell = app
             .document
-            .get_cell(RowIndex::new(current_row), ColIndex::new(col));
+            .cell(RowIndex::new(current_row), ColIndex::new(col));
         if !cell.is_empty() {
             app.view_state.selected_column = ColIndex::new(col);
             update_horizontal_scroll(app, col);

@@ -8,16 +8,12 @@
 //! No cross-buffer pasting between the three buffers.
 
 /// Internal buffer shared by both row and column clipboards
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct ClipboardBuffer {
     data: Vec<Vec<String>>,
 }
 
 impl ClipboardBuffer {
-    fn new() -> Self {
-        Self { data: vec![] }
-    }
-
     fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
@@ -40,7 +36,7 @@ impl ClipboardBuffer {
 }
 
 /// Triple clipboard with independent row, column, and region buffers
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct DualClipboard {
     row_buffer: ClipboardBuffer,
     column_buffer: ClipboardBuffer,
@@ -50,11 +46,7 @@ pub struct DualClipboard {
 impl DualClipboard {
     /// Create a new empty triple clipboard
     pub fn new() -> Self {
-        Self {
-            row_buffer: ClipboardBuffer::new(),
-            column_buffer: ClipboardBuffer::new(),
-            region_buffer: ClipboardBuffer::new(),
-        }
+        Self::default()
     }
 
     // ── Row buffer methods ──
@@ -80,7 +72,7 @@ impl DualClipboard {
     }
 
     /// Get all rows from the row buffer
-    pub fn get_rows(&self) -> Option<Vec<Vec<String>>> {
+    pub fn rows(&self) -> Option<Vec<Vec<String>>> {
         self.row_buffer.get().cloned()
     }
 
@@ -112,7 +104,7 @@ impl DualClipboard {
     }
 
     /// Get all columns from the column buffer (alias for compatibility)
-    pub fn get_columns(&self) -> Option<Vec<Vec<String>>> {
+    pub fn columns(&self) -> Option<Vec<Vec<String>>> {
         self.as_columns()
     }
 
@@ -129,13 +121,13 @@ impl DualClipboard {
     }
 
     /// Get the region from the region buffer
-    pub fn get_region(&self) -> Option<Vec<Vec<String>>> {
+    pub fn region(&self) -> Option<Vec<Vec<String>>> {
         self.region_buffer.get().cloned()
     }
 
     /// Get the region from the region buffer (alias for compatibility)
     pub fn as_region(&self) -> Option<Vec<Vec<String>>> {
-        self.get_region()
+        self.region()
     }
 
     /// Check if the region buffer is empty
@@ -155,12 +147,6 @@ impl DualClipboard {
         self.row_buffer.clear();
         self.column_buffer.clear();
         self.region_buffer.clear();
-    }
-}
-
-impl Default for DualClipboard {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

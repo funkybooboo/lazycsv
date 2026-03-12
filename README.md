@@ -67,7 +67,8 @@ That's it! Press `?` in the app for full keybindings.
 | Key | Action |
 |-----|--------|
 | `hjkl` or arrows | Move around (with count: `5j`, `10h`) |
-| `gg` / `G` / `5G` | Jump to first/last/row 5 |
+| `gg` / `gh` / `gd` | Jump to first row / header row / data row |
+| `G` / `5G` | Jump to last row / row 5 |
 | `:B` / `:A5` | Jump to column B or cell A5 |
 | `w` / `b` / `e` | Next/prev/last non-empty cell |
 | `i` / `a` / `s` | Quick edit cell (Insert mode) |
@@ -79,6 +80,7 @@ That's it! Press `?` in the app for full keybindings.
 | `/` | Search (regex) |
 | `:sql` | SQL query mode |
 | `:files` | File picker dialog |
+| `:ht` | Toggle header mode |
 | `Esc` | Cancel loading/queries |
 | `zt` / `zz` / `zb` | Position row at top/center/bottom |
 | `[` / `]` | Switch CSV files |
@@ -128,7 +130,7 @@ LazyCSV treats CSV files in the same directory like Excel sheets. Open one file,
 
 ## Current Status
 
-**v0.8.1 Complete** (March 2026) - SQL query mode with comprehensive testing, benchmarks, and polished error handling.
+**v0.11.0 Complete** (March 2026) - SQL editor with full vim modal editing, undo/redo system, and configuration support.
 
 **Completed Features:**
 - Fast CSV viewer/editor with vim navigation
@@ -144,14 +146,11 @@ LazyCSV treats CSV files in the same directory like Excel sheets. Open one file,
 - External file modification detection
 - Cancellable operations (`Esc` during loading/queries)
 - File persistence (`:w`, `:wq`, `:q`)
-- 555+ tests passing
+- 700+ tests passing
 
 **Next Up:**
-- **v0.9.0** - Configuration system (config file, themes)
-- **v0.10.0** - Undo/redo system (`u`, `Ctrl+r`, `.`)
-- **v0.11.0** - SQL editor vim editing (full modal editing)
-- **v0.14.0** - Cell transforms (case toggle, sort, filter)
-- **v0.18.0** - SQL IntelliSense (auto-completion)
+- **v0.12.0** - Cell transforms (case toggle, sort, filter)
+- **v0.14.0** - SQL IntelliSense (auto-completion)
 - **v1.0.0** - Stable release
 
 See [plans/roadmap.md](plans/roadmap.md) for the complete detailed roadmap.
@@ -207,14 +206,14 @@ See [docs/development.md](docs/development.md) for contributing guidelines.
 <!-- Screenshot: Regex search overlay -->
 ![Search](screenshots/search.png)
 
-## What's New in v0.8.1
+## What's New in v0.11.0
 
-**SQL & Data Operations Polish (March 2026):**
-- **Code Quality:** Refactored SQL execution (67.7% reduction) and rendering (70% reduction)
-- **Testing:** 30 new SQL edge case tests, 555 total tests passing
-- **Benchmarks:** 13 SQL benchmark groups for performance validation
-- **Error Messages:** Enhanced with fuzzy column name suggestions (Levenshtein distance)
-- **Zero Warnings:** Clean clippy run
+**Full Vim Modal Editing, Undo/Redo, and Configuration (March 2026):**
+- **SQL Editor:** Full vim modal editing in SQL editor (Normal/Insert/Visual modes)
+- **Undo/Redo:** Complete undo/redo system (`u`, `Ctrl+r`, `.` repeat)
+- **Configuration:** Config file support with themes and customization
+- **Testing:** 700+ total tests passing with comprehensive coverage
+- **Performance:** Maintained 60 FPS with enhanced editing capabilities
 
 ## Philosophy
 

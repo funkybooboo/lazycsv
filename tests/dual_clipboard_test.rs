@@ -75,7 +75,7 @@ fn test_capital_p_pastes_row_above() {
 
     // Move down to row 2
     app.handle_key(key(KeyCode::Char('j'))).unwrap();
-    assert_eq!(app.get_selected_row().unwrap().get(), 2);
+    assert_eq!(app.selected_row().unwrap().get(), 2);
 
     let initial_row_count = app.document.row_count();
 
@@ -85,7 +85,7 @@ fn test_capital_p_pastes_row_above() {
     // Row count increased
     assert_eq!(app.document.row_count(), initial_row_count + 1);
     // Selection stays at row 2 (the pasted row)
-    assert_eq!(app.get_selected_row().unwrap().get(), 2);
+    assert_eq!(app.selected_row().unwrap().get(), 2);
     // The pasted row should contain the yanked content
     assert_eq!(app.document.rows[2], vec!["A1", "B1", "C1", "D1", "E1"]);
     // The original row 2 (A2...) is now at row 3
@@ -584,7 +584,7 @@ fn test_dd_then_capital_p_round_trip() {
     assert_eq!(app.document.row_count(), 4);
 
     // Pasted row should match
-    let pasted_idx = app.get_selected_row().unwrap().get();
+    let pasted_idx = app.selected_row().unwrap().get();
     assert_eq!(app.document.rows[pasted_idx], row1);
 }
 
@@ -618,7 +618,7 @@ fn create_large_test_app() -> App {
 fn test_5dd_deletes_5_rows() {
     let mut app = create_large_test_app();
     assert_eq!(app.document.row_count(), 11); // header + 10 data rows
-    assert_eq!(app.get_selected_row().unwrap().get(), 1);
+    assert_eq!(app.selected_row().unwrap().get(), 1);
 
     // Type 5dd
     app.handle_key(key(KeyCode::Char('5'))).unwrap();
@@ -642,7 +642,7 @@ fn test_dd_count_clamps_to_available_rows() {
     for _ in 0..8 {
         app.handle_key(key(KeyCode::Char('j'))).unwrap();
     }
-    assert_eq!(app.get_selected_row().unwrap().get(), 9);
+    assert_eq!(app.selected_row().unwrap().get(), 9);
 
     // Type 99dd — should delete rows 9 and 10 (only 2 available), not panic
     app.handle_key(key(KeyCode::Char('9'))).unwrap();
@@ -667,7 +667,7 @@ fn test_5dd_stores_in_row_buffer_as_region() {
     app.handle_key(key(KeyCode::Char('d'))).unwrap();
     app.handle_key(key(KeyCode::Char('d'))).unwrap();
 
-    let rows = app.clipboard.get_rows().expect("rows should exist");
+    let rows = app.clipboard.rows().expect("rows should exist");
     assert_eq!(rows.len(), 5);
     assert_eq!(rows[0][0], "R1A");
     assert_eq!(rows[4][0], "R5A");
@@ -692,7 +692,7 @@ fn test_5yy_yanks_5_rows() {
     assert_eq!(app.document.row_count(), 11);
     assert!(!app.document.is_dirty);
 
-    let rows = app.clipboard.get_rows().expect("rows should exist");
+    let rows = app.clipboard.rows().expect("rows should exist");
     assert_eq!(rows.len(), 5);
     assert_eq!(rows[0][0], "R1A");
     assert_eq!(rows[4][0], "R5A");
@@ -710,7 +710,7 @@ fn test_yy_count_clamps_to_available_rows() {
     for _ in 0..8 {
         app.handle_key(key(KeyCode::Char('j'))).unwrap();
     }
-    assert_eq!(app.get_selected_row().unwrap().get(), 9);
+    assert_eq!(app.selected_row().unwrap().get(), 9);
 
     // 99yy — should yank rows 9 and 10 only
     app.handle_key(key(KeyCode::Char('9'))).unwrap();
@@ -718,7 +718,7 @@ fn test_yy_count_clamps_to_available_rows() {
     app.handle_key(key(KeyCode::Char('y'))).unwrap();
     app.handle_key(key(KeyCode::Char('y'))).unwrap();
 
-    let rows = app.clipboard.get_rows().expect("rows should exist");
+    let rows = app.clipboard.rows().expect("rows should exist");
     assert_eq!(rows.len(), 2);
     assert_eq!(rows[0][0], "R9A");
     assert_eq!(rows[1][0], "R10A");
@@ -746,7 +746,7 @@ fn test_5yy_then_p_pastes_5_rows() {
     for _ in 0..7 {
         app.handle_key(key(KeyCode::Char('j'))).unwrap();
     }
-    assert_eq!(app.get_selected_row().unwrap().get(), 8);
+    assert_eq!(app.selected_row().unwrap().get(), 8);
 
     // p — paste below row 8
     app.handle_key(key(KeyCode::Char('p'))).unwrap();
@@ -756,7 +756,7 @@ fn test_5yy_then_p_pastes_5_rows() {
     assert_eq!(app.document.rows[9][0], "R1A");
     assert_eq!(app.document.rows[13][0], "R5A");
     // Selection should be on last pasted row (13)
-    assert_eq!(app.get_selected_row().unwrap().get(), 13);
+    assert_eq!(app.selected_row().unwrap().get(), 13);
     assert!(app
         .status_message
         .as_ref()
@@ -777,7 +777,7 @@ fn test_5yy_then_capital_p_pastes_5_rows_above() {
     for _ in 0..7 {
         app.handle_key(key(KeyCode::Char('j'))).unwrap();
     }
-    assert_eq!(app.get_selected_row().unwrap().get(), 8);
+    assert_eq!(app.selected_row().unwrap().get(), 8);
 
     // P — paste above row 8
     app.handle_key(key(KeyCode::Char('P'))).unwrap();
@@ -787,7 +787,7 @@ fn test_5yy_then_capital_p_pastes_5_rows_above() {
     assert_eq!(app.document.rows[8][0], "R1A");
     assert_eq!(app.document.rows[12][0], "R5A");
     // Selection stays at row 8 (first pasted row)
-    assert_eq!(app.get_selected_row().unwrap().get(), 8);
+    assert_eq!(app.selected_row().unwrap().get(), 8);
     assert!(app
         .status_message
         .as_ref()
@@ -802,7 +802,7 @@ fn test_5yy_then_capital_p_pastes_5_rows_above() {
 #[test]
 fn test_cc_clears_row_enters_insert() {
     let mut app = create_test_app();
-    assert_eq!(app.get_selected_row().unwrap().get(), 1);
+    assert_eq!(app.selected_row().unwrap().get(), 1);
 
     // Verify row 1 has content
     assert_eq!(app.document.rows[1], vec!["A1", "B1", "C1", "D1", "E1"]);

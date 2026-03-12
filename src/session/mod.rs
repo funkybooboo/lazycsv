@@ -95,7 +95,7 @@ impl Session {
     }
 
     /// Get the currently active file path
-    pub fn get_current_file(&self) -> &PathBuf {
+    pub fn current_file(&self) -> &PathBuf {
         &self.files[self.active_file_index]
     }
 
@@ -151,7 +151,7 @@ impl Session {
     }
 
     /// Get header mode for the current file (default: true)
-    pub fn get_header_mode(&self) -> bool {
+    pub fn header_mode(&self) -> bool {
         self.header_modes
             .get(&self.files[self.active_file_index])
             .copied()
@@ -165,7 +165,7 @@ impl Session {
     }
 
     /// Get delimiter for a specific file (default: ',')
-    pub fn get_delimiter(&self, file: &PathBuf) -> char {
+    pub fn delimiter(&self, file: &PathBuf) -> char {
         self.delimiters.get(file).copied().unwrap_or(',')
     }
 
@@ -200,7 +200,7 @@ impl Session {
     }
 
     /// Get list of all dirty files
-    pub fn get_dirty_files(&self) -> Vec<PathBuf> {
+    pub fn dirty_files(&self) -> Vec<PathBuf> {
         self.dirty_files.iter().cloned().collect()
     }
 
@@ -210,7 +210,7 @@ impl Session {
     }
 
     /// Get a cached document for a file
-    pub fn get_cached_document(&self, path: &PathBuf) -> Option<&Document> {
+    pub fn cached_document(&self, path: &PathBuf) -> Option<&Document> {
         self.document_cache.get(path)
     }
 
@@ -376,7 +376,7 @@ mod tests {
         let config = FileConfig::new();
         let session = Session::new(files.clone(), 0, config);
 
-        assert_eq!(session.get_current_file(), &files[0]);
+        assert_eq!(session.current_file(), &files[0]);
         assert_eq!(session.active_file_index(), 0);
         assert_eq!(session.file_count(), 3);
     }
@@ -456,7 +456,7 @@ mod tests {
 
         // Mark another file as dirty
         session.mark_dirty(&files[1]);
-        assert_eq!(session.get_dirty_files().len(), 2);
+        assert_eq!(session.dirty_files().len(), 2);
 
         // Mark file as clean
         session.mark_clean(&files[0]);
@@ -479,11 +479,11 @@ mod tests {
 
         // Cache it
         session.cache_document(files[0].clone(), doc);
-        assert!(session.get_cached_document(&files[0]).is_some());
+        assert!(session.cached_document(&files[0]).is_some());
 
         // Remove from cache
         session.remove_from_cache(&files[0]);
-        assert!(session.get_cached_document(&files[0]).is_none());
+        assert!(session.cached_document(&files[0]).is_none());
     }
 
     #[test]
@@ -502,13 +502,13 @@ mod tests {
             session.cache_document(file.clone(), doc);
         }
 
-        assert!(session.get_cached_document(&files[0]).is_some());
-        assert!(session.get_cached_document(&files[1]).is_some());
+        assert!(session.cached_document(&files[0]).is_some());
+        assert!(session.cached_document(&files[1]).is_some());
 
         // Clear all
         session.clear_cache();
-        assert!(session.get_cached_document(&files[0]).is_none());
-        assert!(session.get_cached_document(&files[1]).is_none());
+        assert!(session.cached_document(&files[0]).is_none());
+        assert!(session.cached_document(&files[1]).is_none());
     }
 
     #[test]
@@ -520,7 +520,7 @@ mod tests {
         let new_path = PathBuf::from("renamed.csv");
         session.rename_current_file(new_path.clone());
 
-        assert_eq!(session.get_current_file(), &new_path);
+        assert_eq!(session.current_file(), &new_path);
         assert_eq!(session.files()[0], new_path);
         // Other files unchanged
         assert_eq!(session.files()[1], files[1]);
@@ -558,8 +558,8 @@ mod tests {
         let new_path = PathBuf::from("renamed.csv");
         session.rename_current_file(new_path.clone());
 
-        assert!(session.get_cached_document(&files[0]).is_none());
-        assert!(session.get_cached_document(&new_path).is_some());
+        assert!(session.cached_document(&files[0]).is_none());
+        assert!(session.cached_document(&new_path).is_some());
     }
 
     #[test]
@@ -574,8 +574,8 @@ mod tests {
         let new_path = PathBuf::from("renamed.csv");
         session.rename_current_file(new_path.clone());
 
-        assert!(!session.get_header_mode());
-        assert_eq!(session.get_delimiter(&new_path), ';');
+        assert!(!session.header_mode());
+        assert_eq!(session.delimiter(&new_path), ';');
     }
 
     #[test]

@@ -1,10 +1,23 @@
-//! Magnifier mode input handling submodules
+//! Magnifier mode input handling
 //!
-//! This module contains helper functions for handling input in magnifier mode,
-//! extracted from the main handler to improve maintainability.
+//! This module handles keyboard input when the magnifier (full vim editor) is active.
+//! The magnifier provides a multi-line text editor for viewing and editing large cell
+//! contents with full vim motion and operator support.
+//!
+//! # Module Organization
+//!
+//! - `handler`: Main input handler dispatching to appropriate subhandlers
+//! - `motions`: Vim motion commands (h, j, k, l, w, b, etc.)
+//! - `operators`: Vim operators (d, y, c, etc.)
+//! - `mode_changes`: Mode transitions (i, v, Esc, etc.)
+//! - `search`: Search within magnifier content (/, n, N)
+//! - `pending`: Pending operator state management
 
-pub mod mode_changes;
-pub mod motions;
-pub mod operators;
-pub mod pending;
-pub mod search;
+mod handler;
+mod mode_changes;
+mod motions;
+mod operators;
+mod pending;
+mod search;
+
+pub use handler::handle;

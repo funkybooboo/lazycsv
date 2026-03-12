@@ -20,7 +20,7 @@ fn send_command(app: &mut App, cmd: &str) {
     }) = app.handle_key(key_event(KeyCode::Enter))
     {
         app.document.sort_by_columns(&col_indices, ascending);
-        let current_file = app.get_current_file().clone();
+        let current_file = app.current_file().clone();
         app.session.mark_dirty(&current_file);
         let direction = if ascending { "ascending" } else { "descending" };
         app.status_message = Some(lazycsv::input::StatusMessage::from(format!(

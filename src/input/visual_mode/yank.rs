@@ -55,7 +55,7 @@ fn yank_block(
         for col_idx in start_col.get()..=end_col.get() {
             let cell = app
                 .document
-                .get_cell(RowIndex::new(row_idx), ColIndex::new(col_idx))
+                .cell(RowIndex::new(row_idx), ColIndex::new(col_idx))
                 .to_string();
             row.push(cell);
         }
@@ -78,7 +78,7 @@ fn yank_lines(app: &mut App, start_row: RowIndex, end_row: RowIndex) {
             (0..app.document.column_count())
                 .map(|col_idx| {
                     app.document
-                        .get_cell(RowIndex::new(row_idx), ColIndex::new(col_idx))
+                        .cell(RowIndex::new(row_idx), ColIndex::new(col_idx))
                         .to_string()
                 })
                 .collect()
@@ -97,7 +97,7 @@ fn yank_columns(app: &mut App, start_col: ColIndex, end_col: ColIndex) {
         let column: Vec<String> = (0..app.document.row_count())
             .map(|row_idx| {
                 app.document
-                    .get_cell(RowIndex::new(row_idx), ColIndex::new(col_idx))
+                    .cell(RowIndex::new(row_idx), ColIndex::new(col_idx))
                     .to_string()
             })
             .collect();

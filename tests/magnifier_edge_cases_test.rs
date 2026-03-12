@@ -122,7 +122,7 @@ fn test_magnifier_visual_mode_empty_lines() {
     mag.move_down();
 
     // Check selection exists
-    assert!(mag.get_visual_selection().is_some());
+    assert!(mag.visual_selection().is_some());
 }
 
 #[test]

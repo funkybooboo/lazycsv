@@ -271,7 +271,7 @@ fn test_pending_g_command_no_timeout() {
     // Should have executed and cleared pending state
     assert_eq!(app.input_state.pending_command, None);
     // With header_mode ON, gg goes to first data row (row 1)
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(1)));
+    assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
 }
 
 #[test]
@@ -314,7 +314,7 @@ fn test_pending_count_no_timeout() {
     // Should have executed
     assert_eq!(app.input_state.command_count, None);
     // App starts at row 1 (first data row). With 4 total rows (0=header, 1-3=data), 5j from row 1 saturates at row 3
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(3)));
+    assert_eq!(app.selected_row(), Some(RowIndex::new(3)));
 }
 
 // ===== Default Directory Tests =====
@@ -444,7 +444,7 @@ fn test_row_jump_with_command_mode() {
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
 
     // Should be at row 2 (absolute row index 2, which is the second data row)
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(2)));
+    assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
 }
 
 #[test]
@@ -454,7 +454,7 @@ fn test_vim_like_status_line_components() {
     let app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
     // Verify app has the components needed for vim-like status line
-    assert!(app.get_selected_row().is_some());
+    assert!(app.selected_row().is_some());
     assert!(app.view_state.selected_column.get() < 5);
 
     // App should be in Normal mode initially

@@ -197,7 +197,7 @@ fn handle_reload_file(
     app.search_state = None;
 
     let filename = app
-        .get_current_file()
+        .current_file()
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("file")
@@ -218,7 +218,7 @@ fn handle_reload_file(
 
     match reload_result {
         Ok(true) => {
-            let current_path = app.get_current_file().clone();
+            let current_path = app.current_file().clone();
             app.invalidate_sqlite_cache_for(&current_path);
             app.status_message = None;
             terminal.clear().context("Failed to clear terminal")?;
@@ -242,7 +242,7 @@ fn handle_switch_document(
     terminal.clear().context("Failed to clear terminal")?;
 
     if app.document.is_dirty {
-        let current_path = app.get_current_file().clone();
+        let current_path = app.current_file().clone();
         app.session.mark_dirty(&current_path);
         app.session
             .cache_document(current_path, app.document.clone());
@@ -264,7 +264,7 @@ fn handle_switch_document(
         app.session.set_active_file_index(idx);
     }
 
-    let current_path = app.get_current_file().clone();
+    let current_path = app.current_file().clone();
     app.session.mark_query_output(&current_path);
 
     let old_rows = std::mem::take(&mut app.document.rows);
@@ -304,7 +304,7 @@ fn handle_sort_document(
         .context("Failed to render UI")?;
 
     app.document.sort_by_columns(&col_indices, ascending);
-    let current_file = app.get_current_file().clone();
+    let current_file = app.current_file().clone();
     app.session.mark_dirty(&current_file);
     app.status_message = Some(lazycsv::input::StatusMessage::from(format!(
         "Sorted by {} {}",

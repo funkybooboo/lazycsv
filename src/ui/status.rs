@@ -1,7 +1,7 @@
 //! Status bar and file switcher rendering.
 //!
 //! This module handles rendering the bottom status bar showing current cell
-//! position and value, plus the file switcher for multi-file sessions.
+//! position, plus the file switcher for multi-file sessions.
 
 use crate::App;
 use ratatui::{
@@ -11,13 +11,6 @@ use ratatui::{
     widgets::Paragraph,
     Frame,
 };
-use std::borrow::Cow;
-
-/// Maximum length for cell value display in status bar
-const MAX_STATUS_CELL_LENGTH: usize = 30;
-
-/// Number of characters used for ellipsis truncation
-const ELLIPSIS_LENGTH: usize = 3;
 
 /// Build a status line with left and right content, padding between them
 fn build_status_line(left: &str, right: &str, width: usize) -> String {
@@ -180,30 +173,14 @@ pub fn render_file_switcher(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(switcher, chunks[1]);
 }
 
-/// Build the right side of the status bar (position and cell value)
+/// Build the right side of the status bar (position only, Excel-style)
 fn build_right_side(app: &App) -> String {
     use crate::ui::utils::column_to_excel_letter;
 
-    let selected_row = app.get_selected_row().map(|r| r.get()).unwrap_or(0);
+    let selected_row = app.selected_row().map(|r| r.get()).unwrap_or(0);
     let col_letter = column_to_excel_letter(app.view_state.selected_column.get());
 
-    let cell_value: Cow<'_, str> = if let Some(row_idx) = app.get_selected_row() {
-        let value = app
-            .document
-            .get_cell(row_idx, app.view_state.selected_column);
-        if value.is_empty() {
-            Cow::Borrowed("<empty>")
-        } else if value.len() > MAX_STATUS_CELL_LENGTH {
-            let truncate_at = MAX_STATUS_CELL_LENGTH - ELLIPSIS_LENGTH;
-            Cow::Owned(format!("\"{}...\"", &value[..truncate_at]))
-        } else {
-            Cow::Owned(format!("\"{}\"", value))
-        }
-    } else {
-        Cow::Borrowed("<no data>")
-    };
-
-    format!("{},{} {}", selected_row, col_letter, cell_value)
+    format!("{}{}", col_letter, selected_row)
 }
 
 /// Build the pending command/count indicator
@@ -228,8 +205,6 @@ fn build_pending_indicator(app: &App) -> String {
 
 /// Build the status text based on current mode
 fn build_status_text(app: &App, right_side: &str, pending_indicator: &str, width: usize) -> String {
-    let col_name = app.document.get_header(app.view_state.selected_column);
-
     match app.mode {
         crate::app::Mode::Command => {
             // Show command input: ":sort_" on left, position on right
@@ -260,10 +235,6 @@ fn build_status_text(app: &App, right_side: &str, pending_indicator: &str, width
             build_status_line(&format!("INSERT{}", dirty), right_side, width)
         }
         crate::app::Mode::Magnifier => build_status_line("MAGNIFIER", right_side, width),
-        crate::app::Mode::HeaderEdit => {
-            let left = format!("HEADER EDIT: {}", col_name);
-            build_status_line(&left, right_side, width)
-        }
         crate::app::Mode::VisualBlock => {
             let dirty = if app.document.is_dirty { "*" } else { "" };
             let selection_info = if let Some(sel) = &app.visual_selection {
@@ -390,11 +361,9 @@ fn build_status_text(app: &App, right_side: &str, pending_indicator: &str, width
     }
 }
 
-/// Render the main status bar showing position and cell information.
+/// Render the main status bar showing position information.
 ///
-/// Displays current row/column position, column name, total rows/columns,
-/// current cell value (truncated if too long), and help/quit keybinding hints.
-/// Also shows any pending status messages.
+/// Displays current row/column position and any pending status messages.
 ///
 /// # Arguments
 ///
@@ -468,10 +437,9 @@ mod tests {
     fn test_build_right_side_normal_cell() {
         let app = create_test_app();
         let right = build_right_side(&app);
-        // Row 0 = header when header_mode is on, first data row is 1
-        // But get_selected_row returns None initially, so it shows row 0
-        assert!(right.contains(",")); // Has comma separator
-        assert!(right.contains("\"")); // Has quotes around cell value
+        // Should show Excel-style cell reference (e.g., "A0")
+        assert!(right.starts_with("A")); // Column letter first
+        assert!(right.len() < 10); // Reasonable length for position only
     }
 
     #[test]
@@ -482,10 +450,9 @@ mod tests {
         app.view_state.selected_column = ColIndex::new(1); // Column B (empty in row 1)
 
         let right = build_right_side(&app);
-        // The empty cell in the data should show <empty>
-        // But we need to verify get_selected_row returns Some(1)
-        assert!(app.get_selected_row().is_some());
-        assert!(right.contains("1,B") || right.contains("<empty>") || !right.is_empty());
+        // Should show Excel-style cell reference
+        assert!(app.selected_row().is_some());
+        assert_eq!(right, "B1"); // Excel-style format
     }
 
     #[test]
@@ -495,8 +462,9 @@ mod tests {
         app.view_state.selected_column = ColIndex::new(1); // Column B (long value)
 
         let right = build_right_side(&app);
-        // Long cells should be truncated
-        assert!(right.len() < 200); // Should be reasonable length
+        // Cell value no longer shown, only position
+        assert_eq!(right, "B2"); // Excel-style format
+        assert!(right.len() < 10); // Reasonable length for position only
     }
 
     #[test]
@@ -635,16 +603,6 @@ mod tests {
 
         let status = build_status_text(&app, "right", "", 80);
         assert!(status.contains("MAGNIFIER"));
-    }
-
-    #[test]
-    fn test_build_status_text_header_edit_mode() {
-        let mut app = create_test_app();
-        app.mode = Mode::HeaderEdit;
-
-        let status = build_status_text(&app, "right", "", 80);
-        assert!(status.contains("HEADER EDIT"));
-        assert!(status.contains("A")); // Column name
     }
 
     #[test]

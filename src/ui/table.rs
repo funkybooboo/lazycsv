@@ -26,6 +26,58 @@ const ROW_NUMBER_COLUMN_WIDTH: u16 = 5;
 /// Offset added to selected position to account for column letters and header rows
 const HEADER_ROW_OFFSET: usize = 2;
 
+/// Calculate cell style based on selection, search matches, and visual mode
+///
+/// # Arguments
+///
+/// * `app` - Application state containing visual selection and header mode
+/// * `search_state` - Optional search state for match highlighting
+/// * `row` - Row index of the cell
+/// * `col` - Column index of the cell
+/// * `is_selected` - Whether this is the currently selected cell
+/// * `is_header` - Whether this cell is in the header row
+///
+/// # Returns
+///
+/// A `Style` object with appropriate colors and modifiers
+fn calculate_cell_style(
+    app: &App,
+    search_state: Option<&crate::search::SearchState>,
+    row: RowIndex,
+    col: ColIndex,
+    is_selected: bool,
+    is_header: bool,
+) -> Style {
+    if is_selected {
+        // Selected cell: white background, black text, bold
+        Style::default()
+            .bg(Color::White)
+            .fg(Color::Black)
+            .add_modifier(Modifier::BOLD)
+    } else if is_in_visual_selection(app, row, col) {
+        // Cell in visual selection: dark gray background
+        Style::default().bg(Color::DarkGray).fg(Color::White)
+    } else if search_state
+        .map(|s| s.is_current_match(row, col))
+        .unwrap_or(false)
+    {
+        // Current search match: yellow background, bold
+        Style::default()
+            .bg(Color::Yellow)
+            .fg(Color::Black)
+            .add_modifier(Modifier::BOLD)
+    } else if search_state.map(|s| s.is_match(row, col)).unwrap_or(false) {
+        // Other search matches: dark gray background, yellow text
+        Style::default().bg(Color::DarkGray).fg(Color::Yellow)
+    } else if is_header && app.document.header_mode {
+        // Header row with header mode ON: bold
+        Style::default().add_modifier(Modifier::BOLD)
+    } else {
+        // Default: no special styling
+        Style::default()
+    }
+}
+
 /// Check if a cell is within the current visual selection
 fn is_in_visual_selection(app: &App, row: RowIndex, col: ColIndex) -> bool {
     if let Some(sel) = &app.visual_selection {
@@ -118,39 +170,13 @@ fn build_header_row(
             if let Some(ref content) = edit_content {
                 content.clone()
             } else {
-                app.document.get_header(ci).to_string()
+                app.document.header(ci).to_string()
             }
         } else {
-            app.document.get_header(ci).to_string()
+            app.document.header(ci).to_string()
         };
 
-        let style = if is_selected_cell {
-            // Selected cell in header row: highlight with white background
-            Style::default()
-                .bg(Color::White)
-                .fg(Color::Black)
-                .add_modifier(Modifier::BOLD)
-        } else if is_in_visual_selection(app, ri, ci) {
-            // Cell in visual selection: dark gray background
-            Style::default().bg(Color::DarkGray).fg(Color::White)
-        } else if search_state
-            .map(|s| s.is_current_match(ri, ci))
-            .unwrap_or(false)
-        {
-            Style::default()
-                .bg(Color::Yellow)
-                .fg(Color::Black)
-                .add_modifier(Modifier::BOLD)
-        } else if search_state.map(|s| s.is_match(ri, ci)).unwrap_or(false) {
-            Style::default().bg(Color::DarkGray).fg(Color::Yellow)
-        } else if app.document.header_mode {
-            // Header mode ON: bold headers
-            Style::default().add_modifier(Modifier::BOLD)
-        } else {
-            // Header mode OFF: normal styling
-            Style::default()
-        };
-
+        let style = calculate_cell_style(app, search_state, ri, ci, is_selected_cell, true);
         header_cells.push(Cell::from(header_text).style(style));
     }
 
@@ -219,7 +245,7 @@ fn build_data_rows(
     column_widths: &[u16],
 ) -> Vec<Row<'static>> {
     let selected_column = app.view_state.selected_column;
-    let selected_row_idx = app.get_selected_row().map(|r| r.get());
+    let selected_row_idx = app.selected_row().map(|r| r.get());
     let is_insert_mode = app.mode == Mode::Insert;
     let search_state = app.search_state.as_ref();
 
@@ -294,24 +320,7 @@ fn build_data_rows(
                 // Highlight current cell with background color
                 let ri = RowIndex::new(row_idx);
                 let ci = ColIndex::new(col_idx);
-                let style = if is_selected {
-                    Style::default().bg(Color::White).fg(Color::Black)
-                } else if is_in_visual_selection(app, ri, ci) {
-                    // Cell in visual selection: dark gray background
-                    Style::default().bg(Color::DarkGray).fg(Color::White)
-                } else if search_state
-                    .map(|s| s.is_current_match(ri, ci))
-                    .unwrap_or(false)
-                {
-                    Style::default()
-                        .bg(Color::Yellow)
-                        .fg(Color::Black)
-                        .add_modifier(Modifier::BOLD)
-                } else if search_state.map(|s| s.is_match(ri, ci)).unwrap_or(false) {
-                    Style::default().bg(Color::DarkGray).fg(Color::Yellow)
-                } else {
-                    Style::default()
-                };
+                let style = calculate_cell_style(app, search_state, ri, ci, is_selected, false);
 
                 cells.push(Cell::from(display_text).style(style));
             }
@@ -355,7 +364,7 @@ fn calculate_column_widths(
         // Get header width
         let header_len = app
             .document
-            .get_header(ColIndex::new(col_idx))
+            .header(ColIndex::new(col_idx))
             .len()
             .max(column_to_excel_letter(col_idx).len());
 
@@ -428,7 +437,7 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     // Build column letters and header rows
     let col_letters_row =
         build_column_letters_row(start_col, end_col, app.view_state.selected_column);
-    let selected_row = app.get_selected_row().map(|r| r.get());
+    let selected_row = app.selected_row().map(|r| r.get());
     let header_row = build_header_row(app, start_col, end_col, selected_row);
 
     // Calculate visible viewport for virtual scrolling

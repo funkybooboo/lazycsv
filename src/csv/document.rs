@@ -450,7 +450,7 @@ impl Document {
     /// Get specific cell value (returns "" if out of bounds)
     /// row_idx is absolute: 0 = header row, 1 = first data row, etc.
     #[allow(dead_code)]
-    pub fn get_cell(&self, row_idx: RowIndex, col_idx: ColIndex) -> &str {
+    pub fn cell(&self, row_idx: RowIndex, col_idx: ColIndex) -> &str {
         self.rows
             .get(row_idx.get())
             .and_then(|r| r.get(col_idx.get()))
@@ -459,7 +459,7 @@ impl Document {
     }
 
     /// Get column header by index (returns "" if out of bounds)
-    pub fn get_header(&self, col_idx: ColIndex) -> &str {
+    pub fn header(&self, col_idx: ColIndex) -> &str {
         self.rows
             .first()
             .and_then(|header_row| header_row.get(col_idx.get()))
@@ -544,8 +544,8 @@ impl Document {
 
     /// Get a copy of rows in a range (inclusive, absolute row indices)
     /// Returns the rows without deleting them
-    /// Example: get_rows(RowIndex(5), RowIndex(10)) returns rows 5-10 inclusive
-    pub fn get_rows(&self, start: RowIndex, end: RowIndex) -> Vec<Vec<String>> {
+    /// Example: rows_range(RowIndex(5), RowIndex(10)) returns rows 5-10 inclusive
+    pub fn rows_range(&self, start: RowIndex, end: RowIndex) -> Vec<Vec<String>> {
         let start_idx = start.get();
         let end_idx = end.get();
 
@@ -608,8 +608,8 @@ impl Document {
 
     /// Get a copy of columns in a range (inclusive, 0-based column indices)
     /// Returns the columns without deleting them (each column as `Vec<String>` including header)
-    /// Example: get_columns(ColIndex(1), ColIndex(3)) returns columns B, C, D
-    pub fn get_columns(&self, start: ColIndex, end: ColIndex) -> Vec<Vec<String>> {
+    /// Example: columns_range(ColIndex(1), ColIndex(3)) returns columns B, C, D
+    pub fn columns_range(&self, start: ColIndex, end: ColIndex) -> Vec<Vec<String>> {
         let start_idx = start.get();
         let end_idx = end.get();
 
@@ -652,7 +652,7 @@ impl Document {
         from_end: ColIndex,
         to_before: usize,
     ) -> usize {
-        let columns = self.get_columns(from_start, from_end);
+        let columns = self.columns_range(from_start, from_end);
         let src_start = from_start.get();
         let count = columns.len();
 
@@ -674,7 +674,7 @@ impl Document {
 
     /// Get a single column (including header at index 0)
     /// Returns empty vec if column doesn't exist
-    pub fn get_column(&self, col: ColIndex) -> Vec<String> {
+    pub fn column(&self, col: ColIndex) -> Vec<String> {
         let col_idx = col.get();
 
         if self.rows.is_empty() {
@@ -850,12 +850,12 @@ mod tests {
 
         assert_eq!(csv_data.column_count(), 3);
         assert_eq!(csv_data.row_count(), 3); // Now includes header (1 header + 2 data rows)
-        assert_eq!(csv_data.get_header(ColIndex::new(0)), "Name");
+        assert_eq!(csv_data.header(ColIndex::new(0)), "Name");
         assert_eq!(
-            csv_data.get_cell(RowIndex::new(1), ColIndex::new(0)), // Row 1 is first data row
+            csv_data.cell(RowIndex::new(1), ColIndex::new(0)), // Row 1 is first data row
             "Alice"
         );
-        assert_eq!(csv_data.get_cell(RowIndex::new(2), ColIndex::new(1)), "25");
+        assert_eq!(csv_data.cell(RowIndex::new(2), ColIndex::new(1)), "25");
         // Row 2 is second data row
     }
 
@@ -878,8 +878,8 @@ mod tests {
 
         let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
-        assert_eq!(csv_data.get_cell(RowIndex::new(10), ColIndex::new(0)), ""); // Row out of bounds
-        assert_eq!(csv_data.get_cell(RowIndex::new(1), ColIndex::new(10)), ""); // Column out of bounds (row 1 is first data row)
+        assert_eq!(csv_data.cell(RowIndex::new(10), ColIndex::new(0)), ""); // Row out of bounds
+        assert_eq!(csv_data.cell(RowIndex::new(1), ColIndex::new(10)), ""); // Column out of bounds (row 1 is first data row)
     }
 
     #[test]
@@ -914,7 +914,7 @@ mod tests {
         assert_eq!(csv_data.row_count(), 2); // 1 header + 1 data row
         assert_eq!(csv_data.column_count(), 3);
         assert_eq!(
-            csv_data.get_cell(RowIndex::new(1), ColIndex::new(0)), // Row 1 is first data row
+            csv_data.cell(RowIndex::new(1), ColIndex::new(0)), // Row 1 is first data row
             "Alice"
         );
     }
@@ -930,7 +930,7 @@ mod tests {
 
         assert_eq!(csv_data.row_count(), 3); // 1 header + 2 data rows
         assert_eq!(csv_data.column_count(), 1);
-        assert_eq!(csv_data.get_header(ColIndex::new(0)), "Name");
+        assert_eq!(csv_data.header(ColIndex::new(0)), "Name");
     }
 
     #[test]
@@ -943,12 +943,12 @@ mod tests {
         let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 3); // 1 header + 2 data rows
-        assert_eq!(csv_data.get_cell(RowIndex::new(1), ColIndex::new(0)), "1");
-        assert_eq!(csv_data.get_cell(RowIndex::new(1), ColIndex::new(1)), "");
-        assert_eq!(csv_data.get_cell(RowIndex::new(1), ColIndex::new(2)), "3");
-        assert_eq!(csv_data.get_cell(RowIndex::new(2), ColIndex::new(0)), "");
-        assert_eq!(csv_data.get_cell(RowIndex::new(2), ColIndex::new(1)), "2");
-        assert_eq!(csv_data.get_cell(RowIndex::new(2), ColIndex::new(2)), "");
+        assert_eq!(csv_data.cell(RowIndex::new(1), ColIndex::new(0)), "1");
+        assert_eq!(csv_data.cell(RowIndex::new(1), ColIndex::new(1)), "");
+        assert_eq!(csv_data.cell(RowIndex::new(1), ColIndex::new(2)), "3");
+        assert_eq!(csv_data.cell(RowIndex::new(2), ColIndex::new(0)), "");
+        assert_eq!(csv_data.cell(RowIndex::new(2), ColIndex::new(1)), "2");
+        assert_eq!(csv_data.cell(RowIndex::new(2), ColIndex::new(2)), "");
     }
 
     #[test]
@@ -961,16 +961,13 @@ mod tests {
         let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 3); // 1 header + 2 data rows
+        assert_eq!(csv_data.cell(RowIndex::new(1), ColIndex::new(0)), "Alice");
         assert_eq!(
-            csv_data.get_cell(RowIndex::new(1), ColIndex::new(0)),
-            "Alice"
-        );
-        assert_eq!(
-            csv_data.get_cell(RowIndex::new(1), ColIndex::new(1)),
+            csv_data.cell(RowIndex::new(1), ColIndex::new(1)),
             "Hello, World"
         );
         assert_eq!(
-            csv_data.get_cell(RowIndex::new(2), ColIndex::new(1)),
+            csv_data.cell(RowIndex::new(2), ColIndex::new(1)),
             "Line1\nLine2"
         );
     }
@@ -985,7 +982,7 @@ mod tests {
 
         assert_eq!(csv_data.row_count(), 2); // 1 header + 1 data row
         assert_eq!(
-            csv_data.get_cell(RowIndex::new(1), ColIndex::new(0)),
+            csv_data.cell(RowIndex::new(1), ColIndex::new(0)),
             "She said \"hello\""
         );
     }
@@ -999,14 +996,8 @@ mod tests {
         let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         // CSV parser should preserve whitespace
-        assert_eq!(
-            csv_data.get_cell(RowIndex::new(1), ColIndex::new(0)),
-            "  1  "
-        );
-        assert_eq!(
-            csv_data.get_cell(RowIndex::new(1), ColIndex::new(1)),
-            "  2  "
-        );
+        assert_eq!(csv_data.cell(RowIndex::new(1), ColIndex::new(0)), "  1  ");
+        assert_eq!(csv_data.cell(RowIndex::new(1), ColIndex::new(1)), "  2  ");
     }
 
     #[test]
@@ -1019,13 +1010,10 @@ mod tests {
         let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 3); // 1 header + 2 data rows
-        assert_eq!(csv_data.get_cell(RowIndex::new(1), ColIndex::new(0)), "★");
-        assert_eq!(csv_data.get_cell(RowIndex::new(1), ColIndex::new(1)), "😀");
-        assert_eq!(csv_data.get_cell(RowIndex::new(2), ColIndex::new(0)), "€");
-        assert_eq!(
-            csv_data.get_cell(RowIndex::new(2), ColIndex::new(1)),
-            "日本"
-        );
+        assert_eq!(csv_data.cell(RowIndex::new(1), ColIndex::new(0)), "★");
+        assert_eq!(csv_data.cell(RowIndex::new(1), ColIndex::new(1)), "😀");
+        assert_eq!(csv_data.cell(RowIndex::new(2), ColIndex::new(0)), "€");
+        assert_eq!(csv_data.cell(RowIndex::new(2), ColIndex::new(1)), "日本");
     }
 
     #[test]
@@ -1039,7 +1027,7 @@ mod tests {
 
         assert_eq!(csv_data.row_count(), 2); // 1 header + 1 data row
         assert_eq!(
-            csv_data.get_cell(RowIndex::new(1), ColIndex::new(0)).len(),
+            csv_data.cell(RowIndex::new(1), ColIndex::new(0)).len(),
             1000
         );
     }
@@ -1055,15 +1043,9 @@ mod tests {
 
         assert_eq!(csv_data.row_count(), 3); // 1 header + 2 data rows
                                              // Numbers are stored as strings
-        assert_eq!(csv_data.get_cell(RowIndex::new(1), ColIndex::new(0)), "123");
-        assert_eq!(
-            csv_data.get_cell(RowIndex::new(1), ColIndex::new(1)),
-            "456.789"
-        );
-        assert_eq!(
-            csv_data.get_cell(RowIndex::new(1), ColIndex::new(2)),
-            "1.23e10"
-        );
+        assert_eq!(csv_data.cell(RowIndex::new(1), ColIndex::new(0)), "123");
+        assert_eq!(csv_data.cell(RowIndex::new(1), ColIndex::new(1)), "456.789");
+        assert_eq!(csv_data.cell(RowIndex::new(1), ColIndex::new(2)), "1.23e10");
     }
 
     #[test]
@@ -1127,13 +1109,13 @@ mod tests {
         let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 10001); // 1 header + 10000 data rows
-        assert_eq!(csv_data.get_cell(RowIndex::new(1), ColIndex::new(0)), "0"); // First data row
+        assert_eq!(csv_data.cell(RowIndex::new(1), ColIndex::new(0)), "0"); // First data row
         assert_eq!(
-            csv_data.get_cell(RowIndex::new(10000), ColIndex::new(0)),
+            csv_data.cell(RowIndex::new(10000), ColIndex::new(0)),
             "9999"
         );
         assert_eq!(
-            csv_data.get_cell(RowIndex::new(10000), ColIndex::new(2)),
+            csv_data.cell(RowIndex::new(10000), ColIndex::new(2)),
             "29997"
         );
     }
@@ -1150,8 +1132,8 @@ mod tests {
 
         assert_eq!(csv_data.column_count(), 100);
         assert_eq!(csv_data.row_count(), 2); // 1 header + 1 data row
-        assert_eq!(csv_data.get_header(ColIndex::new(0)), "Col0");
-        assert_eq!(csv_data.get_header(ColIndex::new(99)), "Col99");
+        assert_eq!(csv_data.header(ColIndex::new(0)), "Col0");
+        assert_eq!(csv_data.header(ColIndex::new(99)), "Col99");
     }
 
     #[test]
@@ -1191,7 +1173,7 @@ mod tests {
 
         assert_eq!(csv_data.row_count(), 2); // 1 header + 1 data row
         assert_eq!(
-            csv_data.get_cell(RowIndex::new(1), ColIndex::new(1)),
+            csv_data.cell(RowIndex::new(1), ColIndex::new(1)),
             "123 Main St, Apt 4, City"
         );
     }
@@ -1217,8 +1199,8 @@ mod tests {
 
         for col in 0..csv_data.column_count() {
             // Should be able to access both header and cells for all columns
-            let header = csv_data.get_header(ColIndex::new(col));
-            let cell = csv_data.get_cell(RowIndex::new(0), ColIndex::new(col));
+            let header = csv_data.header(ColIndex::new(col));
+            let cell = csv_data.cell(RowIndex::new(0), ColIndex::new(col));
             assert!(!header.is_empty() || col >= 3);
             assert!(!cell.is_empty() || col >= 3);
         }
@@ -1236,9 +1218,9 @@ mod tests {
 
         assert_eq!(csv_data.column_count(), 3);
         assert_eq!(csv_data.row_count(), 1); // 1 header + 0 data rows
-        assert_eq!(csv_data.get_header(ColIndex::new(0)), "Name");
-        assert_eq!(csv_data.get_header(ColIndex::new(1)), "Age");
-        assert_eq!(csv_data.get_header(ColIndex::new(2)), "City");
+        assert_eq!(csv_data.header(ColIndex::new(0)), "Name");
+        assert_eq!(csv_data.header(ColIndex::new(1)), "Age");
+        assert_eq!(csv_data.header(ColIndex::new(2)), "City");
     }
 
     #[test]
@@ -1254,11 +1236,8 @@ mod tests {
         let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.row_count(), 3); // 1 header + 2 data rows
-        assert_eq!(
-            csv_data.get_cell(RowIndex::new(1), ColIndex::new(0)),
-            "Alice"
-        );
-        assert_eq!(csv_data.get_cell(RowIndex::new(2), ColIndex::new(0)), "Bob");
+        assert_eq!(csv_data.cell(RowIndex::new(1), ColIndex::new(0)), "Alice");
+        assert_eq!(csv_data.cell(RowIndex::new(2), ColIndex::new(0)), "Bob");
     }
 
     #[test]
@@ -1287,11 +1266,8 @@ mod tests {
 
         assert_eq!(csv_data.column_count(), 3);
         assert_eq!(csv_data.row_count(), 2); // 1 header + 1 data row
-        assert_eq!(
-            csv_data.get_cell(RowIndex::new(1), ColIndex::new(0)),
-            "Alice"
-        );
-        assert_eq!(csv_data.get_cell(RowIndex::new(1), ColIndex::new(1)), "30");
+        assert_eq!(csv_data.cell(RowIndex::new(1), ColIndex::new(0)), "Alice");
+        assert_eq!(csv_data.cell(RowIndex::new(1), ColIndex::new(1)), "30");
     }
 
     #[test]
@@ -1303,10 +1279,7 @@ mod tests {
         let csv_data = Document::from_file(file.path(), Some(b';'), false, None).unwrap();
 
         assert_eq!(csv_data.column_count(), 3);
-        assert_eq!(
-            csv_data.get_cell(RowIndex::new(1), ColIndex::new(0)),
-            "Alice"
-        );
+        assert_eq!(csv_data.cell(RowIndex::new(1), ColIndex::new(0)), "Alice");
     }
 
     #[test]
@@ -1318,10 +1291,7 @@ mod tests {
         let csv_data = Document::from_file(file.path(), Some(b'|'), false, None).unwrap();
 
         assert_eq!(csv_data.column_count(), 3);
-        assert_eq!(
-            csv_data.get_cell(RowIndex::new(1), ColIndex::new(0)),
-            "Alice"
-        );
+        assert_eq!(csv_data.cell(RowIndex::new(1), ColIndex::new(0)), "Alice");
     }
 
     #[test]
@@ -1350,7 +1320,7 @@ mod tests {
 
         assert_eq!(csv_data.row_count(), 2); // 1 header + 1 data row
         assert_eq!(
-            csv_data.get_cell(RowIndex::new(1), ColIndex::new(1)).len(),
+            csv_data.cell(RowIndex::new(1), ColIndex::new(1)).len(),
             100_000
         );
     }
@@ -1370,14 +1340,8 @@ mod tests {
         let csv_data = Document::from_file(file.path(), None, false, None).unwrap();
 
         assert_eq!(csv_data.column_count(), 100);
-        assert_eq!(
-            csv_data.get_cell(RowIndex::new(1), ColIndex::new(0)),
-            "val0"
-        );
-        assert_eq!(
-            csv_data.get_cell(RowIndex::new(1), ColIndex::new(99)),
-            "val99"
-        );
+        assert_eq!(csv_data.cell(RowIndex::new(1), ColIndex::new(0)), "val0");
+        assert_eq!(csv_data.cell(RowIndex::new(1), ColIndex::new(99)), "val99");
     }
 
     #[test]
@@ -1395,7 +1359,7 @@ mod tests {
         let csv_data = Document::from_file(&file_path, None, false, None).unwrap();
 
         // BOM should be stripped, headers should be clean
-        assert_eq!(csv_data.get_header(ColIndex::new(0)), "Name");
+        assert_eq!(csv_data.header(ColIndex::new(0)), "Name");
         assert_eq!(csv_data.row_count(), 2); // 1 header + 1 data row
     }
 
@@ -1470,7 +1434,7 @@ mod tests {
         if let Ok(csv_data) = result {
             assert_eq!(csv_data.row_count(), 2); // 1 header + 1 data row
             assert_eq!(
-                csv_data.get_cell(RowIndex::new(1), ColIndex::new(1)).len(),
+                csv_data.cell(RowIndex::new(1), ColIndex::new(1)).len(),
                 1_000_000
             );
         }
@@ -1536,7 +1500,7 @@ mod tests {
         let mut doc = doc;
         doc.set_cell(RowIndex::new(1), ColIndex::new(0), "Bob".to_string());
 
-        assert_eq!(doc.get_cell(RowIndex::new(1), ColIndex::new(0)), "Bob");
+        assert_eq!(doc.cell(RowIndex::new(1), ColIndex::new(0)), "Bob");
         assert!(doc.is_dirty);
     }
 
@@ -1568,8 +1532,8 @@ mod tests {
         doc.insert_row(RowIndex::new(2)); // Insert after data row
 
         assert_eq!(doc.row_count(), original_count + 1);
-        assert_eq!(doc.get_cell(RowIndex::new(2), ColIndex::new(0)), "");
-        assert_eq!(doc.get_cell(RowIndex::new(2), ColIndex::new(1)), "");
+        assert_eq!(doc.cell(RowIndex::new(2), ColIndex::new(0)), "");
+        assert_eq!(doc.cell(RowIndex::new(2), ColIndex::new(1)), "");
         assert!(doc.is_dirty);
     }
 
@@ -1585,8 +1549,8 @@ mod tests {
         doc.insert_row(RowIndex::new(1)); // Insert at first data row
 
         assert_eq!(doc.row_count(), 4); // 1 header + 3 data rows
-        assert_eq!(doc.get_cell(RowIndex::new(1), ColIndex::new(0)), "");
-        assert_eq!(doc.get_cell(RowIndex::new(2), ColIndex::new(0)), "1");
+        assert_eq!(doc.cell(RowIndex::new(1), ColIndex::new(0)), "");
+        assert_eq!(doc.cell(RowIndex::new(2), ColIndex::new(0)), "1");
     }
 
     #[test]
@@ -1602,7 +1566,7 @@ mod tests {
 
         assert_eq!(deleted, Some(vec!["Alice".to_string()]));
         assert_eq!(doc.row_count(), 2); // 1 header + 1 data row
-        assert_eq!(doc.get_cell(RowIndex::new(1), ColIndex::new(0)), "Bob");
+        assert_eq!(doc.cell(RowIndex::new(1), ColIndex::new(0)), "Bob");
         assert!(doc.is_dirty);
     }
 
@@ -1641,7 +1605,7 @@ mod tests {
         assert_eq!(deleted[0][0], "1");
         assert_eq!(deleted[1][0], "2");
         assert_eq!(doc.row_count(), 3); // 1 header + 2 remaining data rows
-        assert_eq!(doc.get_cell(RowIndex::new(1), ColIndex::new(0)), "3");
+        assert_eq!(doc.cell(RowIndex::new(1), ColIndex::new(0)), "3");
     }
 
     #[test]
@@ -1656,7 +1620,7 @@ mod tests {
             "test.csv".to_string(),
         );
 
-        let rows = doc.get_rows(RowIndex::new(1), RowIndex::new(2));
+        let rows = doc.rows_range(RowIndex::new(1), RowIndex::new(2));
 
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0][0], "1");
@@ -1677,8 +1641,8 @@ mod tests {
         doc.insert_empty_column(ColIndex::new(1));
 
         assert_eq!(doc.column_count(), 2);
-        assert_eq!(doc.get_header(ColIndex::new(1)), "Column B"); // Generated header
-        assert_eq!(doc.get_cell(RowIndex::new(1), ColIndex::new(1)), "");
+        assert_eq!(doc.header(ColIndex::new(1)), "Column B"); // Generated header
+        assert_eq!(doc.cell(RowIndex::new(1), ColIndex::new(1)), "");
         assert!(doc.is_dirty);
     }
 
@@ -1695,9 +1659,9 @@ mod tests {
         doc.insert_column(ColIndex::new(1), column_data);
 
         assert_eq!(doc.column_count(), 2);
-        assert_eq!(doc.get_header(ColIndex::new(1)), "B");
-        assert_eq!(doc.get_cell(RowIndex::new(1), ColIndex::new(1)), "10");
-        assert_eq!(doc.get_cell(RowIndex::new(2), ColIndex::new(1)), "20");
+        assert_eq!(doc.header(ColIndex::new(1)), "B");
+        assert_eq!(doc.cell(RowIndex::new(1), ColIndex::new(1)), "10");
+        assert_eq!(doc.cell(RowIndex::new(2), ColIndex::new(1)), "20");
     }
 
     #[test]
@@ -1715,7 +1679,7 @@ mod tests {
         assert_eq!(deleted[0], "A");
         assert_eq!(deleted[1], "1");
         assert_eq!(doc.column_count(), 1);
-        assert_eq!(doc.get_header(ColIndex::new(0)), "B");
+        assert_eq!(doc.header(ColIndex::new(0)), "B");
     }
 
     #[test]
@@ -1726,7 +1690,7 @@ mod tests {
             "test.csv".to_string(),
         );
 
-        let column = doc.get_column(ColIndex::new(0));
+        let column = doc.column(ColIndex::new(0));
 
         assert_eq!(column.len(), 2); // Header + 1 data row
         assert_eq!(column[0], "A");
@@ -1749,7 +1713,7 @@ mod tests {
         assert_eq!(deleted[0][0], "A"); // First column header
         assert_eq!(deleted[1][0], "B"); // Second column header
         assert_eq!(doc.column_count(), 1);
-        assert_eq!(doc.get_header(ColIndex::new(0)), "C");
+        assert_eq!(doc.header(ColIndex::new(0)), "C");
     }
 
     #[test]
@@ -1760,7 +1724,7 @@ mod tests {
             "test.csv".to_string(),
         );
 
-        let columns = doc.get_columns(ColIndex::new(0), ColIndex::new(1));
+        let columns = doc.columns_range(ColIndex::new(0), ColIndex::new(1));
 
         assert_eq!(columns.len(), 2);
         assert_eq!(columns[0][0], "A");
@@ -1783,9 +1747,9 @@ mod tests {
         let mut doc = doc;
         doc.sort_by_columns(&[0], true); // Sort by Name ascending
 
-        assert_eq!(doc.get_cell(RowIndex::new(1), ColIndex::new(0)), "Alice");
-        assert_eq!(doc.get_cell(RowIndex::new(2), ColIndex::new(0)), "Bob");
-        assert_eq!(doc.get_cell(RowIndex::new(3), ColIndex::new(0)), "Charlie");
+        assert_eq!(doc.cell(RowIndex::new(1), ColIndex::new(0)), "Alice");
+        assert_eq!(doc.cell(RowIndex::new(2), ColIndex::new(0)), "Bob");
+        assert_eq!(doc.cell(RowIndex::new(3), ColIndex::new(0)), "Charlie");
         assert!(doc.is_dirty);
     }
 
@@ -1804,9 +1768,9 @@ mod tests {
         let mut doc = doc;
         doc.sort_by_columns(&[0], false); // Sort descending
 
-        assert_eq!(doc.get_cell(RowIndex::new(1), ColIndex::new(0)), "35");
-        assert_eq!(doc.get_cell(RowIndex::new(2), ColIndex::new(0)), "30");
-        assert_eq!(doc.get_cell(RowIndex::new(3), ColIndex::new(0)), "25");
+        assert_eq!(doc.cell(RowIndex::new(1), ColIndex::new(0)), "35");
+        assert_eq!(doc.cell(RowIndex::new(2), ColIndex::new(0)), "30");
+        assert_eq!(doc.cell(RowIndex::new(3), ColIndex::new(0)), "25");
     }
 
     #[test]
@@ -1825,10 +1789,10 @@ mod tests {
         doc.sort_by_columns(&[0, 1], true); // Sort by Dept then Name
 
         // IT before Sales, then alphabetically within same dept
-        assert_eq!(doc.get_cell(RowIndex::new(1), ColIndex::new(0)), "IT");
-        assert_eq!(doc.get_cell(RowIndex::new(2), ColIndex::new(0)), "Sales");
-        assert_eq!(doc.get_cell(RowIndex::new(2), ColIndex::new(1)), "Alice");
-        assert_eq!(doc.get_cell(RowIndex::new(3), ColIndex::new(1)), "Charlie");
+        assert_eq!(doc.cell(RowIndex::new(1), ColIndex::new(0)), "IT");
+        assert_eq!(doc.cell(RowIndex::new(2), ColIndex::new(0)), "Sales");
+        assert_eq!(doc.cell(RowIndex::new(2), ColIndex::new(1)), "Alice");
+        assert_eq!(doc.cell(RowIndex::new(3), ColIndex::new(1)), "Charlie");
     }
 
     #[test]
@@ -1862,9 +1826,9 @@ mod tests {
         doc.move_columns(ColIndex::new(0), ColIndex::new(0), 3);
 
         // Result should be: B C A
-        assert_eq!(doc.get_header(ColIndex::new(0)), "B");
-        assert_eq!(doc.get_header(ColIndex::new(1)), "C");
-        assert_eq!(doc.get_header(ColIndex::new(2)), "A");
+        assert_eq!(doc.header(ColIndex::new(0)), "B");
+        assert_eq!(doc.header(ColIndex::new(1)), "C");
+        assert_eq!(doc.header(ColIndex::new(2)), "A");
     }
 
     #[test]

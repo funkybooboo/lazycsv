@@ -1,7 +1,7 @@
 pub mod help;
 pub mod magnifier;
 pub mod sql_editor;
-mod sql_editor_helpers;
+// mod sql_editor_helpers; // DEPRECATED: Old SQL editor code, removed in v0.11.0
 pub mod status;
 pub mod table;
 pub mod utils;
@@ -64,12 +64,9 @@ pub fn render(frame: &mut Frame, app: &mut App) {
 
     // Render SQL editor overlay if active
     if app.mode == crate::app::Mode::SqlEditor {
-        sql_editor::render_sql_editor_overlay(
-            frame,
-            &app.sql_buffer,
-            app.sql_cursor,
-            app.sql_error.as_deref(),
-        );
+        if let Some(ref vim_editor) = app.sql_vim_editor {
+            sql_editor::render_sql_editor_vim(frame, vim_editor, app.sql_error.as_deref());
+        }
     }
 
     // Render magnifier overlay if active

@@ -10,7 +10,28 @@ const SINGLE_LETTER_COLS: [&str; 26] = [
     "T", "U", "V", "W", "X", "Y", "Z",
 ];
 
-/// Convert column index to letter (0 -> A, 1 -> B, ..., 26 -> AA, etc.)
+/// Convert 0-based column index to Excel-style letter(s)
+///
+/// Uses the Excel column naming scheme: A, B, ..., Z, AA, AB, ..., ZZ, AAA, etc.
+///
+/// # Arguments
+///
+/// * `index` - Zero-based column index (0 = A, 1 = B, etc.)
+///
+/// # Returns
+///
+/// Excel-style column letter(s) as a `Cow<'static, str>` (borrowed for A-Z, owned for multi-letter)
+///
+/// # Examples
+///
+/// ```
+/// use lazycsv::ui::utils::column_to_excel_letter;
+///
+/// assert_eq!(column_to_excel_letter(0), "A");
+/// assert_eq!(column_to_excel_letter(25), "Z");
+/// assert_eq!(column_to_excel_letter(26), "AA");
+/// assert_eq!(column_to_excel_letter(701), "ZZ");
+/// ```
 pub fn column_to_excel_letter(index: usize) -> Cow<'static, str> {
     if let Some(s) = SINGLE_LETTER_COLS.get(index) {
         return Cow::Borrowed(s);
@@ -28,8 +49,39 @@ pub fn column_to_excel_letter(index: usize) -> Cow<'static, str> {
     Cow::Owned(result)
 }
 
-/// Convert Excel column letter(s) to 0-based index
-/// "A" -> 0, "B" -> 1, "Z" -> 25, "AA" -> 26, "BC" -> 54
+/// Convert Excel-style column letter(s) to 0-based index
+///
+/// Converts Excel column naming (A, B, ..., Z, AA, AB, etc.) to zero-based indices.
+/// Case-insensitive: "a", "A", and "aA" are all treated as column 0 and 26 respectively.
+///
+/// # Arguments
+///
+/// * `letters` - Column letter(s) (e.g., "A", "Z", "AA", "BC")
+///
+/// # Returns
+///
+/// * `Ok(usize)` - Zero-based column index
+/// * `Err(String)` - Error message if input is invalid
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Input is empty
+/// - Input contains non-alphabetic characters
+///
+/// # Examples
+///
+/// ```
+/// use lazycsv::ui::utils::excel_letter_to_column;
+///
+/// assert_eq!(excel_letter_to_column("A").unwrap(), 0);
+/// assert_eq!(excel_letter_to_column("Z").unwrap(), 25);
+/// assert_eq!(excel_letter_to_column("AA").unwrap(), 26);
+/// assert_eq!(excel_letter_to_column("bc").unwrap(), 54); // Case-insensitive
+///
+/// assert!(excel_letter_to_column("").is_err());
+/// assert!(excel_letter_to_column("A1").is_err());
+/// ```
 pub fn excel_letter_to_column(letters: &str) -> Result<usize, String> {
     if letters.is_empty() {
         return Err("Empty column name".to_string());

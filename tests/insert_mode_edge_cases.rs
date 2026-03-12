@@ -243,7 +243,7 @@ fn test_cursor_movement_at_boundaries() {
 #[test]
 fn test_insert_comma_in_cell() {
     let mut app = create_test_app();
-    let row_idx = app.get_selected_row().unwrap();
+    let row_idx = app.selected_row().unwrap();
     let col_idx = app.view_state.selected_column;
 
     app.handle_key(key_event(KeyCode::Char('s'))).unwrap();
@@ -259,14 +259,14 @@ fn test_insert_comma_in_cell() {
     app.handle_key(key_event(KeyCode::Enter)).unwrap();
 
     // Verify cell contains commas (should be quoted when saved)
-    let cell_value = app.document.get_cell(row_idx, col_idx);
+    let cell_value = app.document.cell(row_idx, col_idx);
     assert_eq!(cell_value, "a,b,c");
 }
 
 #[test]
 fn test_insert_quotes_in_cell() {
     let mut app = create_test_app();
-    let row_idx = app.get_selected_row().unwrap();
+    let row_idx = app.selected_row().unwrap();
     let col_idx = app.view_state.selected_column;
 
     app.handle_key(key_event(KeyCode::Char('s'))).unwrap();
@@ -281,7 +281,7 @@ fn test_insert_quotes_in_cell() {
     // Commit
     app.handle_key(key_event(KeyCode::Enter)).unwrap();
 
-    let cell_value = app.document.get_cell(row_idx, col_idx);
+    let cell_value = app.document.cell(row_idx, col_idx);
     assert_eq!(cell_value, "say \"hello\"");
 }
 

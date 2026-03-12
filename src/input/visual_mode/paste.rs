@@ -35,7 +35,7 @@ pub fn handle_visual_paste(app: &mut App) -> Result<InputResult> {
 
 /// Paste rectangular region over block selection
 fn paste_block(app: &mut App, start_row: RowIndex, start_col: ColIndex) {
-    if let Some(region) = app.clipboard.get_region() {
+    if let Some(region) = app.clipboard.region() {
         let region_rows = region.len();
         let max_cols = region.iter().map(|r| r.len()).max().unwrap_or(0);
 
@@ -70,7 +70,7 @@ fn paste_block(app: &mut App, start_row: RowIndex, start_col: ColIndex) {
 
 /// Paste rows over line selection
 fn paste_lines(app: &mut App, start_row: RowIndex, end_row: RowIndex) {
-    if let Some(rows) = app.clipboard.get_rows() {
+    if let Some(rows) = app.clipboard.rows() {
         // Delete selected rows first
         app.document.delete_rows(start_row, end_row);
 
@@ -93,7 +93,7 @@ fn paste_lines(app: &mut App, start_row: RowIndex, end_row: RowIndex) {
 
 /// Paste columns over column selection
 fn paste_columns(app: &mut App, start_col: ColIndex, end_col: ColIndex) {
-    if let Some(columns) = app.clipboard.get_columns() {
+    if let Some(columns) = app.clipboard.columns() {
         // Delete selected columns first
         let col_count = end_col.get() - start_col.get() + 1;
         for _ in 0..col_count {

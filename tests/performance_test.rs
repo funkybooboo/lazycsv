@@ -70,7 +70,7 @@ fn test_navigate_large_file_responsive() {
     let duration = start.elapsed();
 
     // Verify we're at row 5000 (5000G goes to absolute row 5000)
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(5000)));
+    assert_eq!(app.selected_row(), Some(RowIndex::new(5000)));
 
     println!("Navigated to row 5000 in {:?}", duration);
     assert!(

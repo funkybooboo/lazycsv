@@ -59,7 +59,7 @@ pub fn handle_commit_cancel(app: &mut App, key: KeyEvent) {
 /// Commit the current edit and return to Normal mode
 fn commit_edit(app: &mut App) {
     if let Some(buffer) = app.edit_buffer.take() {
-        if let Some(row_idx) = app.get_selected_row() {
+        if let Some(row_idx) = app.selected_row() {
             let col_idx = app.view_state.selected_column;
 
             // Only mark dirty if content changed

@@ -12,6 +12,21 @@ use ratatui::{
     Frame,
 };
 
+/// Popup width as percentage of terminal width
+const POPUP_WIDTH_PERCENT: u16 = 70;
+
+/// Popup height as percentage of terminal height
+const POPUP_HEIGHT_PERCENT: u16 = 60;
+
+/// Minimum line number column width in characters
+const MIN_LINE_NUMBER_WIDTH: u16 = 2;
+
+/// Maximum line number column width in characters
+const MAX_LINE_NUMBER_WIDTH: u16 = 4;
+
+/// Extra padding for line number column (includes space after number)
+const LINE_NUMBER_PADDING: u16 = 2;
+
 /// Create a centered rectangle with the given percentage of width and height
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     let popup_layout = Layout::default()
@@ -40,8 +55,8 @@ pub fn render_magnifier(frame: &mut Frame, app: &App, area: Rect) {
         None => return,
     };
 
-    // Create centered popup (70% width, 60% height)
-    let popup_area = centered_rect(70, 60, area);
+    // Create centered popup
+    let popup_area = centered_rect(POPUP_WIDTH_PERCENT, POPUP_HEIGHT_PERCENT, area);
     frame.render_widget(Clear, popup_area);
 
     // Build and render main block with title
@@ -153,14 +168,17 @@ fn build_magnifier_status_bar(
 fn render_content(frame: &mut Frame, magnifier: &crate::magnifier::MagnifierState, area: Rect) {
     let line_count = magnifier.lines().len();
     let line_num_width = if line_count == 0 {
-        2
+        MIN_LINE_NUMBER_WIDTH
     } else {
-        (line_count.to_string().len() as u16).clamp(2, 4)
+        (line_count.to_string().len() as u16).clamp(MIN_LINE_NUMBER_WIDTH, MAX_LINE_NUMBER_WIDTH)
     };
 
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Length(line_num_width + 2), Constraint::Min(0)])
+        .constraints([
+            Constraint::Length(line_num_width + LINE_NUMBER_PADDING),
+            Constraint::Min(0),
+        ])
         .split(area);
 
     render_line_numbers(frame, magnifier, chunks[0], line_num_width);
@@ -230,7 +248,7 @@ fn render_text_content(
     };
 
     let end_line = (scroll_offset + visible_height).min(line_count);
-    let selection = magnifier.get_visual_selection();
+    let selection = magnifier.visual_selection();
     let search_matches = magnifier.search_matches();
     let current_match = magnifier.current_match_index();
 

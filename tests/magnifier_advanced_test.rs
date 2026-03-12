@@ -31,7 +31,7 @@ fn test_visual_mode_char_wise() {
     state.move_right();
 
     // Get selection
-    let selection = state.get_visual_selection();
+    let selection = state.visual_selection();
     assert!(selection.is_some());
 }
 
@@ -50,7 +50,7 @@ fn test_visual_mode_line_wise() {
     state.move_down();
 
     // Get selection
-    let selection = state.get_visual_selection();
+    let selection = state.visual_selection();
     assert!(selection.is_some());
 }
 
@@ -67,7 +67,7 @@ fn test_visual_delete_selection() {
     state.delete_selection();
 
     assert_eq!(state.line_count(), 1);
-    assert_eq!(state.get_line(0), Some("Line 3"));
+    assert_eq!(state.line(0), Some("Line 3"));
 }
 
 #[test]
@@ -144,12 +144,12 @@ fn test_search_word_under_cursor() {
     );
 
     // Get word under cursor
-    let word = state.get_word_under_cursor();
+    let word = state.word_under_cursor();
     assert_eq!(word, Some("hello".to_string()));
 
     // Move to "world"
     state.set_cursor_for_test(0, 6);
-    let word = state.get_word_under_cursor();
+    let word = state.word_under_cursor();
     assert_eq!(word, Some("world".to_string()));
 }
 
@@ -258,7 +258,7 @@ fn test_change_char() {
 
     state.change_char();
     assert_eq!(state.mode(), MagnifierMode::Insert);
-    assert_eq!(state.get_line(0), Some("ello")); // 'h' deleted
+    assert_eq!(state.line(0), Some("ello")); // 'h' deleted
 }
 
 #[test]
@@ -270,7 +270,7 @@ fn test_change_line() {
 
     state.change_line();
     assert_eq!(state.mode(), MagnifierMode::Insert);
-    assert_eq!(state.get_line(0), Some("")); // Line cleared
+    assert_eq!(state.line(0), Some("")); // Line cleared
     assert_eq!(state.cursor(), (0, 0));
 }
 
@@ -284,7 +284,7 @@ fn test_change_to_eol() {
     state.set_cursor_for_test(0, 6); // At 'w'
     state.change_to_eol();
     assert_eq!(state.mode(), MagnifierMode::Insert);
-    assert_eq!(state.get_line(0), Some("hello ")); // "world" deleted
+    assert_eq!(state.line(0), Some("hello ")); // "world" deleted
 }
 
 #[test]
@@ -292,7 +292,7 @@ fn test_replace_char() {
     let mut state = MagnifierState::new("hello".to_string(), (RowIndex::new(0), ColIndex::new(0)));
 
     state.replace_char('H');
-    assert_eq!(state.get_line(0), Some("Hello"));
+    assert_eq!(state.line(0), Some("Hello"));
     assert_eq!(state.mode(), MagnifierMode::Normal); // Stays in normal
 }
 
@@ -305,7 +305,7 @@ fn test_join_lines() {
 
     state.join_lines();
     assert_eq!(state.line_count(), 1);
-    assert_eq!(state.get_line(0), Some("hello world"));
+    assert_eq!(state.line(0), Some("hello world"));
 }
 
 #[test]
@@ -317,7 +317,7 @@ fn test_join_lines_empty() {
 
     state.join_lines();
     assert_eq!(state.line_count(), 2);
-    assert_eq!(state.get_line(0), Some("hello"));
+    assert_eq!(state.line(0), Some("hello"));
 }
 
 #[test]
@@ -325,7 +325,7 @@ fn test_indent_line() {
     let mut state = MagnifierState::new("hello".to_string(), (RowIndex::new(0), ColIndex::new(0)));
 
     state.indent_line();
-    assert_eq!(state.get_line(0), Some("  hello"));
+    assert_eq!(state.line(0), Some("  hello"));
     assert_eq!(state.cursor(), (0, 2)); // Cursor moved right
 }
 
@@ -336,7 +336,7 @@ fn test_dedent_line() {
 
     state.set_cursor_for_test(0, 2);
     state.dedent_line();
-    assert_eq!(state.get_line(0), Some("hello"));
+    assert_eq!(state.line(0), Some("hello"));
     assert_eq!(state.cursor(), (0, 0)); // Cursor moved left
 }
 
@@ -347,7 +347,7 @@ fn test_dedent_line_with_tab() {
 
     state.set_cursor_for_test(0, 1);
     state.dedent_line();
-    assert_eq!(state.get_line(0), Some("hello"));
+    assert_eq!(state.line(0), Some("hello"));
 }
 
 #[test]
@@ -362,7 +362,7 @@ fn test_undo() {
 
     // Undo
     state.undo();
-    assert_eq!(state.get_line(0), Some("hello")); // Back to original
+    assert_eq!(state.line(0), Some("hello")); // Back to original
 }
 
 #[test]
@@ -378,7 +378,7 @@ fn test_redo() {
     // Undo then redo
     state.undo();
     state.redo();
-    assert_eq!(state.get_line(0), Some("Xhello")); // Change restored
+    assert_eq!(state.line(0), Some("Xhello")); // Change restored
 }
 
 #[test]
@@ -398,13 +398,13 @@ fn test_multiple_undo_redo() {
 
     // Undo twice
     state.undo();
-    assert_eq!(state.get_line(0), Some("ba"));
+    assert_eq!(state.line(0), Some("ba"));
     state.undo();
-    assert_eq!(state.get_line(0), Some("a"));
+    assert_eq!(state.line(0), Some("a"));
 
     // Redo once
     state.redo();
-    assert_eq!(state.get_line(0), Some("ba"));
+    assert_eq!(state.line(0), Some("ba"));
 }
 
 #[test]

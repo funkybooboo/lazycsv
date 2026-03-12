@@ -59,7 +59,7 @@ fn get_column_order(app: &App) -> Vec<String> {
     (0..app.document.column_count())
         .map(|i| {
             app.document
-                .get_cell(lazycsv::RowIndex::new(0), ColIndex::new(i))
+                .cell(lazycsv::RowIndex::new(0), ColIndex::new(i))
                 .to_string()
         })
         .collect()
@@ -99,12 +99,12 @@ fn test_move_preserves_data() {
     let col_b_idx = 4; // B is now at index 4 (end)
     assert_eq!(
         app.document
-            .get_cell(lazycsv::RowIndex::new(1), ColIndex::new(col_b_idx)),
+            .cell(lazycsv::RowIndex::new(1), ColIndex::new(col_b_idx)),
         "B1"
     );
     assert_eq!(
         app.document
-            .get_cell(lazycsv::RowIndex::new(2), ColIndex::new(col_b_idx)),
+            .cell(lazycsv::RowIndex::new(2), ColIndex::new(col_b_idx)),
         "B2"
     );
 }

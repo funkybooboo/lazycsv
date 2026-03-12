@@ -28,7 +28,7 @@ pub fn handle_search_command(mag: &mut MagnifierState, key: KeyCode) -> bool {
 
         // Search word under cursor
         KeyCode::Char('*') => {
-            if let Some(word) = mag.get_word_under_cursor() {
+            if let Some(word) = mag.word_under_cursor() {
                 mag.search_forward(word);
             }
             true

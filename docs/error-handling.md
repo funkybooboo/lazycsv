@@ -1,7 +1,7 @@
 # Error Handling Policy
 
-**Version:** v0.1.1  
-**Last Updated:** 2026-03-07
+**Version:** v0.11.0  
+**Last Updated:** 2026-03-08
 
 ## Overview
 

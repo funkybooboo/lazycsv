@@ -140,7 +140,7 @@ impl PendingCommand {
     }
 
     /// Get the buffered column letters if this is a GotoColumn command
-    pub fn get_column_letters(&self) -> Option<&str> {
+    pub fn column_letters(&self) -> Option<&str> {
         match self {
             PendingCommand::GotoColumn(s) => Some(s.as_str()),
             _ => None,

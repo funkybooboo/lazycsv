@@ -41,7 +41,7 @@ fn test_o_on_empty_0_column_file() {
 
     // Cursor should move to the new row
     assert_eq!(
-        app.get_selected_row(),
+        app.selected_row(),
         Some(RowIndex::new(1)),
         "After o, cursor should be on new row"
     );
@@ -58,7 +58,7 @@ fn test_o_on_header_only_file() {
 
     assert_eq!(app.document.row_count(), 1); // Only header
     assert_eq!(app.document.column_count(), 3);
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(0))); // On header row
+    assert_eq!(app.selected_row(), Some(RowIndex::new(0))); // On header row
 
     // Press 'o' to insert first data row
     app.handle_key(key_event(KeyCode::Char('o'))).unwrap();
@@ -67,19 +67,19 @@ fn test_o_on_header_only_file() {
     assert_eq!(app.document.row_count(), 2);
 
     // Cursor should be on row 1 (first data row)
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(1)));
+    assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
 
     // New row should have correct number of columns (all empty)
     assert_eq!(
-        app.document.get_cell(RowIndex::new(1), ColIndex::new(0)),
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
         ""
     );
     assert_eq!(
-        app.document.get_cell(RowIndex::new(1), ColIndex::new(1)),
+        app.document.cell(RowIndex::new(1), ColIndex::new(1)),
         ""
     );
     assert_eq!(
-        app.document.get_cell(RowIndex::new(1), ColIndex::new(2)),
+        app.document.cell(RowIndex::new(1), ColIndex::new(2)),
         ""
     );
 }

@@ -104,8 +104,8 @@ fn test_delim_persists_in_session() {
     assert_eq!(app.document.delimiter, '|');
 
     // Delimiter should be tracked in session
-    let current_file = app.get_current_file().clone();
-    assert_eq!(app.session.get_delimiter(&current_file), '|');
+    let current_file = app.current_file().clone();
+    assert_eq!(app.session.delimiter(&current_file), '|');
 }
 
 #[test]
@@ -125,8 +125,8 @@ fn test_delim_per_file_tracking() {
 
     // Switch to file2 (implementation pending)
     // Verify file1's delimiter is still tracked
-    assert_eq!(app.session.get_delimiter(&file1), '|');
-    assert_eq!(app.session.get_delimiter(&file2), ','); // Default
+    assert_eq!(app.session.delimiter(&file1), '|');
+    assert_eq!(app.session.delimiter(&file2), ','); // Default
 }
 
 #[test]

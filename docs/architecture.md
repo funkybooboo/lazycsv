@@ -49,7 +49,7 @@ parse_args() - Validate CLI arguments
     ↓
 scan_directory_for_csvs() - Find other CSV files
     ↓
-CsvData::from_file() - Load initial file
+Document::from_file() - Load initial file
     ↓
 ratatui::init() - Initialize terminal
     ↓
@@ -2001,7 +2001,7 @@ fn main() -> Result<()> {
 ```
 csv::Reader::from_path() fails
     ↓
-CsvData::from_file() adds context
+Document::from_file() adds context
     ↓
 Propagated with ?
     ↓
@@ -2136,7 +2136,7 @@ fn test_column_index_to_letter() { ... }
 // tests/integration_test.rs
 #[test]
 fn test_load_and_navigate() {
-    let csv = CsvData::from_file(path)?;
+    let csv = Document::from_file(path)?;
     let app = App::new(csv, ...);
     app.handle_key(...);
     assert_eq!(app.selected_row(), Some(1));
@@ -2237,8 +2237,8 @@ pub enum Command {
     SaveAndQuit,
 }
 
-// Dirty tracking (already in CsvData)
-pub struct CsvData {
+// Dirty tracking (already in Document)
+pub struct Document {
     is_dirty: bool,
     // ...
 }
@@ -2248,8 +2248,8 @@ pub struct CsvData {
 ```rust
 // Command pattern for undo/redo
 trait Operation {
-    fn execute(&mut self, data: &mut CsvData) -> Result<()>;
-    fn undo(&mut self, data: &mut CsvData) -> Result<()>;
+    fn execute(&mut self, data: &mut Document) -> Result<()>;
+    fn undo(&mut self, data: &mut Document) -> Result<()>;
 }
 
 pub enum OperationType {
@@ -2273,8 +2273,8 @@ pub struct CommandHistory {
 
 impl CommandHistory {
     fn push(&mut self, op: Box<dyn Operation>);
-    fn undo(&mut self, data: &mut CsvData) -> Option<String>; // Returns description
-    fn redo(&mut self, data: &mut CsvData) -> Option<String>;
+    fn undo(&mut self, data: &mut Document) -> Option<String>; // Returns description
+    fn redo(&mut self, data: &mut Document) -> Option<String>;
 }
 ```
 

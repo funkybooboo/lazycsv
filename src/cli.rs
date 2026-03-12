@@ -42,7 +42,11 @@ pub struct CliArgs {
     pub columns: bool,
 
     /// Format numbers with locale-aware thousands separators.
-    #[arg(short = 'f', long, help = "Format numbers with thousands separators (',' or '.' based on locale)")]
+    #[arg(
+        short = 'f',
+        long,
+        help = "Format numbers with thousands separators (',' or '.' based on locale)"
+    )]
     pub format: bool,
 }
 
@@ -54,6 +58,15 @@ fn parse_delimiter(s: &str) -> Result<u8, String> {
     }
 }
 
+/// Parse command-line arguments using clap
+///
+/// # Returns
+///
+/// A `CliArgs` struct containing all parsed CLI arguments
+///
+/// # Panics
+///
+/// Exits the program if invalid arguments are provided (handled by clap)
 pub fn parse_args() -> CliArgs {
     CliArgs::parse()
 }

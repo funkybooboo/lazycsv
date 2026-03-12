@@ -17,9 +17,11 @@
 //! - Column mode → Column buffer (columns with all rows including header)
 
 mod delete;
+mod handler;
 mod paste;
 mod yank;
 
 pub use delete::handle_visual_delete;
+pub use handler::handle;
 pub use paste::handle_visual_paste;
 pub use yank::handle_visual_yank;

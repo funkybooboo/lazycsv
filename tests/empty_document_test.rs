@@ -61,9 +61,9 @@ fn test_header_only_file_no_data() {
         3,
         "Header-only file should have 3 columns"
     );
-    assert_eq!(doc.get_cell(RowIndex::new(0), ColIndex::new(0)), "Name");
-    assert_eq!(doc.get_cell(RowIndex::new(0), ColIndex::new(1)), "Age");
-    assert_eq!(doc.get_cell(RowIndex::new(0), ColIndex::new(2)), "City");
+    assert_eq!(doc.cell(RowIndex::new(0), ColIndex::new(0)), "Name");
+    assert_eq!(doc.cell(RowIndex::new(0), ColIndex::new(1)), "Age");
+    assert_eq!(doc.cell(RowIndex::new(0), ColIndex::new(2)), "City");
 }
 
 #[test]
@@ -78,13 +78,13 @@ fn test_app_new_with_empty_document_0_cols() {
     // With 0 columns, cursor should not be selectable
     println!(
         "App with 0-col doc: selected_row={:?}",
-        app.get_selected_row()
+        app.selected_row()
     );
 
     // Currently this will select Some(0), but ideally should be None or handle gracefully
     // For now, just document the current behavior
     assert!(
-        app.get_selected_row().is_some(),
+        app.selected_row().is_some(),
         "Currently selects row 0 even with 0 columns"
     );
 }
@@ -102,12 +102,12 @@ fn test_app_new_with_header_only_document() {
     // because there's no data row to move to
     println!(
         "App with header-only doc: selected_row={:?}, header_mode={}",
-        app.get_selected_row(),
+        app.selected_row(),
         app.document.header_mode
     );
 
     assert_eq!(
-        app.get_selected_row(),
+        app.selected_row(),
         Some(RowIndex::new(0)),
         "With only header row, cursor should be on row 0"
     );
@@ -121,11 +121,11 @@ fn test_single_row_single_column() {
     let doc = Document::from_file(&file_path, None, false, None).unwrap();
     assert_eq!(doc.row_count(), 1);
     assert_eq!(doc.column_count(), 1);
-    assert_eq!(doc.get_cell(RowIndex::new(0), ColIndex::new(0)), "Header");
+    assert_eq!(doc.cell(RowIndex::new(0), ColIndex::new(0)), "Header");
 
     let files = vec![file_path.clone()];
     let app = App::new(doc, files, 0, FileConfig::new());
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(0)));
+    assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 }
 
 #[test]
@@ -140,7 +140,7 @@ fn test_navigation_with_header_only_file() {
     // Try to move down - should stay on row 0 (no data rows)
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
     assert_eq!(
-        app.get_selected_row(),
+        app.selected_row(),
         Some(RowIndex::new(0)),
         "j on header-only file should stay on row 0"
     );
@@ -149,7 +149,7 @@ fn test_navigation_with_header_only_file() {
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
     assert_eq!(
-        app.get_selected_row(),
+        app.selected_row(),
         Some(RowIndex::new(0)),
         "gg on header-only file should go to row 0 (only row available)"
     );
@@ -165,7 +165,7 @@ fn test_delete_last_data_row_moves_to_header() {
     let mut app = App::new(doc, files, 0, FileConfig::new());
 
     // Start on row 1 (first data row)
-    assert_eq!(app.get_selected_row(), Some(RowIndex::new(1)));
+    assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
     assert_eq!(app.document.row_count(), 2); // header + 1 data row
 
     // Delete the only data row with dd
@@ -181,7 +181,7 @@ fn test_delete_last_data_row_moves_to_header() {
 
     // Cursor should move to row 0 (header row)
     assert_eq!(
-        app.get_selected_row(),
+        app.selected_row(),
         Some(RowIndex::new(0)),
         "After deleting last data row, cursor should move to header (row 0)"
     );

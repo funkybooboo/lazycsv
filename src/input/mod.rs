@@ -4,9 +4,14 @@
 //! pending commands (like 'g' waiting for second key in 'gg').
 
 pub mod actions;
+pub mod command_mode;
+pub mod file_list_mode;
 pub mod handler;
 pub mod insert_mode;
 pub mod magnifier_mode;
+pub mod normal_mode;
+pub mod search_mode;
+pub mod sql_editor_mode;
 pub mod state;
 pub mod visual_mode;
 

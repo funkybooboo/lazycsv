@@ -122,8 +122,7 @@ fn esc_watch_loop(cancelled: &AtomicBool, done: &AtomicBool) {
                     if unsafe { libc::poll(&mut pfd3, 1, 2) } <= 0 {
                         break;
                     }
-                    if unsafe { libc::read(fd, drain.as_mut_ptr() as *mut libc::c_void, 16) } <= 0
-                    {
+                    if unsafe { libc::read(fd, drain.as_mut_ptr() as *mut libc::c_void, 16) } <= 0 {
                         break;
                     }
                 }

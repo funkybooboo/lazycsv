@@ -21,7 +21,6 @@ The current mode is always shown in the status bar:
 - `-- NORMAL --` - Navigation mode
 - `-- INSERT --` - Quick cell editing
 - `-- MAGNIFIER --` - Vim editor for power editing (multi-line cells)
-- `-- HEADER EDIT --` - Editing column header names (accessed via `,o`/`,O`)
 - `-- VISUAL --` / `-- VISUAL LINE --` / `-- COLUMN VISUAL --` - Selection modes
 - `-- COMMAND --` - Command input mode
 
@@ -71,7 +70,9 @@ The current mode is always shown in the status bar:
 
 | Key | Action |
 |-----|--------|
-| `gg` | Jump to first row |
+| `gg` | Jump to first row (or first data row if header mode ON) |
+| `gh` | Jump to header row (row 0) - requires header mode ON |
+| `gd` | Jump to first data row (row 1) |
 | `G` | Jump to last row |
 | `<number>G` | Jump to specific row (e.g., `15G`) |
 | `0` | Jump to first column |
@@ -220,6 +221,21 @@ Commands show clear error messages instead of silently clamping:
 | `P` | Paste row above current position |
 | `Delete` | Clear current cell content (stay in Normal mode)
 
+### Header Management
+
+| Command | Action |
+|---------|--------|
+| `:ht` | Toggle header mode ON/OFF |
+| `gh` | Go to header row (row 0) - requires header mode ON |
+| `gd` | Go to first data row (row 1) |
+
+**Header Mode Behavior:**
+- When ON: Row 0 is styled as header, `gg` goes to row 1 (first data row)
+- When OFF: Row 0 is treated as regular data, `gg` goes to row 0
+- Header row is always row 0 (no special storage)
+- Edit headers by using `gh` to navigate to row 0, then `i`/`a`/`s` to edit
+- Per-file setting (not persisted to CSV file)
+
 ---
 
 ## v0.4.1 - Persistence & Multi-File Workflow ( Complete)
@@ -263,8 +279,8 @@ The comma `,` key acts as a leader for all column-level operations, following th
 
 | Key | Action |
 |-----|--------|
-| `,o` | Insert new column to the right (enters HeaderEdit mode) |
-| `,O` | Insert new column to the left (enters HeaderEdit mode) |
+| `,o` | Insert new column to the right |
+| `,O` | Insert new column to the left |
 | `,dd` | Delete current column (including header) |
 | `,yy` | Yank (copy) current column (including header) |
 | `,p` | Paste column to the right of current |
@@ -275,7 +291,8 @@ The comma `,` key acts as a leader for all column-level operations, following th
 - After paste, cursor moves to the new column
 - Yanked columns include the header row
 - Column operations work on entire columns (all rows + header)
-- `,o` and `,O` automatically enter HeaderEdit mode to name the new column
+- New columns get auto-generated names like "Column D"
+- Use `gh` to navigate to header row, then `i` to edit header names
 
 ### Visual Selection
 
@@ -720,7 +737,7 @@ The following features were removed from the roadmap to maintain simplicity:
 
 **Kept (Essential Features):**
 -  **Visual mode** (`v`, `V`, `,v`) - Essential for selecting regions to copy/paste/delete
--  **HeaderEdit mode** (accessed via `,o`/`,O`) - Essential for editing column header names
+-  **Header navigation** (`gh`, `gd`) - Quick access to headers and data rows
 -  **Magnifier mode** (`Enter`) - Essential for multi-line cell editing (JSON, descriptions)
 -  **Command ranges** (`:5,10d`, `:B,D`, `:B,D@5,10`) - Planned for v0.10.0+
 
@@ -773,7 +790,7 @@ status_bar = "blue"
 | v0.9.0 | Configuration System (config file, themes, keybindings) |
 | v0.10.0 | Undo/Redo (history management, dot command) |
 | v0.11.0 | SQL Editor Vim Editing (full vim modal editing in SQL editor) |
-| v0.12.0 | UI Consistency & HeaderEdit Mode (standardized UI) |
+| v0.12.0 | UI Consistency & Header Navigation (standardized UI, gh/gd commands) |
 | v0.14.0 | Cell Transforms (case toggle, row swap, advanced filtering) |
 | v0.18.0 | SQL IntelliSense (auto-completion, context-aware suggestions) |
 | v0.22.0 | Macros (command recording and replay) |

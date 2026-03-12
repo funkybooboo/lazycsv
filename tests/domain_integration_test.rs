@@ -89,16 +89,16 @@ fn test_position_with_document_cell_access() {
     assert!(bob_city.col.get() < doc.column_count());
 
     // Access cells using type-safe positions
-    let name_header = doc.get_cell(header_pos.row, header_pos.col);
+    let name_header = doc.cell(header_pos.row, header_pos.col);
     assert_eq!(name_header, "Name");
 
-    let alice = doc.get_cell(alice_name.row, alice_name.col);
+    let alice = doc.cell(alice_name.row, alice_name.col);
     assert_eq!(alice, "Alice");
 
-    let age = doc.get_cell(alice_age.row, alice_age.col);
+    let age = doc.cell(alice_age.row, alice_age.col);
     assert_eq!(age, "30");
 
-    let city = doc.get_cell(bob_city.row, bob_city.col);
+    let city = doc.cell(bob_city.row, bob_city.col);
     assert_eq!(city, "LA");
 }
 
@@ -186,8 +186,8 @@ fn test_position_equality_with_document_cells() {
     assert_eq!(pos1, pos2);
 
     // Verify they access the same cell
-    let cell1 = doc.get_cell(pos1.row, pos1.col);
-    let cell2 = doc.get_cell(pos2.row, pos2.col);
+    let cell1 = doc.cell(pos1.row, pos1.col);
+    let cell2 = doc.cell(pos2.row, pos2.col);
     assert_eq!(cell1, cell2);
     assert_eq!(cell1, "1");
 }
@@ -239,7 +239,7 @@ fn test_large_document_navigation() {
     // Access cell at new position
     // Row 600 = data row 599 (because row 0 is header)
     let new_pos = Position::new(forward, right);
-    let cell = doc.get_cell(new_pos.row, new_pos.col);
+    let cell = doc.cell(new_pos.row, new_pos.col);
     assert_eq!(cell, "R599C45");
 }
 
@@ -275,11 +275,11 @@ fn test_type_safety_prevents_row_col_confusion() {
     let col = ColIndex::new(2);
 
     // Correct order: row, then col
-    let cell = doc.get_cell(row, col);
+    let cell = doc.cell(row, col);
     assert_eq!(cell, "3");
 
     // The following would not compile (type safety at work):
-    // let cell = doc.get_cell(col, row); // ERROR: expected RowIndex, found ColIndex
+    // let cell = doc.cell(col, row); // ERROR: expected RowIndex, found ColIndex
 
     // This test verifies compile-time type safety
     // We can't test the negative case (wrong order) because it won't compile!

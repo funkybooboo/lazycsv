@@ -33,11 +33,11 @@ fn test_row_buffer_isolated_from_column_buffer() {
 
     // Try to paste with ,p (column paste)
     // Should find nothing in column buffer
-    assert!(app.clipboard.get_columns().is_none());
+    assert!(app.clipboard.columns().is_none());
 
     // Row buffer should still have data
-    assert!(app.clipboard.get_rows().is_some());
-    assert_eq!(app.clipboard.get_rows().unwrap().len(), 1);
+    assert!(app.clipboard.rows().is_some());
+    assert_eq!(app.clipboard.rows().unwrap().len(), 1);
 }
 
 #[test]
@@ -56,11 +56,11 @@ fn test_column_buffer_isolated_from_row_buffer() {
 
     // Try to paste with p (row paste)
     // Should find nothing in row buffer
-    assert!(app.clipboard.get_rows().is_none());
+    assert!(app.clipboard.rows().is_none());
 
     // Column buffer should still have data
-    assert!(app.clipboard.get_columns().is_some());
-    assert_eq!(app.clipboard.get_columns().unwrap().len(), 1);
+    assert!(app.clipboard.columns().is_some());
+    assert_eq!(app.clipboard.columns().unwrap().len(), 1);
 }
 
 #[test]
@@ -75,11 +75,11 @@ fn test_region_buffer_isolated_from_row_buffer() {
 
     // Try to paste with p (row paste)
     // Should find nothing in row buffer
-    assert!(app.clipboard.get_rows().is_none());
+    assert!(app.clipboard.rows().is_none());
 
     // Region buffer should still have data
-    assert!(app.clipboard.get_region().is_some());
-    assert_eq!(app.clipboard.get_region().unwrap().len(), 2);
+    assert!(app.clipboard.region().is_some());
+    assert_eq!(app.clipboard.region().unwrap().len(), 2);
 }
 
 #[test]
@@ -94,10 +94,10 @@ fn test_region_buffer_isolated_from_column_buffer() {
 
     // Try to paste with ,p (column paste)
     // Should find nothing in column buffer
-    assert!(app.clipboard.get_columns().is_none());
+    assert!(app.clipboard.columns().is_none());
 
     // Region buffer should still have data
-    assert!(app.clipboard.get_region().is_some());
+    assert!(app.clipboard.region().is_some());
 }
 
 #[test]
@@ -112,9 +112,9 @@ fn test_yank_row_clears_row_buffer_only() {
         .yank_region(vec![vec!["reg1".to_string(), "reg2".to_string()]]);
 
     // Verify all buffers have data
-    assert!(app.clipboard.get_rows().is_some());
-    assert!(app.clipboard.get_columns().is_some());
-    assert!(app.clipboard.get_region().is_some());
+    assert!(app.clipboard.rows().is_some());
+    assert!(app.clipboard.columns().is_some());
+    assert!(app.clipboard.region().is_some());
 
     // Yank a new row
     app.clipboard.yank_rows(vec![vec![
@@ -124,11 +124,11 @@ fn test_yank_row_clears_row_buffer_only() {
     ]]);
 
     // Row buffer should have new data
-    assert_eq!(app.clipboard.get_rows().unwrap()[0][0], "Alice");
+    assert_eq!(app.clipboard.rows().unwrap()[0][0], "Alice");
 
     // Column and region buffers should still have old data
-    assert_eq!(app.clipboard.get_columns().unwrap()[0][0], "col1");
-    assert_eq!(app.clipboard.get_region().unwrap()[0][0], "reg1");
+    assert_eq!(app.clipboard.columns().unwrap()[0][0], "col1");
+    assert_eq!(app.clipboard.region().unwrap()[0][0], "reg1");
 }
 
 #[test]
@@ -151,11 +151,11 @@ fn test_yank_column_clears_column_buffer_only() {
     ]]);
 
     // Column buffer should have new data
-    assert_eq!(app.clipboard.get_columns().unwrap()[0][0], "Name");
+    assert_eq!(app.clipboard.columns().unwrap()[0][0], "Name");
 
     // Row and region buffers should still have old data
-    assert_eq!(app.clipboard.get_rows().unwrap()[0][0], "row1");
-    assert_eq!(app.clipboard.get_region().unwrap()[0][0], "reg1");
+    assert_eq!(app.clipboard.rows().unwrap()[0][0], "row1");
+    assert_eq!(app.clipboard.region().unwrap()[0][0], "reg1");
 }
 
 #[test]
@@ -176,11 +176,11 @@ fn test_yank_region_clears_region_buffer_only() {
     ]);
 
     // Region buffer should have new data
-    assert_eq!(app.clipboard.get_region().unwrap()[0][0], "Alice");
+    assert_eq!(app.clipboard.region().unwrap()[0][0], "Alice");
 
     // Row and column buffers should still have old data
-    assert_eq!(app.clipboard.get_rows().unwrap()[0][0], "row1");
-    assert_eq!(app.clipboard.get_columns().unwrap()[0][0], "col1");
+    assert_eq!(app.clipboard.rows().unwrap()[0][0], "row1");
+    assert_eq!(app.clipboard.columns().unwrap()[0][0], "col1");
 }
 
 #[test]
@@ -195,7 +195,7 @@ fn test_no_transpose_row_to_column() {
     ]]);
 
     // Column buffer should be empty (no transpose)
-    assert!(app.clipboard.get_columns().is_none());
+    assert!(app.clipboard.columns().is_none());
 }
 
 #[test]
@@ -211,7 +211,7 @@ fn test_no_transpose_column_to_row() {
     ]]);
 
     // Row buffer should be empty (no transpose)
-    assert!(app.clipboard.get_rows().is_none());
+    assert!(app.clipboard.rows().is_none());
 }
 
 #[test]
@@ -235,12 +235,12 @@ fn test_multiple_columns_stay_in_column_buffer() {
     ]);
 
     // Should be in column buffer
-    assert!(app.clipboard.get_columns().is_some());
-    assert_eq!(app.clipboard.get_columns().unwrap().len(), 2);
+    assert!(app.clipboard.columns().is_some());
+    assert_eq!(app.clipboard.columns().unwrap().len(), 2);
 
     // Should NOT be in row or region buffers
-    assert!(app.clipboard.get_rows().is_none());
-    assert!(app.clipboard.get_region().is_none());
+    assert!(app.clipboard.rows().is_none());
+    assert!(app.clipboard.region().is_none());
 }
 
 #[test]
@@ -254,10 +254,10 @@ fn test_multiple_rows_stay_in_row_buffer() {
     ]);
 
     // Should be in row buffer
-    assert!(app.clipboard.get_rows().is_some());
-    assert_eq!(app.clipboard.get_rows().unwrap().len(), 2);
+    assert!(app.clipboard.rows().is_some());
+    assert_eq!(app.clipboard.rows().unwrap().len(), 2);
 
     // Should NOT be in column or region buffers
-    assert!(app.clipboard.get_columns().is_none());
-    assert!(app.clipboard.get_region().is_none());
+    assert!(app.clipboard.columns().is_none());
+    assert!(app.clipboard.region().is_none());
 }
