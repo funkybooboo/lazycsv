@@ -252,10 +252,7 @@ fn test_yank_selection_charwise_multiline() {
     editor.move_to_last_line();
     editor.paste_below();
 
-    assert_eq!(
-        editor.content(),
-        "Line 1\nLine 2\nLine 3\nLine 1\nLine 2"
-    );
+    assert_eq!(editor.content(), "Line 1\nLine 2\nLine 3\nLine 1\nLine 2");
 }
 
 #[test]
@@ -269,10 +266,7 @@ fn test_yank_selection_linewise() {
     editor.move_to_last_line();
     editor.paste_below();
 
-    assert_eq!(
-        editor.content(),
-        "Line 1\nLine 2\nLine 3\nLine 1\nLine 2"
-    );
+    assert_eq!(editor.content(), "Line 1\nLine 2\nLine 3\nLine 1\nLine 2");
 }
 
 // ============================================================================

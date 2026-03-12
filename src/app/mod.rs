@@ -295,6 +295,9 @@ pub struct App {
     /// Search input buffer (typed text during / search prompt)
     pub search_buffer: String,
 
+    /// Help search input buffer (typed text during help / search)
+    pub help_search_buffer: String,
+
     /// Visual mode selection state (None when not in visual mode)
     pub visual_selection: Option<VisualSelection>,
 
@@ -414,6 +417,7 @@ impl App {
             external_modification_pending: false,
             search_state: None,
             search_buffer: String::new(),
+            help_search_buffer: String::new(),
             visual_selection: None,
             last_visual_selection: None,
         }
@@ -945,13 +949,13 @@ mod tests {
         app.handle_key(key_event(KeyCode::Char('k'))).unwrap();
         assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
 
-        // With header_mode=true (default), cannot navigate above row 1
+        // Can now navigate to row 0 (header row)
         app.handle_key(key_event(KeyCode::Up)).unwrap();
-        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 
-        // Try to go before first data row - should stay at row 1
+        // Try to go before first row - should stay at row 0
         app.handle_key(key_event(KeyCode::Char('k'))).unwrap();
-        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
     }
 
     #[test]
@@ -1848,15 +1852,15 @@ mod tests {
         // Should start at row 1 (first data row with header_mode=true)
         assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
 
-        // Try to move up from first data row - with header_mode=true, should stay at row 1
+        // Move up from first data row - should move to row 0 (header row)
         app.handle_key(key_event(KeyCode::Char('k'))).unwrap();
 
-        // Should still be at row 1 (header_mode prevents navigating to row 0)
-        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
+        // Should now be at row 0 (header row)
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 
-        // Try to move up again - should stay at row 1
+        // Try to move up again - should stay at row 0
         app.handle_key(key_event(KeyCode::Char('k'))).unwrap();
-        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
     }
 
     #[test]

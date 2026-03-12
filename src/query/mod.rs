@@ -60,7 +60,6 @@
 //!
 //! All operations check for cancellation every 1000 rows, allowing responsive Ctrl+C handling.
 
-mod date_detection;
 mod error_enhancer;
 
 use crate::cancel::{self, CancelledError};
@@ -271,11 +270,15 @@ pub fn strip_csv_extensions(sql: &str) -> String {
             let mut matched_ext = false;
             for ext in extensions {
                 let ext_bytes = ext.as_bytes();
-                if i + ext_bytes.len() <= len && sql[i..i + ext_bytes.len()].eq_ignore_ascii_case(ext) {
+                if i + ext_bytes.len() <= len
+                    && sql[i..i + ext_bytes.len()].eq_ignore_ascii_case(ext)
+                {
                     // Make sure the extension isn't followed by more identifier chars
                     // (e.g. "myfile.csvdata" should NOT be stripped)
                     let after = i + ext_bytes.len();
-                    if after >= len || (!bytes[after].is_ascii_alphanumeric() && bytes[after] != b'_') {
+                    if after >= len
+                        || (!bytes[after].is_ascii_alphanumeric() && bytes[after] != b'_')
+                    {
                         result.push_str(word);
                         i = after;
                         matched_ext = true;
@@ -423,20 +426,10 @@ pub fn load_csv_into_sqlite(conn: &Connection, doc: &Document, table_name: &str)
 
     let col_count = headers.len();
 
-    // Detect column types (date vs numeric) by sampling data rows
-    let col_types = date_detection::detect_column_types(&doc.rows[1..], col_count);
-    let has_date_cols = col_types
-        .iter()
-        .any(|ct| matches!(ct, date_detection::ColumnType::Date(_)));
-
-    // Build CREATE TABLE with detected affinities
+    // Build CREATE TABLE with TEXT affinity for all columns
     let col_defs: Vec<String> = headers
         .iter()
-        .enumerate()
-        .map(|(i, h)| {
-            let affinity = date_detection::sqlite_affinity(&col_types[i]);
-            format!("\"{}\" {}", h.replace('"', "\"\""), affinity)
-        })
+        .map(|h| format!("\"{}\" TEXT", h.replace('"', "\"\"")))
         .collect();
 
     let create_sql = format!(
@@ -460,30 +453,12 @@ pub fn load_csv_into_sqlite(conn: &Connection, doc: &Document, table_name: &str)
 
     let mut stmt = conn.prepare_cached(&insert_sql)?;
 
-    if has_date_cols {
-        // Date normalization path — allocates for date columns
-        for row in doc.rows.iter().skip(1) {
-            let params: Vec<String> = (0..col_count)
-                .map(|i| {
-                    let val = row.get(i).map(|s| s.as_str()).unwrap_or("");
-                    match &col_types[i] {
-                        date_detection::ColumnType::Date(fmt) => {
-                            date_detection::normalize_to_iso(val, *fmt)
-                        }
-                        date_detection::ColumnType::Numeric => val.to_string(),
-                    }
-                })
-                .collect();
-            stmt.execute(rusqlite::params_from_iter(params.iter().map(|s| s.as_str())))?;
-        }
-    } else {
-        // Fast zero-copy path — binds &str refs directly
-        for row in doc.rows.iter().skip(1) {
-            let params: Vec<&str> = (0..col_count)
-                .map(|i| row.get(i).map(|s| s.as_str()).unwrap_or(""))
-                .collect();
-            stmt.execute(rusqlite::params_from_iter(params))?;
-        }
+    // Fast zero-copy path — binds &str refs directly
+    for row in doc.rows.iter().skip(1) {
+        let params: Vec<&str> = (0..col_count)
+            .map(|i| row.get(i).map(|s| s.as_str()).unwrap_or(""))
+            .collect();
+        stmt.execute(rusqlite::params_from_iter(params))?;
     }
 
     drop(stmt);
@@ -529,34 +504,10 @@ fn load_csv_file_into_sqlite(
 
     let col_count = headers.len();
 
-    // Buffer initial rows for date detection sampling
-    let mut buffered: Vec<csv::StringRecord> = Vec::new();
-    for result in reader.records() {
-        let record = result.context("Failed to read CSV record")?;
-        buffered.push(record);
-        if buffered.len() >= 100 {
-            break;
-        }
-    }
-
-    // Detect column types from buffered samples
-    let sample_rows: Vec<Vec<&str>> = buffered
-        .iter()
-        .map(|rec| (0..col_count).map(|i| rec.get(i).unwrap_or("")).collect())
-        .collect();
-    let col_types = date_detection::detect_column_types_from_strs(&sample_rows, col_count);
-    let has_date_cols = col_types
-        .iter()
-        .any(|ct| matches!(ct, date_detection::ColumnType::Date(_)));
-
-    // CREATE TABLE with detected affinities
+    // CREATE TABLE with TEXT affinity for all columns
     let col_defs: Vec<String> = headers
         .iter()
-        .enumerate()
-        .map(|(i, h)| {
-            let affinity = date_detection::sqlite_affinity(&col_types[i]);
-            format!("\"{}\" {}", h.replace('"', "\"\""), affinity)
-        })
+        .map(|h| format!("\"{}\" TEXT", h.replace('"', "\"\"")))
         .collect();
     let escaped_table = table_name.replace('"', "\"\"");
     conn.execute(
@@ -582,33 +533,14 @@ fn load_csv_file_into_sqlite(
     let mut stmt = conn.prepare_cached(&insert_sql)?;
 
     // Helper closure to insert a record
-    let insert_record = |stmt: &mut rusqlite::CachedStatement, record: &csv::StringRecord| -> Result<()> {
-        if has_date_cols {
-            let params: Vec<String> = (0..col_count)
-                .map(|i| {
-                    let val = record.get(i).unwrap_or("");
-                    match &col_types[i] {
-                        date_detection::ColumnType::Date(fmt) => {
-                            date_detection::normalize_to_iso(val, *fmt)
-                        }
-                        date_detection::ColumnType::Numeric => val.to_string(),
-                    }
-                })
-                .collect();
-            stmt.execute(rusqlite::params_from_iter(params.iter().map(|s| s.as_str())))?;
-        } else {
+    let insert_record =
+        |stmt: &mut rusqlite::CachedStatement, record: &csv::StringRecord| -> Result<()> {
             let params: Vec<&str> = (0..col_count)
                 .map(|i| record.get(i).unwrap_or(""))
                 .collect();
             stmt.execute(rusqlite::params_from_iter(params))?;
-        }
-        Ok(())
-    };
-
-    // Insert buffered rows first
-    for record in &buffered {
-        insert_record(&mut stmt, record)?;
-    }
+            Ok(())
+        };
 
     // Continue with remaining rows from reader
     for result in reader.records() {
@@ -750,19 +682,10 @@ pub fn load_csv_into_sqlite_cancellable(
 
     let col_count = headers.len();
 
-    // Detect column types (date vs numeric) by sampling data rows
-    let col_types = date_detection::detect_column_types(&doc.rows[1..], col_count);
-    let has_date_cols = col_types
-        .iter()
-        .any(|ct| matches!(ct, date_detection::ColumnType::Date(_)));
-
+    // Build CREATE TABLE with TEXT affinity for all columns
     let col_defs: Vec<String> = headers
         .iter()
-        .enumerate()
-        .map(|(i, h)| {
-            let affinity = date_detection::sqlite_affinity(&col_types[i]);
-            format!("\"{}\" {}", h.replace('"', "\"\""), affinity)
-        })
+        .map(|h| format!("\"{}\" TEXT", h.replace('"', "\"\"")))
         .collect();
 
     let create_sql = format!(
@@ -791,25 +714,10 @@ pub fn load_csv_into_sqlite_cancellable(
             let _ = conn.execute("ROLLBACK", []);
             bail!(CancelledError);
         }
-        if has_date_cols {
-            let params: Vec<String> = (0..col_count)
-                .map(|j| {
-                    let val = row.get(j).map(|s| s.as_str()).unwrap_or("");
-                    match &col_types[j] {
-                        date_detection::ColumnType::Date(fmt) => {
-                            date_detection::normalize_to_iso(val, *fmt)
-                        }
-                        date_detection::ColumnType::Numeric => val.to_string(),
-                    }
-                })
-                .collect();
-            stmt.execute(rusqlite::params_from_iter(params.iter().map(|s| s.as_str())))?;
-        } else {
-            let params: Vec<&str> = (0..col_count)
-                .map(|j| row.get(j).map(|s| s.as_str()).unwrap_or(""))
-                .collect();
-            stmt.execute(rusqlite::params_from_iter(params))?;
-        }
+        let params: Vec<&str> = (0..col_count)
+            .map(|j| row.get(j).map(|s| s.as_str()).unwrap_or(""))
+            .collect();
+        stmt.execute(rusqlite::params_from_iter(params))?;
     }
 
     drop(stmt);

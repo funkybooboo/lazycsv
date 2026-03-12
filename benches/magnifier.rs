@@ -375,7 +375,7 @@ fn bench_vim_visual(c: &mut Criterion) {
                         mag
                     },
                     |mag| {
-                        let sel = mag.get_visual_selection();
+                        let sel = mag.visual_selection();
                         black_box(sel);
                     },
                     criterion::BatchSize::SmallInput,

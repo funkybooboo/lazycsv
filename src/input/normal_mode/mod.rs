@@ -17,8 +17,23 @@
 //!
 //! - `handler`: Main input handler dispatching to appropriate actions
 //! - `multi_key`: Multi-keystroke command handling (gg, dd, etc.)
+//! - `help`: Help overlay display and scrolling
+//! - `search`: Search operations (/, n, N, *)
+//! - `visual_mode`: Visual mode entry (v, V, `,v`)
+//! - `editing`: Row/cell editing operations (o, O, p, P, Delete)
+//! - `mode_transitions`: Mode switching (i, a, :, /, q, m)
+//! - `file_switching`: File navigation (`[`, `]`)
+//! - `navigation`: Navigation helpers (Enter, Ctrl+d, Ctrl+u)
 
+mod commands;
+mod editing;
+mod file_switching;
 mod handler;
+mod help;
+mod mode_transitions;
 mod multi_key;
+mod navigation;
+mod search;
+mod visual_mode;
 
 pub use handler::handle;

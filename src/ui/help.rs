@@ -19,6 +19,11 @@ const HELP_OVERLAY_WIDTH_PERCENT: u16 = 70;
 const HELP_OVERLAY_HEIGHT_PERCENT: u16 = 80;
 
 /// Build the help text lines
+pub fn get_help_text() -> Vec<Line<'static>> {
+    build_help_text()
+}
+
+/// Build the help text lines
 fn build_help_text() -> Vec<Line<'static>> {
     vec![
         Line::from(Span::styled(
@@ -145,7 +150,19 @@ fn build_help_text() -> Vec<Line<'static>> {
             Style::default().add_modifier(Modifier::BOLD),
         )),
         Line::from("  :q / :q!           Quit (force quit)"),
-        Line::from("  ?                  Toggle this help (j/k to scroll)"),
+        Line::from("  ?                  Toggle this help"),
+        Line::from(""),
+        Line::from(Span::styled(
+            "HELP NAVIGATION",
+            Style::default().add_modifier(Modifier::BOLD),
+        )),
+        Line::from("  j/k                Scroll down/up one line"),
+        Line::from("  Ctrl+d / Ctrl+u    Scroll down/up one page"),
+        Line::from("  Ctrl+f / Ctrl+b    Scroll down/up one page"),
+        Line::from("  g / G              Jump to top/bottom"),
+        Line::from("  /                  Search help text"),
+        Line::from("  n / N              Next/previous search match"),
+        Line::from("  Esc / ?            Close help"),
         Line::from(""),
     ]
 }
@@ -161,7 +178,8 @@ fn build_help_text() -> Vec<Line<'static>> {
 ///
 /// * `frame` - The Ratatui frame to render into
 /// * `scroll_offset` - Vertical scroll offset for content
-pub fn render_help_overlay(frame: &mut Frame, scroll_offset: u16) {
+/// * `search_query` - Optional search query to display
+pub fn render_help_overlay(frame: &mut Frame, scroll_offset: u16, search_query: Option<&str>) {
     // Create centered area
     let area = centered_rect(
         HELP_OVERLAY_WIDTH_PERCENT,
@@ -176,18 +194,20 @@ pub fn render_help_overlay(frame: &mut Frame, scroll_offset: u16) {
     let visible_height = area.height.saturating_sub(2); // -2 for borders
     let needs_scroll = content_height > visible_height;
 
-    // Build title with scroll indicator
-    let title = if needs_scroll {
+    // Build title with scroll indicator or search prompt
+    let title = if let Some(query) = search_query {
+        format!(" Help - Search: /{} ", query)
+    } else if needs_scroll {
         let max_scroll = content_height.saturating_sub(visible_height);
         if scroll_offset >= max_scroll {
             " Help (END) ".to_string()
         } else if scroll_offset > 0 {
             format!(" Help ({}/{}) ", scroll_offset + 1, max_scroll + 1)
         } else {
-            " Help (j/k to scroll) ".to_string()
+            " Help (j/k to scroll, / to search) ".to_string()
         }
     } else {
-        " Help ".to_string()
+        " Help (/ to search) ".to_string()
     };
 
     let help = Paragraph::new(help_text)

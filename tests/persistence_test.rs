@@ -176,10 +176,7 @@ fn test_W_saves_all_dirty_files() {
 
     // Verify the edit worked
     assert!(app.document.is_dirty);
-    assert_eq!(
-        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
-        "Q"
-    );
+    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "Q");
 
     // Cache current doc and mark as dirty (this is what file switching would do)
     app.session

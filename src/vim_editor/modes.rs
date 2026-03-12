@@ -15,6 +15,19 @@ pub enum VimMode {
     VisualLine,
 }
 
+impl VimMode {
+    /// Get the display name for this mode
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            VimMode::Normal => "NORMAL",
+            VimMode::Insert => "INSERT",
+            VimMode::Command => "COMMAND",
+            VimMode::Visual => "VISUAL",
+            VimMode::VisualLine => "VISUAL LINE",
+        }
+    }
+}
+
 /// Pending command for multi-key sequences
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PendingCommand {

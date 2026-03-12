@@ -168,10 +168,7 @@ impl Document {
             }
 
             let mut csv_reader = builder.from_reader(reader);
-            return Ok(csv_reader
-                .byte_headers()
-                .map(|h| h.len())
-                .unwrap_or(0));
+            return Ok(csv_reader.byte_headers().map(|h| h.len()).unwrap_or(0));
         }
 
         let file_bytes =
@@ -246,11 +243,7 @@ impl Document {
                 .context(format!("Failed to open file: {}", path.display()))?;
             let reader = std::io::BufReader::with_capacity(256 * 1024, file);
             let rows = Self::parse_csv_streaming_cancellable(
-                reader,
-                delimiter,
-                no_headers,
-                file_len,
-                cancelled,
+                reader, delimiter, no_headers, file_len, cancelled,
             )?;
             return Ok(Document {
                 rows,
@@ -417,7 +410,7 @@ impl Document {
         let mut record = csv::ByteRecord::new();
         let mut i = 0usize;
         while csv_reader.read_byte_record(&mut record)? {
-            if i % cancel::CHECK_INTERVAL == 0 && cancel::check_esc(cancelled) {
+            if i.is_multiple_of(cancel::CHECK_INTERVAL) && cancel::check_esc(cancelled) {
                 anyhow::bail!(CancelledError);
             }
             rows.push(record.iter().map(Self::field_to_string).collect());

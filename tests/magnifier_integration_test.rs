@@ -55,10 +55,8 @@ fn test_magnifier_open_edit_save_close_workflow() {
 
     // Verify cell was updated
     assert_eq!(
-        app.document.cell(
-            app.selected_row().unwrap(),
-            app.view_state.selected_column
-        ),
+        app.document
+            .cell(app.selected_row().unwrap(), app.view_state.selected_column),
         "Alice Smith"
     );
 }
@@ -89,10 +87,8 @@ fn test_magnifier_open_edit_discard_workflow() {
 
     // Verify cell unchanged
     assert_eq!(
-        app.document.cell(
-            app.selected_row().unwrap(),
-            app.view_state.selected_column
-        ),
+        app.document
+            .cell(app.selected_row().unwrap(), app.view_state.selected_column),
         original_content
     );
 }
@@ -133,10 +129,9 @@ fn test_magnifier_multiline_editing() {
 
     // Save and verify
     app.save_and_close_magnifier();
-    let cell_content = app.document.cell(
-        app.selected_row().unwrap(),
-        app.view_state.selected_column,
-    );
+    let cell_content = app
+        .document
+        .cell(app.selected_row().unwrap(), app.view_state.selected_column);
     assert!(cell_content.contains('\n'));
     assert_eq!(cell_content.lines().count(), 3);
 }
@@ -192,10 +187,8 @@ fn test_magnifier_vim_operators_workflow() {
     // Close and discard
     app.close_magnifier_discard();
     assert_eq!(
-        app.document.cell(
-            app.selected_row().unwrap(),
-            app.view_state.selected_column
-        ),
+        app.document
+            .cell(app.selected_row().unwrap(), app.view_state.selected_column),
         original
     );
 }
@@ -234,10 +227,8 @@ fn test_magnifier_empty_cell() {
     // Save
     app.save_and_close_magnifier();
     assert_eq!(
-        app.document.cell(
-            app.selected_row().unwrap(),
-            app.view_state.selected_column
-        ),
+        app.document
+            .cell(app.selected_row().unwrap(), app.view_state.selected_column),
         "New"
     );
 }
@@ -266,10 +257,9 @@ fn test_magnifier_long_content() {
 
     // Save and verify
     app.save_and_close_magnifier();
-    let cell_content = app.document.cell(
-        app.selected_row().unwrap(),
-        app.view_state.selected_column,
-    );
+    let cell_content = app
+        .document
+        .cell(app.selected_row().unwrap(), app.view_state.selected_column);
     assert!(cell_content.len() > 100);
 }
 

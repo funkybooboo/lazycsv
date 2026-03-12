@@ -1,13 +1,12 @@
-//! Status bar and file switcher rendering.
+//! Status bar rendering for the main table view.
 //!
-//! This module handles rendering the bottom status bar showing current cell
-//! position, plus the file switcher for multi-file sessions.
+//! This module handles rendering the bottom status bar that displays current
+//! mode, cursor position, pending commands, and status messages.
 
 use crate::App;
 use ratatui::{
     layout::Rect,
-    style::{Color, Modifier, Style},
-    text::{Line, Span},
+    style::{Color, Style},
     widgets::Paragraph,
     Frame,
 };
@@ -29,158 +28,59 @@ fn build_status_line(left: &str, right: &str, width: usize) -> String {
     }
 }
 
-/// Render the file switcher showing all open CSV files (minimal single-line format).
-///
-/// Displays a list of all CSV files in the current directory.
-/// Format: "file1.csv | file2.csv | file3.csv [1/3]"
-/// Active file is shown first/highlighted.
-///
-/// # Arguments
-///
-/// * `frame` - The Ratatui frame to render into
-/// * `app` - Application state containing session file list
-/// * `area` - The rectangle area to render the switcher within
-pub fn render_file_switcher(frame: &mut Frame, app: &App, area: Rect) {
-    use ratatui::layout::{Constraint, Direction, Layout};
-
-    if app.session.files().is_empty() {
-        return;
-    }
-
-    // Split: horizontal rule + file list
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(1), Constraint::Length(1)])
-        .split(area);
-
-    // Horizontal rule above file list
-    let rule = Paragraph::new("─".repeat(area.width as usize));
-    frame.render_widget(rule, chunks[0]);
-
-    let dim_style = Style::default().add_modifier(Modifier::DIM);
-    let bold_style = Style::default().add_modifier(Modifier::BOLD);
-    let available_width = area.width as usize;
-
-    // File count indicator (shown at end)
-    let count_indicator = if app.session.files().len() > 1 {
-        format!(
-            " [{}/{}]",
-            app.session.active_file_index() + 1,
-            app.session.files().len()
-        )
-    } else {
-        String::new()
-    };
-    let count_width = count_indicator.len();
-
-    // Calculate position of each file and find current file's position
-    let mut file_positions: Vec<(usize, usize)> = Vec::new(); // (start, end) for each file
-    let mut pos = 0usize;
-
-    for (idx, path) in app.session.files().iter().enumerate() {
-        if idx > 0 {
-            pos += 3; // " | "
-        }
-        let start = pos;
-        let filename = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("unknown");
-        pos += filename.len();
-        file_positions.push((start, pos));
-    }
-
-    let total_len = pos;
-
-    // Calculate scroll offset to keep current file visible
-    let active_idx = app.session.active_file_index();
-    let (active_start, active_end) = file_positions[active_idx];
-    let visible_width = available_width.saturating_sub(count_width + 1);
-
-    // Auto-scroll to keep active file visible
-    let scroll_offset = if active_end <= visible_width || active_start < visible_width / 2 {
-        0 // File fits without scrolling or is near the start
-    } else {
-        // Scroll to show active file
-        active_start.saturating_sub(visible_width / 4)
-    };
-
-    // Build visible portion of file list
-    let mut spans: Vec<Span> = Vec::new();
-
-    // Add scroll indicator if scrolled
-    if scroll_offset > 0 {
-        spans.push(Span::styled("< ", dim_style));
-    }
-
-    let mut current_pos = 0usize;
-    for (idx, path) in app.session.files().iter().enumerate() {
-        let separator = if idx > 0 { " | " } else { "" };
-        let filename = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("unknown");
-
-        // Add dirty indicator if file is dirty
-        let dirty_indicator = if app.session.is_dirty(path) { "*" } else { "" };
-        let display_name = format!("{}{}", filename, dirty_indicator);
-
-        let sep_start = current_pos;
-        let sep_end = sep_start + separator.len();
-        let file_start = sep_end;
-        let file_end = file_start + display_name.len();
-
-        // Check if this segment is visible
-        if file_end > scroll_offset && sep_start < scroll_offset + visible_width {
-            // Add separator if visible
-            if !separator.is_empty() && sep_end > scroll_offset {
-                spans.push(Span::styled(separator.to_string(), dim_style));
-            }
-
-            // Add filename if visible
-            if file_end > scroll_offset {
-                let style = if idx == active_idx {
-                    bold_style
-                } else {
-                    dim_style
-                };
-                spans.push(Span::styled(display_name, style));
-            }
-        }
-
-        current_pos = file_end;
-    }
-
-    // Add scroll indicator if there's more content
-    if total_len > scroll_offset + visible_width {
-        spans.push(Span::styled(" >", dim_style));
-    }
-
-    // Calculate current display length
-    let display_len: usize = spans.iter().map(|s| s.content.len()).sum();
-
-    // Add padding to push count indicator to the right
-    let padding_needed = available_width.saturating_sub(display_len + count_width);
-    if padding_needed > 0 {
-        spans.push(Span::raw(" ".repeat(padding_needed)));
-    }
-
-    // Add count indicator
-    spans.push(Span::styled(count_indicator, dim_style));
-
-    let line = Line::from(spans);
-    let switcher = Paragraph::new(line);
-    frame.render_widget(switcher, chunks[1]);
-}
-
-/// Build the right side of the status bar (position only, Excel-style)
+/// Build the right side of the status bar with enhanced position and cell info
 fn build_right_side(app: &App) -> String {
     use crate::ui::utils::column_to_excel_letter;
 
     let selected_row = app.selected_row().map(|r| r.get()).unwrap_or(0);
     let col_letter = column_to_excel_letter(app.view_state.selected_column.get());
+    let total_rows = app.document.row_count();
+    let total_cols = app.document.column_count();
 
-    format!("{}{}", col_letter, selected_row)
+    // Calculate percentage through document (by row)
+    let row_percent = if total_rows > 0 {
+        ((selected_row as f64 / total_rows.saturating_sub(1).max(1) as f64) * 100.0) as usize
+    } else {
+        0
+    };
+
+    // Get current cell content info
+    let cell_info = if let Some(row_idx) = app.selected_row() {
+        let cell_content = app.document.cell(row_idx, app.view_state.selected_column);
+        let cell_len = cell_content.len();
+
+        if cell_len > 0 {
+            // Detect cell type
+            let cell_type = if cell_content.chars().all(|c| c.is_ascii_digit() || c == '-') {
+                "int"
+            } else if cell_content.parse::<f64>().is_ok() {
+                "num"
+            } else if cell_content.eq_ignore_ascii_case("true")
+                || cell_content.eq_ignore_ascii_case("false")
+            {
+                "bool"
+            } else {
+                "text"
+            };
+            format!(" | {}:{}", cell_type, cell_len)
+        } else {
+            " | empty".to_string()
+        }
+    } else {
+        String::new()
+    };
+
+    format!(
+        "{}{} | Row {}/{} ({}%) | Col {}/{}{}",
+        col_letter,
+        selected_row,
+        selected_row + 1,
+        total_rows,
+        row_percent,
+        app.view_state.selected_column.get() + 1,
+        total_cols,
+        cell_info
+    )
 }
 
 /// Build the pending command/count indicator
@@ -370,7 +270,7 @@ fn build_status_text(app: &App, right_side: &str, pending_indicator: &str, width
 /// * `frame` - The Ratatui frame to render into
 /// * `app` - Application state containing cursor position and document data
 /// * `area` - The rectangle area to render the status bar within
-pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
+pub fn render(frame: &mut Frame, app: &App, area: Rect) {
     let right_side = build_right_side(app);
     let pending_indicator = build_pending_indicator(app);
     let status_text = build_status_text(app, &right_side, &pending_indicator, area.width as usize);
@@ -437,22 +337,25 @@ mod tests {
     fn test_build_right_side_normal_cell() {
         let app = create_test_app();
         let right = build_right_side(&app);
-        // Should show Excel-style cell reference (e.g., "A0")
+        // Should show Excel-style cell reference with stats
         assert!(right.starts_with("A")); // Column letter first
-        assert!(right.len() < 10); // Reasonable length for position only
+        assert!(right.contains("Row")); // Contains row info
+        assert!(right.contains("Col")); // Contains column info
+        assert!(right.contains("%")); // Contains percentage
     }
 
     #[test]
     fn test_build_right_side_empty_cell() {
         let mut app = create_test_app();
         // Ensure row is selected first
-        app.view_state.table_state.select(Some(1)); // Row 1 (has empty cell at B)
-        app.view_state.selected_column = ColIndex::new(1); // Column B (empty in row 1)
+        app.view_state.table_state.select(Some(2)); // Row 2 (has empty cell at B)
+        app.view_state.selected_column = ColIndex::new(1); // Column B (empty in row 2)
 
         let right = build_right_side(&app);
-        // Should show Excel-style cell reference
+        // Should show Excel-style cell reference with empty cell indicator
         assert!(app.selected_row().is_some());
-        assert_eq!(right, "B1"); // Excel-style format
+        assert!(right.starts_with("B2")); // Excel-style format
+        assert!(right.contains("empty")); // Empty cell indicator
     }
 
     #[test]
@@ -462,9 +365,10 @@ mod tests {
         app.view_state.selected_column = ColIndex::new(1); // Column B (long value)
 
         let right = build_right_side(&app);
-        // Cell value no longer shown, only position
-        assert_eq!(right, "B2"); // Excel-style format
-        assert!(right.len() < 10); // Reasonable length for position only
+        // Should show position with cell type info
+        assert!(right.starts_with("B2")); // Excel-style format
+        assert!(right.contains("Row")); // Contains row info
+        assert!(right.contains("Col")); // Contains column info
     }
 
     #[test]
@@ -728,7 +632,7 @@ mod tests {
     }
 
     #[test]
-    fn test_render_status_bar_external_modification() {
+    fn test_render_external_modification() {
         let mut app = create_test_app();
         app.external_modification_pending = true;
 
@@ -738,102 +642,10 @@ mod tests {
         terminal
             .draw(|f| {
                 let area = f.area();
-                render_status_bar(f, &app, area);
+                render(f, &app, area);
             })
             .unwrap();
 
         // Should render without crashing (green background applied)
-    }
-
-    #[test]
-    fn test_render_file_switcher_single_file() {
-        let app = create_test_app();
-
-        let backend = TestBackend::new(80, 3);
-        let mut terminal = Terminal::new(backend).unwrap();
-
-        terminal
-            .draw(|f| {
-                let area = f.area();
-                render_file_switcher(f, &app, area);
-            })
-            .unwrap();
-
-        // Should render without crashing
-    }
-
-    #[test]
-    fn test_render_file_switcher_multiple_files() {
-        let document = Document::new(
-            vec!["A".to_string()],
-            vec![vec!["1".to_string()]],
-            "test1.csv".to_string(),
-        );
-        let csv_files = vec![
-            PathBuf::from("test1.csv"),
-            PathBuf::from("test2.csv"),
-            PathBuf::from("test3.csv"),
-        ];
-        let app = App::new(document, csv_files, 0, FileConfig::new());
-
-        let backend = TestBackend::new(80, 3);
-        let mut terminal = Terminal::new(backend).unwrap();
-
-        terminal
-            .draw(|f| {
-                let area = f.area();
-                render_file_switcher(f, &app, area);
-            })
-            .unwrap();
-
-        // Should render without crashing and show file count
-    }
-
-    #[test]
-    fn test_render_file_switcher_many_files_scrolling() {
-        let document = Document::new(
-            vec!["A".to_string()],
-            vec![vec!["1".to_string()]],
-            "test.csv".to_string(),
-        );
-        let csv_files: Vec<PathBuf> = (0..50)
-            .map(|i| PathBuf::from(format!("file{}.csv", i)))
-            .collect();
-        let app = App::new(document, csv_files, 25, FileConfig::new()); // Active file in middle
-
-        let backend = TestBackend::new(80, 3);
-        let mut terminal = Terminal::new(backend).unwrap();
-
-        terminal
-            .draw(|f| {
-                let area = f.area();
-                render_file_switcher(f, &app, area);
-            })
-            .unwrap();
-
-        // Should render without crashing and handle scrolling
-    }
-
-    #[test]
-    fn test_render_file_switcher_empty_files_list() {
-        let document = Document::new(
-            vec!["A".to_string()],
-            vec![vec!["1".to_string()]],
-            "test.csv".to_string(),
-        );
-        let csv_files = vec![]; // Empty list
-        let app = App::new(document, csv_files, 0, FileConfig::new());
-
-        let backend = TestBackend::new(80, 3);
-        let mut terminal = Terminal::new(backend).unwrap();
-
-        terminal
-            .draw(|f| {
-                let area = f.area();
-                render_file_switcher(f, &app, area);
-            })
-            .unwrap();
-
-        // Should handle empty file list gracefully (early return)
     }
 }

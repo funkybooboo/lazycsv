@@ -126,10 +126,7 @@ fn main() -> Result<()> {
     }
 }
 
-fn run(
-    terminal: &mut Term,
-    mut app: App,
-) -> Result<()> {
+fn run(terminal: &mut Term, mut app: App) -> Result<()> {
     let mut needs_redraw = true;
     let mut last_mtime_check = Instant::now();
 
@@ -168,11 +165,7 @@ fn run(
 }
 
 /// Dispatch input results to appropriate handlers
-fn handle_input_result(
-    terminal: &mut Term,
-    app: &mut App,
-    result: InputResult,
-) -> Result<()> {
+fn handle_input_result(terminal: &mut Term, app: &mut App, result: InputResult) -> Result<()> {
     match result {
         InputResult::ReloadFile => handle_reload_file(terminal, app)?,
         InputResult::Quit => app.should_quit = true,
@@ -189,10 +182,7 @@ fn handle_input_result(
 }
 
 /// Handle file reload with cancellation support
-fn handle_reload_file(
-    terminal: &mut Term,
-    app: &mut App,
-) -> Result<()> {
+fn handle_reload_file(terminal: &mut Term, app: &mut App) -> Result<()> {
     app.external_modification_pending = false;
     app.search_state = None;
 
@@ -273,7 +263,7 @@ fn handle_switch_document(
 
     // Mark query result as unsaved so the tab shows (*)
     app.document.is_dirty = true;
-    let result_path = app.get_current_file().clone();
+    let result_path = app.current_file().clone();
     app.session.mark_dirty(&result_path);
 
     app.view_state = lazycsv::ui::ViewState::default();
@@ -314,11 +304,7 @@ fn handle_sort_document(
 }
 
 /// Handle SQL query execution with cancellation support
-fn handle_execute_query(
-    terminal: &mut Term,
-    app: &mut App,
-    query: String,
-) -> Result<()> {
+fn handle_execute_query(terminal: &mut Term, app: &mut App, query: String) -> Result<()> {
     let output_name = app
         .session
         .find_query_output_file()

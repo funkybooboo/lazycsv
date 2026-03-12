@@ -214,14 +214,10 @@ pub fn move_down_by(app: &mut App, count: usize) {
 }
 
 /// Move up by count rows (5k moves up 5 rows)
-/// Respects header_mode: when ON, stops at row 1 (first data row)
 pub fn move_up_by(app: &mut App, count: usize) {
     let current = app.view_state.table_state.selected().unwrap_or(0);
     let target = current.saturating_sub(count);
-
-    // When header_mode is ON, don't allow navigation above row 1
-    let min_row = if app.document.header_mode { 1 } else { 0 };
-    let final_target = target.max(min_row);
+    let final_target = target.max(0);
 
     app.view_state.table_state.select(Some(final_target));
     app.view_state.viewport_mode = ViewportMode::Auto;
@@ -550,8 +546,8 @@ mod tests {
 
         move_up_by(&mut app, 100);
 
-        // With header_mode=true (default), stops at row 1
-        assert_eq!(app.view_state.table_state.selected(), Some(1));
+        // Now stops at row 0 (can navigate to header row)
+        assert_eq!(app.view_state.table_state.selected(), Some(0));
     }
 
     #[test]

@@ -41,6 +41,12 @@ pub struct ViewState {
 
     /// Selected index in file list (for FileList mode)
     pub file_list_selected: usize,
+
+    /// Help search query (None when not searching)
+    pub help_search_query: Option<String>,
+
+    /// Current match index in help search results
+    pub help_search_match_index: usize,
 }
 
 impl Default for ViewState {
@@ -54,6 +60,8 @@ impl Default for ViewState {
             file_list_scroll_offset: 0,
             help_scroll_offset: 0,
             file_list_selected: 0,
+            help_search_query: None,
+            help_search_match_index: 0,
         }
     }
 }
@@ -78,6 +86,8 @@ impl ViewState {
     pub fn hide_help(&mut self) {
         self.help_overlay_visible = false;
         self.help_scroll_offset = 0; // Reset scroll when closing
+        self.help_search_query = None; // Clear search when closing
+        self.help_search_match_index = 0;
     }
 
     /// Check if help overlay is visible

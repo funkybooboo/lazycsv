@@ -16,7 +16,7 @@ pub fn scan_directory(dir: &Path) -> Result<Vec<PathBuf>> {
         let is_hidden = entry
             .file_name()
             .to_str()
-            .map_or(false, |name| name.starts_with('.'));
+            .is_some_and(|name| name.starts_with('.'));
         if is_hidden {
             continue;
         }
@@ -49,10 +49,12 @@ pub fn scan_directory_for_csvs(file_path: &Path) -> Result<Vec<PathBuf>> {
     let mut csv_files = scan_directory(dir)?;
 
     // Ensure the explicitly-opened file is always included, even if hidden
-    let canonical = file_path.canonicalize().unwrap_or_else(|_| file_path.to_path_buf());
-    let already_included = csv_files.iter().any(|p| {
-        p.canonicalize().unwrap_or_else(|_| p.clone()) == canonical
-    });
+    let canonical = file_path
+        .canonicalize()
+        .unwrap_or_else(|_| file_path.to_path_buf());
+    let already_included = csv_files
+        .iter()
+        .any(|p| p.canonicalize().unwrap_or_else(|_| p.clone()) == canonical);
     if !already_included && file_path.is_file() {
         csv_files.push(file_path.to_path_buf());
         csv_files.sort();
@@ -280,8 +282,12 @@ mod tests {
         let csv_files = result.unwrap();
         // Should include both: the explicitly-opened hidden file and the visible sibling
         assert_eq!(csv_files.len(), 2);
-        assert!(csv_files.iter().any(|p| p.file_name().unwrap() == ".hidden.csv"));
-        assert!(csv_files.iter().any(|p| p.file_name().unwrap() == "visible.csv"));
+        assert!(csv_files
+            .iter()
+            .any(|p| p.file_name().unwrap() == ".hidden.csv"));
+        assert!(csv_files
+            .iter()
+            .any(|p| p.file_name().unwrap() == "visible.csv"));
     }
 
     #[test]

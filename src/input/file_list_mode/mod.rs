@@ -1,41 +1,91 @@
 //! File list mode handlers
 //!
-//! Handles keyboard input when in FileList mode (Ctrl+P fuzzy file finder).
+//! Handles keyboard input when in FileList mode with yazi-like keybindings.
+
+pub mod operations;
 
 use crate::app::{App, Mode};
 use crate::input::actions::InputResult;
 use crate::input::StatusMessage;
 use anyhow::Result;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// Handle keyboard input in file list mode
 pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
-    match key.code {
-        KeyCode::Esc => {
+    match (key.code, key.modifiers) {
+        // Exit file manager
+        (KeyCode::Esc, _) | (KeyCode::Char('q'), KeyModifiers::NONE) => {
             cancel(app);
             Ok(InputResult::Continue)
         }
-        KeyCode::Backspace => {
+
+        // Search/filter - backspace
+        (KeyCode::Backspace, _) => {
             app.input_state.pop_file_filter_char();
             app.view_state.file_list_selected = 0;
             Ok(InputResult::Continue)
         }
-        KeyCode::Up | KeyCode::Char('k') => {
+
+        // Navigation - vim keys and arrows
+        (KeyCode::Up, _) | (KeyCode::Char('k'), KeyModifiers::NONE) => {
             if app.view_state.file_list_selected > 0 {
                 app.view_state.file_list_selected -= 1;
             }
             Ok(InputResult::Continue)
         }
-        KeyCode::Down | KeyCode::Char('j') => {
+        (KeyCode::Down, _) | (KeyCode::Char('j'), KeyModifiers::NONE) => {
             move_down(app);
             Ok(InputResult::Continue)
         }
-        KeyCode::Enter => select_file(app),
-        KeyCode::Char(c) => {
-            app.input_state.push_file_filter_char(c);
+
+        // Jump to top (gg in vim, but 'g' alone for simplicity)
+        (KeyCode::Char('g'), KeyModifiers::NONE) => {
             app.view_state.file_list_selected = 0;
             Ok(InputResult::Continue)
         }
+
+        // Jump to bottom (G in vim)
+        (KeyCode::Char('G'), KeyModifiers::SHIFT) => {
+            let filtered_count = count_filtered_files(app);
+            if filtered_count > 0 {
+                app.view_state.file_list_selected = filtered_count - 1;
+            }
+            Ok(InputResult::Continue)
+        }
+
+        // Open selected file
+        (KeyCode::Enter, _) | (KeyCode::Char('o'), KeyModifiers::NONE) => select_file(app),
+
+        // File operations - yazi-like
+        (KeyCode::Char('r'), KeyModifiers::NONE) => {
+            operations::start_rename(app);
+            Ok(InputResult::Continue)
+        }
+        (KeyCode::Char('d'), KeyModifiers::NONE) => {
+            operations::start_delete(app);
+            Ok(InputResult::Continue)
+        }
+        (KeyCode::Char('y'), KeyModifiers::NONE) => {
+            operations::start_copy(app);
+            Ok(InputResult::Continue)
+        }
+        (KeyCode::Char('n'), KeyModifiers::NONE) => {
+            operations::start_create(app);
+            Ok(InputResult::Continue)
+        }
+
+        // Search/filter - alphanumeric characters (but not operation keys)
+        (KeyCode::Char(c), mods) if mods == KeyModifiers::NONE || mods == KeyModifiers::SHIFT => {
+            // Skip operation keys
+            if matches!(c, 'k' | 'j' | 'g' | 'G' | 'o' | 'r' | 'd' | 'y' | 'n' | 'q') {
+                Ok(InputResult::Continue)
+            } else {
+                app.input_state.push_file_filter_char(c);
+                app.view_state.file_list_selected = 0;
+                Ok(InputResult::Continue)
+            }
+        }
+
         _ => Ok(InputResult::Continue),
     }
 }

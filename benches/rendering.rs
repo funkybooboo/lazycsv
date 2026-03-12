@@ -94,9 +94,7 @@ fn bench_get_cell(c: &mut Criterion) {
                 // Access cells at various positions
                 let row = black_box(size / 2);
                 let col = black_box(5);
-                let cell = app
-                    .document
-                    .get_cell(RowIndex::new(row), ColIndex::new(col));
+                let cell = app.document.cell(RowIndex::new(row), ColIndex::new(col));
                 black_box(cell);
             });
         });
@@ -118,7 +116,7 @@ fn bench_column_width_calculation(c: &mut Criterion) {
                 for i in 0..black_box(10.min(cols)) {
                     let header = app
                         .document
-                        .get_header(lazycsv::domain::position::ColIndex::new(i));
+                        .header(lazycsv::domain::position::ColIndex::new(i));
                     black_box(header.len());
                 }
             });
@@ -184,7 +182,7 @@ fn bench_cell_access_patterns(c: &mut Criterion) {
                     let start_row = black_box(size / 2);
                     for row_offset in 0..40 {
                         for col in 0..10 {
-                            let cell = app.document.get_cell(
+                            let cell = app.document.cell(
                                 RowIndex::new((start_row + row_offset).min(size - 1)),
                                 ColIndex::new(col),
                             );

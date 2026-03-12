@@ -32,13 +32,7 @@ pub fn render_sql_editor_vim(frame: &mut Frame, vim_editor: &VimEditor, sql_erro
     // Clear background and render border with mode indicator
     frame.render_widget(Clear, area);
 
-    let mode_str = match vim_editor.mode() {
-        VimMode::Normal => "NORMAL",
-        VimMode::Insert => "INSERT",
-        VimMode::Visual => "VISUAL",
-        VimMode::VisualLine => "VISUAL LINE",
-        VimMode::Command => "COMMAND",
-    };
+    let mode_str = vim_editor.mode().display_name();
 
     let title = format!(
         " SQL Query - {} (Ctrl+Enter: execute, Esc: cancel) ",

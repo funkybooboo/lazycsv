@@ -70,16 +70,7 @@ fn test_o_on_header_only_file() {
     assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
 
     // New row should have correct number of columns (all empty)
-    assert_eq!(
-        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
-        ""
-    );
-    assert_eq!(
-        app.document.cell(RowIndex::new(1), ColIndex::new(1)),
-        ""
-    );
-    assert_eq!(
-        app.document.cell(RowIndex::new(1), ColIndex::new(2)),
-        ""
-    );
+    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "");
+    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(1)), "");
+    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(2)), "");
 }

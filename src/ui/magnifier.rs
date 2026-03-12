@@ -27,27 +27,6 @@ const MAX_LINE_NUMBER_WIDTH: u16 = 4;
 /// Extra padding for line number column (includes space after number)
 const LINE_NUMBER_PADDING: u16 = 2;
 
-/// Create a centered rectangle with the given percentage of width and height
-fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    let popup_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Percentage((100 - percent_y) / 2),
-            Constraint::Percentage(percent_y),
-            Constraint::Percentage((100 - percent_y) / 2),
-        ])
-        .split(r);
-
-    Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage((100 - percent_x) / 2),
-            Constraint::Percentage(percent_x),
-            Constraint::Percentage((100 - percent_x) / 2),
-        ])
-        .split(popup_layout[1])[1]
-}
-
 /// Render the magnifier mode overlay
 pub fn render_magnifier(frame: &mut Frame, app: &App, area: Rect) {
     let magnifier = match &app.magnifier_state {
@@ -56,7 +35,7 @@ pub fn render_magnifier(frame: &mut Frame, app: &App, area: Rect) {
     };
 
     // Create centered popup
-    let popup_area = centered_rect(POPUP_WIDTH_PERCENT, POPUP_HEIGHT_PERCENT, area);
+    let popup_area = super::help::centered_rect(POPUP_WIDTH_PERCENT, POPUP_HEIGHT_PERCENT, area);
     frame.render_widget(Clear, popup_area);
 
     // Build and render main block with title
@@ -116,16 +95,10 @@ fn build_magnifier_status_bar(
     // Left side: mode indicator or command buffer
     let left_text = if magnifier.mode() == crate::magnifier::MagnifierMode::Command {
         format!(":{}", magnifier.command_buffer())
+    } else if magnifier.mode() == crate::magnifier::MagnifierMode::Normal {
+        magnifier.pending_display().unwrap_or("").to_string()
     } else {
-        match magnifier.mode() {
-            crate::magnifier::MagnifierMode::Insert => "-- INSERT --".to_string(),
-            crate::magnifier::MagnifierMode::Visual => "-- VISUAL --".to_string(),
-            crate::magnifier::MagnifierMode::VisualLine => "-- VISUAL LINE --".to_string(),
-            crate::magnifier::MagnifierMode::Normal => {
-                magnifier.pending_display().unwrap_or("").to_string()
-            }
-            _ => String::new(),
-        }
+        format!("-- {} --", magnifier.mode().display_name())
     };
 
     // Right side: cursor position and percentage
@@ -449,7 +422,7 @@ mod tests {
     #[test]
     fn test_centered_rect_80_percent() {
         let area = Rect::new(0, 0, 100, 100);
-        let centered = centered_rect(80, 80, area);
+        let centered = super::super::help::centered_rect(80, 80, area);
 
         // Should be centered with 80% width and height
         assert_eq!(centered.width, 80);
@@ -461,7 +434,7 @@ mod tests {
     #[test]
     fn test_centered_rect_50_percent() {
         let area = Rect::new(0, 0, 100, 100);
-        let centered = centered_rect(50, 50, area);
+        let centered = super::super::help::centered_rect(50, 50, area);
 
         assert_eq!(centered.width, 50);
         assert_eq!(centered.height, 50);

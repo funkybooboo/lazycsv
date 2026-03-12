@@ -755,8 +755,8 @@ fn test_shift_enter_at_first_row() {
 
     // Should be in Normal mode
     assert_eq!(app.mode, Mode::Normal);
-    // Should still be on first data row
-    assert_eq!(app.selected_row().unwrap().get(), 1);
+    // Should move to header row (row 0)
+    assert_eq!(app.selected_row().unwrap().get(), 0);
 }
 
 #[test]

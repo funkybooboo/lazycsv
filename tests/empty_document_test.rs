@@ -76,10 +76,7 @@ fn test_app_new_with_empty_document_0_cols() {
     let app = App::new(doc, files, 0, FileConfig::new());
 
     // With 0 columns, cursor should not be selectable
-    println!(
-        "App with 0-col doc: selected_row={:?}",
-        app.selected_row()
-    );
+    println!("App with 0-col doc: selected_row={:?}", app.selected_row());
 
     // Currently this will select Some(0), but ideally should be None or handle gracefully
     // For now, just document the current behavior

@@ -238,7 +238,7 @@ fn test_boundary_navigation_workflow() {
         app.handle_key(key_event(KeyCode::Char('k'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('h'))).unwrap();
     }
-    assert_eq!(app.selected_row(), Some(RowIndex::new(1))); // Stops at first data row
+    assert_eq!(app.selected_row(), Some(RowIndex::new(0))); // Stops at header row
     assert_eq!(app.view_state.selected_column, ColIndex::new(0));
 
     // Go to opposite corner

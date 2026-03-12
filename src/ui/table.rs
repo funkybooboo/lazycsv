@@ -428,7 +428,7 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     let visible_col_count = end_col - start_col;
 
     if visible_col_count == 0 {
-        let title = Paragraph::new(format!(" lazycsv: {} (no columns)", csv.filename))
+        let title = Paragraph::new(format!(" {} (no columns)", csv.filename))
             .style(Style::default().add_modifier(Modifier::BOLD));
         frame.render_widget(title, area);
         return;
@@ -494,10 +494,35 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
         ])
         .split(area);
 
-    // Title bar: filename left, row count right
+    // Title bar: filename left, cell value right (Excel-style)
     let dirty_indicator = if csv.is_dirty { "*" } else { "" };
-    let title_left = format!(" lazycsv: {}{}", csv.filename, dirty_indicator);
-    let title_right = format!("{}/{} ", selected_idx + 1, csv.row_count());
+    let title_left = format!(" {}{}", csv.filename, dirty_indicator);
+
+    // Get current cell value for display (like Excel's formula bar)
+    let cell_value = if let Some(row_idx) = app.selected_row() {
+        let content = csv.cell(row_idx, app.view_state.selected_column);
+        if content.is_empty() {
+            String::new()
+        } else {
+            // Truncate if too long, show first part of cell value
+            let max_len = area.width.saturating_sub(title_left.len() as u16 + 5) as usize;
+            if content.len() > max_len {
+                format!(
+                    "{}...",
+                    content
+                        .chars()
+                        .take(max_len.saturating_sub(3))
+                        .collect::<String>()
+                )
+            } else {
+                content.to_string()
+            }
+        }
+    } else {
+        String::new()
+    };
+
+    let title_right = format!("{} ", cell_value);
     let title_padding = (area.width as usize)
         .saturating_sub(title_left.len())
         .saturating_sub(title_right.len());
@@ -515,7 +540,7 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     // Render stateful widget with adjusted selection state
     // Virtual scrolling requires adjusting the selected position to be relative
     // to the visible window, plus offset for column letters and header rows
-    let mut adjusted_state = app.view_state.table_state.clone();
+    let mut adjusted_state = app.view_state.table_state;
     if let Some(selected) = adjusted_state.selected() {
         let position_in_window = if selected >= scroll_offset && selected < end_row {
             selected - scroll_offset

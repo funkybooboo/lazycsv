@@ -27,7 +27,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.10.0 | Undo/Redo & Command History | [ ] | TBD |
 | v0.10.1 | Undo System Testing & Reliability | [ ] | TBD |
 | v0.11.0 | SQL Editor Vim Editing | [x] | 700+ |
-| v0.11.1 | SQL Editor Refactoring & Quality | [ ] | TBD |
+| v0.11.1 | SQL Editor Refactoring & Quality | [x] | 1,251 |
 | v0.12.0 | UI Consistency & Standardization | [ ] | TBD |
 | v0.12.1 | UI System Testing | [ ] | TBD |
 | v0.13.0 | Repository Organization & Structure | [ ] | TBD |
@@ -54,7 +54,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.23.1 | Final Architecture Polish | [ ] | TBD |
 | v1.0.0 | Stable Release & Polish | [ ] | - |
 
-**Total Tests Passing:** 700+ tests (169 vim_editor + 50 SQL + 61 magnifier + 457+ other)
+**Total Tests Passing:** 1,251 tests (all integration and unit tests across vim_editor, SQL, magnifier, and core modules)
 
 ---
 
@@ -107,11 +107,14 @@ Search system cleanup with improved performance and test coverage.
 **[v0.8.0](versions/v0.8.0.md) - SQL Query Mode & Data Operations**  
 SQL query execution using DuckDB with rich result views and data transformation capabilities.  
 
-**[v0.8.1](versions/v0.8.1.md) - SQL & Data Operations Polish**  
+**[v0.8.1](versions/v0.8.1.md)** - SQL & Data Operations Polish**  
 SQL system refinement with improved error handling and comprehensive testing (555 tests total).  
 
 **[v0.11.0](versions/v0.11.0.md) - SQL Editor Vim Editing**  
 Full vim modal editing in SQL editor with reusable vim_editor module (700+ tests total).  
+
+**[v0.11.1](versions/v0.11.1.md) - SQL Editor Refactoring & Quality**  
+Refactored vim_editor with command pattern, removed code duplication, reorganized normal_mode into 11 modules, split UI modules, added unit tests, zero clippy warnings (1,251 tests total).  
 
 ###  Planned Versions
 
@@ -126,12 +129,6 @@ Undo/redo system with persistent command history and session restoration.
 
 **[v0.10.1](versions/v0.10.1.md) - Undo System Testing & Reliability**  
 Undo system refinement with edge case handling and comprehensive test coverage.  
-
-**[v0.11.0](versions/v0.11.0.md) - SQL Editor Vim Editing**  
-Full vim editing in SQL editor with syntax highlighting and multi-line query support.  
-
-**[v0.11.1](versions/v0.11.1.md) - SQL Editor Refactoring & Quality**  
-SQL editor code quality improvements with consistent patterns and testing.  
 
 **[v0.12.0](versions/v0.12.0.md) - UI Consistency & Standardization**  
 Standardize UI components, color scheme, and visual feedback across all modes.  
