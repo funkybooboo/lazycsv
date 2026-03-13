@@ -28,7 +28,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.10.1 | Undo System Testing & Reliability | [ ] | TBD |
 | v0.11.0 | SQL Editor Vim Editing | [x] | 700+ |
 | v0.11.1 | SQL Editor Refactoring & Quality | [x] | 1,251 |
-| v0.12.0 | UI Consistency & Standardization | [ ] | TBD |
+| v0.12.0 | UI Consistency & Standardization | [~] | 453 |
 | v0.12.1 | UI System Testing | [ ] | TBD |
 | v0.13.0 | Repository Organization & Structure | [ ] | TBD |
 | v0.13.1 | Module Organization & Cleanup | [ ] | TBD |
@@ -116,6 +116,9 @@ Full vim modal editing in SQL editor with reusable vim_editor module (700+ tests
 **[v0.11.1](versions/v0.11.1.md) - SQL Editor Refactoring & Quality**  
 Refactored vim_editor with command pattern, removed code duplication, reorganized normal_mode into 11 modules, split UI modules, added unit tests, zero clippy warnings (1,251 tests total).  
 
+**[v0.12.0](versions/v0.12.0.md) - UI Consistency & Standardization** (IN PROGRESS)  
+Yazi-inspired 3-column file explorer with parent directory preview, current directory navigation, and file/CSV preview. Modal standardization, full file operations (rename/delete/move/copy/create), and dynamic CSV loading.  
+
 ###  Planned Versions
 
 **[v0.9.0](versions/v0.9.0.md) - Configuration System**  
@@ -129,9 +132,6 @@ Undo/redo system with persistent command history and session restoration.
 
 **[v0.10.1](versions/v0.10.1.md) - Undo System Testing & Reliability**  
 Undo system refinement with edge case handling and comprehensive test coverage.  
-
-**[v0.12.0](versions/v0.12.0.md) - UI Consistency & Standardization**  
-Standardize UI components, color scheme, and visual feedback across all modes.  
 
 **[v0.12.1](versions/v0.12.1.md) - UI System Testing**  
 UI system testing with visual regression tests and accessibility improvements.  
