@@ -1,6 +1,6 @@
 //! Command executor for ex-style commands (e.g., :q, :w, :sort)
 
-use crate::app::{App, Mode};
+use crate::app::App;
 use crate::csv::Document;
 use crate::input::actions::InputResult;
 use crate::input::StatusMessage;
@@ -115,7 +115,6 @@ pub fn execute(app: &mut App) -> Result<InputResult> {
         "c" => execute_column_jump(app, _arg),
         "f" => execute_filename(app, _arg),
         "noh" | "nohlsearch" => execute_clear_search(app),
-        "files" => execute_file_list(app),
         "sort" | "sort!" => execute_sort(app, &cmd_name_lower, _arg),
         _ => {
             // Unknown command
@@ -337,17 +336,6 @@ fn execute_filename(app: &mut App, arg: Option<&str>) -> Result<InputResult> {
 fn execute_clear_search(app: &mut App) -> Result<InputResult> {
     app.search_state = None;
     app.status_message = Some(StatusMessage::from("Search cleared"));
-    Ok(InputResult::Continue)
-}
-
-/// Execute :files command to show file picker
-fn execute_file_list(app: &mut App) -> Result<InputResult> {
-    // Enter FileList mode to show file picker
-    app.mode = Mode::FileList;
-    app.input_state.clear_file_filter();
-    app.status_message = Some(StatusMessage::from(
-        "Type to filter, number to select, Enter for first, Esc to cancel",
-    ));
     Ok(InputResult::Continue)
 }
 

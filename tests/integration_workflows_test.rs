@@ -99,86 +99,6 @@ fn test_quit_workflow_dirty_state() {
     assert!(app.status_message.is_some());
 }
 
-#[test]
-fn test_file_switching_workflow() {
-    let csv_data = create_test_csv();
-    let csv_files = vec![
-        PathBuf::from("file1.csv"),
-        PathBuf::from("file2.csv"),
-        PathBuf::from("file3.csv"),
-    ];
-    let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
-
-    // Start at file 0
-    assert_eq!(app.session.active_file_index(), 0);
-
-    // Switch forward through all files
-    let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-    assert_eq!(should_reload, InputResult::ReloadFile);
-    assert_eq!(app.session.active_file_index(), 1);
-
-    let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-    assert_eq!(should_reload, InputResult::ReloadFile);
-    assert_eq!(app.session.active_file_index(), 2);
-
-    // Wrap around to first file
-    let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-    assert_eq!(should_reload, InputResult::ReloadFile);
-    assert_eq!(app.session.active_file_index(), 0);
-
-    // Switch backward
-    let should_reload = app.handle_key(key_event(KeyCode::Char('['))).unwrap();
-    assert_eq!(should_reload, InputResult::ReloadFile);
-    assert_eq!(app.session.active_file_index(), 2);
-}
-
-#[test]
-fn test_help_and_quit_workflow() {
-    let csv_data = create_test_csv();
-    let csv_files = vec![PathBuf::from("test.csv")];
-    let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
-
-    // Open help
-    app.handle_key(key_event(KeyCode::Char('?'))).unwrap();
-    assert!(app.view_state.help_overlay_visible);
-
-    // Try to open sql editor while help is open (should not work - navigation blocked)
-    app.handle_key(key_event(KeyCode::Char('q'))).unwrap();
-    assert_eq!(app.mode, lazycsv::app::Mode::Normal); // q is blocked when help is shown
-
-    // Close help
-    app.handle_key(key_event(KeyCode::Char('?'))).unwrap();
-    assert!(!app.view_state.help_overlay_visible);
-
-    // Now q opens SQL editor
-    app.handle_key(key_event(KeyCode::Char('q'))).unwrap();
-    assert_eq!(app.mode, lazycsv::app::Mode::SqlEditor);
-
-    // Escape back, then quit via :q
-    app.handle_key(key_event(KeyCode::Esc)).unwrap();
-    app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
-    app.handle_key(key_event(KeyCode::Char('q'))).unwrap();
-    app.handle_key(key_event(KeyCode::Enter)).unwrap();
-    assert!(app.should_quit);
-}
-
-#[test]
-fn test_navigate_then_switch_file_workflow() {
-    let csv_data = create_test_csv();
-    let csv_files = vec![PathBuf::from("file1.csv"), PathBuf::from("file2.csv")];
-    let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
-
-    // Navigate to a specific position
-    app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
-    app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
-    assert_eq!(app.selected_row(), Some(RowIndex::new(3))); // Last data row
-    assert_eq!(app.view_state.selected_column, ColIndex::new(2));
-
-    // Switch file
-    let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-    assert_eq!(should_reload, InputResult::ReloadFile);
-    assert_eq!(app.session.active_file_index(), 1);
-}
 
 #[test]
 fn test_rapid_key_sequence_workflow() {
@@ -254,25 +174,6 @@ fn test_boundary_navigation_workflow() {
     assert_eq!(app.view_state.selected_column, ColIndex::new(2));
 }
 
-#[test]
-fn test_current_file_tracking() {
-    let csv_data = create_test_csv();
-    let csv_files = vec![
-        PathBuf::from("file1.csv"),
-        PathBuf::from("file2.csv"),
-        PathBuf::from("file3.csv"),
-    ];
-    let mut app = App::new(csv_data, csv_files.clone(), 1, FileConfig::new());
-
-    // Should start at file index 1
-    assert_eq!(app.current_file(), &csv_files[1]);
-
-    app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-    assert_eq!(app.current_file(), &csv_files[2]);
-
-    app.handle_key(key_event(KeyCode::Char('['))).unwrap();
-    assert_eq!(app.current_file(), &csv_files[1]);
-}
 
 #[test]
 fn test_status_message_lifecycle() {
@@ -293,78 +194,7 @@ fn test_status_message_lifecycle() {
     assert!(app.status_message.is_some());
 }
 
-// ===== Priority 3: Integration Workflow Tests =====
 
-#[test]
-fn test_complete_user_session_workflow() {
-    let csv_data = create_test_csv();
-    let csv_files = vec![PathBuf::from("file1.csv"), PathBuf::from("file2.csv")];
-    let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
-
-    // Simulate realistic user session
-    // 1. Navigate around
-    app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-    app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-    app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
-
-    // 2. Go to specific location with gg
-    app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-    app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-    assert_eq!(app.selected_row(), Some(RowIndex::new(1))); // First data row
-
-    // 3. Use count prefix (2j from row 1 = row 3)
-    app.handle_key(key_event(KeyCode::Char('2'))).unwrap();
-    app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-    assert_eq!(app.selected_row(), Some(RowIndex::new(3))); // row 1 + 2 = row 3
-
-    // 4. Navigate to end
-    app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
-    app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
-
-    // 5. Toggle help
-    app.handle_key(key_event(KeyCode::Char('?'))).unwrap();
-    assert!(app.view_state.help_overlay_visible);
-    app.handle_key(key_event(KeyCode::Char('?'))).unwrap();
-    assert!(!app.view_state.help_overlay_visible);
-
-    // 6. Switch files
-    app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-    assert_eq!(app.session.active_file_index(), 1);
-
-    // 7. Navigate in new file
-    app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-
-    // All state should be consistent
-    assert_eq!(app.input_state.pending_command, None);
-    assert_eq!(app.input_state.command_count, None);
-}
-
-#[test]
-fn test_rapid_file_switching_10_times() {
-    let csv_data = create_test_csv();
-    let csv_files = vec![
-        PathBuf::from("file1.csv"),
-        PathBuf::from("file2.csv"),
-        PathBuf::from("file3.csv"),
-    ];
-    let mut app = App::new(csv_data, csv_files.clone(), 0, FileConfig::new());
-
-    // Rapidly switch between files
-    for _ in 0..10 {
-        app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-    }
-
-    // Should wrap around correctly (10 % 3 = 1)
-    assert_eq!(app.session.active_file_index(), 1);
-
-    // Try backward switches
-    for _ in 0..10 {
-        app.handle_key(key_event(KeyCode::Char('['))).unwrap();
-    }
-
-    // Should wrap correctly backward
-    assert_eq!(app.session.active_file_index(), 0);
-}
 
 #[test]
 fn test_help_spam_100_toggles() {
@@ -479,21 +309,6 @@ fn test_navigation_state_preserved_across_help() {
     assert_eq!(app.view_state.selected_column, col_before);
 }
 
-#[test]
-fn test_count_prefix_with_file_switching() {
-    let csv_data = create_test_csv();
-    let csv_files = vec![PathBuf::from("file1.csv"), PathBuf::from("file2.csv")];
-    let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
-
-    // Build count prefix
-    app.handle_key(key_event(KeyCode::Char('5'))).unwrap();
-
-    // Switch file (count should be cleared or not apply to file switching)
-    app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-
-    // State should be valid
-    assert_eq!(app.session.active_file_index(), 1);
-}
 
 #[test]
 fn test_complete_session_load_navigate_switch_quit() {
@@ -536,77 +351,7 @@ fn test_complete_session_load_navigate_switch_quit() {
     assert!(!app.should_quit);
 }
 
-#[test]
-fn test_recover_from_file_switch_error() {
-    let temp_dir = TempDir::new().unwrap();
-    let valid_file = temp_dir.path().join("valid.csv");
-    let invalid_path = PathBuf::from("/nonexistent/invalid.csv");
 
-    write(&valid_file, "A,B\n1,2\n3,4").unwrap();
-
-    let doc = Document::from_file(&valid_file, None, false, None).unwrap();
-    let mut app = App::new(
-        doc,
-        vec![valid_file.clone(), invalid_path],
-        0,
-        FileConfig::new(),
-    );
-
-    // Switch to invalid file
-    app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-    let result = app.reload_current_file();
-
-    // Should fail to reload
-    assert!(result.is_err());
-
-    // Switch back to valid file
-    app.handle_key(key_event(KeyCode::Char('['))).unwrap();
-    let result = app.reload_current_file();
-
-    // Should successfully reload
-    assert!(result.is_ok());
-    assert_eq!(app.session.active_file_index(), 0);
-}
-
-#[test]
-fn test_rapid_navigation_and_file_switching() {
-    let temp_dir = TempDir::new().unwrap();
-    let file1_path = temp_dir.path().join("f1.csv");
-    let file2_path = temp_dir.path().join("f2.csv");
-
-    write(&file1_path, "A,B,C\n1,2,3\n4,5,6\n7,8,9\n10,11,12").unwrap();
-    write(&file2_path, "X,Y,Z\n20,21,22\n23,24,25").unwrap();
-
-    let doc = Document::from_file(&file1_path, None, false, None).unwrap();
-    let mut app = App::new(
-        doc,
-        vec![file1_path.clone(), file2_path.clone()],
-        0,
-        FileConfig::new(),
-    );
-
-    // Rapid mixed operations (50 keypresses)
-    let keys = [
-        'j', 'j', 'k', 'l', 'h', 'j', 'l', ']', 'j', 'j', 'k', 'h', '[', 'j', 'l', 'j', 'k', '$',
-        '0', 'j', ']', 'k', 'k', '[', 'l', 'l', 'h', 'j', 'j', 'j', 'k', 'k', 'l', '$', '0', ']',
-        '[', 'j', 'k', 'l', 'h', 'j', 'l', 'k', '0', '$', ']', '[', 'j', 'k',
-    ];
-
-    for key in keys.iter() {
-        if *key == ']' || *key == '[' {
-            app.handle_key(key_event(KeyCode::Char(*key))).unwrap();
-            // Reload after file switch
-            let _ = app.reload_current_file();
-        } else {
-            app.handle_key(key_event(KeyCode::Char(*key))).unwrap();
-        }
-    }
-
-    // App should remain stable
-    assert!(!app.should_quit);
-    // Should have valid position
-    assert!(app.selected_row().is_some());
-}
 
 #[test]
 fn test_help_during_multi_key_command() {
@@ -636,46 +381,6 @@ fn test_help_during_multi_key_command() {
     assert!(!app.should_quit);
 }
 
-#[test]
-fn test_viewport_mode_reset_across_files() {
-    let temp_dir = TempDir::new().unwrap();
-    let file1_path = temp_dir.path().join("f1.csv");
-    let file2_path = temp_dir.path().join("f2.csv");
-
-    write(&file1_path, "A,B\n1,2\n3,4\n5,6").unwrap();
-    write(&file2_path, "X,Y\n7,8\n9,10").unwrap();
-
-    let doc = Document::from_file(&file1_path, None, false, None).unwrap();
-    let mut app = App::new(
-        doc,
-        vec![file1_path.clone(), file2_path.clone()],
-        0,
-        FileConfig::new(),
-    );
-
-    // Set viewport mode to center
-    app.handle_key(key_event(KeyCode::Char('z'))).unwrap();
-    app.handle_key(key_event(KeyCode::Char('z'))).unwrap();
-    assert_eq!(
-        app.view_state.viewport_mode,
-        lazycsv::ui::ViewportMode::Center
-    );
-
-    // Switch to file 2
-    app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-    app.reload_current_file().unwrap();
-
-    // Viewport mode should persist or reset (document behavior)
-    // Either behavior is acceptable, just verify app is stable
-    assert_eq!(app.session.active_file_index(), 1);
-
-    // Switch back to file 1
-    app.handle_key(key_event(KeyCode::Char('['))).unwrap();
-    app.reload_current_file().unwrap();
-
-    // App should be stable
-    assert_eq!(app.session.active_file_index(), 0);
-}
 
 #[test]
 fn test_status_message_lifecycle_complete() {

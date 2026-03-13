@@ -25,6 +25,9 @@ pub struct InputState {
 
     /// File filter buffer for FileList mode (search/filter files)
     pub file_filter_buffer: String,
+
+    /// Whether file list is in search mode (/ pressed)
+    pub file_list_search_active: bool,
 }
 
 impl InputState {

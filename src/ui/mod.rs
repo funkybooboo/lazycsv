@@ -39,13 +39,12 @@ pub fn render_loading(frame: &mut Frame, message: &str) {
 
 /// Main UI rendering function
 pub fn render(frame: &mut Frame, app: &mut App) {
-    // Split terminal into main area + file switcher + status bar
+    // Split terminal into main area + status bar
     // Minimal layout: no heavy borders, just horizontal rules as separators
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Min(0),    // Table area (includes title bar + rule)
-            Constraint::Length(2), // File switcher (rule + file list)
             Constraint::Length(1), // Status bar (single line, vim-like)
         ])
         .split(frame.area());
@@ -53,11 +52,8 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     // Render table with row/column numbers
     table::render_table(frame, app, chunks[0]);
 
-    // Render file switcher (always visible)
-    file_switcher::render(frame, app, chunks[1]);
-
     // Render status bar
-    status_bar::render(frame, app, chunks[2]);
+    status_bar::render(frame, app, chunks[1]);
 
     // Render help overlay if active
     if app.view_state.help_overlay_visible {
@@ -81,6 +77,60 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     if app.mode == crate::app::Mode::FileList {
         file_manager::render(frame, app);
     }
+
+    // Render file operation prompt if active
+    if app.mode == crate::app::Mode::FileOperationPrompt {
+        render_file_operation_prompt(frame, app);
+    }
+}
+
+/// Render file operation prompt overlay
+fn render_file_operation_prompt(frame: &mut ratatui::Frame, app: &crate::app::App) {
+    use ratatui::{
+        style::Style,
+        text::Line,
+        widgets::{Block, Borders, Clear, Paragraph},
+    };
+
+    // Small centered prompt (30% width, 3 lines height)
+    let area = help::centered_rect(40, 20, frame.area());
+    frame.render_widget(Clear, area);
+
+    let (title, prompt) = match &app.file_operation {
+        Some(crate::app::FileOperation::Rename(path)) => {
+            let old_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
+            (format!(" Rename: {} ", old_name), "New name:")
+        }
+        Some(crate::app::FileOperation::Delete(path)) => {
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
+            (format!(" Delete: {} ", name), "Type 'yes' to confirm:")
+        }
+        Some(crate::app::FileOperation::Move(_)) => (" Move ".to_string(), "Destination:"),
+        Some(crate::app::FileOperation::Copy(path)) => {
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
+            (format!(" Copy: {} ", name), "New name:")
+        }
+        Some(crate::app::FileOperation::Create) => (" Create New File ".to_string(), "Filename:"),
+        None => (" File Operation ".to_string(), ""),
+    };
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(title)
+        .style(Style::default());
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let text = vec![
+        Line::from(prompt),
+        Line::from(format!("> {}", app.file_operation_buffer)),
+        Line::from(""),
+        Line::from("Enter: confirm | Esc: cancel"),
+    ];
+
+    let paragraph = Paragraph::new(text);
+    frame.render_widget(paragraph, inner);
 }
 
 // Re-export public utilities and types

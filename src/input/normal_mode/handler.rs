@@ -9,9 +9,7 @@ use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::num::NonZeroUsize;
 
-use super::{
-    editing, file_switching, help, mode_transitions, navigation as nav, search, visual_mode,
-};
+use super::{editing, help, mode_transitions, navigation as nav, search, visual_mode};
 
 /// Maximum command count to prevent overflow
 const MAX_COMMAND_COUNT: usize = 100000;
@@ -75,9 +73,9 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     }
 
     match key.code {
-        // Open SQL query editor
-        KeyCode::Char('q') if help::is_navigation_allowed(app) => {
-            mode_transitions::enter_sql_editor(app);
+        // Space - start Space+key sequence
+        KeyCode::Char(' ') if help::is_navigation_allowed(app) => {
+            app.input_state.set_pending_command(PendingCommand::Space);
             return Ok(InputResult::Continue);
         }
 
@@ -95,15 +93,6 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         // Clear search highlighting with Esc
         KeyCode::Esc if app.search_state.is_some() => {
             search::clear_search(app);
-        }
-
-        // File switching
-        KeyCode::Char('[') if help::is_navigation_allowed(app) => {
-            return Ok(file_switching::previous_file(app));
-        }
-
-        KeyCode::Char(']') if help::is_navigation_allowed(app) => {
-            return Ok(file_switching::next_file(app));
         }
 
         // Start multi-key sequences
@@ -223,11 +212,6 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         // Insert mode: F2 - edit cell (same as 'i')
         KeyCode::F(2) if help::is_navigation_allowed(app) => {
             mode_transitions::edit_with_f2(app);
-        }
-
-        // Magnifier mode: 'm' - open magnifier for complex cell editing
-        KeyCode::Char('m') if help::is_navigation_allowed(app) => {
-            mode_transitions::enter_magnifier(app);
         }
 
         // Row operations: 'o' - add row below and enter Insert mode

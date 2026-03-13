@@ -8,18 +8,18 @@
 
 use crate::App;
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    layout::Rect,
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
     Frame,
 };
 
 /// Width percentage for file manager modal
-const FILE_MANAGER_WIDTH_PERCENT: u16 = 60;
+const FILE_MANAGER_WIDTH_PERCENT: u16 = 80;
 
 /// Height percentage for file manager modal
-const FILE_MANAGER_HEIGHT_PERCENT: u16 = 70;
+const FILE_MANAGER_HEIGHT_PERCENT: u16 = 80;
 
 /// Render the file manager modal
 pub fn render(frame: &mut Frame, app: &App) {
@@ -32,34 +32,27 @@ pub fn render(frame: &mut Frame, app: &App) {
     // Clear background
     frame.render_widget(Clear, area);
 
-    // Create main layout: title + search + list + help
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3), // Title + search bar
-            Constraint::Min(5),    // File list
-            Constraint::Length(3), // Help text
-        ])
-        .split(area);
-
-    // Title and search bar
-    render_title_and_search(frame, app, chunks[0]);
-
-    // File list
-    render_file_list(frame, app, chunks[1]);
-
-    // Help text
-    render_help(frame, chunks[2]);
+    // Just render the file list - no extra sections
+    render_file_list(frame, app, area);
 }
 
-/// Render title and search input
-fn render_title_and_search(frame: &mut Frame, app: &App, area: Rect) {
-    let filter = &app.input_state.file_filter_buffer;
+/// Render the file list
+fn render_file_list(frame: &mut Frame, app: &App, area: Rect) {
+    use crate::input::file_list_mode::{scan_directory, BrowserEntry};
 
-    let title = if filter.is_empty() {
-        " File Manager ".to_string()
+    // Build title with current directory and search indicator
+    let filter = &app.input_state.file_filter_buffer;
+    let dir_name = app
+        .view_state
+        .current_directory
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("/");
+
+    let title = if app.input_state.file_list_search_active {
+        format!(" File Menu [{}]: /{} ", dir_name, filter)
     } else {
-        format!(" File Manager: /{} ", filter)
+        format!(" File Menu [{}] ", dir_name)
     };
 
     let block = Block::default()
@@ -67,153 +60,110 @@ fn render_title_and_search(frame: &mut Frame, app: &App, area: Rect) {
         .title(title)
         .style(Style::default());
 
-    // Get inner area before rendering block
     let inner = block.inner(area);
-
-    // Render the block
     frame.render_widget(block, area);
 
-    // Show search prompt inside
-    let search_text = if filter.is_empty() {
-        "Type to search files..."
-    } else {
-        ""
+    // Scan current directory for entries
+    let entries = match scan_directory(&app.view_state.current_directory) {
+        Ok(e) => e,
+        Err(err) => {
+            let error_msg = format!("Error reading directory: {}", err);
+            let error_para = Paragraph::new(error_msg).style(Style::default());
+            frame.render_widget(error_para, inner);
+            return;
+        }
     };
 
-    let search = Paragraph::new(search_text).style(Style::default().fg(Color::DarkGray));
-    frame.render_widget(search, inner);
-}
-
-/// Render the file list
-fn render_file_list(frame: &mut Frame, app: &App, area: Rect) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(" Files ")
-        .style(Style::default());
-
-    let inner = block.inner(area);
-    let block_clone = Block::default()
-        .borders(Borders::ALL)
-        .title(" Files ")
-        .style(Style::default());
-
-    frame.render_widget(block_clone, area);
-
-    // Get filtered files
-    let filter = app.input_state.file_filter_buffer.to_lowercase();
-    let files = app.session.files();
-    let active_idx = app.session.active_file_index();
-    let selected_idx = app.view_state.file_list_selected;
-
-    let filtered_files: Vec<(usize, &std::path::PathBuf)> = files
+    // Apply filter
+    let filter_lower = filter.to_lowercase();
+    let filtered_entries: Vec<&BrowserEntry> = entries
         .iter()
-        .enumerate()
-        .filter(|(_, path)| {
+        .filter(|entry| {
             if filter.is_empty() {
                 true
+            } else if let Some(name) = entry.filename() {
+                name.to_lowercase().contains(&filter_lower)
             } else {
-                path.file_name()
-                    .and_then(|n| n.to_str())
-                    .map(|s| s.to_lowercase().contains(&filter))
-                    .unwrap_or(false)
+                false
             }
         })
         .collect();
 
+    let selected_idx = app.view_state.file_list_selected;
+    let active_file = app.session.files().get(app.session.active_file_index());
+
     // Build list items
-    let items: Vec<ListItem> = filtered_files
+    let items: Vec<ListItem> = filtered_entries
         .iter()
         .enumerate()
-        .map(|(display_idx, (orig_idx, path))| {
-            let filename = path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("unknown");
-
-            let dirty = if app.session.is_dirty(path) { "*" } else { "" };
-            let is_active = *orig_idx == active_idx;
+        .map(|(display_idx, entry)| {
             let is_selected = display_idx == selected_idx;
+            let is_active = active_file.map(|f| f == entry.path()).unwrap_or(false);
 
-            // Build line with indicators
             let mut spans = Vec::new();
 
             // Cursor indicator
             if is_selected {
-                spans.push(Span::styled(
-                    "> ",
-                    Style::default()
-                        .fg(Color::Yellow)
-                        .add_modifier(Modifier::BOLD),
-                ));
+                spans.push(Span::raw("> "));
             } else {
                 spans.push(Span::raw("  "));
             }
 
-            // Active file indicator
-            if is_active {
-                spans.push(Span::styled("● ", Style::default().fg(Color::Green)));
-            } else {
-                spans.push(Span::raw("  "));
+            // Icon/type indicator
+            match entry {
+                BrowserEntry::Directory(path) => {
+                    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
+
+                    let icon = if name == ".." { "↑ " } else { "📁 " };
+                    spans.push(Span::raw(icon));
+
+                    let style = if is_selected {
+                        Style::default().add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default()
+                    };
+                    spans.push(Span::styled(name, style));
+                }
+                BrowserEntry::CsvFile(path) => {
+                    // Active file indicator
+                    if is_active {
+                        spans.push(Span::raw("● "));
+                    } else {
+                        spans.push(Span::raw("  "));
+                    }
+
+                    let filename = path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("unknown");
+
+                    let dirty = if app.session.is_dirty(path) { "*" } else { "" };
+
+                    let style = if is_selected {
+                        Style::default().add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default()
+                    };
+
+                    spans.push(Span::styled(format!("{}{}", filename, dirty), style));
+                }
             }
-
-            // Filename
-            let style = if is_selected {
-                Style::default()
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD)
-            } else if is_active {
-                Style::default().fg(Color::Green)
-            } else {
-                Style::default().fg(Color::Gray)
-            };
-
-            spans.push(Span::styled(format!("{}{}", filename, dirty), style));
 
             ListItem::new(Line::from(spans))
         })
         .collect();
 
-    // Show empty message if no files match
+    // Show empty message if no items
     if items.is_empty() {
         let msg = if filter.is_empty() {
-            "No CSV files found"
+            "No items in directory"
         } else {
-            "No matching files"
+            "No matching items"
         };
-        let empty = Paragraph::new(msg)
-            .style(Style::default().fg(Color::DarkGray))
-            .block(Block::default());
+        let empty = Paragraph::new(msg).style(Style::default());
         frame.render_widget(empty, inner);
     } else {
         let list = List::new(items);
         frame.render_widget(list, inner);
     }
-}
-
-/// Render help text
-fn render_help(frame: &mut Frame, area: Rect) {
-    let help_text = vec![Line::from(vec![
-        Span::styled("j/k", Style::default().fg(Color::Yellow)),
-        Span::raw(":nav  "),
-        Span::styled("Enter", Style::default().fg(Color::Yellow)),
-        Span::raw(":open  "),
-        Span::styled("d", Style::default().fg(Color::Yellow)),
-        Span::raw(":delete  "),
-        Span::styled("r", Style::default().fg(Color::Yellow)),
-        Span::raw(":rename  "),
-        Span::styled("y", Style::default().fg(Color::Yellow)),
-        Span::raw(":copy  "),
-        Span::styled("n", Style::default().fg(Color::Yellow)),
-        Span::raw(":new  "),
-        Span::styled("Esc", Style::default().fg(Color::Yellow)),
-        Span::raw(":close"),
-    ])];
-
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(" Help ")
-        .style(Style::default());
-
-    let help = Paragraph::new(help_text).block(block);
-    frame.render_widget(help, area);
 }

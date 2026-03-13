@@ -77,6 +77,8 @@ pub enum Mode {
     SqlEditor,
     /// Search input (entered via /)
     Search,
+    /// Prompt for file operations (rename, move, copy, create)
+    FileOperationPrompt,
 }
 
 /// Visual mode selection anchor and type
@@ -303,6 +305,22 @@ pub struct App {
 
     /// Last visual selection (for gv command to reselect)
     pub last_visual_selection: Option<VisualSelection>,
+
+    /// File operation prompt state
+    pub file_operation: Option<FileOperation>,
+
+    /// File operation prompt buffer
+    pub file_operation_buffer: String,
+}
+
+/// File operation being prompted for
+#[derive(Debug, Clone, PartialEq)]
+pub enum FileOperation {
+    Rename(PathBuf), // Original path
+    Delete(PathBuf), // Path to delete
+    Move(PathBuf),   // Source path
+    Copy(PathBuf),   // Source path
+    Create,          // New file in current directory
 }
 
 impl App {
@@ -420,6 +438,8 @@ impl App {
             help_search_buffer: String::new(),
             visual_selection: None,
             last_visual_selection: None,
+            file_operation: None,
+            file_operation_buffer: String::new(),
         }
     }
 
@@ -1027,6 +1047,8 @@ mod tests {
 
         assert_eq!(app.mode, Mode::Normal);
 
+        // Space+q opens SQL editor
+        app.handle_key(key_event(KeyCode::Char(' '))).unwrap();
         app.handle_key(key_event(KeyCode::Char('q'))).unwrap();
         assert_eq!(app.mode, Mode::SqlEditor);
         assert!(!app.should_quit);
@@ -1089,63 +1111,6 @@ mod tests {
 
         app.handle_key(key_event(KeyCode::Esc)).unwrap();
         assert!(!app.view_state.help_overlay_visible);
-    }
-
-    #[test]
-    fn test_file_switching_next() {
-        let csv_data = create_test_csv_data();
-        let csv_files = vec![
-            PathBuf::from("file1.csv"),
-            PathBuf::from("file2.csv"),
-            PathBuf::from("file3.csv"),
-        ];
-        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
-
-        assert_eq!(app.session.active_file_index(), 0);
-
-        let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-        assert_eq!(should_reload, InputResult::ReloadFile);
-        assert_eq!(app.session.active_file_index(), 1);
-
-        let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-        assert_eq!(should_reload, InputResult::ReloadFile);
-        assert_eq!(app.session.active_file_index(), 2);
-
-        // Wrap around to first file
-        let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-        assert_eq!(should_reload, InputResult::ReloadFile);
-        assert_eq!(app.session.active_file_index(), 0);
-    }
-
-    #[test]
-    fn test_file_switching_previous() {
-        let csv_data = create_test_csv_data();
-        let csv_files = vec![
-            PathBuf::from("file1.csv"),
-            PathBuf::from("file2.csv"),
-            PathBuf::from("file3.csv"),
-        ];
-        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
-
-        assert_eq!(app.session.active_file_index(), 0);
-
-        let should_reload = app.handle_key(key_event(KeyCode::Char('['))).unwrap();
-        assert_eq!(should_reload, InputResult::ReloadFile);
-        assert_eq!(app.session.active_file_index(), 2); // Wrap to last file
-
-        let should_reload = app.handle_key(key_event(KeyCode::Char('['))).unwrap();
-        assert_eq!(should_reload, InputResult::ReloadFile);
-        assert_eq!(app.session.active_file_index(), 1);
-    }
-
-    #[test]
-    fn test_no_file_switching_with_single_file() {
-        let csv_data = create_test_csv_data();
-        let csv_files = vec![PathBuf::from("file1.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
-
-        let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-        assert_eq!(should_reload, InputResult::Continue); // Should not reload with single file
     }
 
     #[test]
@@ -1327,23 +1292,6 @@ mod tests {
     }
 
     #[test]
-    fn test_file_switch_single_file_no_op() {
-        // Setup: Create app with only 1 file
-        let csv_data = create_test_csv_data();
-        let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
-
-        let initial_index = app.session.active_file_index();
-
-        // Try to switch to next file with only 1 file
-        let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-
-        // Should not reload (no other files), index should stay the same
-        assert_eq!(should_reload, InputResult::Continue);
-        assert_eq!(app.session.active_file_index(), initial_index);
-    }
-
-    #[test]
     fn test_dirty_flag_behavior() {
         // Setup: Create app with clean data
         let csv_data = create_test_csv_data();
@@ -1355,10 +1303,6 @@ mod tests {
 
         // Navigation shouldn't set dirty flag
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-        assert!(!app.document.is_dirty);
-
-        // File switching shouldn't set dirty flag
-        let _ = app.handle_key(key_event(KeyCode::Char('[')));
         assert!(!app.document.is_dirty);
     }
 
@@ -1407,56 +1351,6 @@ mod tests {
 
         // Should be at column 2 (moved right 2 columns from column 0)
         assert_eq!(app.view_state.selected_column, ColIndex::new(2));
-    }
-
-    #[test]
-    fn test_file_switch_at_last_boundary() {
-        // Setup: Create app with 3 files, start at last file (index 2)
-        let csv_data = create_test_csv_data();
-        let csv_files = vec![
-            PathBuf::from("file1.csv"),
-            PathBuf::from("file2.csv"),
-            PathBuf::from("file3.csv"),
-        ];
-        let mut app = App::new(
-            csv_data,
-            csv_files.clone(),
-            2,
-            crate::session::FileConfig::new(),
-        );
-
-        assert_eq!(app.session.active_file_index(), 2);
-
-        // Try to go to next file (should wrap to first)
-        let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-
-        // Should reload and wrap to first file
-        assert_eq!(should_reload, InputResult::ReloadFile);
-        assert_eq!(app.session.active_file_index(), 0);
-    }
-
-    #[test]
-    fn test_state_comprehensive_after_file_switch() {
-        // Setup: Create app with multiple files
-        let csv_data = create_test_csv_data();
-        let csv_files = vec![PathBuf::from("file1.csv"), PathBuf::from("file2.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
-
-        // Set some state
-        app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-        app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
-        let _row_before = app.selected_row();
-        let _col_before = app.view_state.selected_column;
-
-        // Switch file
-        let should_reload = app.handle_key(key_event(KeyCode::Char(']'))).unwrap();
-        assert_eq!(should_reload, InputResult::ReloadFile);
-
-        // Verify file index changed
-        assert_eq!(app.session.active_file_index(), 1);
-
-        // Note: State (row/col) behavior depends on implementation
-        // This test documents current behavior
     }
 
     #[test]
@@ -1688,32 +1582,6 @@ mod tests {
 
         // Note: In real app, file switch would reload and reset position
         // This test verifies current behavior
-    }
-
-    #[test]
-    fn test_file_switch_at_first_boundary() {
-        // Setup: Create app with 3 files, start at first file (index 0)
-        let csv_data = create_test_csv_data();
-        let csv_files = vec![
-            PathBuf::from("file1.csv"),
-            PathBuf::from("file2.csv"),
-            PathBuf::from("file3.csv"),
-        ];
-        let mut app = App::new(
-            csv_data,
-            csv_files.clone(),
-            0,
-            crate::session::FileConfig::new(),
-        );
-
-        assert_eq!(app.session.active_file_index(), 0);
-
-        // Try to go to previous file (should wrap to last)
-        let should_reload = app.handle_key(key_event(KeyCode::Char('['))).unwrap();
-
-        // Should reload and wrap to last file
-        assert_eq!(should_reload, InputResult::ReloadFile);
-        assert_eq!(app.session.active_file_index(), 2);
     }
 
     // ===== Priority 1: Navigation Edge Cases =====
@@ -2535,38 +2403,5 @@ mod tests {
         app.handle_key(key_event(KeyCode::Enter)).unwrap();
 
         assert!(app.search_state.is_none());
-    }
-
-    #[test]
-    fn test_file_switch_caches_query_output() {
-        // Simulate: real.csv + query result.csv, switch away and back
-        let csv_data = create_test_csv_data();
-        let csv_files = vec![PathBuf::from("test.csv")];
-        let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
-
-        // Simulate adding a query result file
-        let result_path = PathBuf::from("result.csv");
-        let idx = app.session.add_file(result_path.clone());
-        app.session.set_active_file_index(idx);
-        app.session.mark_query_output(&result_path);
-        app.document = Document::new(
-            vec!["Col1".to_string()],
-            vec![vec!["query_result".to_string()]],
-            "result.csv".to_string(),
-        );
-
-        // Verify we're on result.csv
-        assert_eq!(app.current_file(), &result_path);
-        assert!(app.session.is_query_output(&result_path));
-
-        // Press [ to switch to previous file
-        let result = app.handle_key(key_event(KeyCode::Char('['))).unwrap();
-        assert!(matches!(result, InputResult::ReloadFile));
-
-        // Session should have switched to test.csv
-        assert_eq!(app.current_file(), &PathBuf::from("test.csv"));
-
-        // result.csv should now be cached
-        assert!(app.session.cached_document(&result_path).is_some());
     }
 }

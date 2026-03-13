@@ -13,10 +13,10 @@ use ratatui::{
 };
 
 /// Popup width as percentage of terminal width
-const POPUP_WIDTH_PERCENT: u16 = 70;
+const POPUP_WIDTH_PERCENT: u16 = 80;
 
 /// Popup height as percentage of terminal height
-const POPUP_HEIGHT_PERCENT: u16 = 60;
+const POPUP_HEIGHT_PERCENT: u16 = 80;
 
 /// Minimum line number column width in characters
 const MIN_LINE_NUMBER_WIDTH: u16 = 2;
@@ -63,7 +63,7 @@ pub fn render_magnifier(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(status_bar, chunks[1]);
 }
 
-/// Build the magnifier title bar with cell position and hints
+/// Build the magnifier title bar with cell position
 fn build_magnifier_title(magnifier: &crate::magnifier::MagnifierState) -> String {
     let (row, col) = magnifier.cell_position();
     let cell_name = format!(
@@ -73,9 +73,9 @@ fn build_magnifier_title(magnifier: &crate::magnifier::MagnifierState) -> String
     );
 
     if magnifier.is_dirty() {
-        format!(" {} [modified] (:wq save, :q! discard) ", cell_name)
+        format!(" {} [modified] ", cell_name)
     } else {
-        format!(" {} (:wq save, :q! discard, Esc cancel) ", cell_name)
+        format!(" {} ", cell_name)
     }
 }
 
@@ -101,8 +101,13 @@ fn build_magnifier_status_bar(
         format!("-- {} --", magnifier.mode().display_name())
     };
 
-    // Right side: cursor position and percentage
-    let right_text = format!("{},{} {}%", cursor_line + 1, cursor_col + 1, line_percent);
+    // Right side: cursor position, percentage, and help tip
+    let right_text = format!(
+        "{},{} {}% | ? for help",
+        cursor_line + 1,
+        cursor_col + 1,
+        line_percent
+    );
 
     // Middle: search info if active
     let middle_text = if let Some(pattern) = magnifier.search_pattern() {

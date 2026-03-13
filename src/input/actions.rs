@@ -110,6 +110,8 @@ pub enum PendingCommand {
     CommaD,
     /// Waiting for second 'y' after comma (for ,yy - yank column)
     CommaY,
+    /// Waiting for key after Space (Space+f, Space+q, Space+m)
+    Space,
 }
 
 impl PendingCommand {

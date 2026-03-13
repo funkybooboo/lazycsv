@@ -1,111 +1,127 @@
-//! File operations for file manager mode
+//! File operations (rename, delete, move, copy, create) for file menu
 
-use crate::app::App;
-use crate::input::StatusMessage;
-use std::path::PathBuf;
+use super::{scan_directory, BrowserEntry};
+use crate::app::{App, FileOperation, Mode};
+use crate::input::{InputResult, StatusMessage};
+use anyhow::Result;
 
-/// Pending file operation state
-#[derive(Debug, Clone, PartialEq)]
-pub enum FileOperation {
-    None,
-    /// Rename file - waiting for new name input
-    Rename {
-        original_path: PathBuf,
-    },
-    /// Delete file - waiting for confirmation
-    Delete {
-        path: PathBuf,
-    },
-    /// Copy file - waiting for new name input
-    Copy {
-        source_path: PathBuf,
-    },
-    /// Create new file - waiting for name input
-    Create,
-}
-
-impl FileOperation {
-    pub fn is_active(&self) -> bool {
-        !matches!(self, FileOperation::None)
-    }
-
-    pub fn prompt_text(&self) -> &str {
-        match self {
-            FileOperation::None => "",
-            FileOperation::Rename { .. } => "New name: ",
-            FileOperation::Delete { .. } => "Delete? (y/n): ",
-            FileOperation::Copy { .. } => "Copy to: ",
-            FileOperation::Create => "New file name: ",
-        }
-    }
-}
-
-/// Start rename operation for selected file
-pub fn start_rename(app: &mut App) {
-    if let Some(_path) = get_selected_file_path(app) {
-        app.status_message = Some(StatusMessage::from("Enter new name..."));
-        // TODO: Set file operation state (needs to be added to App)
-    } else {
-        app.status_message = Some(StatusMessage::from("No file selected"));
-    }
-}
-
-/// Start delete operation for selected file
-pub fn start_delete(app: &mut App) {
-    if let Some(path) = get_selected_file_path(app) {
-        let filename = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("unknown");
-        app.status_message = Some(StatusMessage::from(format!(
-            "Delete {}? Press 'y' to confirm",
-            filename
-        )));
-        // TODO: Set file operation state
-    } else {
-        app.status_message = Some(StatusMessage::from("No file selected"));
-    }
-}
-
-/// Start copy operation for selected file
-pub fn start_copy(app: &mut App) {
-    if let Some(_path) = get_selected_file_path(app) {
-        app.status_message = Some(StatusMessage::from("Enter destination name..."));
-        // TODO: Set file operation state
-    } else {
-        app.status_message = Some(StatusMessage::from("No file selected"));
-    }
-}
-
-/// Start create new file operation
-pub fn start_create(app: &mut App) {
-    app.status_message = Some(StatusMessage::from("Enter new file name..."));
-    // TODO: Set file operation state
-}
-
-/// Get the path of the currently selected file in the file list
-fn get_selected_file_path(app: &App) -> Option<PathBuf> {
+/// Get the currently selected entry in the file browser
+fn get_selected_entry(app: &App) -> Result<BrowserEntry> {
+    let entries = scan_directory(&app.view_state.current_directory)?;
     let filter = app.input_state.file_filter_buffer.to_lowercase();
-    let files = app.session.files();
-    let selected_idx = app.view_state.file_list_selected;
 
-    let filtered_files: Vec<&PathBuf> = files
+    let filtered: Vec<&BrowserEntry> = entries
         .iter()
-        .filter(|path| {
+        .filter(|e| {
             if filter.is_empty() {
                 true
+            } else if let Some(name) = e.filename() {
+                name.to_lowercase().contains(&filter)
             } else {
-                path.file_name()
-                    .and_then(|n| n.to_str())
-                    .map(|s| s.to_lowercase().contains(&filter))
-                    .unwrap_or(false)
+                false
             }
         })
         .collect();
 
-    if selected_idx < filtered_files.len() {
-        Some(filtered_files[selected_idx].clone())
-    } else {
-        None
+    if filtered.is_empty() {
+        anyhow::bail!("No file selected");
     }
+
+    let idx = app.view_state.file_list_selected.min(filtered.len() - 1);
+    Ok(filtered[idx].clone())
+}
+
+/// Prompt for renaming the selected file
+pub fn prompt_rename(app: &mut App) -> Result<InputResult> {
+    let entry = match get_selected_entry(app) {
+        Ok(e) => e,
+        Err(_) => {
+            app.status_message = Some(StatusMessage::from("No file selected"));
+            return Ok(InputResult::Continue);
+        }
+    };
+
+    // Don't allow renaming ".."
+    if entry.filename() == Some("..") {
+        app.status_message = Some(StatusMessage::from("Cannot rename parent directory"));
+        return Ok(InputResult::Continue);
+    }
+
+    // Set up rename operation
+    app.file_operation = Some(FileOperation::Rename(entry.path().to_path_buf()));
+    app.file_operation_buffer = entry.filename().unwrap_or("").to_string();
+    app.mode = Mode::FileOperationPrompt;
+    Ok(InputResult::Continue)
+}
+
+/// Prompt for deleting the selected file
+pub fn prompt_delete(app: &mut App) -> Result<InputResult> {
+    let entry = match get_selected_entry(app) {
+        Ok(e) => e,
+        Err(_) => {
+            app.status_message = Some(StatusMessage::from("No file selected"));
+            return Ok(InputResult::Continue);
+        }
+    };
+
+    // Don't allow deleting ".."
+    if entry.filename() == Some("..") {
+        app.status_message = Some(StatusMessage::from("Cannot delete parent directory"));
+        return Ok(InputResult::Continue);
+    }
+
+    // Set up delete operation (requires confirmation)
+    app.file_operation = Some(FileOperation::Delete(entry.path().to_path_buf()));
+    app.file_operation_buffer.clear();
+    app.mode = Mode::FileOperationPrompt;
+    Ok(InputResult::Continue)
+}
+
+/// Prompt for moving the selected file
+pub fn prompt_move(app: &mut App) -> Result<InputResult> {
+    let entry = match get_selected_entry(app) {
+        Ok(e) => e,
+        Err(_) => {
+            app.status_message = Some(StatusMessage::from("No file selected"));
+            return Ok(InputResult::Continue);
+        }
+    };
+
+    // Don't allow moving ".."
+    if entry.filename() == Some("..") {
+        app.status_message = Some(StatusMessage::from("Cannot move parent directory"));
+        return Ok(InputResult::Continue);
+    }
+
+    // Set up move operation
+    app.file_operation = Some(FileOperation::Move(entry.path().to_path_buf()));
+    app.file_operation_buffer.clear();
+    app.mode = Mode::FileOperationPrompt;
+    Ok(InputResult::Continue)
+}
+
+/// Prompt for copying the selected file
+pub fn prompt_copy(app: &mut App) -> Result<InputResult> {
+    let entry = match get_selected_entry(app) {
+        Ok(e) => e,
+        Err(_) => {
+            app.status_message = Some(StatusMessage::from("No file selected"));
+            return Ok(InputResult::Continue);
+        }
+    };
+
+    // Set up copy operation
+    app.file_operation = Some(FileOperation::Copy(entry.path().to_path_buf()));
+    app.file_operation_buffer = format!("{}.copy", entry.filename().unwrap_or("file"));
+    app.mode = Mode::FileOperationPrompt;
+    Ok(InputResult::Continue)
+}
+
+/// Prompt for creating a new file
+pub fn prompt_create(app: &mut App) -> Result<InputResult> {
+    // Set up create operation
+    app.file_operation = Some(FileOperation::Create);
+    app.file_operation_buffer = "new.csv".to_string();
+    app.mode = Mode::FileOperationPrompt;
+    Ok(InputResult::Continue)
 }

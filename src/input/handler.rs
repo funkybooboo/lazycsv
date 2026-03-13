@@ -23,6 +23,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         Mode::SqlEditor => crate::input::sql_editor_mode::handle(app, key),
         Mode::Magnifier => crate::input::magnifier_mode::handle(app, key),
         Mode::Search => crate::input::search_mode::handle(app, key),
+        Mode::FileOperationPrompt => crate::input::file_operation_mode::handle(app, key),
         Mode::VisualBlock | Mode::VisualLine | Mode::VisualColumn => {
             super::visual_mode::handle(app, key)
         }

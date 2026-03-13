@@ -143,6 +143,29 @@ pub fn handle(app: &mut App, first: PendingCommand, second: KeyCode) -> Result<I
             commands::yank_columns(app);
         }
 
+        // Space+f - Open files menu
+        (PendingCommand::Space, KeyCode::Char('f')) => {
+            use crate::app::Mode;
+            app.input_state.clear_pending_command();
+            app.mode = Mode::FileList;
+            app.input_state.clear_file_filter();
+            app.status_message = Some(StatusMessage::from(
+                "Type to filter, number to select, Enter for first, Esc to cancel",
+            ));
+        }
+
+        // Space+q - Open SQL query editor
+        (PendingCommand::Space, KeyCode::Char('q')) => {
+            app.input_state.clear_pending_command();
+            super::mode_transitions::enter_sql_editor(app);
+        }
+
+        // Space+m - Open magnifier
+        (PendingCommand::Space, KeyCode::Char('m')) => {
+            app.input_state.clear_pending_command();
+            super::mode_transitions::enter_magnifier(app);
+        }
+
         _ => {
             app.input_state.clear_pending_command();
             app.status_message = Some(StatusMessage::from(format!(
@@ -191,5 +214,6 @@ fn format_pending_command(cmd: &PendingCommand) -> String {
         PendingCommand::Comma => ",".to_string(),
         PendingCommand::CommaD => ",d".to_string(),
         PendingCommand::CommaY => ",y".to_string(),
+        PendingCommand::Space => "Space".to_string(),
     }
 }

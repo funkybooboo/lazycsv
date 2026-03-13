@@ -28,6 +28,30 @@ fn build_status_line(left: &str, right: &str, width: usize) -> String {
     }
 }
 
+/// Build a status line with left (mode), center (filename), and right (stats + help)
+fn build_three_part_status_line(left: &str, center: &str, right: &str, width: usize) -> String {
+    let left_len = left.chars().count();
+    let center_len = center.chars().count();
+    let right_len = right.chars().count();
+
+    // Calculate center position
+    let center_start = (width / 2).saturating_sub(center_len / 2);
+
+    // Calculate padding
+    let left_padding = center_start.saturating_sub(left_len);
+    let right_start = center_start + center_len;
+    let right_padding = width.saturating_sub(right_start).saturating_sub(right_len);
+
+    format!(
+        "{}{}{}{}{}",
+        left,
+        " ".repeat(left_padding),
+        center,
+        " ".repeat(right_padding),
+        right
+    )
+}
+
 /// Build the right side of the status bar with enhanced position and cell info
 fn build_right_side(app: &App) -> String {
     use crate::ui::utils::column_to_excel_letter;
@@ -95,6 +119,7 @@ fn build_pending_indicator(app: &App) -> String {
         Some(crate::input::PendingCommand::Comma) => ",".to_string(),
         Some(crate::input::PendingCommand::CommaD) => ",d".to_string(),
         Some(crate::input::PendingCommand::CommaY) => ",y".to_string(),
+        Some(crate::input::PendingCommand::Space) => "Space".to_string(),
         None => app
             .input_state
             .command_count
@@ -107,36 +132,58 @@ fn build_pending_indicator(app: &App) -> String {
 fn build_status_text(app: &App, right_side: &str, pending_indicator: &str, width: usize) -> String {
     match app.mode {
         crate::app::Mode::Command => {
-            // Show command input: ":sort_" on left, position on right
-            let left = format!(":{}", app.input_state.command_buffer);
-            build_status_line(&left, right_side, width)
+            let dirty = if app.document.is_dirty { "*" } else { "" };
+            let filename = &app.document.filename;
+            let left = format!(" :{}", app.input_state.command_buffer);
+            let center = format!("{}{}", filename, dirty);
+            let right = format!("{} | ? for help ", right_side);
+            build_three_part_status_line(&left, &center, &right, width)
         }
         crate::app::Mode::Search => {
-            // Show search input: "/pattern" on left, position on right
-            let left = format!("/{}", app.search_buffer);
-            build_status_line(&left, right_side, width)
+            let dirty = if app.document.is_dirty { "*" } else { "" };
+            let filename = &app.document.filename;
+            let left = format!(" /{}", app.search_buffer);
+            let center = format!("{}{}", filename, dirty);
+            let right = format!("{} | ? for help ", right_side);
+            build_three_part_status_line(&left, &center, &right, width)
         }
         crate::app::Mode::Normal => {
-            // Show notification or mode indicator
+            let dirty = if app.document.is_dirty { "*" } else { "" };
+            let filename = &app.document.filename;
+
             let left = if let Some(ref msg) = app.status_message {
-                msg.as_str().to_string()
+                format!(" {}", msg.as_str())
             } else if !pending_indicator.is_empty() {
-                pending_indicator.to_string()
+                format!(" {}", pending_indicator)
             } else if let Some(ref search) = app.search_state {
-                format!("/{} {}", search.pattern, search.display_position())
+                format!(" /{} {}", search.pattern, search.display_position())
             } else {
-                let dirty = if app.document.is_dirty { "*" } else { "" };
-                format!("NORMAL{}", dirty)
+                format!(" NORMAL{}", dirty)
             };
-            build_status_line(&left, right_side, width)
+
+            let center = format!("{}{}", filename, dirty);
+            let right = format!("{} | ? for help ", right_side);
+            build_three_part_status_line(&left, &center, &right, width)
         }
         crate::app::Mode::Insert => {
             let dirty = if app.document.is_dirty { "*" } else { "" };
-            build_status_line(&format!("INSERT{}", dirty), right_side, width)
+            let filename = &app.document.filename;
+            let left = format!(" INSERT{}", dirty);
+            let center = format!("{}", filename);
+            let right = format!("{} | ? for help ", right_side);
+            build_three_part_status_line(&left, &center, &right, width)
         }
-        crate::app::Mode::Magnifier => build_status_line("MAGNIFIER", right_side, width),
+        crate::app::Mode::Magnifier => {
+            let dirty = if app.document.is_dirty { "*" } else { "" };
+            let filename = &app.document.filename;
+            let left = format!(" MAGNIFIER{}", dirty);
+            let center = format!("{}", filename);
+            let right = format!("{} | ? for help ", right_side);
+            build_three_part_status_line(&left, &center, &right, width)
+        }
         crate::app::Mode::VisualBlock => {
             let dirty = if app.document.is_dirty { "*" } else { "" };
+            let filename = &app.document.filename;
             let selection_info = if let Some(sel) = &app.visual_selection {
                 let (start_row, end_row, start_col, end_col) = sel.bounds();
                 format!(
@@ -149,28 +196,28 @@ fn build_status_text(app: &App, right_side: &str, pending_indicator: &str, width
             } else {
                 String::new()
             };
-            build_status_line(
-                &format!("VISUAL{}{}", selection_info, dirty),
-                right_side,
-                width,
-            )
+            let left = format!(" VISUAL{}{}", selection_info, dirty);
+            let center = format!("{}", filename);
+            let right = format!("{} | ? for help ", right_side);
+            build_three_part_status_line(&left, &center, &right, width)
         }
         crate::app::Mode::VisualLine => {
             let dirty = if app.document.is_dirty { "*" } else { "" };
+            let filename = &app.document.filename;
             let selection_info = if let Some(sel) = &app.visual_selection {
                 let (start_row, end_row, _, _) = sel.bounds();
                 format!(" LINE {}-{}", start_row.get() + 1, end_row.get() + 1)
             } else {
                 String::new()
             };
-            build_status_line(
-                &format!("VISUAL{}{}", selection_info, dirty),
-                right_side,
-                width,
-            )
+            let left = format!(" VISUAL{}{}", selection_info, dirty);
+            let center = format!("{}", filename);
+            let right = format!("{} | ? for help ", right_side);
+            build_three_part_status_line(&left, &center, &right, width)
         }
         crate::app::Mode::VisualColumn => {
             let dirty = if app.document.is_dirty { "*" } else { "" };
+            let filename = &app.document.filename;
             let selection_info = if let Some(sel) = &app.visual_selection {
                 let (_, _, start_col, end_col) = sel.bounds();
                 format!(
@@ -181,11 +228,10 @@ fn build_status_text(app: &App, right_side: &str, pending_indicator: &str, width
             } else {
                 String::new()
             };
-            build_status_line(
-                &format!("VISUAL{}{}", selection_info, dirty),
-                right_side,
-                width,
-            )
+            let left = format!(" VISUAL{}{}", selection_info, dirty);
+            let center = format!("{}", filename);
+            let right = format!("{} | ? for help ", right_side);
+            build_three_part_status_line(&left, &center, &right, width)
         }
         crate::app::Mode::SqlEditor => {
             let left = if let Some(ref err) = app.sql_error {
@@ -196,67 +242,49 @@ fn build_status_text(app: &App, right_side: &str, pending_indicator: &str, width
             build_status_line(&left, right_side, width)
         }
         crate::app::Mode::FileList => {
-            // Show file list with cursor indicator and filter
-            let files = app.session.files();
-            let filter = &app.input_state.file_filter_buffer;
-            let filter_lower = filter.to_lowercase();
+            use crate::input::file_list_mode::scan_directory;
 
-            // Filter files based on search
-            let filtered_files: Vec<(usize, &std::path::PathBuf)> = files
+            let dirty = if app.document.is_dirty { "*" } else { "" };
+            let filename = &app.document.filename;
+            let filter = &app.input_state.file_filter_buffer;
+
+            // Count filtered entries in current directory
+            let entries = scan_directory(&app.view_state.current_directory).unwrap_or_default();
+            let filter_lower = filter.to_lowercase();
+            let filtered_count = entries
                 .iter()
-                .enumerate()
-                .filter(|(_, path)| {
+                .filter(|entry| {
                     if filter.is_empty() {
                         true
+                    } else if let Some(name) = entry.filename() {
+                        name.to_lowercase().contains(&filter_lower)
                     } else {
-                        path.file_name()
-                            .and_then(|n| n.to_str())
-                            .map(|s| s.to_lowercase().contains(&filter_lower))
-                            .unwrap_or(false)
+                        false
                     }
                 })
-                .collect();
+                .count();
 
-            // Build file list with cursor indicator: "> file1.csv* | file2.csv | file3.csv"
-            let mut file_list = String::new();
-            let selected_idx = app.view_state.file_list_selected;
+            let selected = app.view_state.file_list_selected + 1;
 
-            for (display_num, (_orig_idx, path)) in filtered_files.iter().enumerate() {
-                let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
-
-                // Add dirty indicator
-                let dirty = if app.session.is_dirty(path) { "*" } else { "" };
-
-                // Add cursor indicator for selected file
-                let cursor = if display_num == selected_idx {
-                    "> "
-                } else {
-                    ""
-                };
-
-                // Add separator between files
-                if display_num > 0 {
-                    file_list.push_str(" | ");
-                }
-
-                file_list.push_str(&format!("{}{}{}", cursor, filename, dirty));
-            }
-
-            let left = if filter.is_empty() {
-                format!(
-                    "FILES (j/k or arrows to navigate, Enter to select): {}",
-                    file_list
-                )
+            let left = if app.input_state.file_list_search_active {
+                format!(" /{}", filter)
+            } else if !filter.is_empty() {
+                format!(" FILE MENU (filtered: {})", filter)
             } else {
-                format!(
-                    "FILTER: \"{}\" ({} matches): {}",
-                    filter,
-                    filtered_files.len(),
-                    file_list
-                )
+                " FILE MENU".to_string()
             };
 
-            build_status_line(&left, "", width)
+            let center = format!("{}{}", filename, dirty);
+            let right = format!("{} of {} items | ? for help ", selected, filtered_count);
+            build_three_part_status_line(&left, &center, &right, width)
+        }
+        crate::app::Mode::FileOperationPrompt => {
+            let dirty = if app.document.is_dirty { "*" } else { "" };
+            let filename = &app.document.filename;
+            let left = " FILE OPERATION".to_string();
+            let center = format!("{}{}", filename, dirty);
+            let right = "Enter: confirm | Esc: cancel ";
+            build_three_part_status_line(&left, &center, &right, width)
         }
     }
 }
@@ -497,7 +525,8 @@ mod tests {
         app.document.is_dirty = true;
 
         let status = build_status_text(&app, "right", "", 80);
-        assert!(status.contains("INSERT*"));
+        assert!(status.contains("*"));
+        assert!(status.contains("INSERT"));
     }
 
     #[test]

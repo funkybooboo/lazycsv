@@ -9,8 +9,8 @@
 //! - **Navigation**: h/j/k/l, gg/G, w/b, 0/$, Ctrl+f/b, etc.
 //! - **Visual mode**: v (block), V (line), ,v (column)
 //! - **Editing**: i/a/I/A/s (insert), d/y/p (delete/yank/paste), u (undo), Ctrl+r (redo)
-//! - **Commands**: : (command mode), / (search), q (SQL query)
-//! - **Files**: gf (jump to file), Ctrl+^ (switch files), :w/:q (save/quit)
+//! - **Commands**: : (command mode), / (search), Space+q (SQL query)
+//! - **Files**: Space+f (file menu), :w/:q (save/quit)
 //! - **Multi-key**: gg, dd, yy, cc, and more
 //!
 //! # Module Organization
@@ -21,13 +21,11 @@
 //! - `search`: Search operations (/, n, N, *)
 //! - `visual_mode`: Visual mode entry (v, V, `,v`)
 //! - `editing`: Row/cell editing operations (o, O, p, P, Delete)
-//! - `mode_transitions`: Mode switching (i, a, :, /, q, m)
-//! - `file_switching`: File navigation (`[`, `]`)
+//! - `mode_transitions`: Mode switching (i, a, :, /, Space+q, Space+m)
 //! - `navigation`: Navigation helpers (Enter, Ctrl+d, Ctrl+u)
 
 mod commands;
 mod editing;
-mod file_switching;
 mod handler;
 mod help;
 mod mode_transitions;

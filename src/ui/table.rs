@@ -17,8 +17,8 @@ use ratatui::{
 /// Height reserved for title bar, horizontal rule, column letters, and header row
 const TABLE_HEADER_HEIGHT: u16 = 4;
 
-/// Height reserved for status bar (1) and file switcher (2)
-const STATUS_BAR_HEIGHT: u16 = 3;
+/// Height reserved for status bar (1)
+const STATUS_BAR_HEIGHT: u16 = 1;
 
 /// Width allocated for the row number column
 const ROW_NUMBER_COLUMN_WIDTH: u16 = 5;
@@ -494,39 +494,20 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
         ])
         .split(area);
 
-    // Title bar: filename left, cell value right (Excel-style)
-    let dirty_indicator = if csv.is_dirty { "*" } else { "" };
-    let title_left = format!(" {}{}", csv.filename, dirty_indicator);
-
+    // Title bar: cell value on left (not truncated)
     // Get current cell value for display (like Excel's formula bar)
     let cell_value = if let Some(row_idx) = app.selected_row() {
         let content = csv.cell(row_idx, app.view_state.selected_column);
         if content.is_empty() {
             String::new()
         } else {
-            // Truncate if too long, show first part of cell value
-            let max_len = area.width.saturating_sub(title_left.len() as u16 + 5) as usize;
-            if content.len() > max_len {
-                format!(
-                    "{}...",
-                    content
-                        .chars()
-                        .take(max_len.saturating_sub(3))
-                        .collect::<String>()
-                )
-            } else {
-                content.to_string()
-            }
+            content.to_string()
         }
     } else {
         String::new()
     };
 
-    let title_right = format!("{} ", cell_value);
-    let title_padding = (area.width as usize)
-        .saturating_sub(title_left.len())
-        .saturating_sub(title_right.len());
-    let title_text = format!("{}{}{}", title_left, " ".repeat(title_padding), title_right);
+    let title_text = format!(" {}", cell_value);
     let title_bar = Paragraph::new(title_text).style(Style::default().add_modifier(Modifier::BOLD));
     frame.render_widget(title_bar, chunks[0]);
 

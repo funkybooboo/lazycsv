@@ -13,10 +13,10 @@ use ratatui::{
 };
 
 /// Width percentage for SQL editor overlay
-const SQL_EDITOR_WIDTH_PERCENT: u16 = 70;
+const SQL_EDITOR_WIDTH_PERCENT: u16 = 80;
 
 /// Height percentage for SQL editor overlay
-const SQL_EDITOR_HEIGHT_PERCENT: u16 = 50;
+const SQL_EDITOR_HEIGHT_PERCENT: u16 = 80;
 
 /// Render the SQL editor overlay with vim editing
 ///
@@ -34,33 +34,58 @@ pub fn render_sql_editor_vim(frame: &mut Frame, vim_editor: &VimEditor, sql_erro
 
     let mode_str = vim_editor.mode().display_name();
 
-    let title = format!(
-        " SQL Query - {} (Ctrl+Enter: execute, Esc: cancel) ",
-        mode_str
-    );
+    let title = format!(" SQL Query - {} ", mode_str);
     let block = Block::default().borders(Borders::ALL).title(title);
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    // Split area for query text and optional error/status line
-    let (query_area, status_area) = split_editor_area(inner, sql_error.is_some());
+    // Split area for query text and status line
+    let (query_area, status_area) = split_editor_area(inner);
 
     // Render query text with line numbers and cursor
     let lines = build_vim_editor_lines(vim_editor);
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, query_area);
 
-    // Render error message or command buffer
+    // Render status bar with error/command/help
+    let status_line = build_status_line(vim_editor, sql_error, status_area.width as usize);
+    let status_paragraph = Paragraph::new(vec![status_line]);
+    frame.render_widget(status_paragraph, status_area);
+}
+
+/// Build status line with mode/command/error and help tip
+fn build_status_line<'a>(
+    vim_editor: &VimEditor,
+    sql_error: Option<&str>,
+    width: usize,
+) -> Line<'a> {
+    let help_text = "? for help";
+
     if let Some(err) = sql_error {
-        let error_line = build_error_line(err);
-        let error_paragraph = Paragraph::new(vec![error_line]);
-        frame.render_widget(error_paragraph, status_area);
+        // Error message on left, help on right
+        let error_text = format!("Error: {}", err);
+        let padding = width.saturating_sub(error_text.len() + help_text.len() + 2);
+        Line::from(vec![
+            Span::styled(
+                error_text,
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(" ".repeat(padding)),
+            Span::raw(help_text),
+        ])
     } else if vim_editor.mode() == VimMode::Command {
-        // Show command buffer
+        // Command buffer on left, help on right
         let cmd_text = format!(":{}", vim_editor.command_buffer());
-        let cmd_line = Line::from(vec![Span::styled(cmd_text, Style::default())]);
-        let cmd_paragraph = Paragraph::new(vec![cmd_line]);
-        frame.render_widget(cmd_paragraph, status_area);
+        let padding = width.saturating_sub(cmd_text.len() + help_text.len() + 1);
+        Line::from(vec![
+            Span::styled(cmd_text, Style::default()),
+            Span::raw(" ".repeat(padding)),
+            Span::raw(help_text),
+        ])
+    } else {
+        // Just help on right
+        let padding = width.saturating_sub(help_text.len());
+        Line::from(vec![Span::raw(" ".repeat(padding)), Span::raw(help_text)])
     }
 }
 
@@ -127,28 +152,13 @@ fn build_vim_editor_lines(vim_editor: &VimEditor) -> Vec<Line<'static>> {
     display_lines
 }
 
-/// Build an error display line
-fn build_error_line(error: &str) -> Line<'static> {
-    Line::from(vec![Span::styled(
-        format!("Error: {}", error),
-        Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-    )])
-}
-
-/// Split the editor area into query text area and status/error area.
+/// Split the editor area into query text area and status area.
 ///
 /// Returns (query_area, status_area).
-fn split_editor_area(inner: Rect, has_status: bool) -> (Rect, Rect) {
-    let chunks = if has_status {
-        Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Min(1), Constraint::Length(1)])
-            .split(inner)
-    } else {
-        Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Min(1), Constraint::Length(0)])
-            .split(inner)
-    };
+fn split_editor_area(inner: Rect) -> (Rect, Rect) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(1), Constraint::Length(1)])
+        .split(inner);
     (chunks[0], chunks[1])
 }

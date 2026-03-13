@@ -47,6 +47,9 @@ pub struct ViewState {
 
     /// Current match index in help search results
     pub help_search_match_index: usize,
+
+    /// Current directory for file browser (yazi-style navigation)
+    pub current_directory: std::path::PathBuf,
 }
 
 impl Default for ViewState {
@@ -62,6 +65,8 @@ impl Default for ViewState {
             file_list_selected: 0,
             help_search_query: None,
             help_search_match_index: 0,
+            current_directory: std::env::current_dir()
+                .unwrap_or_else(|_| std::path::PathBuf::from(".")),
         }
     }
 }

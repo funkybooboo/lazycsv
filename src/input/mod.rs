@@ -6,6 +6,7 @@
 pub mod actions;
 pub mod command_mode;
 pub mod file_list_mode;
+pub mod file_operation_mode;
 pub mod handler;
 pub mod insert_mode;
 pub mod magnifier_mode;

@@ -29,6 +29,12 @@ fn send_command(app: &mut App, cmd: &str) {
     let _ = app.handle_key(key_event(KeyCode::Enter));
 }
 
+/// Helper to open files menu using Space+f
+fn open_files_menu(app: &mut App) {
+    let _ = app.handle_key(key_event(KeyCode::Char(' ')));
+    let _ = app.handle_key(key_event(KeyCode::Char('f')));
+}
+
 #[test]
 fn test_files_command_enters_file_list_mode() {
     let temp_dir = TempDir::new().unwrap();
@@ -39,8 +45,8 @@ fn test_files_command_enters_file_list_mode() {
     let files = vec![file1.clone(), file2.clone()];
     let mut app = App::new(doc, files, 0, FileConfig::new());
 
-    // Execute :files command
-    send_command(&mut app, "files");
+    // Open files menu with Space+f
+    open_files_menu(&mut app);
 
     // Should enter FileList mode
     assert_eq!(app.mode, Mode::FileList);
@@ -59,7 +65,7 @@ fn test_file_list_mode_escape_cancels() {
     let files = vec![file1.clone(), file2.clone()];
     let mut app = App::new(doc, files, 0, FileConfig::new());
 
-    send_command(&mut app, "files");
+    open_files_menu(&mut app);
     assert_eq!(app.mode, Mode::FileList);
 
     // Press Escape
@@ -83,7 +89,7 @@ fn test_file_list_cursor_navigation_down() {
     let files = vec![file1.clone(), file2.clone(), file3.clone()];
     let mut app = App::new(doc, files, 0, FileConfig::new());
 
-    send_command(&mut app, "files");
+    open_files_menu(&mut app);
     assert_eq!(app.view_state.file_list_selected, 0);
 
     // Press 'j' to move cursor down
@@ -110,7 +116,7 @@ fn test_file_list_cursor_navigation_up() {
     let files = vec![file1.clone(), file2.clone(), file3.clone()];
     let mut app = App::new(doc, files, 0, FileConfig::new());
 
-    send_command(&mut app, "files");
+    open_files_menu(&mut app);
 
     // Move to bottom first
     let _ = app.handle_key(key_event(KeyCode::Char('j')));
@@ -141,7 +147,7 @@ fn test_file_list_arrow_keys_navigation() {
     let files = vec![file1.clone(), file2.clone(), file3.clone()];
     let mut app = App::new(doc, files, 0, FileConfig::new());
 
-    send_command(&mut app, "files");
+    open_files_menu(&mut app);
 
     // Use Down arrow
     let _ = app.handle_key(key_event(KeyCode::Down));
@@ -174,7 +180,7 @@ fn test_file_list_enter_selects_cursor_position() {
     // Currently on file 1 (index 0)
     assert_eq!(app.session.active_file_index(), 0);
 
-    send_command(&mut app, "files");
+    open_files_menu(&mut app);
 
     // Move cursor to file 2
     let _ = app.handle_key(key_event(KeyCode::Char('j')));
@@ -199,7 +205,7 @@ fn test_file_list_filter_by_name() {
     let files = vec![file1.clone(), file2.clone(), file3.clone()];
     let mut app = App::new(doc, files, 0, FileConfig::new());
 
-    send_command(&mut app, "files");
+    open_files_menu(&mut app);
     assert_eq!(app.mode, Mode::FileList);
 
     // Use j/k navigation to move to file 3 instead of filtering
@@ -227,7 +233,7 @@ fn test_file_list_filter_with_cursor_navigation() {
     let files = vec![file1.clone(), file2.clone(), file3.clone()];
     let mut app = App::new(doc, files, 0, FileConfig::new());
 
-    send_command(&mut app, "files");
+    open_files_menu(&mut app);
 
     // Type "cust" to filter - should match 2 files
     let _ = app.handle_key(key_event(KeyCode::Char('c')));
@@ -259,7 +265,10 @@ fn test_file_list_filter_backspace() {
     let files = vec![file1.clone()];
     let mut app = App::new(doc, files, 0, FileConfig::new());
 
-    send_command(&mut app, "files");
+    open_files_menu(&mut app);
+
+    // Enter search mode with /
+    let _ = app.handle_key(key_event(KeyCode::Char('/')));
 
     // Type some characters
     let _ = app.handle_key(key_event(KeyCode::Char('a')));
@@ -286,7 +295,10 @@ fn test_file_list_filter_no_match() {
     let files = vec![file1.clone(), file2.clone()];
     let mut app = App::new(doc, files, 0, FileConfig::new());
 
-    send_command(&mut app, "files");
+    open_files_menu(&mut app);
+
+    // Enter search mode with /
+    let _ = app.handle_key(key_event(KeyCode::Char('/')));
 
     // Type filter that doesn't match
     let _ = app.handle_key(key_event(KeyCode::Char('x')));
@@ -312,7 +324,7 @@ fn test_file_list_single_file_navigation() {
     let files = vec![file1.clone()];
     let mut app = App::new(doc, files, 0, FileConfig::new());
 
-    send_command(&mut app, "files");
+    open_files_menu(&mut app);
 
     // Cursor should be at 0
     assert_eq!(app.view_state.file_list_selected, 0);
@@ -343,14 +355,15 @@ fn test_file_list_cursor_resets_on_filter_change() {
     let files = vec![file1.clone(), file2.clone(), file3.clone()];
     let mut app = App::new(doc, files, 0, FileConfig::new());
 
-    send_command(&mut app, "files");
+    open_files_menu(&mut app);
 
     // Move cursor to position 2
     let _ = app.handle_key(key_event(KeyCode::Char('j')));
     let _ = app.handle_key(key_event(KeyCode::Char('j')));
     assert_eq!(app.view_state.file_list_selected, 2);
 
-    // Type a filter character - cursor should reset to 0
+    // Enter search mode and type a filter character - cursor should reset to 0
+    let _ = app.handle_key(key_event(KeyCode::Char('/')));
     let _ = app.handle_key(key_event(KeyCode::Char('b')));
     assert_eq!(app.view_state.file_list_selected, 0);
     assert_eq!(app.input_state.file_filter_buffer, "b");
@@ -370,7 +383,7 @@ fn test_file_list_q_exits_like_escape() {
     let files = vec![file1.clone(), file2.clone()];
     let mut app = App::new(doc, files, 0, FileConfig::new());
 
-    send_command(&mut app, "files");
+    open_files_menu(&mut app);
     assert_eq!(app.mode, Mode::FileList);
 
     // Press 'q' to quit file manager
@@ -395,7 +408,7 @@ fn test_file_list_g_jumps_to_top() {
     let files = vec![file1.clone(), file2.clone(), file3.clone(), file4.clone()];
     let mut app = App::new(doc, files, 0, FileConfig::new());
 
-    send_command(&mut app, "files");
+    open_files_menu(&mut app);
 
     // Move to bottom
     let _ = app.handle_key(key_event(KeyCode::Char('j')));
@@ -403,7 +416,8 @@ fn test_file_list_g_jumps_to_top() {
     let _ = app.handle_key(key_event(KeyCode::Char('j')));
     assert_eq!(app.view_state.file_list_selected, 3);
 
-    // Press 'g' to jump to top
+    // Press 'gg' to jump to top
+    let _ = app.handle_key(key_event(KeyCode::Char('g')));
     let _ = app.handle_key(key_event(KeyCode::Char('g')));
     assert_eq!(app.view_state.file_list_selected, 0);
 }
@@ -420,119 +434,12 @@ fn test_file_list_shift_g_jumps_to_bottom() {
     let files = vec![file1.clone(), file2.clone(), file3.clone(), file4.clone()];
     let mut app = App::new(doc, files, 0, FileConfig::new());
 
-    send_command(&mut app, "files");
+    open_files_menu(&mut app);
     assert_eq!(app.view_state.file_list_selected, 0);
 
     // Press 'G' (Shift+g) to jump to bottom
     let _ = app.handle_key(KeyEvent::new(KeyCode::Char('G'), KeyModifiers::SHIFT));
     assert_eq!(app.view_state.file_list_selected, 3);
-}
-
-#[test]
-fn test_file_list_o_opens_file_like_enter() {
-    let temp_dir = TempDir::new().unwrap();
-    let file1 = create_test_csv(&temp_dir, "file1.csv", "A,B\n1,2\n");
-    let file2 = create_test_csv(&temp_dir, "file2.csv", "X,Y\n3,4\n");
-
-    let doc = Document::from_file(&file1, None, false, None).unwrap();
-    let files = vec![file1.clone(), file2.clone()];
-    let mut app = App::new(doc, files, 0, FileConfig::new());
-
-    send_command(&mut app, "files");
-
-    // Move to file 2
-    let _ = app.handle_key(key_event(KeyCode::Char('j')));
-    assert_eq!(app.view_state.file_list_selected, 1);
-
-    // Press 'o' to open
-    let _ = app.handle_key(key_event(KeyCode::Char('o')));
-
-    // Should switch to file 2 and return to Normal mode
-    assert_eq!(app.session.active_file_index(), 1);
-    assert_eq!(app.mode, Mode::Normal);
-}
-
-#[test]
-fn test_file_list_r_triggers_rename_message() {
-    let temp_dir = TempDir::new().unwrap();
-    let file1 = create_test_csv(&temp_dir, "file1.csv", "A,B\n1,2\n");
-    let file2 = create_test_csv(&temp_dir, "file2.csv", "X,Y\n3,4\n");
-
-    let doc = Document::from_file(&file1, None, false, None).unwrap();
-    let files = vec![file1.clone(), file2.clone()];
-    let mut app = App::new(doc, files, 0, FileConfig::new());
-
-    send_command(&mut app, "files");
-
-    // Press 'r' to rename
-    let _ = app.handle_key(key_event(KeyCode::Char('r')));
-
-    // Should show rename message (operation not fully implemented yet)
-    assert!(app.status_message.is_some());
-    let msg = app.status_message.as_ref().unwrap().as_str();
-    assert!(msg.contains("name"));
-}
-
-#[test]
-fn test_file_list_d_triggers_delete_message() {
-    let temp_dir = TempDir::new().unwrap();
-    let file1 = create_test_csv(&temp_dir, "file1.csv", "A,B\n1,2\n");
-    let file2 = create_test_csv(&temp_dir, "file2.csv", "X,Y\n3,4\n");
-
-    let doc = Document::from_file(&file1, None, false, None).unwrap();
-    let files = vec![file1.clone(), file2.clone()];
-    let mut app = App::new(doc, files, 0, FileConfig::new());
-
-    send_command(&mut app, "files");
-
-    // Press 'd' to delete
-    let _ = app.handle_key(key_event(KeyCode::Char('d')));
-
-    // Should show delete confirmation message
-    assert!(app.status_message.is_some());
-    let msg = app.status_message.as_ref().unwrap().as_str();
-    assert!(msg.contains("Delete") || msg.contains("confirm"));
-}
-
-#[test]
-fn test_file_list_y_triggers_copy_message() {
-    let temp_dir = TempDir::new().unwrap();
-    let file1 = create_test_csv(&temp_dir, "file1.csv", "A,B\n1,2\n");
-    let file2 = create_test_csv(&temp_dir, "file2.csv", "X,Y\n3,4\n");
-
-    let doc = Document::from_file(&file1, None, false, None).unwrap();
-    let files = vec![file1.clone(), file2.clone()];
-    let mut app = App::new(doc, files, 0, FileConfig::new());
-
-    send_command(&mut app, "files");
-
-    // Press 'y' to copy
-    let _ = app.handle_key(key_event(KeyCode::Char('y')));
-
-    // Should show copy message
-    assert!(app.status_message.is_some());
-    let msg = app.status_message.as_ref().unwrap().as_str();
-    assert!(msg.contains("name") || msg.contains("destination"));
-}
-
-#[test]
-fn test_file_list_n_triggers_create_message() {
-    let temp_dir = TempDir::new().unwrap();
-    let file1 = create_test_csv(&temp_dir, "file1.csv", "A,B\n1,2\n");
-
-    let doc = Document::from_file(&file1, None, false, None).unwrap();
-    let files = vec![file1.clone()];
-    let mut app = App::new(doc, files, 0, FileConfig::new());
-
-    send_command(&mut app, "files");
-
-    // Press 'n' to create new file
-    let _ = app.handle_key(key_event(KeyCode::Char('n')));
-
-    // Should show create message
-    assert!(app.status_message.is_some());
-    let msg = app.status_message.as_ref().unwrap().as_str();
-    assert!(msg.contains("new") || msg.contains("name"));
 }
 
 #[test]
@@ -547,17 +454,20 @@ fn test_file_list_g_and_capital_g_with_filtered_list() {
     let files = vec![file1.clone(), file2.clone(), file3.clone(), file4.clone()];
     let mut app = App::new(doc, files, 0, FileConfig::new());
 
-    send_command(&mut app, "files");
+    open_files_menu(&mut app);
 
     // Filter to only show files starting with 'a' (3 files)
+    let _ = app.handle_key(key_event(KeyCode::Char('/')));
     let _ = app.handle_key(key_event(KeyCode::Char('a')));
+    let _ = app.handle_key(key_event(KeyCode::Enter)); // Exit search mode
 
     // Move down twice to get to index 2
     let _ = app.handle_key(key_event(KeyCode::Char('j')));
     let _ = app.handle_key(key_event(KeyCode::Char('j')));
     assert_eq!(app.view_state.file_list_selected, 2);
 
-    // Jump to top with 'g'
+    // Jump to top with 'gg'
+    let _ = app.handle_key(key_event(KeyCode::Char('g')));
     let _ = app.handle_key(key_event(KeyCode::Char('g')));
     assert_eq!(app.view_state.file_list_selected, 0);
 
@@ -580,7 +490,7 @@ fn test_file_list_operations_dont_filter() {
     let files = vec![file1.clone(), file2.clone()];
     let mut app = App::new(doc, files, 0, FileConfig::new());
 
-    send_command(&mut app, "files");
+    open_files_menu(&mut app);
 
     // Start with empty filter
     assert_eq!(app.input_state.file_filter_buffer, "");
