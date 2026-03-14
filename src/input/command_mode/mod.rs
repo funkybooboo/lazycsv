@@ -32,5 +32,6 @@
 mod executor;
 mod handler;
 mod range_commands;
+pub mod stats;
 
 pub use handler::handle;

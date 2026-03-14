@@ -48,6 +48,7 @@ pub fn handle_commit_cancel(app: &mut App, key: KeyEvent) {
 
         // Exit: Cancel
         (KeyCode::Esc, _) => {
+            app.formula_completion = None;
             app.edit_buffer = None;
             app.mode = Mode::Normal;
         }
@@ -58,14 +59,14 @@ pub fn handle_commit_cancel(app: &mut App, key: KeyEvent) {
 
 /// Commit the current edit and return to Normal mode
 fn commit_edit(app: &mut App) {
+    app.formula_completion = None;
     if let Some(buffer) = app.edit_buffer.take() {
         if let Some(row_idx) = app.selected_row() {
             let col_idx = app.view_state.selected_column;
 
             // Only mark dirty if content changed
             if buffer.content != buffer.original {
-                app.document.set_cell(row_idx, col_idx, buffer.content);
-                app.last_edit_position = Some((row_idx, col_idx));
+                app.commit_cell_value(row_idx, col_idx, buffer.content);
             }
         }
     }

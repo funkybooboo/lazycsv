@@ -5,6 +5,7 @@ pub mod clipboard;
 pub mod csv;
 pub mod domain;
 pub mod file_system;
+pub mod formula;
 pub mod input;
 pub mod magnifier;
 pub mod navigation;

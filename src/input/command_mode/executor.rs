@@ -24,7 +24,10 @@ pub fn execute(app: &mut App) -> Result<InputResult> {
 
     // Special handling for :c command (column jump)
     // Support both `:cA` (no space) and `:c A` (with space)
-    if cmd.starts_with('c') || cmd.starts_with('C') {
+    // Exclude known commands that start with 'c' (count)
+    let cmd_lower_full = cmd.to_lowercase();
+    let is_known_c_command = cmd_lower_full.starts_with("count");
+    if !is_known_c_command && (cmd.starts_with('c') || cmd.starts_with('C')) {
         let rest = &cmd[1..]; // Get everything after 'c'
 
         // Check if rest starts with a letter or digit (column specifier)
@@ -116,6 +119,11 @@ pub fn execute(app: &mut App) -> Result<InputResult> {
         "f" => execute_filename(app, _arg),
         "noh" | "nohlsearch" => execute_clear_search(app),
         "sort" | "sort!" => execute_sort(app, &cmd_name_lower, _arg),
+        "stats" => super::stats::execute_stats(app, _arg),
+        "sum" => super::stats::execute_sum(app, _arg),
+        "avg" | "average" => super::stats::execute_avg(app, _arg),
+        "count" => super::stats::execute_count(app, _arg),
+        "distinct" => super::stats::execute_distinct(app, _arg),
         _ => {
             // Unknown command
             app.status_message = Some(StatusMessage::from(format!("Unknown command: :{}", cmd)));

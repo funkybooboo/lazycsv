@@ -496,13 +496,13 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
         .split(area);
 
     // Title bar: cell value on left (not truncated)
-    // Get current cell value for display (like Excel's formula bar)
+    // Shows formula text for formula cells, otherwise raw cell value (like Excel's formula bar)
     let cell_value = if let Some(row_idx) = app.selected_row() {
-        let content = csv.cell(row_idx, app.view_state.selected_column);
+        let content = app.cell_formula_or_value(row_idx, app.view_state.selected_column);
         if content.is_empty() {
             String::new()
         } else {
-            content.to_string()
+            content
         }
     } else {
         String::new()

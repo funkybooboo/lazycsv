@@ -431,6 +431,12 @@ pub struct App {
 
     /// File operation prompt buffer
     pub file_operation_buffer: String,
+
+    /// Formula store for cell formulas (TUI-only, not persisted to CSV)
+    pub formula_store: crate::formula::FormulaStore,
+
+    /// Formula completion popup state (shown during insert mode when typing '=')
+    pub formula_completion: Option<SqlCompletion>,
 }
 
 /// File operation being prompted for
@@ -561,6 +567,8 @@ impl App {
             last_visual_selection: None,
             file_operation: None,
             file_operation_buffer: String::new(),
+            formula_store: crate::formula::FormulaStore::new(),
+            formula_completion: None,
         }
     }
 
@@ -683,6 +691,65 @@ impl App {
     }
 
     // ============================================================================
+    // Formula Methods
+    // ============================================================================
+
+    /// Commit a cell value, detecting and storing formulas.
+    /// If `content` starts with '=', tries to parse it as a formula.
+    /// The document always stores the computed value; the formula is kept separately.
+    pub fn commit_cell_value(
+        &mut self,
+        row: crate::domain::position::RowIndex,
+        col: crate::domain::position::ColIndex,
+    content: String,
+    ) {
+        if let Some(formula) = crate::formula::parse_formula(&content) {
+            // Evaluate using document cell values
+            let computed = formula.evaluate(&|r, c| self.document.storage.get_cell(r, c));
+            self.formula_store
+                .set(row.get(), col.get(), content, formula);
+            self.document.set_cell(row, col, computed);
+        } else {
+            // Not a formula — remove any existing formula and store raw value
+            self.formula_store.remove(row.get(), col.get());
+            self.document.set_cell(row, col, content);
+        }
+
+        self.document.is_dirty = true;
+        let file_path = self.current_file().clone();
+        self.session.mark_dirty(&file_path);
+        self.last_edit_position = Some((row, col));
+
+        // Re-evaluate any formulas that reference this cell
+        self.re_evaluate_formulas_referencing(row.get(), col.get());
+    }
+
+    /// Re-evaluate all formulas that reference the given cell.
+    fn re_evaluate_formulas_referencing(&mut self, changed_row: usize, changed_col: usize) {
+        let dependents = self.formula_store.cells_referencing(changed_row, changed_col);
+        for (r, c) in dependents {
+            if let Some(formula) = self.formula_store.get_formula(r, c).cloned() {
+                let computed = formula.evaluate(&|row, col| self.document.storage.get_cell(row, col));
+                self.document.storage.set_cell(r, c, computed);
+            }
+        }
+    }
+
+    /// Get the display value for a cell — the formula text if it has a formula, otherwise the raw value.
+    /// Used when entering edit mode or showing in the formula bar.
+    pub fn cell_formula_or_value(
+        &self,
+        row: crate::domain::position::RowIndex,
+        col: crate::domain::position::ColIndex,
+    ) -> String {
+        if let Some(raw) = self.formula_store.get_raw(row.get(), col.get()) {
+            raw.to_string()
+        } else {
+            self.document.cell(row, col).to_string()
+        }
+    }
+
+    // ============================================================================
     // Magnifier Mode Methods (Phase 4)
     // ============================================================================
 
@@ -696,8 +763,8 @@ impl App {
             .unwrap_or(RowIndex::new(0));
         let col = self.view_state.selected_column;
 
-        // Get cell content
-        let cell_content = self.document.cell(row, col).to_string();
+        // Get cell content — show formula text if this cell has a formula
+        let cell_content = self.cell_formula_or_value(row, col);
 
         // Create magnifier state
         self.magnifier_state = Some(crate::magnifier::MagnifierState::new(
@@ -715,16 +782,8 @@ impl App {
             let content = mag.content();
             let (row, col) = mag.cell_position();
 
-            // Update cell content in document (in-memory buffer)
-            self.document.set_cell(row, col, content.clone());
-            self.document.is_dirty = true;
-
-            // Mark file as dirty in session
-            let file_path = self.current_file().clone();
-            self.session.mark_dirty(&file_path);
-
-            // Update last edit position
-            self.last_edit_position = Some((row, col));
+            // Use commit_cell_value to handle formula detection
+            self.commit_cell_value(row, col, content.clone());
 
             // Update magnifier's original content so it's no longer dirty
             if let Some(mag) = &mut self.magnifier_state {
@@ -739,16 +798,8 @@ impl App {
             let content = mag.content();
             let (row, col) = mag.cell_position();
 
-            // Update cell content in document (in-memory buffer)
-            self.document.set_cell(row, col, content);
-            self.document.is_dirty = true;
-
-            // Mark file as dirty in session
-            let file_path = self.current_file().clone();
-            self.session.mark_dirty(&file_path);
-
-            // Update last edit position
-            self.last_edit_position = Some((row, col));
+            // Use commit_cell_value to handle formula detection
+            self.commit_cell_value(row, col, content);
 
             // Return to normal mode
             self.mode = Mode::Normal;

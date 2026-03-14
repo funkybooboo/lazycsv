@@ -55,6 +55,7 @@ pub fn handle_file_switch(app: &mut App, next: bool) -> InputResult {
 
     if switched {
         app.search_state = None;
+        app.formula_store.clear();
         InputResult::ReloadFile
     } else {
         InputResult::Continue
@@ -88,7 +89,7 @@ pub fn enter_insert_mode(app: &mut App, cursor: CursorPosition, content: Initial
     let row_idx = app.selected_row().unwrap_or(RowIndex::new(0));
     let col_idx = app.view_state.selected_column;
 
-    let current_value = app.document.cell(row_idx, col_idx).to_string();
+    let current_value = app.cell_formula_or_value(row_idx, col_idx);
 
     let (buffer_content, cursor_pos) = match (content, cursor) {
         (InitialContent::Clear, _) => (String::new(), 0),
