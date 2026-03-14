@@ -16,7 +16,7 @@ fn test_load_10k_rows_completes_quickly() {
 
     assert!(result.is_ok(), "Failed to load large CSV");
     let doc = result.unwrap();
-    assert_eq!(doc.rows.len(), 10_001); // 1 header + 10,000 data rows
+    assert_eq!(doc.row_count(), 10_001); // 1 header + 10,000 data rows
 
     println!("Loaded 10K rows in {:?}", duration);
     assert!(
@@ -36,8 +36,8 @@ fn test_load_100_columns_completes_quickly() {
 
     assert!(result.is_ok(), "Failed to load wide CSV");
     let doc = result.unwrap();
-    assert_eq!(doc.rows[0].len(), 100); // Header row has 100 columns
-    assert_eq!(doc.rows.len(), 1001); // 1 header + 1000 data rows
+    assert_eq!(doc.column_count(), 100); // Header row has 100 columns
+    assert_eq!(doc.row_count(), 1001); // 1 header + 1000 data rows
 
     println!("Loaded 100 columns in {:?}", duration);
     assert!(

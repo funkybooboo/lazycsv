@@ -3,6 +3,7 @@
 //! Displays a centered modal popup for typing and executing SQL queries
 //! against loaded CSV tables with full vim editing capabilities.
 
+use crate::app::{SqlCompletion, COMPLETION_MAX_VISIBLE};
 use crate::vim_editor::{VimEditor, VimMode};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -22,7 +23,12 @@ const SQL_EDITOR_HEIGHT_PERCENT: u16 = 80;
 ///
 /// Displays a centered modal window where the user can edit SQL queries
 /// using full vim modal editing (Normal, Insert, Visual modes).
-pub fn render_sql_editor_vim(frame: &mut Frame, vim_editor: &VimEditor, sql_error: Option<&str>) {
+pub fn render_sql_editor_vim(
+    frame: &mut Frame,
+    vim_editor: &VimEditor,
+    sql_error: Option<&str>,
+    completion: Option<&SqlCompletion>,
+) {
     let area = super::help::centered_rect(
         SQL_EDITOR_WIDTH_PERCENT,
         SQL_EDITOR_HEIGHT_PERCENT,
@@ -51,6 +57,114 @@ pub fn render_sql_editor_vim(frame: &mut Frame, vim_editor: &VimEditor, sql_erro
     let status_line = build_status_line(vim_editor, sql_error, status_area.width as usize);
     let status_paragraph = Paragraph::new(vec![status_line]);
     frame.render_widget(status_paragraph, status_area);
+
+    // Render completion popup if active
+    if let Some(comp) = completion {
+        render_completion_popup(frame, vim_editor, comp, query_area);
+    }
+}
+
+/// Render the completion popup anchored below the cursor
+fn render_completion_popup(
+    frame: &mut Frame,
+    vim_editor: &VimEditor,
+    completion: &SqlCompletion,
+    query_area: Rect,
+) {
+    use crate::app::CompletionItem;
+
+    let filtered: Vec<&CompletionItem> = completion.filtered_items();
+    if filtered.is_empty() {
+        return;
+    }
+
+    let (cursor_line, cursor_col) = vim_editor.cursor();
+    let line_count = vim_editor.line_count();
+    let line_num_width = format!("{}", line_count).len() + 1;
+
+    let popup_x = query_area.x + line_num_width as u16 + cursor_col as u16;
+    let popup_y = query_area.y + cursor_line as u16 + 1;
+
+    // 4 = tag "[K] " prefix width
+    let max_name_len = filtered.iter().map(|item| item.text.len()).max().unwrap_or(10);
+    let title_width = if completion.filter.is_empty() {
+        0
+    } else {
+        completion.filter.len() + 3
+    };
+    let popup_width = ((max_name_len + 4).max(title_width) + 4).min(50) as u16;
+    let visible_count = filtered.len().min(COMPLETION_MAX_VISIBLE);
+    let popup_height = visible_count as u16 + 2;
+
+    let frame_area = frame.area();
+    let popup_x = popup_x.min(frame_area.right().saturating_sub(popup_width));
+    let popup_y = popup_y.min(frame_area.bottom().saturating_sub(popup_height));
+
+    let popup_rect = Rect::new(popup_x, popup_y, popup_width, popup_height);
+    let scroll_offset = completion.scroll_offset;
+    let inner_width = popup_width.saturating_sub(2) as usize;
+    let filter_lower = completion.filter.to_ascii_lowercase();
+
+    let lines: Vec<Line<'static>> = filtered
+        .iter()
+        .enumerate()
+        .skip(scroll_offset)
+        .take(visible_count)
+        .map(|(idx, item)| {
+            let is_selected = idx == completion.selected;
+            let bg = if is_selected { Color::Blue } else { Color::DarkGray };
+            let base_style = Style::default().fg(Color::White).bg(bg);
+            let tag_style = Style::default().fg(item.kind.color()).bg(bg);
+            let highlight_style = base_style.add_modifier(Modifier::BOLD | Modifier::UNDERLINED);
+
+            let tag = format!("{} ", item.kind.tag());
+            let name = &item.text;
+            let name_budget = inner_width.saturating_sub(tag.len());
+
+            let mut spans: Vec<Span<'static>> = vec![Span::styled(tag, tag_style)];
+
+            // Highlight matching portion of the name
+            if !filter_lower.is_empty() {
+                if let Some(match_start) = name.to_ascii_lowercase().find(&filter_lower) {
+                    let match_end = match_start + filter_lower.len();
+                    let before = &name[..match_start];
+                    let matched = &name[match_start..match_end];
+                    let after = &name[match_end..];
+                    spans.push(Span::styled(before.to_string(), base_style));
+                    spans.push(Span::styled(matched.to_string(), highlight_style));
+                    // Pad the rest
+                    let remaining = name_budget.saturating_sub(name.len());
+                    let padded_after = format!("{}{}", after, " ".repeat(remaining));
+                    spans.push(Span::styled(padded_after, base_style));
+                } else {
+                    let padded = format!("{:<width$}", name, width = name_budget);
+                    spans.push(Span::styled(padded, base_style));
+                }
+            } else {
+                let padded = format!("{:<width$}", name, width = name_budget);
+                spans.push(Span::styled(padded, if is_selected {
+                    base_style.add_modifier(Modifier::BOLD)
+                } else {
+                    base_style
+                }));
+            }
+
+            Line::from(spans)
+        })
+        .collect();
+
+    frame.render_widget(Clear, popup_rect);
+    let mut popup_block = Block::default()
+        .borders(Borders::ALL)
+        .style(Style::default().bg(Color::DarkGray));
+    if !completion.filter.is_empty() {
+        popup_block = popup_block.title(format!(" /{} ", completion.filter));
+    }
+    let popup_inner = popup_block.inner(popup_rect);
+    frame.render_widget(popup_block, popup_rect);
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, popup_inner);
 }
 
 /// Build status line with mode/command/error and help tip

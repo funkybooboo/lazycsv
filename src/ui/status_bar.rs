@@ -11,23 +11,6 @@ use ratatui::{
     Frame,
 };
 
-/// Build a status line with left and right content, padding between them
-fn build_status_line(left: &str, right: &str, width: usize) -> String {
-    let left_len = left.chars().count();
-    let right_len = right.chars().count();
-    let total = left_len + right_len + 2; // +2 for spacing
-
-    if total >= width {
-        // If too long, truncate left side
-        let available = width.saturating_sub(right_len + 2);
-        let truncated_left: String = left.chars().take(available).collect();
-        format!(" {} {}", truncated_left, right)
-    } else {
-        let padding = width - total;
-        format!(" {}{}{}", left, " ".repeat(padding), right)
-    }
-}
-
 /// Build a status line with left (mode), center (filename), and right (stats + help)
 fn build_three_part_status_line(left: &str, center: &str, right: &str, width: usize) -> String {
     let left_len = left.chars().count();
@@ -234,12 +217,16 @@ fn build_status_text(app: &App, right_side: &str, pending_indicator: &str, width
             build_three_part_status_line(&left, &center, &right, width)
         }
         crate::app::Mode::SqlEditor => {
+            let dirty = if app.document.is_dirty { "*" } else { "" };
+            let filename = &app.document.filename;
             let left = if let Some(ref err) = app.sql_error {
-                err.clone()
+                format!(" {}", err)
             } else {
-                "SQL EDITOR".to_string()
+                format!(" SQL EDITOR{}", dirty)
             };
-            build_status_line(&left, right_side, width)
+            let center = format!("{}{}", filename, dirty);
+            let right = format!("{} | ? for help ", right_side);
+            build_three_part_status_line(&left, &center, &right, width)
         }
         crate::app::Mode::FileList => {
             use crate::input::file_list_mode::scan_directory;
@@ -343,22 +330,6 @@ mod tests {
         );
         let csv_files = vec![PathBuf::from("test.csv")];
         App::new(document, csv_files, 0, FileConfig::new())
-    }
-
-    #[test]
-    fn test_build_status_line_normal() {
-        let result = build_status_line("LEFT", "RIGHT", 80);
-        assert!(result.contains("LEFT"));
-        assert!(result.contains("RIGHT"));
-        // Line includes leading space, so actual content is 79 chars + leading space
-        assert!(result.len() >= 79 && result.len() <= 81);
-    }
-
-    #[test]
-    fn test_build_status_line_truncation() {
-        let result = build_status_line("VERY_LONG_LEFT_SIDE", "RIGHT", 20);
-        assert!(result.contains("RIGHT"));
-        assert!(result.len() <= 22); // Allow for small variation
     }
 
     #[test]

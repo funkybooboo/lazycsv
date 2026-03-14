@@ -64,7 +64,12 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     // Render SQL editor overlay if active
     if app.mode == crate::app::Mode::SqlEditor {
         if let Some(ref vim_editor) = app.sql_vim_editor {
-            sql_editor::render_sql_editor_vim(frame, vim_editor, app.sql_error.as_deref());
+            sql_editor::render_sql_editor_vim(
+                frame,
+                vim_editor,
+                app.sql_error.as_deref(),
+                app.sql_completion.as_ref(),
+            );
         }
     }
 

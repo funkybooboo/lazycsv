@@ -57,7 +57,7 @@ pub fn load_current_document(
         return (true, false);
     }
 
-    if document.rows.is_empty() || document.rows[0].is_empty() {
+    if document.row_count() == 0 || document.column_count() == 0 {
         return (true, false);
     }
 
@@ -98,7 +98,7 @@ pub fn load_cached_document(
         return (true, false);
     }
 
-    if cached_doc.rows.is_empty() || cached_doc.rows[0].is_empty() {
+    if cached_doc.row_count() == 0 || cached_doc.column_count() == 0 {
         return (true, false);
     }
 
@@ -145,7 +145,7 @@ pub fn load_file_from_disk(
         file_path, delimiter, no_headers, encoding, cancelled,
     ) {
         Ok(d) => {
-            if d.rows.is_empty() || d.rows[0].is_empty() {
+            if d.row_count() == 0 || d.column_count() == 0 {
                 return (true, false);
             }
             match cache.reload_table(file_path, &table_name, &d, d.generation, cancelled) {

@@ -112,8 +112,8 @@ fn handle_mode_switch(editor: &mut VimEditor, key: KeyEvent) -> KeyResult {
         }
         KeyCode::Char('a') if key.modifiers == KeyModifiers::NONE => {
             editor.push_undo();
-            editor.move_right();
             editor.enter_insert_mode();
+            editor.move_right();
             KeyResult::Handled
         }
         KeyCode::Char('A') => {

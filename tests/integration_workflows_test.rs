@@ -1,6 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use lazycsv::input::PendingCommand;
-use lazycsv::{App, ColIndex, Document, FileConfig, InputResult, RowIndex};
+use lazycsv::{App, ColIndex, Document, FileConfig, RowIndex};
 use std::fs::write;
 use std::path::PathBuf;
 use tempfile::TempDir;

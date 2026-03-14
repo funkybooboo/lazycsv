@@ -60,6 +60,7 @@
 //!
 //! All operations check for cancellation every 1000 rows, allowing responsive Ctrl+C handling.
 
+mod date_detection;
 mod error_enhancer;
 
 use crate::cancel::{self, CancelledError};
@@ -415,21 +416,34 @@ pub fn resolve_csv_files(path: &Path) -> Result<Vec<PathBuf>> {
 /// # }
 /// ```
 pub fn load_csv_into_sqlite(conn: &Connection, doc: &Document, table_name: &str) -> Result<()> {
-    if doc.rows.is_empty() {
+    if doc.row_count() == 0 {
         bail!("Document has no rows (not even headers)");
     }
 
-    let headers = &doc.rows[0];
+    let headers = doc.storage.header_row();
     if headers.is_empty() {
         bail!("Document has no columns");
     }
 
     let col_count = headers.len();
+    let row_count = doc.row_count();
 
-    // Build CREATE TABLE with TEXT affinity for all columns
+    // Detect column types by sampling up to 1000 rows (not all rows)
+    let sample_end = row_count.min(1001); // 1000 data rows + header
+    let sample_rows = doc.get_rows_range(1, sample_end);
+    let col_types = date_detection::detect_column_types(&sample_rows, col_count);
+    let has_date_cols = col_types
+        .iter()
+        .any(|ct| matches!(ct, date_detection::ColumnType::Date(_)));
+
+    // Build CREATE TABLE with detected affinities
     let col_defs: Vec<String> = headers
         .iter()
-        .map(|h| format!("\"{}\" TEXT", h.replace('"', "\"\"")))
+        .enumerate()
+        .map(|(i, h)| {
+            let affinity = date_detection::sqlite_affinity(&col_types[i]);
+            format!("\"{}\" {}", h.replace('"', "\"\""), affinity)
+        })
         .collect();
 
     let create_sql = format!(
@@ -453,12 +467,28 @@ pub fn load_csv_into_sqlite(conn: &Connection, doc: &Document, table_name: &str)
 
     let mut stmt = conn.prepare_cached(&insert_sql)?;
 
-    // Fast zero-copy path — binds &str refs directly
-    for row in doc.rows.iter().skip(1) {
-        let params: Vec<&str> = (0..col_count)
-            .map(|i| row.get(i).map(|s| s.as_str()).unwrap_or(""))
-            .collect();
-        stmt.execute(rusqlite::params_from_iter(params))?;
+    // Stream rows one at a time from storage (avoids materializing all rows for lazy docs)
+    for row_idx in 1..row_count {
+        let row = doc.storage.get_row(row_idx);
+        if has_date_cols {
+            let params: Vec<String> = (0..col_count)
+                .map(|j| {
+                    let val = row.get(j).map(|s| s.as_str()).unwrap_or("");
+                    match &col_types[j] {
+                        date_detection::ColumnType::Date(fmt) => {
+                            date_detection::normalize_to_iso(val, *fmt)
+                        }
+                        date_detection::ColumnType::Numeric => val.to_string(),
+                    }
+                })
+                .collect();
+            stmt.execute(rusqlite::params_from_iter(params.iter().map(|s: &String| s.as_str())))?;
+        } else {
+            let params: Vec<&str> = (0..col_count)
+                .map(|j| row.get(j).map(|s| s.as_str()).unwrap_or(""))
+                .collect();
+            stmt.execute(rusqlite::params_from_iter(params))?;
+        }
     }
 
     drop(stmt);
@@ -504,10 +534,33 @@ fn load_csv_file_into_sqlite(
 
     let col_count = headers.len();
 
-    // CREATE TABLE with TEXT affinity for all columns
+    // Sample first 100 records for column type detection
+    let mut sample_rows: Vec<Vec<String>> = Vec::new();
+    let mut buffered_records: Vec<csv::StringRecord> = Vec::new();
+    for result in reader.records() {
+        let record = result.context("Failed to read CSV record")?;
+        if sample_rows.len() < 100 {
+            let row: Vec<String> = (0..col_count)
+                .map(|i| record.get(i).unwrap_or("").to_string())
+                .collect();
+            sample_rows.push(row);
+        }
+        buffered_records.push(record);
+    }
+
+    let col_types = date_detection::detect_column_types(&sample_rows, col_count);
+    let has_date_cols = col_types
+        .iter()
+        .any(|ct| matches!(ct, date_detection::ColumnType::Date(_)));
+
+    // CREATE TABLE with detected affinities
     let col_defs: Vec<String> = headers
         .iter()
-        .map(|h| format!("\"{}\" TEXT", h.replace('"', "\"\"")))
+        .enumerate()
+        .map(|(i, h)| {
+            let affinity = date_detection::sqlite_affinity(&col_types[i]);
+            format!("\"{}\" {}", h.replace('"', "\"\""), affinity)
+        })
         .collect();
     let escaped_table = table_name.replace('"', "\"\"");
     conn.execute(
@@ -532,20 +585,27 @@ fn load_csv_file_into_sqlite(
 
     let mut stmt = conn.prepare_cached(&insert_sql)?;
 
-    // Helper closure to insert a record
-    let insert_record =
-        |stmt: &mut rusqlite::CachedStatement, record: &csv::StringRecord| -> Result<()> {
+    // Insert all buffered records
+    for record in &buffered_records {
+        if has_date_cols {
+            let params: Vec<String> = (0..col_count)
+                .map(|j| {
+                    let val = record.get(j).unwrap_or("");
+                    match &col_types[j] {
+                        date_detection::ColumnType::Date(fmt) => {
+                            date_detection::normalize_to_iso(val, *fmt)
+                        }
+                        date_detection::ColumnType::Numeric => val.to_string(),
+                    }
+                })
+                .collect();
+            stmt.execute(rusqlite::params_from_iter(params.iter().map(|s: &String| s.as_str())))?;
+        } else {
             let params: Vec<&str> = (0..col_count)
-                .map(|i| record.get(i).unwrap_or(""))
+                .map(|j| record.get(j).unwrap_or(""))
                 .collect();
             stmt.execute(rusqlite::params_from_iter(params))?;
-            Ok(())
-        };
-
-    // Continue with remaining rows from reader
-    for result in reader.records() {
-        let record = result.context("Failed to read CSV record")?;
-        insert_record(&mut stmt, &record)?;
+        }
     }
 
     drop(stmt);
@@ -598,7 +658,7 @@ fn load_csv_file_into_sqlite(
 ///     "result.csv".to_string(),
 /// )?;
 ///
-/// assert_eq!(result.rows.len(), 2); // Headers + 1 data row
+/// assert_eq!(result.row_count(), 2); // Headers + 1 data row
 /// # Ok(())
 /// # }
 /// ```
@@ -671,21 +731,40 @@ pub fn load_csv_into_sqlite_cancellable(
     table_name: &str,
     cancelled: &AtomicBool,
 ) -> Result<()> {
-    if doc.rows.is_empty() {
+    if doc.row_count() == 0 {
         bail!("Document has no rows (not even headers)");
     }
 
-    let headers = &doc.rows[0];
+    let headers = doc.storage.header_row();
     if headers.is_empty() {
         bail!("Document has no columns");
     }
 
-    let col_count = headers.len();
+    // Fast path for lazy (mmap-backed) documents: stream directly from raw bytes
+    // using csv::ByteRecord reuse, avoiding per-row String allocations.
+    if let Some(lazy) = doc.storage.lazy_storage() {
+        return load_lazy_into_sqlite_cancellable(conn, lazy, headers, table_name, cancelled);
+    }
 
-    // Build CREATE TABLE with TEXT affinity for all columns
+    // Standard path for in-memory documents
+    let col_count = headers.len();
+    let row_count = doc.row_count();
+
+    // Detect column types by sampling up to 1000 rows
+    let sample_end = row_count.min(1001);
+    let sample_rows = doc.get_rows_range(1, sample_end);
+    let col_types = date_detection::detect_column_types(&sample_rows, col_count);
+    let has_date_cols = col_types
+        .iter()
+        .any(|ct| matches!(ct, date_detection::ColumnType::Date(_)));
+
     let col_defs: Vec<String> = headers
         .iter()
-        .map(|h| format!("\"{}\" TEXT", h.replace('"', "\"\"")))
+        .enumerate()
+        .map(|(i, h)| {
+            let affinity = date_detection::sqlite_affinity(&col_types[i]);
+            format!("\"{}\" {}", h.replace('"', "\"\""), affinity)
+        })
         .collect();
 
     let create_sql = format!(
@@ -708,16 +787,167 @@ pub fn load_csv_into_sqlite_cancellable(
 
     let mut stmt = conn.prepare_cached(&insert_sql)?;
 
-    for (i, row) in doc.rows.iter().skip(1).enumerate() {
-        if i % cancel::CHECK_INTERVAL == 0 && cancel::check_esc(cancelled) {
+    for row_idx in 1..row_count {
+        if (row_idx - 1) % cancel::CHECK_INTERVAL == 0 && cancel::check_esc(cancelled) {
             drop(stmt);
             let _ = conn.execute("ROLLBACK", []);
             bail!(CancelledError);
         }
-        let params: Vec<&str> = (0..col_count)
-            .map(|j| row.get(j).map(|s| s.as_str()).unwrap_or(""))
-            .collect();
-        stmt.execute(rusqlite::params_from_iter(params))?;
+        let row = doc.storage.get_row(row_idx);
+        if has_date_cols {
+            let params: Vec<String> = (0..col_count)
+                .map(|j| {
+                    let val = row.get(j).map(|s| s.as_str()).unwrap_or("");
+                    match &col_types[j] {
+                        date_detection::ColumnType::Date(fmt) => {
+                            date_detection::normalize_to_iso(val, *fmt)
+                        }
+                        date_detection::ColumnType::Numeric => val.to_string(),
+                    }
+                })
+                .collect();
+            stmt.execute(rusqlite::params_from_iter(params.iter().map(|s: &String| s.as_str())))?;
+        } else {
+            let params: Vec<&str> = (0..col_count)
+                .map(|j| row.get(j).map(|s| s.as_str()).unwrap_or(""))
+                .collect();
+            stmt.execute(rusqlite::params_from_iter(params))?;
+        }
+    }
+
+    drop(stmt);
+    conn.execute("COMMIT", [])
+        .context("Failed to commit transaction")?;
+
+    Ok(())
+}
+
+/// Fast path: stream a lazy (mmap-backed) document directly into SQLite.
+///
+/// Uses a csv::Reader over the raw mmap bytes with ByteRecord reuse,
+/// avoiding per-row String allocations. This is dramatically faster than
+/// calling `get_row()` 100M times.
+fn load_lazy_into_sqlite_cancellable(
+    conn: &Connection,
+    lazy: &crate::csv::row_storage::LazyStorage,
+    headers: &[String],
+    table_name: &str,
+    cancelled: &AtomicBool,
+) -> Result<()> {
+    let col_count = headers.len();
+    let raw = lazy.raw_bytes();
+    let delim = lazy.delimiter();
+
+    // Build a streaming csv::Reader over the raw mmap bytes.
+    // Using ByteRecord reuse avoids per-row allocation.
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .delimiter(delim)
+        .from_reader(raw);
+
+    // Sample first 100 records for column type detection.
+    // We read StringRecords for the sample, then reset and use ByteRecord for the bulk.
+    let sample_rows: Vec<Vec<String>> = {
+        let mut samples = Vec::new();
+        let mut record = csv::ByteRecord::new();
+        let mut count = 0;
+        while count < 100 && reader.read_byte_record(&mut record).unwrap_or(false) {
+            let row: Vec<String> = record
+                .iter()
+                .map(|f| String::from_utf8_lossy(f).into_owned())
+                .collect();
+            samples.push(row);
+            count += 1;
+        }
+        samples
+    };
+
+    let col_types = date_detection::detect_column_types(&sample_rows, col_count);
+    let has_date_cols = col_types
+        .iter()
+        .any(|ct| matches!(ct, date_detection::ColumnType::Date(_)));
+
+    // CREATE TABLE
+    let col_defs: Vec<String> = headers
+        .iter()
+        .enumerate()
+        .map(|(i, h)| {
+            let affinity = date_detection::sqlite_affinity(&col_types[i]);
+            format!("\"{}\" {}", h.replace('"', "\"\""), affinity)
+        })
+        .collect();
+
+    let escaped_table = table_name.replace('"', "\"\"");
+    conn.execute(
+        &format!(
+            "CREATE TABLE \"{}\" ({})",
+            escaped_table,
+            col_defs.join(", ")
+        ),
+        [],
+    )
+    .context(format!("Failed to create table '{}'", table_name))?;
+
+    let placeholders: Vec<&str> = vec!["?"; col_count];
+    let insert_sql = format!(
+        "INSERT INTO \"{}\" VALUES ({})",
+        escaped_table,
+        placeholders.join(", ")
+    );
+
+    conn.execute("BEGIN", [])
+        .context("Failed to begin transaction")?;
+
+    let mut stmt = conn.prepare_cached(&insert_sql)?;
+
+    // Re-create reader from the start to stream all data rows.
+    // The mmap is still available so this is free.
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .delimiter(delim)
+        .from_reader(raw);
+
+    let mut record = csv::ByteRecord::new();
+    let mut row_count: usize = 0;
+
+    while reader.read_byte_record(&mut record).unwrap_or(false) {
+        if row_count % cancel::CHECK_INTERVAL == 0 && cancel::check_esc(cancelled) {
+            drop(stmt);
+            let _ = conn.execute("ROLLBACK", []);
+            bail!(CancelledError);
+        }
+
+        if has_date_cols {
+            let params: Vec<String> = (0..col_count)
+                .map(|i| {
+                    let val = record
+                        .get(i)
+                        .map(|b| String::from_utf8_lossy(b).into_owned())
+                        .unwrap_or_default();
+                    match &col_types[i] {
+                        date_detection::ColumnType::Date(fmt) => {
+                            date_detection::normalize_to_iso(&val, *fmt)
+                        }
+                        date_detection::ColumnType::Numeric => val,
+                    }
+                })
+                .collect();
+            stmt.execute(rusqlite::params_from_iter(params.iter().map(|s: &String| s.as_str())))?;
+        } else {
+            // Fast path: bind byte fields directly as &str without String allocation
+            // (safe because mmap bytes remain valid for the duration)
+            let params: Vec<std::borrow::Cow<'_, str>> = (0..col_count)
+                .map(|i| {
+                    record
+                        .get(i)
+                        .map(|b| String::from_utf8_lossy(b))
+                        .unwrap_or(std::borrow::Cow::Borrowed(""))
+                })
+                .collect();
+            let param_refs: Vec<&str> = params.iter().map(|c| c.as_ref()).collect();
+            stmt.execute(rusqlite::params_from_iter(param_refs))?;
+        }
+        row_count += 1;
     }
 
     drop(stmt);
@@ -881,6 +1111,7 @@ pub fn execute_query(path: &Path, query: &str, config: &FileConfig) -> Result<()
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::csv::row_storage::RowStorage;
     use std::path::PathBuf;
 
     #[test]
@@ -917,11 +1148,11 @@ mod tests {
     fn test_load_and_query_roundtrip() {
         let conn = Connection::open_in_memory().unwrap();
         let doc = Document {
-            rows: vec![
+            storage: RowStorage::in_memory(vec![
                 vec!["name".into(), "age".into()],
                 vec!["Alice".into(), "30".into()],
                 vec!["Bob".into(), "25".into()],
-            ],
+            ]),
             filename: "test.csv".into(),
             is_dirty: false,
             header_mode: true,
@@ -964,7 +1195,7 @@ mod tests {
     fn test_load_empty_document_fails() {
         let conn = Connection::open_in_memory().unwrap();
         let doc = Document {
-            rows: vec![],
+            storage: RowStorage::in_memory(vec![]),
             filename: "empty.csv".into(),
             is_dirty: false,
             header_mode: true,
@@ -980,7 +1211,7 @@ mod tests {
     fn test_load_headers_only() {
         let conn = Connection::open_in_memory().unwrap();
         let doc = Document {
-            rows: vec![vec!["col1".into(), "col2".into()]],
+            storage: RowStorage::in_memory(vec![vec!["col1".into(), "col2".into()]]),
             filename: "headers_only.csv".into(),
             is_dirty: false,
             header_mode: true,
@@ -1000,10 +1231,10 @@ mod tests {
     fn test_load_special_column_names() {
         let conn = Connection::open_in_memory().unwrap();
         let doc = Document {
-            rows: vec![
+            storage: RowStorage::in_memory(vec![
                 vec!["select".into(), "from".into(), "where".into()],
                 vec!["a".into(), "b".into(), "c".into()],
-            ],
+            ]),
             filename: "reserved.csv".into(),
             is_dirty: false,
             header_mode: true,
@@ -1024,10 +1255,10 @@ mod tests {
     fn test_load_with_missing_cells() {
         let conn = Connection::open_in_memory().unwrap();
         let doc = Document {
-            rows: vec![
+            storage: RowStorage::in_memory(vec![
                 vec!["a".into(), "b".into(), "c".into()],
                 vec!["1".into()], // Missing b and c
-            ],
+            ]),
             filename: "sparse.csv".into(),
             is_dirty: false,
             header_mode: true,
@@ -1049,10 +1280,10 @@ mod tests {
     fn test_misspelled_column_shows_useful_error() {
         let conn = Connection::open_in_memory().unwrap();
         let doc = Document {
-            rows: vec![
+            storage: RowStorage::in_memory(vec![
                 vec!["Company".into(), "Contact".into()],
                 vec!["Acme".into(), "John".into()],
-            ],
+            ]),
             filename: "customers.csv".into(),
             is_dirty: false,
             header_mode: true,
@@ -1131,11 +1362,11 @@ mod tests {
     fn test_execute_query_to_document_simple_select() {
         let conn = Connection::open_in_memory().unwrap();
         let doc = Document {
-            rows: vec![
+            storage: RowStorage::in_memory(vec![
                 vec!["Name".into(), "Age".into()],
                 vec!["Alice".into(), "30".into()],
                 vec!["Bob".into(), "25".into()],
-            ],
+            ]),
             filename: "people.csv".into(),
             is_dirty: false,
             header_mode: true,
@@ -1151,20 +1382,20 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(result_doc.rows.len(), 2); // 1 header + 1 data row
-        assert_eq!(result_doc.rows[0][0], "Name");
-        assert_eq!(result_doc.rows[1][0], "Alice");
+        assert_eq!(result_doc.row_count(), 2); // 1 header + 1 data row
+        assert_eq!(result_doc.storage.header_row()[0], "Name");
+        assert_eq!(result_doc.storage.get_cell(1, 0), "Alice");
     }
 
     #[test]
     fn test_execute_query_to_document_aggregate() {
         let conn = Connection::open_in_memory().unwrap();
         let doc = Document {
-            rows: vec![
+            storage: RowStorage::in_memory(vec![
                 vec!["Product".into(), "Price".into()],
                 vec!["Apple".into(), "1.50".into()],
                 vec!["Banana".into(), "0.75".into()],
-            ],
+            ]),
             filename: "products.csv".into(),
             is_dirty: false,
             header_mode: true,
@@ -1180,9 +1411,9 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(result_doc.rows.len(), 2); // 1 header + 1 data row
-        assert_eq!(result_doc.rows[0][0], "total");
-        assert_eq!(result_doc.rows[1][0], "2");
+        assert_eq!(result_doc.row_count(), 2); // 1 header + 1 data row
+        assert_eq!(result_doc.storage.header_row()[0], "total");
+        assert_eq!(result_doc.storage.get_cell(1, 0), "2");
     }
 
     #[test]
@@ -1201,10 +1432,10 @@ mod tests {
     fn test_execute_query_to_document_empty_result() {
         let conn = Connection::open_in_memory().unwrap();
         let doc = Document {
-            rows: vec![
+            storage: RowStorage::in_memory(vec![
                 vec!["ID".into(), "Value".into()],
                 vec!["1".into(), "test".into()],
-            ],
+            ]),
             filename: "data.csv".into(),
             is_dirty: false,
             header_mode: true,
@@ -1221,8 +1452,8 @@ mod tests {
         .unwrap();
 
         // Should have headers but no data rows
-        assert_eq!(result_doc.rows.len(), 1);
-        assert_eq!(result_doc.rows[0].len(), 2); // ID and Value columns
+        assert_eq!(result_doc.row_count(), 1);
+        assert_eq!(result_doc.storage.header_row().len(), 2); // ID and Value columns
     }
 
     #[test]
@@ -1231,11 +1462,11 @@ mod tests {
 
         // Create two tables
         let doc1 = Document {
-            rows: vec![
+            storage: RowStorage::in_memory(vec![
                 vec!["ID".into(), "Name".into()],
                 vec!["1".into(), "Alice".into()],
                 vec!["2".into(), "Bob".into()],
-            ],
+            ]),
             filename: "users.csv".into(),
             is_dirty: false,
             header_mode: true,
@@ -1243,10 +1474,10 @@ mod tests {
             generation: 0,
         };
         let doc2 = Document {
-            rows: vec![
+            storage: RowStorage::in_memory(vec![
                 vec!["UserID".into(), "Email".into()],
                 vec!["1".into(), "alice@example.com".into()],
-            ],
+            ]),
             filename: "emails.csv".into(),
             is_dirty: false,
             header_mode: true,
@@ -1264,9 +1495,9 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(result_doc.rows.len(), 2); // 1 header + 1 joined row
-        assert_eq!(result_doc.rows[1][0], "Alice");
-        assert_eq!(result_doc.rows[1][1], "alice@example.com");
+        assert_eq!(result_doc.row_count(), 2); // 1 header + 1 joined row
+        assert_eq!(result_doc.storage.get_cell(1, 0), "Alice");
+        assert_eq!(result_doc.storage.get_cell(1, 1), "alice@example.com");
     }
 
     #[test]

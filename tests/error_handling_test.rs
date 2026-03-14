@@ -131,7 +131,7 @@ fn test_corrupt_csv_inconsistent_columns() {
     match result {
         Ok(doc) => {
             // If it succeeds, verify the data structure
-            assert!(!doc.rows.is_empty());
+            assert!(doc.row_count() > 0);
         }
         Err(err) => {
             // Expected to fail with inconsistent columns
@@ -156,7 +156,7 @@ fn test_binary_file_treated_as_csv() {
     match result {
         Ok(doc) => {
             // Parsed with replacement characters - acceptable
-            assert!(!doc.rows.is_empty()); // Should have at least header row
+            assert!(doc.row_count() > 0); // Should have at least header row
         }
         Err(err) => {
             // Failed to parse - also acceptable

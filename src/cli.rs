@@ -48,6 +48,17 @@ pub struct CliArgs {
         help = "Format numbers with thousands separators (',' or '.' based on locale)"
     )]
     pub format: bool,
+
+    /// Sort data by specified columns on load.
+    /// Columns can be specified by name, number (1-indexed), or Excel letter (A, B, ...).
+    /// Multiple columns separated by commas. Prefix with '!' for descending order.
+    /// Examples: -s Name  -s 1,2  -s '!Age'  -s '!Price,Name'
+    #[arg(
+        short = 's',
+        long = "sort",
+        help = "Sort by columns on load (e.g., -s Name, -s 1,2, -s '!Age' for descending)"
+    )]
+    pub sort: Option<String>,
 }
 
 fn parse_delimiter(s: &str) -> Result<u8, String> {
@@ -197,6 +208,35 @@ mod tests {
         let args = CliArgs::try_parse_from(["lazycsv"]);
         assert!(args.is_ok());
         assert_eq!(args.unwrap().query, None);
+    }
+
+    #[test]
+    fn test_cli_with_sort_short() {
+        let args = CliArgs::try_parse_from(["lazycsv", "data.csv", "-s", "Name"]);
+        assert!(args.is_ok());
+        let args = args.unwrap();
+        assert_eq!(args.sort, Some("Name".to_string()));
+    }
+
+    #[test]
+    fn test_cli_with_sort_long() {
+        let args = CliArgs::try_parse_from(["lazycsv", "--sort", "1,2"]);
+        assert!(args.is_ok());
+        assert_eq!(args.unwrap().sort, Some("1,2".to_string()));
+    }
+
+    #[test]
+    fn test_cli_with_sort_descending() {
+        let args = CliArgs::try_parse_from(["lazycsv", "-s", "!Price,Name"]);
+        assert!(args.is_ok());
+        assert_eq!(args.unwrap().sort, Some("!Price,Name".to_string()));
+    }
+
+    #[test]
+    fn test_cli_default_sort_is_none() {
+        let args = CliArgs::try_parse_from(["lazycsv"]);
+        assert!(args.is_ok());
+        assert_eq!(args.unwrap().sort, None);
     }
 
     #[test]

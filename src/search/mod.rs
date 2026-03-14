@@ -82,6 +82,7 @@
 //! assert_eq!(matches.len(), 2); // "Alice" and "Age"
 //! ```
 
+use crate::csv::row_storage::LazyStorage;
 use crate::{ColIndex, Document, RowIndex};
 use regex::RegexBuilder;
 
@@ -272,11 +273,21 @@ impl SearchState {
 ///
 /// Returns matches sorted by (row, col) from natural iteration order.
 pub fn find_matches(document: &Document, pattern: &str) -> Vec<(RowIndex, ColIndex)> {
+    // Fast path: for lazy documents, search raw mmap bytes to avoid parsing every row.
+    if let Some(lazy) = document.storage.lazy_storage() {
+        return find_matches_lazy(lazy, pattern);
+    }
+
+    // Standard path for in-memory documents.
+    find_matches_in_memory(document, pattern)
+}
+
+/// Standard search for in-memory documents — iterates all rows.
+fn find_matches_in_memory(document: &Document, pattern: &str) -> Vec<(RowIndex, ColIndex)> {
     let mut matches = Vec::new();
 
-    // Try to compile as regex (case-insensitive). Fall back to literal substring.
     if let Ok(re) = RegexBuilder::new(pattern).case_insensitive(true).build() {
-        for (row_idx, row) in document.rows.iter().enumerate() {
+        for (row_idx, row) in document.iter_rows().enumerate() {
             for (col_idx, cell) in row.iter().enumerate() {
                 if re.is_match(cell) {
                     matches.push((RowIndex::new(row_idx), ColIndex::new(col_idx)));
@@ -285,7 +296,7 @@ pub fn find_matches(document: &Document, pattern: &str) -> Vec<(RowIndex, ColInd
         }
     } else {
         let pattern_lower = pattern.to_lowercase();
-        for (row_idx, row) in document.rows.iter().enumerate() {
+        for (row_idx, row) in document.iter_rows().enumerate() {
             for (col_idx, cell) in row.iter().enumerate() {
                 if cell.to_lowercase().contains(&pattern_lower) {
                     matches.push((RowIndex::new(row_idx), ColIndex::new(col_idx)));
@@ -295,6 +306,138 @@ pub fn find_matches(document: &Document, pattern: &str) -> Vec<(RowIndex, ColInd
     }
 
     matches
+}
+
+/// Fast search for lazy (mmap-backed) documents.
+///
+/// Strategy:
+/// 1. Use `regex::bytes::Regex` to find all byte positions matching the pattern in raw mmap bytes
+/// 2. Binary search `row_offsets` to map each byte position to a row index
+/// 3. Collect unique candidate row indices
+/// 4. Parse only candidate rows and verify cell-level matches with the string regex
+/// 5. Also check all rows in the edit overlay
+fn find_matches_lazy(lazy: &LazyStorage, pattern: &str) -> Vec<(RowIndex, ColIndex)> {
+    let mut matches = Vec::new();
+    let raw = lazy.raw_bytes();
+    let offsets = lazy.row_offsets();
+
+    // Compile both a string regex (for cell-level verification) and a byte regex (for raw scan).
+    // If pattern is invalid regex, fall back to literal mode.
+    let (string_matcher, byte_re) = match (
+        RegexBuilder::new(pattern).case_insensitive(true).build(),
+        regex::bytes::RegexBuilder::new(pattern)
+            .case_insensitive(true)
+            .build(),
+    ) {
+        (Ok(s), Ok(b)) => (StringMatcher::Regex(s), Some(b)),
+        _ => (StringMatcher::Literal(pattern.to_lowercase()), None),
+    };
+
+    // Step 1: Find candidate rows by scanning raw bytes.
+    let mut candidate_rows = Vec::new();
+
+    if let Some(ref byte_re) = byte_re {
+        // Regex mode: scan raw bytes with byte regex
+        let mut last_row_idx = usize::MAX;
+        for m in byte_re.find_iter(raw) {
+            let byte_pos = m.start() as u64;
+            let row_idx = match offsets.binary_search(&byte_pos) {
+                Ok(i) => i,
+                Err(i) => i.saturating_sub(1),
+            };
+            if row_idx != last_row_idx {
+                candidate_rows.push(row_idx);
+                last_row_idx = row_idx;
+            }
+        }
+    } else {
+        // Literal fallback: use memchr memmem for fast byte-level substring search.
+        // Since we need case-insensitive, and raw bytes aren't lowercased,
+        // search for both the lowercase and original pattern bytes as an approximation.
+        // For correctness, search for common case variants.
+        let pat_lower = pattern.to_lowercase();
+        let pat_bytes = pat_lower.as_bytes();
+
+        // For ASCII patterns, also try uppercase variant
+        let pat_upper = pattern.to_uppercase();
+        let pat_upper_bytes = pat_upper.as_bytes();
+
+        let finder_lower = memchr::memmem::find_iter(raw, pat_bytes);
+        let finder_upper = if pat_bytes != pat_upper_bytes {
+            Some(memchr::memmem::find_iter(raw, pat_upper_bytes))
+        } else {
+            None
+        };
+
+        let mut row_set = std::collections::BTreeSet::new();
+
+        for byte_pos in finder_lower {
+            let row_idx = match offsets.binary_search(&(byte_pos as u64)) {
+                Ok(i) => i,
+                Err(i) => i.saturating_sub(1),
+            };
+            row_set.insert(row_idx);
+        }
+        if let Some(finder) = finder_upper {
+            for byte_pos in finder {
+                let row_idx = match offsets.binary_search(&(byte_pos as u64)) {
+                    Ok(i) => i,
+                    Err(i) => i.saturating_sub(1),
+                };
+                row_set.insert(row_idx);
+            }
+        }
+
+        candidate_rows = row_set.into_iter().collect();
+    }
+
+    // Step 2: Also include all edited rows as candidates (edits may not be in mmap).
+    let edits = lazy.edits();
+    for &row_idx in edits.keys() {
+        // Insert in sorted order will be handled by dedup below
+        candidate_rows.push(row_idx);
+    }
+    candidate_rows.sort_unstable();
+    candidate_rows.dedup();
+
+    // Step 3: Parse only candidate rows and verify matches at the cell level.
+    for &row_idx in &candidate_rows {
+        let row = lazy.parse_row_public(row_idx);
+        for (col_idx, cell) in row.iter().enumerate() {
+            if string_matcher.is_match(cell) {
+                matches.push((RowIndex::new(row_idx), ColIndex::new(col_idx)));
+            }
+        }
+    }
+
+    // Step 4: Also search the header row (index 0).
+    // The header might already be in candidates from byte scan, but ensure it's checked.
+    if !candidate_rows.contains(&0) {
+        let header = lazy.header();
+        for (col_idx, cell) in header.iter().enumerate() {
+            if string_matcher.is_match(cell) {
+                matches.push((RowIndex::new(0), ColIndex::new(col_idx)));
+            }
+        }
+    }
+
+    matches.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+    matches
+}
+
+/// Helper for string-level matching (regex or literal).
+enum StringMatcher {
+    Regex(regex::Regex),
+    Literal(String),
+}
+
+impl StringMatcher {
+    fn is_match(&self, text: &str) -> bool {
+        match self {
+            StringMatcher::Regex(re) => re.is_match(text),
+            StringMatcher::Literal(pat) => text.to_lowercase().contains(pat),
+        }
+    }
 }
 
 #[cfg(test)]

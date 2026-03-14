@@ -10,7 +10,7 @@
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use lazycsv::app::Mode;
-use lazycsv::{App, Document, FileConfig};
+use lazycsv::{App, ColIndex, Document, FileConfig, RowIndex};
 use std::path::PathBuf;
 
 fn key(code: KeyCode) -> KeyEvent {
@@ -310,7 +310,7 @@ fn test_visual_line_d_deletes_rows() {
     assert_eq!(app.document.row_count(), initial_rows - 2);
 
     // First data row is now what was row 3
-    assert_eq!(app.document.rows[1][0], "A3");
+    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "A3");
 
     assert_eq!(app.mode, Mode::Normal);
 }
@@ -522,7 +522,7 @@ fn test_visual_line_p_replaces_rows() {
     app.handle_key(key(KeyCode::Char('p'))).unwrap();
 
     // Row 3 should now contain row 1's content
-    assert_eq!(app.document.rows[3][0], "A1");
+    assert_eq!(app.document.cell(RowIndex::new(3), ColIndex::new(0)), "A1");
 }
 
 // ============================================================================

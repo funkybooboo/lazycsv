@@ -1,6 +1,7 @@
-//! In-memory CSV document with headers and rows
+//! CSV document with headers and rows — supports lazy loading for large files
 
 use crate::cancel::{self, CancelledError};
+use crate::csv::row_storage::RowStorage;
 use crate::domain::position::{ColIndex, RowIndex};
 use anyhow::{Context, Result};
 use csv;
@@ -9,11 +10,11 @@ use std::fs;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 
-/// Holds parsed CSV document in memory
+/// Holds parsed CSV document — either fully in-memory or lazily loaded from disk
 #[derive(Debug, Clone, PartialEq)]
 pub struct Document {
-    /// All rows including header (row 0 = header, rest = data)
-    pub rows: Vec<Vec<String>>,
+    /// Row storage backend (InMemory or Lazy)
+    pub(crate) storage: RowStorage,
 
     /// Original filename for display
     pub filename: String,
@@ -33,6 +34,24 @@ pub struct Document {
 }
 
 impl Document {
+    /// Load CSV from a reader (e.g. stdin) with optional delimiter and header settings.
+    pub fn from_reader<R: std::io::Read>(
+        reader: R,
+        delimiter: Option<u8>,
+        no_headers: bool,
+        filename: String,
+    ) -> Result<Self> {
+        let rows = Self::parse_csv_streaming(reader, delimiter, no_headers, 0)?;
+        Ok(Document {
+            storage: RowStorage::in_memory(rows),
+            filename,
+            is_dirty: false,
+            header_mode: true,
+            delimiter: delimiter.map(|d| d as char).unwrap_or(','),
+            generation: 0,
+        })
+    }
+
     /// Load CSV from file path with optional delimiter, header, and encoding settings.
     pub fn from_file(
         path: &Path,
@@ -46,15 +65,14 @@ impl Document {
             .unwrap_or("unknown")
             .to_string();
 
-        // Fast path: stream from disk with ByteRecord reuse
-        if encoding_label.is_none() {
-            let file_len = path.metadata().map(|m| m.len() as usize).unwrap_or(0);
-            let file = std::fs::File::open(path)
-                .context(format!("Failed to open file: {}", path.display()))?;
-            let reader = std::io::BufReader::with_capacity(256 * 1024, file);
-            let rows = Self::parse_csv_streaming(reader, delimiter, no_headers, file_len)?;
+        // Lazy path: large files with default encoding use mmap + row-offset index
+        if encoding_label.is_none()
+            && crate::csv::row_storage::should_use_lazy(path)
+        {
+            let storage =
+                RowStorage::lazy_from_file(path, delimiter, no_headers)?;
             return Ok(Document {
-                rows,
+                storage,
                 filename,
                 is_dirty: false,
                 header_mode: true,
@@ -63,6 +81,24 @@ impl Document {
             });
         }
 
+        // Fast streaming path: default encoding, small file
+        if encoding_label.is_none() {
+            let file_len = path.metadata().map(|m| m.len() as usize).unwrap_or(0);
+            let file = std::fs::File::open(path)
+                .context(format!("Failed to open file: {}", path.display()))?;
+            let reader = std::io::BufReader::with_capacity(256 * 1024, file);
+            let rows = Self::parse_csv_streaming(reader, delimiter, no_headers, file_len)?;
+            return Ok(Document {
+                storage: RowStorage::in_memory(rows),
+                filename,
+                is_dirty: false,
+                header_mode: true,
+                delimiter: delimiter.map(|d| d as char).unwrap_or(','),
+                generation: 0,
+            });
+        }
+
+        // Slow path: custom encoding requires full decode first
         let file_bytes =
             fs::read(path).context(format!("Failed to read file: {}", path.display()))?;
 
@@ -74,7 +110,7 @@ impl Document {
         all_rows.extend(data_rows);
 
         Ok(Document {
-            rows: all_rows,
+            storage: RowStorage::in_memory(all_rows),
             filename,
             is_dirty: false,
             header_mode: true,
@@ -236,7 +272,24 @@ impl Document {
             .unwrap_or("unknown")
             .to_string();
 
-        // Fast path: stream from disk with ByteRecord reuse
+        // Lazy path: large files with default encoding use mmap + row-offset index
+        if encoding_label.is_none()
+            && crate::csv::row_storage::should_use_lazy(path)
+        {
+            let storage = RowStorage::lazy_from_file_cancellable(
+                path, delimiter, no_headers, cancelled,
+            )?;
+            return Ok(Document {
+                storage,
+                filename,
+                is_dirty: false,
+                header_mode: true,
+                delimiter: delimiter.map(|d| d as char).unwrap_or(','),
+                generation: 0,
+            });
+        }
+
+        // Fast streaming path: default encoding, small file
         if encoding_label.is_none() {
             let file_len = path.metadata().map(|m| m.len() as usize).unwrap_or(0);
             let file = std::fs::File::open(path)
@@ -246,7 +299,7 @@ impl Document {
                 reader, delimiter, no_headers, file_len, cancelled,
             )?;
             return Ok(Document {
-                rows,
+                storage: RowStorage::in_memory(rows),
                 filename,
                 is_dirty: false,
                 header_mode: true,
@@ -255,6 +308,7 @@ impl Document {
             });
         }
 
+        // Slow path: custom encoding
         let file_bytes =
             fs::read(path).context(format!("Failed to read file: {}", path.display()))?;
 
@@ -270,7 +324,7 @@ impl Document {
         all_rows.extend(data_rows);
 
         Ok(Document {
-            rows: all_rows,
+            storage: RowStorage::in_memory(all_rows),
             filename,
             is_dirty: false,
             header_mode: true,
@@ -420,45 +474,57 @@ impl Document {
         Ok(rows)
     }
 
+    // ── Read-only accessors (work with both InMemory and Lazy) ──
+
     /// Get total row count (including header row)
     /// Row 0 = header, Row 1+ = data rows
     pub fn row_count(&self) -> usize {
-        self.rows.len()
+        self.storage.row_count()
     }
 
     /// Get data row count (excluding header row)
     pub fn data_row_count(&self) -> usize {
-        if self.rows.is_empty() {
-            0
-        } else {
-            self.rows.len() - 1
-        }
+        let count = self.storage.row_count();
+        if count == 0 { 0 } else { count - 1 }
     }
 
     /// Get column count
     pub fn column_count(&self) -> usize {
-        self.rows.first().map(|r| r.len()).unwrap_or(0)
+        self.storage.col_count()
     }
 
     /// Get specific cell value (returns "" if out of bounds)
     /// row_idx is absolute: 0 = header row, 1 = first data row, etc.
     #[allow(dead_code)]
-    pub fn cell(&self, row_idx: RowIndex, col_idx: ColIndex) -> &str {
-        self.rows
-            .get(row_idx.get())
-            .and_then(|r| r.get(col_idx.get()))
-            .map(|s| s.as_str())
-            .unwrap_or("")
+    pub fn cell(&self, row_idx: RowIndex, col_idx: ColIndex) -> String {
+        self.storage.get_cell(row_idx.get(), col_idx.get())
     }
 
     /// Get column header by index (returns "" if out of bounds)
-    pub fn header(&self, col_idx: ColIndex) -> &str {
-        self.rows
-            .first()
-            .and_then(|header_row| header_row.get(col_idx.get()))
-            .map(|s| s.as_str())
-            .unwrap_or("")
+    pub fn header(&self, col_idx: ColIndex) -> String {
+        self.storage.header_row()
+            .get(col_idx.get())
+            .cloned()
+            .unwrap_or_default()
     }
+
+    /// Get a range of rows as owned Vecs (for rendering visible window).
+    /// Range is [start..end) — exclusive end.
+    pub fn get_rows_range(&self, start: usize, end: usize) -> Vec<Vec<String>> {
+        self.storage.get_rows_range(start, end)
+    }
+
+    /// Iterate over all rows (including header at index 0).
+    pub fn iter_rows(&self) -> crate::csv::row_storage::RowIter<'_> {
+        self.storage.iter_rows()
+    }
+
+    /// Returns true if the document is lazily loaded from disk.
+    pub fn is_lazy(&self) -> bool {
+        self.storage.is_lazy()
+    }
+
+    // ── Mutation (materializes lazy storage on structural changes) ──
 
     /// Set a cell value (returns old value, sets is_dirty = true)
     /// row_idx is absolute: 0 = header row, 1 = first data row, etc.
@@ -468,68 +534,78 @@ impl Document {
         col_idx: ColIndex,
         value: String,
     ) -> Option<String> {
-        if let Some(row) = self.rows.get_mut(row_idx.get()) {
-            if let Some(cell) = row.get_mut(col_idx.get()) {
-                self.is_dirty = true;
-                self.generation += 1;
-                let old = std::mem::replace(cell, value);
-                return Some(old);
-            }
+        let old = self.storage.set_cell(row_idx.get(), col_idx.get(), value);
+        if old.is_some() {
+            self.is_dirty = true;
+            self.generation += 1;
         }
-        None
+        old
+    }
+
+    /// Force materialization of all rows into memory.
+    pub fn materialize(&mut self) {
+        self.storage.materialize();
+    }
+
+    /// Get mutable access to in-memory rows, materializing if lazy.
+    fn rows_mut(&mut self) -> &mut Vec<Vec<String>> {
+        self.storage.rows_mut()
     }
 
     /// Insert a new empty row at the specified index (absolute row index)
-    /// Row 0 = header, Row 1+ = data
-    /// Note: Inserting at row 0 will insert BEFORE the header (creating a new header)
     pub fn insert_row(&mut self, at: RowIndex) {
         let col_count = self.column_count();
         let empty_row = vec![String::new(); col_count];
-        let actual_insert = at.get().min(self.rows.len());
-        self.rows.insert(actual_insert, empty_row);
+        let rows = self.rows_mut();
+        let actual_insert = at.get().min(rows.len());
+        rows.insert(actual_insert, empty_row);
         self.is_dirty = true;
         self.generation += 1;
     }
 
     /// Delete a row at the specified index (absolute row index)
-    /// Returns the deleted row, or None if out of bounds
-    /// Note: Deleting row 0 deletes the header row
     pub fn delete_row(&mut self, at: RowIndex) -> Option<Vec<String>> {
-        if at.get() < self.rows.len() {
+        let result = {
+            let rows = self.rows_mut();
+            if at.get() < rows.len() {
+                Some(rows.remove(at.get()))
+            } else {
+                None
+            }
+        };
+        if result.is_some() {
             self.is_dirty = true;
             self.generation += 1;
-            Some(self.rows.remove(at.get()))
-        } else {
-            None
         }
+        result
     }
 
     /// Delete multiple rows in a range (inclusive, absolute row indices)
-    /// Returns the deleted rows
-    /// Example: delete_rows(RowIndex(5), RowIndex(10)) deletes rows 5-10 inclusive
     pub fn delete_rows(&mut self, start: RowIndex, end: RowIndex) -> Vec<Vec<String>> {
         let start_idx = start.get();
         let end_idx = end.get();
 
-        // Validate range
-        if start_idx > end_idx || start_idx >= self.rows.len() {
-            return vec![];
-        }
-
-        // Clamp end to valid range
-        let actual_end = end_idx.min(self.rows.len() - 1);
-        let count = actual_end - start_idx + 1;
-
-        self.is_dirty = true;
-        self.generation += 1;
-
-        // Remove rows one by one and collect them
-        let mut deleted = Vec::new();
-        for _ in 0..count {
-            if let Some(row) = self.rows.get(start_idx).cloned() {
-                self.rows.remove(start_idx);
-                deleted.push(row);
+        let deleted = {
+            let rows = self.rows_mut();
+            if start_idx > end_idx || start_idx >= rows.len() {
+                return vec![];
             }
+
+            let actual_end = end_idx.min(rows.len() - 1);
+            let count = actual_end - start_idx + 1;
+
+            let mut deleted = Vec::new();
+            for _ in 0..count {
+                if start_idx < rows.len() {
+                    deleted.push(rows.remove(start_idx));
+                }
+            }
+            deleted
+        };
+
+        if !deleted.is_empty() {
+            self.is_dirty = true;
+            self.generation += 1;
         }
 
         deleted
@@ -541,44 +617,37 @@ impl Document {
     pub fn rows_range(&self, start: RowIndex, end: RowIndex) -> Vec<Vec<String>> {
         let start_idx = start.get();
         let end_idx = end.get();
+        let count = self.storage.row_count();
 
-        // Validate range
-        if start_idx > end_idx || start_idx >= self.rows.len() {
+        if start_idx > end_idx || start_idx >= count {
             return vec![];
         }
 
-        // Clamp end to valid range
-        let actual_end = end_idx.min(self.rows.len() - 1);
-
-        // Collect rows in range
-        self.rows[start_idx..=actual_end].to_vec()
+        let actual_end = end_idx.min(count - 1);
+        self.storage.get_rows_range(start_idx, actual_end + 1)
     }
 
     /// Delete a range of columns (inclusive, 0-based column indices)
-    /// Returns the deleted columns (each column as `Vec<String>` including header)
-    /// Example: delete_columns(ColIndex(1), ColIndex(3)) deletes columns B, C, D
     pub fn delete_columns(&mut self, start: ColIndex, end: ColIndex) -> Vec<Vec<String>> {
         let start_idx = start.get();
         let end_idx = end.get();
 
-        // Validate range
-        if self.rows.is_empty() {
+        let rows = self.rows_mut();
+        if rows.is_empty() {
             return vec![];
         }
 
-        let col_count = self.rows[0].len();
+        let col_count = rows[0].len();
         if start_idx >= col_count || start_idx > end_idx {
             return vec![];
         }
 
-        // Clamp end to valid range
         let actual_end = end_idx.min(col_count - 1);
         let delete_count = actual_end - start_idx + 1;
 
-        // Collect deleted columns (transpose: rows become columns)
         let mut deleted_columns = vec![vec![]; delete_count];
 
-        for row in &self.rows {
+        for row in rows.iter() {
             for (offset, col_idx) in (start_idx..=actual_end).enumerate() {
                 if col_idx < row.len() {
                     deleted_columns[offset].push(row[col_idx].clone());
@@ -586,8 +655,7 @@ impl Document {
             }
         }
 
-        // Delete columns from all rows
-        for row in &mut self.rows {
+        for row in rows.iter_mut() {
             if row.len() > start_idx {
                 let remove_end = actual_end.min(row.len() - 1);
                 row.drain(start_idx..=remove_end);
@@ -605,25 +673,24 @@ impl Document {
     pub fn columns_range(&self, start: ColIndex, end: ColIndex) -> Vec<Vec<String>> {
         let start_idx = start.get();
         let end_idx = end.get();
+        let count = self.storage.row_count();
 
-        // Validate range
-        if self.rows.is_empty() {
+        if count == 0 {
             return vec![];
         }
 
-        let col_count = self.rows[0].len();
+        let col_count = self.storage.col_count();
         if start_idx >= col_count || start_idx > end_idx {
             return vec![];
         }
 
-        // Clamp end to valid range
         let actual_end = end_idx.min(col_count - 1);
         let column_count = actual_end - start_idx + 1;
 
-        // Collect columns (transpose: rows become columns)
         let mut columns = vec![vec![]; column_count];
 
-        for row in &self.rows {
+        for i in 0..count {
+            let row = self.storage.get_row(i);
             for (offset, col_idx) in (start_idx..=actual_end).enumerate() {
                 if col_idx < row.len() {
                     columns[offset].push(row[col_idx].clone());
@@ -635,10 +702,6 @@ impl Document {
     }
 
     /// Move columns from source range to a new position.
-    /// `from_start`/`from_end`: inclusive source range (original indices).
-    /// `to_before`: insertion point in original indices (0 = beginning, N = before original column N).
-    /// For "after column A" (index 0), pass to_before=1. For "before all", pass to_before=0.
-    /// Returns the new 0-based column index of the first moved column.
     pub fn move_columns(
         &mut self,
         from_start: ColIndex,
@@ -661,7 +724,6 @@ impl Document {
             self.insert_column(ColIndex::new(insert_at + i), col_data);
         }
 
-        // is_dirty already set by delete_columns and insert_column
         insert_at
     }
 
@@ -669,13 +731,15 @@ impl Document {
     /// Returns empty vec if column doesn't exist
     pub fn column(&self, col: ColIndex) -> Vec<String> {
         let col_idx = col.get();
+        let count = self.storage.row_count();
 
-        if self.rows.is_empty() {
+        if count == 0 {
             return vec![];
         }
 
-        let mut column = Vec::with_capacity(self.rows.len());
-        for row in &self.rows {
+        let mut column = Vec::with_capacity(count);
+        for i in 0..count {
+            let row = self.storage.get_row(i);
             if col_idx < row.len() {
                 column.push(row[col_idx].clone());
             } else {
@@ -687,24 +751,22 @@ impl Document {
     }
 
     /// Delete a single column at the given index
-    /// Returns the deleted column (including header at index 0)
     pub fn delete_column(&mut self, col: ColIndex) -> Vec<String> {
         let col_idx = col.get();
 
-        if self.rows.is_empty() {
+        let rows = self.rows_mut();
+        if rows.is_empty() {
             return vec![];
         }
 
-        let col_count = self.rows[0].len();
+        let col_count = rows[0].len();
         if col_idx >= col_count {
             return vec![];
         }
 
-        // Collect deleted column values
-        let mut deleted_column = Vec::with_capacity(self.rows.len());
+        let mut deleted_column = Vec::with_capacity(rows.len());
 
-        // Delete from all rows and collect values
-        for row in &mut self.rows {
+        for row in rows.iter_mut() {
             if col_idx < row.len() {
                 deleted_column.push(row.remove(col_idx));
             } else {
@@ -718,20 +780,16 @@ impl Document {
     }
 
     /// Insert a new column at the given position
-    /// column_data should include header at index 0
-    /// If column_data is shorter than row count, empty strings are used
     pub fn insert_column(&mut self, at: ColIndex, column_data: Vec<String>) {
         let col_idx = at.get();
 
-        if self.rows.is_empty() {
+        let rows = self.rows_mut();
+        if rows.is_empty() {
             return;
         }
 
-        // Insert cells from column_data into each row
-        for (row_idx, row) in self.rows.iter_mut().enumerate() {
+        for (row_idx, row) in rows.iter_mut().enumerate() {
             let value = column_data.get(row_idx).cloned().unwrap_or_default();
-
-            // Ensure we don't go out of bounds
             let insert_pos = col_idx.min(row.len());
             row.insert(insert_pos, value);
         }
@@ -741,36 +799,33 @@ impl Document {
     }
 
     /// Insert a new empty column at the given position with a generated header
-    /// Example: insert_empty_column(ColIndex(2)) inserts at column C
     pub fn insert_empty_column(&mut self, at: ColIndex) {
         let col_idx = at.get();
+        let row_count = self.row_count();
 
-        if self.rows.is_empty() {
+        if row_count == 0 {
             return;
         }
 
-        // Generate header like "Column C" based on position
         let header = format!(
             "Column {}",
             crate::ui::utils::column_to_excel_letter(col_idx)
         );
 
-        // Build column data with header and empty cells
         let column_data = std::iter::once(header)
-            .chain(std::iter::repeat_n(String::new(), self.rows.len() - 1))
+            .chain(std::iter::repeat_n(String::new(), row_count - 1))
             .collect();
 
         self.insert_column(at, column_data);
     }
 
     /// Sort data rows by the given column indices.
-    /// Row 0 (header) stays fixed; only rows[1..] are sorted.
-    /// Tries numeric comparison first, falls back to string comparison.
     pub fn sort_by_columns(&mut self, col_indices: &[usize], ascending: bool) {
-        if self.rows.len() <= 2 {
-            return; // 0 or 1 data rows — nothing to sort
+        let rows = self.rows_mut();
+        if rows.len() <= 2 {
+            return;
         }
-        let data = &mut self.rows[1..];
+        let data = &mut rows[1..];
         data.sort_by(|a, b| {
             for &col in col_indices {
                 let va = a.get(col).map(|s| s.as_str()).unwrap_or("");
@@ -795,13 +850,19 @@ impl Document {
         self.header_mode = !self.header_mode;
     }
 
+    /// Take ownership of the storage, leaving empty storage behind.
+    /// Used for background deallocation of old document data.
+    pub fn take_storage(&mut self) -> RowStorage {
+        std::mem::replace(&mut self.storage, RowStorage::in_memory(vec![]))
+    }
+
     /// Create a Document from headers and data rows (for testing)
     #[cfg(test)]
     pub fn from_parts(headers: Vec<String>, data_rows: Vec<Vec<String>>, filename: String) -> Self {
         let mut all_rows = vec![headers];
         all_rows.extend(data_rows);
         Document {
-            rows: all_rows,
+            storage: RowStorage::in_memory(all_rows),
             filename,
             is_dirty: false,
             header_mode: true,
@@ -815,7 +876,7 @@ impl Document {
         let mut all_rows = vec![headers];
         all_rows.extend(data_rows);
         Document {
-            rows: all_rows,
+            storage: RowStorage::in_memory(all_rows),
             filename,
             is_dirty: false,
             header_mode: true,
@@ -891,9 +952,9 @@ mod tests {
         assert!(result.is_ok());
         let csv_data = result.unwrap();
         // rows[0] is header, rows[1..] are data
-        assert_eq!(csv_data.rows[1][1], "日本語テキスト");
-        assert_eq!(csv_data.rows[2][1], " Emoji");
-        assert_eq!(csv_data.rows[3][1], "ñóëü");
+        assert_eq!(csv_data.cell(RowIndex::new(1), ColIndex::new(1)), "日本語テキスト");
+        assert_eq!(csv_data.cell(RowIndex::new(2), ColIndex::new(1)), " Emoji");
+        assert_eq!(csv_data.cell(RowIndex::new(3), ColIndex::new(1)), "ñóëü");
     }
 
     #[test]
@@ -1088,7 +1149,7 @@ mod tests {
         assert!(result.is_ok());
         let csv_data = result.unwrap();
         // rows[0] is header, rows[1] is first data row
-        assert_eq!(csv_data.rows[1][1], long_text);
+        assert_eq!(csv_data.cell(RowIndex::new(1), ColIndex::new(1)), long_text);
     }
 
     #[test]

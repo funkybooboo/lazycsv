@@ -369,11 +369,11 @@ fn calculate_column_widths(
             .max(column_to_excel_letter(col_idx).len());
 
         // Sample data rows to find max width (sample first 100 rows for performance)
-        let max_data_len = app
+        let sample_rows = app
             .document
-            .rows
+            .get_rows_range(0, 100.min(app.document.row_count()));
+        let max_data_len = sample_rows
             .iter()
-            .take(100)
             .filter_map(|row| row.get(col_idx))
             .map(|s| s.chars().count()) // Use char count for unicode support
             .max()
@@ -460,11 +460,12 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     // Start from row 1 (first data row) since header is rendered separately
     let data_start = scroll_offset.max(1); // Never show row 0 in data area
     let end_row = (data_start + table_height).min(csv.row_count());
-    let visible_rows = if data_start < csv.row_count() {
-        &csv.rows[data_start..end_row]
+    let visible_rows_vec = if data_start < csv.row_count() {
+        csv.get_rows_range(data_start, end_row)
     } else {
-        &[]
+        vec![]
     };
+    let visible_rows = visible_rows_vec.as_slice();
 
     // Calculate column widths first (needed for cell padding)
     let (widths, raw_widths) = calculate_column_widths(app, &area, start_col, end_col);

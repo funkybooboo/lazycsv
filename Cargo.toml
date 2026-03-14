@@ -21,6 +21,9 @@ encoding_rs = "0.8.33"
 rusqlite = { version = "0.38", features = ["bundled"] }
 libc = "0.2"
 regex = "1"
+memmap2 = "0.9"
+lru = "0.16"
+memchr = "2"
 
 [profile.release]
 opt-level = 3

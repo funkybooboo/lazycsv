@@ -40,7 +40,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.16.1 | Error Handling & Robustness | [ ] | TBD |
 | v0.17.0 | Advanced Filtering & Conditional Views | [ ] | TBD |
 | v0.17.1 | Module Organization & Cleanup | [ ] | TBD |
-| v0.18.0 | SQL IntelliSense & Auto-completion | [ ] | TBD |
+| v0.18.0 | SQL IntelliSense & Auto-completion | [x] | TBD |
 | v0.18.1 | SQL IntelliSense Polish & Testing | [ ] | TBD |
 | v0.19.0 | Column Resize & Advanced Column Operations | [ ] | TBD |
 | v0.19.1 | Documentation & Maintainability | [ ] | TBD |
@@ -52,6 +52,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.22.1 | Performance Benchmarking & Tuning | [ ] | TBD |
 | v0.23.0 | Final Architecture Review | [ ] | TBD |
 | v0.23.1 | Final Architecture Polish | [ ] | TBD |
+| v0.24.0 | Performance, CLI Pipeline & SQL Type Intelligence | [x] | TBD |
 | v1.0.0 | Stable Release & Polish | [ ] | - |
 
 **Total Tests Passing:** 1,251 tests (all integration and unit tests across vim_editor, SQL, magnifier, and core modules)
@@ -116,8 +117,11 @@ Full vim modal editing in SQL editor with reusable vim_editor module (700+ tests
 **[v0.11.1](versions/v0.11.1.md) - SQL Editor Refactoring & Quality**  
 Refactored vim_editor with command pattern, removed code duplication, reorganized normal_mode into 11 modules, split UI modules, added unit tests, zero clippy warnings (1,251 tests total).  
 
-**[v0.12.0](versions/v0.12.0.md) - UI Consistency & Standardization** (IN PROGRESS)  
-Yazi-inspired 3-column file explorer with parent directory preview, current directory navigation, and file/CSV preview. Modal standardization, full file operations (rename/delete/move/copy/create), and dynamic CSV loading.  
+**[v0.12.0](versions/v0.12.0.md) - UI Consistency & Standardization** (IN PROGRESS)
+Yazi-inspired 3-column file explorer with parent directory preview, current directory navigation, and file/CSV preview. Modal standardization, full file operations (rename/delete/move/copy/create), and dynamic CSV loading.
+
+**[v0.24.0](versions/v0.24.0.md) - Performance, CLI Pipeline & SQL Type Intelligence**
+Lazy loading with memory-mapped files for large CSVs, CLI sort mode, piped stdin support for all non-interactive modes, and automatic column type detection for correct numeric/date ordering in SQL queries.
 
 ###  Planned Versions
 
@@ -354,4 +358,4 @@ LazyCSV uses vim-style modal editing with these modes:
 
 - [Architecture Documentation](../docs/architecture.md)
 - [Feature Documentation](../docs/features.md)
-- [Version Details](versions/) - Detailed documentation for each version
+- [Version Details](versions/v0.24.0.md) - Detailed documentation for each version

@@ -358,11 +358,10 @@ fn execute_sort(app: &mut App, cmd_name: &str, arg: Option<&str>) -> Result<Inpu
                 col_indices.push(num - 1);
             } else {
                 // Try header name first (case-insensitive), then Excel column letter
-                let header_match = app
-                    .document
-                    .rows
-                    .first()
-                    .and_then(|h| h.iter().position(|name| name.eq_ignore_ascii_case(spec)));
+                let header_row = app.document.storage.header_row();
+                let header_match = header_row
+                    .iter()
+                    .position(|name| name.eq_ignore_ascii_case(spec));
                 if let Some(idx) = header_match {
                     col_indices.push(idx);
                 } else if spec.chars().all(|c| c.is_ascii_alphabetic()) {

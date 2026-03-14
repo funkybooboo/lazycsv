@@ -7,8 +7,12 @@ use crate::input::handler::{enter_insert_mode, CursorPosition, InitialContent};
 pub fn enter_sql_editor(app: &mut App) {
     app.sql_cursor = app.sql_buffer.chars().count();
     app.mode = Mode::SqlEditor;
-    // Initialize vim editor with current SQL buffer content
-    app.sql_vim_editor = Some(crate::vim_editor::VimEditor::new(app.sql_buffer.clone()));
+    let mut editor = crate::vim_editor::VimEditor::new(app.sql_buffer.clone());
+    // Auto-enter INSERT mode when there's no existing query
+    if app.sql_buffer.trim().is_empty() {
+        editor.enter_insert_mode();
+    }
+    app.sql_vim_editor = Some(editor);
 }
 
 /// Enter command mode (:)

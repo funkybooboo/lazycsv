@@ -468,7 +468,7 @@ fn test_yy_yanks_row() {
     let mut app = create_test_app();
     let row_idx = app.selected_row().unwrap();
     // With new navigation model, row_idx.get() is already absolute index
-    let expected_row: Vec<String> = app.document.rows.get(row_idx.get()).unwrap().clone();
+    let expected_row: Vec<String> = app.document.get_rows_range(row_idx.get(), row_idx.get() + 1)[0].clone();
 
     app.handle_key(key_event(KeyCode::Char('y'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('y'))).unwrap();
@@ -893,7 +893,7 @@ fn test_insert_row_has_correct_column_count() {
     // New row should have same number of columns
     let new_row_idx = app.selected_row().unwrap();
     // With new navigation model, row_idx.get() is already absolute index
-    let new_row = app.document.rows.get(new_row_idx.get()).unwrap();
+    let new_row = app.document.get_rows_range(new_row_idx.get(), new_row_idx.get() + 1)[0].clone();
     assert_eq!(new_row.len(), col_count);
 }
 
@@ -906,10 +906,10 @@ fn test_insert_row_cells_are_empty() {
 
     let new_row_idx = app.selected_row().unwrap();
     // With new navigation model, row_idx.get() is already absolute index
-    let new_row = app.document.rows.get(new_row_idx.get()).unwrap();
+    let new_row = app.document.get_rows_range(new_row_idx.get(), new_row_idx.get() + 1)[0].clone();
 
     // All cells should be empty
-    for cell in new_row {
+    for cell in &new_row {
         assert!(cell.is_empty());
     }
 }
@@ -919,7 +919,7 @@ fn test_paste_row_content_matches_yanked() {
     let mut app = create_test_app();
 
     // Get the first data row content (rows[1] is first data row with new navigation)
-    let original_row: Vec<String> = app.document.rows.get(1).unwrap().clone();
+    let original_row: Vec<String> = app.document.get_rows_range(1, 2)[0].clone();
 
     // Yank first row
     app.handle_key(key_event(KeyCode::Char('y'))).unwrap();
@@ -931,10 +931,10 @@ fn test_paste_row_content_matches_yanked() {
 
     // Get the pasted row using absolute row index
     let pasted_row_idx = app.selected_row().unwrap();
-    let pasted_row = app.document.rows.get(pasted_row_idx.get()).unwrap();
+    let pasted_row = app.document.get_rows_range(pasted_row_idx.get(), pasted_row_idx.get() + 1)[0].clone();
 
     // Content should match
-    assert_eq!(pasted_row, &original_row);
+    assert_eq!(pasted_row, original_row);
 }
 
 // ============================================================================

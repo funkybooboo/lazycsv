@@ -1,19 +1,11 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use lazycsv::{App, Document, FileConfig};
+use lazycsv::{App, ColIndex, Document, FileConfig, RowIndex};
 use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
 fn key_event(code: KeyCode) -> KeyEvent {
     KeyEvent::new(code, KeyModifiers::NONE)
-}
-
-/// Helper to create a test CSV file
-fn create_test_csv(content: &str) -> (TempDir, PathBuf) {
-    let temp_dir = TempDir::new().unwrap();
-    let file_path = temp_dir.path().join("test.csv");
-    fs::write(&file_path, content).unwrap();
-    (temp_dir, file_path)
 }
 
 /// Helper to send command string to app
@@ -30,6 +22,14 @@ fn send_command(app: &mut App, cmd: &str) {
     let _ = app.handle_key(key_event(KeyCode::Enter));
 }
 
+/// Helper to create a test CSV file
+fn create_test_csv(content: &str) -> (TempDir, PathBuf) {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.csv");
+    fs::write(&file_path, content).unwrap();
+    (temp_dir, file_path)
+}
+
 #[test]
 fn test_delim_command_changes_delimiter() {
     // Create CSV with semicolon delimiter
@@ -41,8 +41,8 @@ fn test_delim_command_changes_delimiter() {
     let mut app = App::new(doc, files, 0, FileConfig::new());
 
     // Initially, it should parse as 1 column (no commas found)
-    assert_eq!(app.document.rows[0].len(), 1);
-    assert_eq!(app.document.rows[0][0], "Name;Age;City");
+    assert_eq!(app.document.column_count(), 1);
+    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(0)), "Name;Age;City");
 
     // Change delimiter to semicolon
     send_command(&mut app, "delim ;");
@@ -51,15 +51,15 @@ fn test_delim_command_changes_delimiter() {
     assert_eq!(app.document.delimiter, ';');
 
     // Now should have 3 columns parsed correctly
-    assert_eq!(app.document.rows[0].len(), 3);
-    assert_eq!(app.document.rows[0][0], "Name");
-    assert_eq!(app.document.rows[0][1], "Age");
-    assert_eq!(app.document.rows[0][2], "City");
+    assert_eq!(app.document.column_count(), 3);
+    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(0)), "Name");
+    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(1)), "Age");
+    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(2)), "City");
 
     // Data rows should be parsed correctly
     assert_eq!(app.document.data_row_count(), 2);
-    assert_eq!(app.document.rows[1][0], "Alice");
-    assert_eq!(app.document.rows[1][1], "30");
+    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "Alice");
+    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(1)), "30");
 }
 
 #[test]

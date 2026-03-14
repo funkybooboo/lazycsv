@@ -260,9 +260,9 @@ fn test_whitespace_csv() {
     assert_eq!(doc.row_count(), 11, "whitespace.csv should have 10 rows");
 
     // CSV parsing typically trims whitespace, but let's verify structure is correct
-    let headers: Vec<&str> = (0..7).map(|i| doc.header(ColIndex::new(i))).collect();
-    assert!(headers.contains(&"Leading"));
-    assert!(headers.contains(&"Trailing"));
+    let headers: Vec<String> = (0..7).map(|i| doc.header(ColIndex::new(i))).collect();
+    assert!(headers.iter().any(|h| h == "Leading"));
+    assert!(headers.iter().any(|h| h == "Trailing"));
 }
 
 #[test]

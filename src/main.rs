@@ -1,5 +1,8 @@
 use anyhow::{Context, Result};
-use crossterm::event::{self, Event, KeyEventKind};
+use crossterm::event::{
+    self, Event, KeyEventKind, KeyboardEnhancementFlags, PopKeyboardEnhancementFlags,
+    PushKeyboardEnhancementFlags,
+};
 use lazycsv::{cli, ui, App, FileConfig, InputResult};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
@@ -13,66 +16,29 @@ fn main() -> Result<()> {
 
     // Non-interactive query mode: execute SQL and exit
     if let Some(ref query) = cli_args.query {
-        let path = cli_args.path.clone().unwrap_or_else(|| PathBuf::from("."));
-        let config = FileConfig::with_options(
-            cli_args.delimiter,
-            cli_args.no_headers,
-            cli_args.encoding.clone(),
-        );
-        return lazycsv::query::execute_query(&path, query, &config);
+        return execute_query_mode(query, &cli_args);
+    }
+
+    // Non-interactive sort mode: load, sort, output CSV to stdout, and exit
+    if let Some(ref sort_spec) = cli_args.sort {
+        return execute_sort_and_output(sort_spec, &cli_args);
     }
 
     // Non-interactive row/column count mode: print counts and exit
     if cli_args.rows || cli_args.columns {
-        let path = cli_args.path.clone().unwrap_or_else(|| PathBuf::from("."));
-        let files = if path.is_file() {
-            vec![path]
-        } else if path.is_dir() {
-            let csv_files = lazycsv::file_system::scan_directory(&path)?;
-            if csv_files.is_empty() {
-                anyhow::bail!("No CSV files found in {}", path.display());
-            }
-            csv_files
-        } else {
-            anyhow::bail!("Path does not exist: {}", path.display());
-        };
+        return execute_count_mode(&cli_args);
+    }
 
-        let separator = if cli_args.format {
-            detect_thousands_separator()
-        } else {
-            '\0' // sentinel: no formatting
-        };
-
-        for file in &files {
-            let name = file
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("unknown");
-
-            let mut parts = Vec::new();
-
-            if cli_args.rows {
-                let count = lazycsv::csv::Document::count_rows(
-                    file,
-                    cli_args.delimiter,
-                    cli_args.no_headers,
-                    cli_args.encoding.clone(),
-                )?;
-                parts.push(format!("{} rows", format_number(count, separator)));
-            }
-
-            if cli_args.columns {
-                let count = lazycsv::csv::Document::count_columns(
-                    file,
-                    cli_args.delimiter,
-                    cli_args.encoding.clone(),
-                )?;
-                parts.push(format!("{} columns", format_number(count, separator)));
-            }
-
-            println!("{}: {}", name, parts.join(", "));
-        }
-        return Ok(());
+    // Piped stdin requires a non-interactive flag (-q, --sort, --rows, --columns)
+    if cli_args.path.is_none() && stdin_is_piped() {
+        anyhow::bail!(
+            "Piped stdin is not supported in interactive TUI mode.\n\
+             Use a non-interactive flag: -q <query>, --sort <col>, --rows, or --columns.\n\
+             Examples:\n  \
+               cat data.csv | lazycsv -q \"SELECT * FROM stdin\"\n  \
+               cat data.csv | lazycsv --sort Salary\n  \
+               cat data.csv | lazycsv --rows"
+        );
     }
 
     // Interactive TUI mode: resolve files first, then show loading screen
@@ -80,6 +46,18 @@ fn main() -> Result<()> {
 
     // Initialize terminal before loading so we can show feedback
     let mut terminal = ratatui::init();
+
+    // Enable keyboard enhancement so Ctrl+Enter is distinguishable from Enter.
+    // Gracefully ignored if the terminal doesn't support it.
+    let supports_enhancement =
+        crossterm::terminal::supports_keyboard_enhancement().unwrap_or(false);
+    if supports_enhancement {
+        crossterm::execute!(
+            std::io::stdout(),
+            PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES)
+        )
+        .ok();
+    }
 
     // Show loading message while file loads (with Esc hint)
     let filename = file_path
@@ -104,10 +82,10 @@ fn main() -> Result<()> {
             if e.downcast_ref::<lazycsv::cancel::CancelledError>()
                 .is_some()
             {
-                ratatui::restore();
+                restore_terminal(supports_enhancement);
                 return Ok(());
             }
-            ratatui::restore();
+            restore_terminal(supports_enhancement);
             return Err(e);
         }
     };
@@ -116,7 +94,7 @@ fn main() -> Result<()> {
     let result = run(&mut terminal, app);
 
     // Always restore terminal
-    ratatui::restore();
+    restore_terminal(supports_enhancement);
 
     // Exit immediately to avoid slow destructor cleanup for large documents.
     // The OS reclaims all memory when the process exits.
@@ -124,6 +102,13 @@ fn main() -> Result<()> {
         Ok(()) => std::process::exit(0),
         Err(e) => Err(e),
     }
+}
+
+fn restore_terminal(supports_enhancement: bool) {
+    if supports_enhancement {
+        crossterm::execute!(std::io::stdout(), PopKeyboardEnhancementFlags).ok();
+    }
+    ratatui::restore();
 }
 
 fn run(terminal: &mut Term, mut app: App) -> Result<()> {
@@ -257,8 +242,8 @@ fn handle_switch_document(
     let current_path = app.current_file().clone();
     app.session.mark_query_output(&current_path);
 
-    let old_rows = std::mem::take(&mut app.document.rows);
-    std::thread::spawn(move || drop(old_rows));
+    let old_storage = app.document.take_storage();
+    std::thread::spawn(move || drop(old_storage));
     app.document = doc;
 
     // Mark query result as unsaved so the tab shows (*)
@@ -361,6 +346,227 @@ fn handle_execute_query(terminal: &mut Term, app: &mut App, query: String) -> Re
         app.mode = lazycsv::app::Mode::SqlEditor;
         app.status_message = None;
     }
+    Ok(())
+}
+
+/// Check if stdin has piped data (not a terminal).
+fn stdin_is_piped() -> bool {
+    use std::io::IsTerminal;
+    !std::io::stdin().is_terminal()
+}
+
+/// Save piped stdin to a temporary file and return its path.
+/// The caller is responsible for cleanup (or let it be cleaned up on process exit).
+fn save_stdin_to_tempfile() -> Result<PathBuf> {
+    use std::io::Read;
+    let mut buf = Vec::new();
+    std::io::stdin().lock().read_to_end(&mut buf)?;
+    let temp_dir = std::env::temp_dir();
+    let temp_path = temp_dir.join("stdin.csv");
+    std::fs::write(&temp_path, &buf)?;
+    Ok(temp_path)
+}
+
+/// Non-interactive query mode with stdin support.
+fn execute_query_mode(query: &str, cli_args: &cli::CliArgs) -> Result<()> {
+    let config = FileConfig::with_options(
+        cli_args.delimiter,
+        cli_args.no_headers,
+        cli_args.encoding.clone(),
+    );
+
+    if let Some(ref path) = cli_args.path {
+        return lazycsv::query::execute_query(path, query, &config);
+    }
+
+    if stdin_is_piped() {
+        let temp_path = save_stdin_to_tempfile()?;
+        let result = lazycsv::query::execute_query(&temp_path, query, &config);
+        let _ = std::fs::remove_file(&temp_path);
+        return result;
+    }
+
+    lazycsv::query::execute_query(&PathBuf::from("."), query, &config)
+}
+
+/// Non-interactive row/column count mode with stdin support.
+fn execute_count_mode(cli_args: &cli::CliArgs) -> Result<()> {
+    let separator = if cli_args.format {
+        detect_thousands_separator()
+    } else {
+        '\0'
+    };
+
+    if cli_args.path.is_none() && stdin_is_piped() {
+        // Read from stdin
+        let doc = {
+            let stdin = std::io::stdin();
+            let reader = std::io::BufReader::new(stdin.lock());
+            lazycsv::csv::Document::from_reader(
+                reader,
+                cli_args.delimiter,
+                cli_args.no_headers,
+                "stdin".to_string(),
+            )?
+        };
+        let mut parts = Vec::new();
+        if cli_args.rows {
+            let count = if doc.row_count() > 0 {
+                doc.row_count() - 1 // subtract header row
+            } else {
+                0
+            };
+            parts.push(format!("{} rows", format_number(count, separator)));
+        }
+        if cli_args.columns {
+            parts.push(format!(
+                "{} columns",
+                format_number(doc.column_count(), separator)
+            ));
+        }
+        println!("stdin: {}", parts.join(", "));
+        return Ok(());
+    }
+
+    let path = cli_args.path.clone().unwrap_or_else(|| PathBuf::from("."));
+    let files = if path.is_file() {
+        vec![path]
+    } else if path.is_dir() {
+        let csv_files = lazycsv::file_system::scan_directory(&path)?;
+        if csv_files.is_empty() {
+            anyhow::bail!("No CSV files found in {}", path.display());
+        }
+        csv_files
+    } else {
+        anyhow::bail!("Path does not exist: {}", path.display());
+    };
+
+    for file in &files {
+        let name = file
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("unknown");
+
+        let mut parts = Vec::new();
+
+        if cli_args.rows {
+            let count = lazycsv::csv::Document::count_rows(
+                file,
+                cli_args.delimiter,
+                cli_args.no_headers,
+                cli_args.encoding.clone(),
+            )?;
+            parts.push(format!("{} rows", format_number(count, separator)));
+        }
+
+        if cli_args.columns {
+            let count = lazycsv::csv::Document::count_columns(
+                file,
+                cli_args.delimiter,
+                cli_args.encoding.clone(),
+            )?;
+            parts.push(format!("{} columns", format_number(count, separator)));
+        }
+
+        println!("{}: {}", name, parts.join(", "));
+    }
+    Ok(())
+}
+
+/// Non-interactive sort: load CSV, sort by columns, write sorted CSV to stdout.
+fn execute_sort_and_output(sort_spec: &str, cli_args: &cli::CliArgs) -> Result<()> {
+    // Load document from file path or stdin
+    let mut doc = if let Some(ref path) = cli_args.path {
+        let file_path = if path.is_file() {
+            path.clone()
+        } else if path.is_dir() {
+            let csv_files = lazycsv::file_system::scan_directory(path)?;
+            csv_files
+                .into_iter()
+                .next()
+                .ok_or_else(|| anyhow::anyhow!("No CSV files found in {}", path.display()))?
+        } else {
+            anyhow::bail!("Path does not exist: {}", path.display());
+        };
+        lazycsv::csv::Document::from_file(
+            &file_path,
+            cli_args.delimiter,
+            cli_args.no_headers,
+            cli_args.encoding.clone(),
+        )?
+    } else if stdin_is_piped() {
+        let stdin = std::io::stdin();
+        let reader = std::io::BufReader::new(stdin.lock());
+        lazycsv::csv::Document::from_reader(
+            reader,
+            cli_args.delimiter,
+            cli_args.no_headers,
+            "stdin".to_string(),
+        )?
+    } else {
+        anyhow::bail!("No input file specified. Provide a file path or pipe data via stdin.");
+    };
+
+    // Parse sort spec: optional '!' prefix for descending
+    let (spec, ascending) = if let Some(stripped) = sort_spec.strip_prefix('!') {
+        (stripped, false)
+    } else {
+        (sort_spec, true)
+    };
+
+    let specs: Vec<&str> = spec.split(',').map(|s| s.trim()).collect();
+    let mut col_indices = Vec::new();
+
+    for s in &specs {
+        if s.is_empty() {
+            continue;
+        }
+        if let Ok(num) = s.parse::<usize>() {
+            if num == 0 || num > doc.column_count() {
+                anyhow::bail!(
+                    "Column {} out of range (1-{})",
+                    num,
+                    doc.column_count()
+                );
+            }
+            col_indices.push(num - 1);
+        } else {
+            // Try header name (case-insensitive)
+            let col_count = doc.column_count();
+            let header_match = (0..col_count).find(|&i| {
+                doc.header(lazycsv::ColIndex::new(i))
+                    .eq_ignore_ascii_case(s)
+            });
+            if let Some(idx) = header_match {
+                col_indices.push(idx);
+            } else if s.chars().all(|c| c.is_ascii_alphabetic()) {
+                match lazycsv::ui::utils::excel_letter_to_column(s) {
+                    Ok(idx) if idx < doc.column_count() => {
+                        col_indices.push(idx);
+                    }
+                    _ => {
+                        anyhow::bail!("Column \"{}\" not found", s);
+                    }
+                }
+            } else {
+                anyhow::bail!("Column \"{}\" not found", s);
+            }
+        }
+    }
+
+    if col_indices.is_empty() {
+        anyhow::bail!("No valid columns specified in sort: {}", sort_spec);
+    }
+
+    // Sort the document
+    doc.sort_by_columns(&col_indices, ascending);
+
+    // Write sorted CSV to stdout
+    let delimiter = doc.delimiter;
+    let stdout = std::io::stdout();
+    let mut out = std::io::BufWriter::new(stdout.lock());
+    lazycsv::csv::write_csv_content(&mut out, &doc, delimiter)?;
+
     Ok(())
 }
 

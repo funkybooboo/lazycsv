@@ -81,6 +81,123 @@ pub enum Mode {
     FileOperationPrompt,
 }
 
+/// Maximum visible rows in the completion popup
+pub const COMPLETION_MAX_VISIBLE: usize = 10;
+
+/// Category of a completion item
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CompletionKind {
+    Keyword,
+    Function,
+    Column,
+    Table,
+}
+
+impl CompletionKind {
+    /// Short tag shown in the completion popup
+    pub fn tag(self) -> &'static str {
+        match self {
+            CompletionKind::Keyword => "[K]",
+            CompletionKind::Function => "[F]",
+            CompletionKind::Column => "[C]",
+            CompletionKind::Table => "[T]",
+        }
+    }
+
+    pub fn color(self) -> ratatui::style::Color {
+        match self {
+            CompletionKind::Keyword => ratatui::style::Color::Cyan,
+            CompletionKind::Function => ratatui::style::Color::Yellow,
+            CompletionKind::Column => ratatui::style::Color::Green,
+            CompletionKind::Table => ratatui::style::Color::Magenta,
+        }
+    }
+}
+
+/// A single item in the completion popup
+#[derive(Debug, Clone)]
+pub struct CompletionItem {
+    pub text: String,
+    pub kind: CompletionKind,
+}
+
+/// SQL completion popup state
+#[derive(Debug, Clone)]
+pub struct SqlCompletion {
+    /// All available items (unfiltered)
+    pub all_items: Vec<CompletionItem>,
+    /// Current filter/search string
+    pub filter: String,
+    /// Number of characters of the partial word that were already typed before
+    /// the popup was opened. Used to replace the prefix on accept.
+    pub prefix_len: usize,
+    /// Currently selected index (within filtered list)
+    pub selected: usize,
+    /// Scroll offset for the visible window
+    pub scroll_offset: usize,
+}
+
+impl SqlCompletion {
+    pub fn new(items: Vec<CompletionItem>, prefix: &str) -> Self {
+        Self {
+            all_items: items,
+            filter: prefix.to_string(),
+            prefix_len: prefix.len(),
+            selected: 0,
+            scroll_offset: 0,
+        }
+    }
+
+    /// Get the filtered list of items matching the current filter.
+    pub fn filtered_items(&self) -> Vec<&CompletionItem> {
+        if self.filter.is_empty() {
+            self.all_items.iter().collect()
+        } else {
+            let filter_lower = self.filter.to_ascii_lowercase();
+            self.all_items
+                .iter()
+                .filter(|item| item.text.to_ascii_lowercase().contains(&filter_lower))
+                .collect()
+        }
+    }
+
+    pub fn move_down(&mut self) {
+        let count = self.filtered_items().len();
+        if count > 0 {
+            self.selected = (self.selected + 1).min(count - 1);
+            if self.selected >= self.scroll_offset + COMPLETION_MAX_VISIBLE {
+                self.scroll_offset = self.selected + 1 - COMPLETION_MAX_VISIBLE;
+            }
+        }
+    }
+
+    pub fn move_up(&mut self) {
+        self.selected = self.selected.saturating_sub(1);
+        if self.selected < self.scroll_offset {
+            self.scroll_offset = self.selected;
+        }
+    }
+
+    /// Append a character to the filter and reset selection.
+    pub fn push_filter(&mut self, ch: char) {
+        self.filter.push(ch);
+        self.selected = 0;
+        self.scroll_offset = 0;
+    }
+
+    /// Remove the last character from the filter.
+    pub fn pop_filter(&mut self) {
+        self.filter.pop();
+        self.selected = 0;
+        self.scroll_offset = 0;
+    }
+
+    pub fn selected_item(&self) -> Option<&CompletionItem> {
+        let filtered = self.filtered_items();
+        filtered.get(self.selected).copied()
+    }
+}
+
 /// Visual mode selection anchor and type
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct VisualSelection {
@@ -279,6 +396,9 @@ pub struct App {
     /// Vim editor for SQL query editing (None when not in SQL editor mode)
     pub sql_vim_editor: Option<crate::vim_editor::VimEditor>,
 
+    /// SQL table-name completion popup state (None when not showing)
+    pub sql_completion: Option<SqlCompletion>,
+
     /// Magnifier state for complex cell editing (None when not in magnifier mode)
     pub magnifier_state: Option<crate::magnifier::MagnifierState>,
 
@@ -429,6 +549,7 @@ impl App {
             sql_cursor: 0,
             sql_error: None,
             sql_vim_editor: None,
+            sql_completion: None,
             magnifier_state: None,
             should_quit: false,
             sqlite_cache: None,
@@ -726,8 +847,8 @@ impl App {
         // Check for cached document first (e.g. query output files that don't exist on disk)
         if let Some(cached) = self.session.cached_document(&file_path) {
             // Drop old rows on background thread to avoid blocking UI
-            let old_rows = std::mem::take(&mut self.document.rows);
-            std::thread::spawn(move || drop(old_rows));
+            let old_storage = self.document.take_storage();
+            std::thread::spawn(move || drop(old_storage));
             self.document = cached.clone();
             self.view_state = ViewState::default();
             let initial_row = if self.document.header_mode && self.document.row_count() > 1 {
@@ -755,8 +876,8 @@ impl App {
         ) {
             Ok(doc) => {
                 // Drop old rows on background thread
-                let old_rows = std::mem::take(&mut self.document.rows);
-                std::thread::spawn(move || drop(old_rows));
+                let old_storage = self.document.take_storage();
+                std::thread::spawn(move || drop(old_storage));
                 self.document = doc;
                 // Invalidate SQLite cache for this file (generation reset to 0)
                 self.invalidate_sqlite_cache_for(&file_path);

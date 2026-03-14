@@ -1,5 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use lazycsv::{App, Document, FileConfig};
+use lazycsv::{App, ColIndex, Document, FileConfig, RowIndex};
 use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -38,9 +38,9 @@ fn test_new_command_with_headers() {
 
     // Should create document with 3 columns
     assert_eq!(app.document.column_count(), 3);
-    assert_eq!(app.document.rows[0][0], "Name");
-    assert_eq!(app.document.rows[0][1], "Age");
-    assert_eq!(app.document.rows[0][2], "City");
+    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(0)), "Name");
+    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(1)), "Age");
+    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(2)), "City");
 
     // Should have only header row (0 data rows)
     assert_eq!(app.document.data_row_count(), 0);
@@ -67,7 +67,7 @@ fn test_new_command_without_headers() {
 
     // Should create document with 1 column named "Column 1"
     assert_eq!(app.document.column_count(), 1);
-    assert_eq!(app.document.rows[0][0], "Column 1");
+    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(0)), "Column 1");
 
     // Should have only header row
     assert_eq!(app.document.data_row_count(), 0);
@@ -94,7 +94,7 @@ fn test_new_command_single_header() {
 
     // Should create document with 1 column
     assert_eq!(app.document.column_count(), 1);
-    assert_eq!(app.document.rows[0][0], "ID");
+    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(0)), "ID");
     assert_eq!(app.document.data_row_count(), 0);
 }
 
@@ -113,8 +113,8 @@ fn test_new_command_many_headers() {
 
     // Should create document with 10 columns
     assert_eq!(app.document.column_count(), 10);
-    assert_eq!(app.document.rows[0][0], "A");
-    assert_eq!(app.document.rows[0][9], "J");
+    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(0)), "A");
+    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(9)), "J");
 }
 
 #[test]
@@ -131,9 +131,9 @@ fn test_new_command_with_spaces_in_headers() {
     send_command(&mut app, "new First Name,Last Name,Email Address");
 
     assert_eq!(app.document.column_count(), 3);
-    assert_eq!(app.document.rows[0][0], "First Name");
-    assert_eq!(app.document.rows[0][1], "Last Name");
-    assert_eq!(app.document.rows[0][2], "Email Address");
+    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(0)), "First Name");
+    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(1)), "Last Name");
+    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(2)), "Email Address");
 }
 
 #[test]

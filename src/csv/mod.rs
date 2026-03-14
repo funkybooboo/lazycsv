@@ -4,7 +4,8 @@
 //! delimiters and encoding, and providing in-memory document access.
 
 pub mod document;
+pub mod row_storage;
 pub mod writer;
 
 pub use document::Document;
-pub use writer::write_csv_atomic;
+pub use writer::{write_csv_atomic, write_csv_content};
