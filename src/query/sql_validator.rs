@@ -14,16 +14,80 @@ use std::path::PathBuf;
 
 /// SQL keywords that should not be treated as identifiers
 const SQL_KEYWORDS: &[&str] = &[
-    "SELECT", "FROM", "WHERE", "JOIN", "LEFT", "RIGHT", "INNER", "CROSS",
-    "OUTER", "NATURAL", "ON", "GROUP", "ORDER", "BY", "HAVING", "LIMIT",
-    "OFFSET", "UNION", "ALL", "DISTINCT", "AS", "AND", "OR", "NOT", "IN",
-    "BETWEEN", "LIKE", "IS", "NULL", "EXISTS", "CASE", "WHEN", "THEN",
-    "ELSE", "END", "ASC", "DESC", "INSERT", "UPDATE", "DELETE", "SET",
-    "VALUES", "CREATE", "DROP", "ALTER", "TABLE", "TRUE", "FALSE",
-    "COUNT", "SUM", "AVG", "MIN", "MAX", "COALESCE", "IFNULL", "NULLIF",
-    "UPPER", "LOWER", "LENGTH", "TRIM", "SUBSTR", "REPLACE", "CAST",
-    "TYPEOF", "ABS", "ROUND", "DATE", "TIME", "DATETIME", "STRFTIME",
-    "GROUP_CONCAT", "TOTAL", "EXCEPT", "INTERSECT",
+    "SELECT",
+    "FROM",
+    "WHERE",
+    "JOIN",
+    "LEFT",
+    "RIGHT",
+    "INNER",
+    "CROSS",
+    "OUTER",
+    "NATURAL",
+    "ON",
+    "GROUP",
+    "ORDER",
+    "BY",
+    "HAVING",
+    "LIMIT",
+    "OFFSET",
+    "UNION",
+    "ALL",
+    "DISTINCT",
+    "AS",
+    "AND",
+    "OR",
+    "NOT",
+    "IN",
+    "BETWEEN",
+    "LIKE",
+    "IS",
+    "NULL",
+    "EXISTS",
+    "CASE",
+    "WHEN",
+    "THEN",
+    "ELSE",
+    "END",
+    "ASC",
+    "DESC",
+    "INSERT",
+    "UPDATE",
+    "DELETE",
+    "SET",
+    "VALUES",
+    "CREATE",
+    "DROP",
+    "ALTER",
+    "TABLE",
+    "TRUE",
+    "FALSE",
+    "COUNT",
+    "SUM",
+    "AVG",
+    "MIN",
+    "MAX",
+    "COALESCE",
+    "IFNULL",
+    "NULLIF",
+    "UPPER",
+    "LOWER",
+    "LENGTH",
+    "TRIM",
+    "SUBSTR",
+    "REPLACE",
+    "CAST",
+    "TYPEOF",
+    "ABS",
+    "ROUND",
+    "DATE",
+    "TIME",
+    "DATETIME",
+    "STRFTIME",
+    "GROUP_CONCAT",
+    "TOTAL",
+    "EXCEPT",
+    "INTERSECT",
 ];
 
 /// A token with its position in the source text
@@ -102,7 +166,15 @@ fn tokenize_with_positions(sql: &str) -> Vec<LocatedToken> {
         }
 
         // Operators (skip)
-        if ch == '=' || ch == '<' || ch == '>' || ch == '!' || ch == '+' || ch == '-' || ch == '/' || ch == '%' {
+        if ch == '='
+            || ch == '<'
+            || ch == '>'
+            || ch == '!'
+            || ch == '+'
+            || ch == '-'
+            || ch == '/'
+            || ch == '%'
+        {
             i += 1;
             col += 1;
             // Skip multi-char operators
@@ -231,7 +303,13 @@ pub fn validate(
     let column_to_tables = build_column_table_map(&referenced_tables);
 
     // Check 3: Unknown column references
-    check_unknown_columns(&tokens, &table_refs, &all_columns, &schema, &mut diagnostics);
+    check_unknown_columns(
+        &tokens,
+        &table_refs,
+        &all_columns,
+        &schema,
+        &mut diagnostics,
+    );
 
     // Check 4: Ambiguous column references
     check_ambiguous_columns(&tokens, &table_refs, &column_to_tables, &mut diagnostics);
@@ -242,7 +320,7 @@ pub fn validate(
 /// A parsed table reference: table name, optional alias, position
 #[derive(Debug, Clone)]
 struct TableRef {
-    table_name: String,  // lowercase
+    table_name: String,    // lowercase
     alias: Option<String>, // lowercase
 }
 
@@ -255,8 +333,12 @@ fn parse_table_references(tokens: &[LocatedToken], known_tables: &[String]) -> V
     while i < upper.len() {
         let is_from = upper[i] == "FROM";
         let is_join = upper[i] == "JOIN"
-            || (i + 1 < upper.len() && upper[i + 1] == "JOIN"
-                && matches!(upper[i].as_str(), "LEFT" | "RIGHT" | "INNER" | "CROSS" | "OUTER" | "NATURAL"));
+            || (i + 1 < upper.len()
+                && upper[i + 1] == "JOIN"
+                && matches!(
+                    upper[i].as_str(),
+                    "LEFT" | "RIGHT" | "INNER" | "CROSS" | "OUTER" | "NATURAL"
+                ));
 
         if !is_from && !is_join {
             i += 1;
@@ -294,7 +376,10 @@ fn parse_table_references(tokens: &[LocatedToken], known_tables: &[String]) -> V
 
             if !known_tables.contains(&table_lower) {
                 // Not a known table, still record for reference
-                refs.push(TableRef { table_name: table_lower, alias: None });
+                refs.push(TableRef {
+                    table_name: table_lower,
+                    alias: None,
+                });
                 continue;
             }
 
@@ -312,7 +397,10 @@ fn parse_table_references(tokens: &[LocatedToken], known_tables: &[String]) -> V
                 i += 1;
             }
 
-            refs.push(TableRef { table_name: table_lower, alias });
+            refs.push(TableRef {
+                table_name: table_lower,
+                alias,
+            });
 
             // For JOIN, only one table before ON
             if !is_from {
@@ -325,11 +413,35 @@ fn parse_table_references(tokens: &[LocatedToken], known_tables: &[String]) -> V
 }
 
 fn is_sql_keyword_non_alias(word: &str) -> bool {
-    matches!(word,
-        "WHERE" | "GROUP" | "ORDER" | "HAVING" | "SET" | "SELECT" | "ON" | "LIMIT"
-        | "LEFT" | "RIGHT" | "INNER" | "CROSS" | "OUTER" | "NATURAL" | "JOIN"
-        | "FROM" | "AND" | "OR" | "NOT" | "IN" | "BETWEEN" | "LIKE" | "IS"
-        | "NULL" | "UNION" | "EXCEPT" | "INTERSECT"
+    matches!(
+        word,
+        "WHERE"
+            | "GROUP"
+            | "ORDER"
+            | "HAVING"
+            | "SET"
+            | "SELECT"
+            | "ON"
+            | "LIMIT"
+            | "LEFT"
+            | "RIGHT"
+            | "INNER"
+            | "CROSS"
+            | "OUTER"
+            | "NATURAL"
+            | "JOIN"
+            | "FROM"
+            | "AND"
+            | "OR"
+            | "NOT"
+            | "IN"
+            | "BETWEEN"
+            | "LIKE"
+            | "IS"
+            | "NULL"
+            | "UNION"
+            | "EXCEPT"
+            | "INTERSECT"
     )
 }
 
@@ -372,17 +484,14 @@ fn check_unknown_tables(
                 if i < upper.len() && upper[i] == "AS" {
                     i += 1;
                 }
-                if i < upper.len() && !is_sql_keyword_non_alias(&upper[i]) && tokens[i].text != "," {
+                if i < upper.len() && !is_sql_keyword_non_alias(&upper[i]) && tokens[i].text != ","
+                {
                     i += 1;
                 }
             } else {
                 // Unknown table - find suggestion
                 let mut msg = format!("Unknown table '{}'", tok.text);
-                let suggestions = find_similar(
-                    &table_lower,
-                    known_tables,
-                    2,
-                );
+                let suggestions = find_similar(&table_lower, known_tables, 2);
                 if !suggestions.is_empty() {
                     msg.push_str(&format!(". Did you mean: {}?", suggestions.join(", ")));
                 }
@@ -403,10 +512,7 @@ fn check_unknown_tables(
 }
 
 /// Check for JOIN without ON condition.
-fn check_missing_join_conditions(
-    tokens: &[LocatedToken],
-    diagnostics: &mut Vec<SqlDiagnostic>,
-) {
+fn check_missing_join_conditions(tokens: &[LocatedToken], diagnostics: &mut Vec<SqlDiagnostic>) {
     let upper: Vec<String> = tokens.iter().map(|t| t.text.to_ascii_uppercase()).collect();
 
     for i in 0..upper.len() {
@@ -499,8 +605,12 @@ fn build_column_table_map(tables: &[ResolvedTable]) -> HashMap<String, Vec<Strin
 /// Returns indices into the token array that represent column references.
 fn find_column_positions(tokens: &[LocatedToken], table_refs: &[TableRef]) -> Vec<usize> {
     let upper: Vec<String> = tokens.iter().map(|t| t.text.to_ascii_uppercase()).collect();
-    let known_aliases: Vec<String> = table_refs.iter().filter_map(|tr| tr.alias.clone()).collect();
-    let known_table_names: Vec<String> = table_refs.iter().map(|tr| tr.table_name.clone()).collect();
+    let known_aliases: Vec<String> = table_refs
+        .iter()
+        .filter_map(|tr| tr.alias.clone())
+        .collect();
+    let known_table_names: Vec<String> =
+        table_refs.iter().map(|tr| tr.table_name.clone()).collect();
 
     let mut positions = Vec::new();
 
@@ -640,7 +750,8 @@ fn check_unknown_columns(
 
             if let Some(table) = table_name {
                 if let Some((_, headers)) = schema.get(table.as_str()) {
-                    let headers_lower: Vec<String> = headers.iter().map(|h| h.to_lowercase()).collect();
+                    let headers_lower: Vec<String> =
+                        headers.iter().map(|h| h.to_lowercase()).collect();
                     if !headers_lower.contains(&col_lower) {
                         let mut msg = format!("Unknown column '{}'", tok.text);
                         let suggestions = find_similar(&col_lower, &headers_lower, 2);
@@ -692,8 +803,8 @@ fn check_ambiguous_columns(
     let col_positions = find_column_positions(tokens, table_refs);
 
     for &idx in &col_positions {
-        // Skip qualified references (table.column)
-        if idx >= 2 && tokens[idx - 1].text == "." {
+        // Skip qualified references (table.column) — these are unambiguous
+        if idx > 0 && tokens[idx - 1].text == "." {
             continue;
         }
 
@@ -839,7 +950,11 @@ mod tests {
 
         let files = vec![p1, p2];
         let schema = build_test_schema(&files);
-        let diags = validate("SELECT * FROM users JOIN orders ON users.id = orders.user_id", &files, &schema);
+        let diags = validate(
+            "SELECT * FROM users JOIN orders ON users.id = orders.user_id",
+            &files,
+            &schema,
+        );
         assert!(diags.iter().all(|d| !d.message.contains("JOIN without ON")));
     }
 

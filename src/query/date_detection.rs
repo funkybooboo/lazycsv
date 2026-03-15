@@ -184,7 +184,7 @@ fn is_iso_date(s: &str) -> bool {
         _ => return false,
     };
 
-    if year < 1000 || month < 1 || month > 12 || day < 1 || day > 31 {
+    if year < 1000 || !(1..=12).contains(&month) || !(1..=31).contains(&day) {
         return false;
     }
 
@@ -214,12 +214,12 @@ fn is_slash_date(s: &str) -> bool {
 
     match (a, b, year) {
         (Some(a), Some(b), Some(y)) => {
-            if y < 1000 || y > 9999 {
+            if !(1000..=9999).contains(&y) {
                 return false;
             }
             // At least one interpretation (DD/MM or MM/DD) must be valid
-            let valid_dmy = a >= 1 && a <= 31 && b >= 1 && b <= 12;
-            let valid_mdy = a >= 1 && a <= 12 && b >= 1 && b <= 31;
+            let valid_dmy = (1..=31).contains(&a) && (1..=12).contains(&b);
+            let valid_mdy = (1..=12).contains(&a) && (1..=31).contains(&b);
             if !valid_dmy && !valid_mdy {
                 return false;
             }
@@ -247,7 +247,10 @@ fn is_dot_date(s: &str) -> bool {
         parse_u32(parts[2]),
     ) {
         (Some(day), Some(month), Some(year)) => {
-            if year < 1000 || year > 9999 || month < 1 || month > 12 || day < 1 || day > 31 {
+            if !(1000..=9999).contains(&year)
+                || !(1..=12).contains(&month)
+                || !(1..=31).contains(&day)
+            {
                 return false;
             }
         }
@@ -280,14 +283,14 @@ fn is_valid_time_24h(s: &str) -> bool {
     };
     let _ = hour;
 
-    if parse_u32(parts[1]).map_or(true, |m| m > 59) {
+    if parse_u32(parts[1]).is_none_or(|m| m > 59) {
         return false;
     }
 
     if parts.len() == 3 {
         // Handle fractional seconds: "30.123"
         let sec_str = parts[2].split('.').next().unwrap_or("");
-        if parse_u32(sec_str).map_or(true, |s| s > 59) {
+        if parse_u32(sec_str).is_none_or(|s| s > 59) {
             return false;
         }
     }
@@ -315,13 +318,13 @@ fn is_valid_time_12h(s: &str) -> bool {
         return false;
     }
 
-    if parse_u32(parts[0]).map_or(true, |h| h < 1 || h > 12) {
+    if parse_u32(parts[0]).is_none_or(|h| !(1..=12).contains(&h)) {
         return false;
     }
-    if parse_u32(parts[1]).map_or(true, |m| m > 59) {
+    if parse_u32(parts[1]).is_none_or(|m| m > 59) {
         return false;
     }
-    if parts.len() == 3 && parse_u32(parts[2]).map_or(true, |s| s > 59) {
+    if parts.len() == 3 && parse_u32(parts[2]).is_none_or(|s| s > 59) {
         return false;
     }
 

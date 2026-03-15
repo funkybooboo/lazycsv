@@ -501,7 +501,7 @@ impl Formula {
             Some(n) => n as usize,
             None => return "#VALUE!".to_string(),
         };
-        let exact = self
+        let _exact = self
             .args
             .get(3)
             .map(|a| {
@@ -520,11 +520,7 @@ impl Formula {
         // Search first row for lookup value
         for c in min_col..=max_col {
             let cell_val = get_cell(min_row, c);
-            let matches = if exact {
-                cell_val.trim() == lookup_val.trim()
-            } else {
-                cell_val.trim() == lookup_val.trim()
-            };
+            let matches = cell_val.trim() == lookup_val.trim();
             if matches {
                 let result_row = min_row + row_index - 1;
                 return get_cell(result_row, c);
@@ -837,7 +833,8 @@ fn evaluate_condition(arg: &Arg, get_cell: &dyn Fn(usize, usize) -> String) -> b
 /// Evaluate a comparison expression like "A1>10", "B2>=5", "A1<>B1".
 fn eval_comparison(expr: &str, get_cell: &dyn Fn(usize, usize) -> String) -> bool {
     // Try each operator (longest first to avoid prefix matching)
-    let operators: &[(&str, fn(&str, &str) -> bool)] = &[
+    type CmpOperators<'a> = &'a [(&'a str, fn(&str, &str) -> bool)];
+    let operators: CmpOperators = &[
         (">=", cmp_gte),
         ("<=", cmp_lte),
         ("<>", cmp_ne),

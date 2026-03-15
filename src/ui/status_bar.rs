@@ -147,7 +147,7 @@ fn build_status_text(app: &App, right_side: &str, pending_indicator: &str, width
             let dirty = if app.document.is_dirty { "*" } else { "" };
             let filename = &app.document.filename;
             let left = format!(" INSERT{}", dirty);
-            let center = format!("{}", filename);
+            let center = filename.to_string();
             let right = format!("{} | ? for help ", right_side);
             build_three_part_status_line(&left, &center, &right, width)
         }
@@ -155,7 +155,7 @@ fn build_status_text(app: &App, right_side: &str, pending_indicator: &str, width
             let dirty = if app.document.is_dirty { "*" } else { "" };
             let filename = &app.document.filename;
             let left = format!(" MAGNIFIER{}", dirty);
-            let center = format!("{}", filename);
+            let center = filename.to_string();
             let right = format!("{} | ? for help ", right_side);
             build_three_part_status_line(&left, &center, &right, width)
         }
@@ -175,7 +175,7 @@ fn build_status_text(app: &App, right_side: &str, pending_indicator: &str, width
                 String::new()
             };
             let left = format!(" VISUAL{}{}", selection_info, dirty);
-            let center = format!("{}", filename);
+            let center = filename.to_string();
             let right = format!("{} | ? for help ", right_side);
             build_three_part_status_line(&left, &center, &right, width)
         }
@@ -189,7 +189,7 @@ fn build_status_text(app: &App, right_side: &str, pending_indicator: &str, width
                 String::new()
             };
             let left = format!(" VISUAL{}{}", selection_info, dirty);
-            let center = format!("{}", filename);
+            let center = filename.to_string();
             let right = format!("{} | ? for help ", right_side);
             build_three_part_status_line(&left, &center, &right, width)
         }
@@ -207,7 +207,7 @@ fn build_status_text(app: &App, right_side: &str, pending_indicator: &str, width
                 String::new()
             };
             let left = format!(" VISUAL{}{}", selection_info, dirty);
-            let center = format!("{}", filename);
+            let center = filename.to_string();
             let right = format!("{} | ? for help ", right_side);
             build_three_part_status_line(&left, &center, &right, width)
         }
@@ -266,7 +266,7 @@ fn build_status_text(app: &App, right_side: &str, pending_indicator: &str, width
             let left = " FILE OPERATION".to_string();
             let center = format!("{}{}", filename, dirty);
             let right = "Enter: confirm | Esc: cancel ";
-            build_three_part_status_line(&left, &center, &right, width)
+            build_three_part_status_line(&left, &center, right, width)
         }
     }
 }

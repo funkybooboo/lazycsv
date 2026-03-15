@@ -155,8 +155,7 @@ impl VimEditor {
             let new_line = self.current_line().to_string();
             let new_char_count = new_line.chars().count();
             // Skip leading whitespace on new line
-            while self.cursor.1 < new_char_count
-                && Self::is_whitespace_at(&new_line, self.cursor.1)
+            while self.cursor.1 < new_char_count && Self::is_whitespace_at(&new_line, self.cursor.1)
             {
                 self.cursor.1 += 1;
             }

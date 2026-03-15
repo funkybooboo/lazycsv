@@ -14,7 +14,8 @@ impl VimEditor {
         let char_count = line.chars().count();
         let char_col = char_col.min(char_count);
         // Convert char position to byte position for String::insert
-        let byte_pos = line.char_indices()
+        let byte_pos = line
+            .char_indices()
             .nth(char_col)
             .map(|(i, _)| i)
             .unwrap_or(line.len());
@@ -73,7 +74,8 @@ impl VimEditor {
         let char_col = self.cursor.1;
         let line_idx = self.cursor.0;
 
-        let byte_pos = self.lines[line_idx].char_indices()
+        let byte_pos = self.lines[line_idx]
+            .char_indices()
             .nth(char_col)
             .map(|(i, _)| i)
             .unwrap_or(self.lines[line_idx].len());

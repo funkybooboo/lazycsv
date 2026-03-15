@@ -336,10 +336,8 @@ fn build_vim_editor_lines_with_diagnostics(
         }
 
         // Add squiggly underline line for diagnostics on this line
-        let line_diags: Vec<&SqlDiagnostic> = diagnostics
-            .iter()
-            .filter(|d| d.line == line_idx)
-            .collect();
+        let line_diags: Vec<&SqlDiagnostic> =
+            diagnostics.iter().filter(|d| d.line == line_idx).collect();
 
         if !line_diags.is_empty() {
             let gutter = " ".repeat(line_num_width + 1);
@@ -374,10 +372,7 @@ fn build_squiggle_line(diagnostics: &[&SqlDiagnostic], _line_len: usize) -> Vec<
             DiagnosticSeverity::Error => Color::Red,
             DiagnosticSeverity::Warning => Color::Yellow,
         };
-        spans.push(Span::styled(
-            "~".repeat(len),
-            Style::default().fg(color),
-        ));
+        spans.push(Span::styled("~".repeat(len), Style::default().fg(color)));
         pos = diag.col_end;
     }
 

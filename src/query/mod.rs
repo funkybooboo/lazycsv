@@ -270,8 +270,7 @@ pub fn strip_csv_extensions(sql: &str) -> String {
                     if candidate.eq_ignore_ascii_case(ext) {
                         // Make sure the extension isn't followed by more identifier chars
                         let after = i + ext_chars.len();
-                        if after >= len
-                            || (!chars[after].is_alphanumeric() && chars[after] != '_')
+                        if after >= len || (!chars[after].is_alphanumeric() && chars[after] != '_')
                         {
                             result.push_str(&word);
                             i = after;
@@ -912,7 +911,7 @@ fn load_lazy_into_sqlite_cancellable(
     let mut row_count: usize = 0;
 
     while reader.read_byte_record(&mut record).unwrap_or(false) {
-        if row_count % cancel::CHECK_INTERVAL == 0 && cancel::check_esc(cancelled) {
+        if row_count.is_multiple_of(cancel::CHECK_INTERVAL) && cancel::check_esc(cancelled) {
             drop(stmt);
             let _ = conn.execute("ROLLBACK", []);
             bail!(CancelledError);

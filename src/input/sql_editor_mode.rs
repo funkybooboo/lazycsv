@@ -296,7 +296,11 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                     template: None,
                     template_steps: vec![],
                 }];
-                items.extend(column_items_from_query(&sql_text, &files, &mut app.schema_cache));
+                items.extend(column_items_from_query(
+                    &sql_text,
+                    &files,
+                    &mut app.schema_cache,
+                ));
                 items.extend(function_items());
                 items.extend(keyword_items(&["DISTINCT", "CASE"]));
                 items
@@ -317,7 +321,9 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                 ]));
                 items
             }
-            CompletionContext::GroupBy => column_items_from_query(&sql_text, &files, &mut app.schema_cache),
+            CompletionContext::GroupBy => {
+                column_items_from_query(&sql_text, &files, &mut app.schema_cache)
+            }
             CompletionContext::OrderBy => {
                 let mut items = column_items_from_query(&sql_text, &files, &mut app.schema_cache);
                 items.extend(keyword_items(&["ASC", "DESC"]));
@@ -334,7 +340,11 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                     })
                     .collect();
                 items.extend(function_items());
-                items.extend(column_items_from_query(&sql_text, &files, &mut app.schema_cache));
+                items.extend(column_items_from_query(
+                    &sql_text,
+                    &files,
+                    &mut app.schema_cache,
+                ));
                 items
             }
         };
@@ -424,8 +434,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             .iter()
             .filter_map(|p| app.schema_cache.get_or_read(p).map(|h| (p.clone(), h)))
             .collect();
-        app.sql_diagnostics =
-            crate::query::sql_validator::validate(&sql_text, &files, &schema);
+        app.sql_diagnostics = crate::query::sql_validator::validate(&sql_text, &files, &schema);
     }
 
     Ok(InputResult::Continue)
@@ -537,7 +546,9 @@ fn execute_template_steps(app: &mut App) {
                 let column = app.sql_template_last_column.as_deref().unwrap_or("column");
                 let table_q = quote_if_needed(table);
                 let column_q = quote_if_needed(column);
-                let sql = fmt.replace("{table}", &table_q).replace("{column}", &column_q);
+                let sql = fmt
+                    .replace("{table}", &table_q)
+                    .replace("{column}", &column_q);
                 let mut new_editor = crate::vim_editor::VimEditor::new(sql);
                 new_editor.enter_insert_mode();
                 let line_count = new_editor.line_count();
@@ -607,7 +618,8 @@ fn detect_completion_context(text_before_cursor: &str) -> CompletionContext {
     let upper = text_before_cursor.to_ascii_uppercase();
 
     // Find the last occurrence of each clause keyword
-    let clauses: &[(&str, fn() -> CompletionContext)] = &[
+    type ClauseList<'a> = &'a [(&'a str, fn() -> CompletionContext)];
+    let clauses: ClauseList = &[
         ("SELECT", || CompletionContext::Select),
         ("FROM", || CompletionContext::From),
         ("JOIN", || CompletionContext::From),
@@ -628,11 +640,11 @@ fn detect_completion_context(text_before_cursor: &str) -> CompletionContext {
         if let Some(pos) = upper.rfind(kw) {
             let after = pos + kw.len();
             // Verify it's a whole keyword (followed by whitespace or end)
-            if after >= upper.len() || upper.as_bytes()[after].is_ascii_whitespace() {
-                if best_pos.map_or(true, |prev| pos > prev) {
-                    best_pos = Some(pos);
-                    best_ctx = Some(make_ctx());
-                }
+            if (after >= upper.len() || upper.as_bytes()[after].is_ascii_whitespace())
+                && best_pos.is_none_or(|prev| pos > prev)
+            {
+                best_pos = Some(pos);
+                best_ctx = Some(make_ctx());
             }
         }
     }
@@ -691,7 +703,6 @@ fn column_items_from_query(
     }
     columns
 }
-
 
 /// Check if cursor is right after "alias." and return the alias name.
 /// e.g. "select t." → Some("t"), "select t.col" → None (already typing)

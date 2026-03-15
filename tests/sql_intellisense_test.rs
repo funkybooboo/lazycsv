@@ -55,15 +55,23 @@ fn test_very_long_query_many_columns() {
 
     // Build a SELECT with all columns and many WHERE conditions to exceed 1000 chars
     let select_cols = cols.join(", ");
-    let conditions: Vec<String> = (0..25).map(|i| format!("col{} = col{}", i * 2, i * 2 + 1)).collect();
-    let extra_conditions: Vec<String> = (0..25).map(|i| format!("col{} = col{}", i, i + 25)).collect();
+    let conditions: Vec<String> = (0..25)
+        .map(|i| format!("col{} = col{}", i * 2, i * 2 + 1))
+        .collect();
+    let extra_conditions: Vec<String> = (0..25)
+        .map(|i| format!("col{} = col{}", i, i + 25))
+        .collect();
     let sql = format!(
         "SELECT {} FROM wide WHERE {} AND {}",
         select_cols,
         conditions.join(" AND "),
         extra_conditions.join(" AND ")
     );
-    assert!(sql.len() > 1000, "Query should be >1000 chars, got {}", sql.len());
+    assert!(
+        sql.len() > 1000,
+        "Query should be >1000 chars, got {}",
+        sql.len()
+    );
 
     let diags = validate(&sql, &files, &schema);
     // Should produce no unknown-table or unknown-column errors
@@ -109,7 +117,9 @@ fn test_deeply_nested_subqueries_3_levels() {
     let diags = validate(sql, &files, &schema);
     // The innermost "data" should be recognized
     assert!(
-        diags.iter().all(|d| !d.message.contains("Unknown table 'data'")),
+        diags
+            .iter()
+            .all(|d| !d.message.contains("Unknown table 'data'")),
         "Should recognize 'data' table in nested subquery: {:?}",
         diags.iter().map(|d| &d.message).collect::<Vec<_>>()
     );
@@ -125,7 +135,9 @@ fn test_deeply_nested_subqueries_5_levels() {
     let sql = "SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM items) a) b) c) d";
     let diags = validate(sql, &files, &schema);
     assert!(
-        diags.iter().all(|d| !d.message.contains("Unknown table 'items'")),
+        diags
+            .iter()
+            .all(|d| !d.message.contains("Unknown table 'items'")),
         "Should recognize 'items' in 5-level nested subquery"
     );
 }
@@ -273,13 +285,19 @@ fn test_large_schema_completion() {
 #[test]
 fn test_empty_string() {
     let diags = validate("", &[], &HashMap::new());
-    assert!(diags.is_empty(), "Empty query should produce no diagnostics");
+    assert!(
+        diags.is_empty(),
+        "Empty query should produce no diagnostics"
+    );
 }
 
 #[test]
 fn test_whitespace_only() {
     let diags = validate("   \n\t  ", &[], &HashMap::new());
-    assert!(diags.is_empty(), "Whitespace-only query should produce no diagnostics");
+    assert!(
+        diags.is_empty(),
+        "Whitespace-only query should produce no diagnostics"
+    );
 }
 
 #[test]
@@ -401,13 +419,48 @@ fn test_only_operators() {
 
 fn make_completion_items() -> Vec<CompletionItem> {
     vec![
-        CompletionItem { text: "SELECT".into(), kind: CompletionKind::Keyword, template: None, template_steps: vec![] },
-        CompletionItem { text: "SUM".into(), kind: CompletionKind::Function, template: None, template_steps: vec![] },
-        CompletionItem { text: "sales".into(), kind: CompletionKind::Table, template: None, template_steps: vec![] },
-        CompletionItem { text: "score".into(), kind: CompletionKind::Column, template: None, template_steps: vec![] },
-        CompletionItem { text: "status".into(), kind: CompletionKind::Column, template: None, template_steps: vec![] },
-        CompletionItem { text: "FROM".into(), kind: CompletionKind::Keyword, template: None, template_steps: vec![] },
-        CompletionItem { text: "first_name".into(), kind: CompletionKind::Column, template: None, template_steps: vec![] },
+        CompletionItem {
+            text: "SELECT".into(),
+            kind: CompletionKind::Keyword,
+            template: None,
+            template_steps: vec![],
+        },
+        CompletionItem {
+            text: "SUM".into(),
+            kind: CompletionKind::Function,
+            template: None,
+            template_steps: vec![],
+        },
+        CompletionItem {
+            text: "sales".into(),
+            kind: CompletionKind::Table,
+            template: None,
+            template_steps: vec![],
+        },
+        CompletionItem {
+            text: "score".into(),
+            kind: CompletionKind::Column,
+            template: None,
+            template_steps: vec![],
+        },
+        CompletionItem {
+            text: "status".into(),
+            kind: CompletionKind::Column,
+            template: None,
+            template_steps: vec![],
+        },
+        CompletionItem {
+            text: "FROM".into(),
+            kind: CompletionKind::Keyword,
+            template: None,
+            template_steps: vec![],
+        },
+        CompletionItem {
+            text: "first_name".into(),
+            kind: CompletionKind::Column,
+            template: None,
+            template_steps: vec![],
+        },
     ]
 }
 
@@ -416,7 +469,11 @@ fn test_completion_empty_filter_returns_all() {
     let items = make_completion_items();
     let completion = SqlCompletion::new(items.clone(), "");
     let filtered = completion.filtered_items();
-    assert_eq!(filtered.len(), items.len(), "Empty filter should return all items");
+    assert_eq!(
+        filtered.len(),
+        items.len(),
+        "Empty filter should return all items"
+    );
 }
 
 #[test]
@@ -469,11 +526,17 @@ fn test_completion_push_pop_filter() {
 
     completion.push_filter('c');
     let count_sc = completion.filtered_items().len();
-    assert!(count_sc <= count_s, "More specific filter should not produce more results");
+    assert!(
+        count_sc <= count_s,
+        "More specific filter should not produce more results"
+    );
 
     completion.pop_filter();
     let count_after_pop = completion.filtered_items().len();
-    assert_eq!(count_after_pop, count_s, "Pop should restore previous filter results");
+    assert_eq!(
+        count_after_pop, count_s,
+        "Pop should restore previous filter results"
+    );
 }
 
 #[test]
@@ -537,28 +600,64 @@ fn test_completion_kind_tags() {
 #[test]
 fn test_tables_categorized_as_table_kind() {
     let items = vec![
-        CompletionItem { text: "users".into(), kind: CompletionKind::Table, template: None, template_steps: vec![] },
-        CompletionItem { text: "orders".into(), kind: CompletionKind::Table, template: None, template_steps: vec![] },
-        CompletionItem { text: "id".into(), kind: CompletionKind::Column, template: None, template_steps: vec![] },
+        CompletionItem {
+            text: "users".into(),
+            kind: CompletionKind::Table,
+            template: None,
+            template_steps: vec![],
+        },
+        CompletionItem {
+            text: "orders".into(),
+            kind: CompletionKind::Table,
+            template: None,
+            template_steps: vec![],
+        },
+        CompletionItem {
+            text: "id".into(),
+            kind: CompletionKind::Column,
+            template: None,
+            template_steps: vec![],
+        },
     ];
 
     let completion = SqlCompletion::new(items, "");
     let filtered = completion.filtered_items();
-    let tables: Vec<_> = filtered.iter().filter(|i| i.kind == CompletionKind::Table).collect();
+    let tables: Vec<_> = filtered
+        .iter()
+        .filter(|i| i.kind == CompletionKind::Table)
+        .collect();
     assert_eq!(tables.len(), 2, "Should have exactly 2 table completions");
 }
 
 #[test]
 fn test_columns_categorized_as_column_kind() {
     let items = vec![
-        CompletionItem { text: "name".into(), kind: CompletionKind::Column, template: None, template_steps: vec![] },
-        CompletionItem { text: "age".into(), kind: CompletionKind::Column, template: None, template_steps: vec![] },
-        CompletionItem { text: "SELECT".into(), kind: CompletionKind::Keyword, template: None, template_steps: vec![] },
+        CompletionItem {
+            text: "name".into(),
+            kind: CompletionKind::Column,
+            template: None,
+            template_steps: vec![],
+        },
+        CompletionItem {
+            text: "age".into(),
+            kind: CompletionKind::Column,
+            template: None,
+            template_steps: vec![],
+        },
+        CompletionItem {
+            text: "SELECT".into(),
+            kind: CompletionKind::Keyword,
+            template: None,
+            template_steps: vec![],
+        },
     ];
 
     let completion = SqlCompletion::new(items, "");
     let filtered = completion.filtered_items();
-    let columns: Vec<_> = filtered.iter().filter(|i| i.kind == CompletionKind::Column).collect();
+    let columns: Vec<_> = filtered
+        .iter()
+        .filter(|i| i.kind == CompletionKind::Column)
+        .collect();
     assert_eq!(columns.len(), 2, "Should have exactly 2 column completions");
 }
 
@@ -695,13 +794,13 @@ fn test_integration_completion_with_real_columns() {
 
     let completion = SqlCompletion::new(items, "");
     let filtered = completion.filtered_items();
-    assert!(filtered.len() >= 6, "Should have columns + table from sample.csv");
+    assert!(
+        filtered.len() >= 6,
+        "Should have columns + table from sample.csv"
+    );
 
     // Filter by "N" should find "Name"
-    let completion_n = SqlCompletion::new(
-        filtered.iter().map(|i| (*i).clone()).collect(),
-        "N",
-    );
+    let completion_n = SqlCompletion::new(filtered.iter().map(|i| (*i).clone()).collect(), "N");
     let filtered_n = completion_n.filtered_items();
     assert!(
         filtered_n.iter().any(|i| i.text == "Name"),
@@ -716,7 +815,11 @@ fn test_integration_completion_with_real_columns() {
 #[test]
 fn test_unicode_column_names() {
     let dir = tempfile::tempdir().unwrap();
-    let path = write_csv(dir.path(), "data.csv", "nombre,edad,ciudad\nAna,25,Madrid\n");
+    let path = write_csv(
+        dir.path(),
+        "data.csv",
+        "nombre,edad,ciudad\nAna,25,Madrid\n",
+    );
     let files = vec![path];
     let schema = build_schema(&files);
 
@@ -923,7 +1026,9 @@ fn test_qualified_column_not_ambiguous() {
     let sql = "SELECT t1.id FROM t1 JOIN t2 ON t1.id = t2.id";
     let diags = validate(sql, &files, &schema);
     assert!(
-        diags.iter().all(|d| !d.message.contains("Ambiguous column")),
+        diags
+            .iter()
+            .all(|d| !d.message.contains("Ambiguous column")),
         "Qualified 't1.id' should not be flagged as ambiguous"
     );
 }

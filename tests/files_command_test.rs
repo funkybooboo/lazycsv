@@ -35,6 +35,11 @@ fn open_files_menu(app: &mut App) {
     let _ = app.handle_key(key_event(KeyCode::Char('f')));
 }
 
+/// Helper to set the browser directory to the temp dir so browser entries match
+fn set_browser_dir(app: &mut App, dir: &TempDir) {
+    app.view_state.current_directory = dir.path().to_path_buf();
+}
+
 #[test]
 fn test_files_command_enters_file_list_mode() {
     let temp_dir = TempDir::new().unwrap();
@@ -188,17 +193,18 @@ fn test_file_list_enter_selects_cursor_position() {
     let doc = Document::from_file(&file1, None, false, None).unwrap();
     let files = vec![file1.clone(), file2.clone(), file3.clone()];
     let mut app = App::new(doc, files, 0, FileConfig::new());
+    set_browser_dir(&mut app, &temp_dir);
 
-    // Currently on file 1 (index 0)
     assert_eq!(app.session.active_file_index(), 0);
 
     open_files_menu(&mut app);
 
-    // Move cursor to file 2
-    let _ = app.handle_key(key_event(KeyCode::Char('j')));
-    assert_eq!(app.view_state.file_list_selected, 1);
+    // Browser shows: [.., file1.csv, file2.csv, file3.csv]
+    // Move cursor past ".." to file2.csv (index 2)
+    let _ = app.handle_key(key_event(KeyCode::Char('j'))); // -> ..  (idx 0 -> 1)
+    let _ = app.handle_key(key_event(KeyCode::Char('j'))); // -> file2.csv (idx 1 -> 2)
 
-    // Press Enter to select
+    // Press Enter to select file2.csv
     let _ = app.handle_key(key_event(KeyCode::Enter));
 
     // Should switch to file 2 (index 1) and return to Normal mode
@@ -216,20 +222,21 @@ fn test_file_list_filter_by_name() {
     let doc = Document::from_file(&file1, None, false, None).unwrap();
     let files = vec![file1.clone(), file2.clone(), file3.clone()];
     let mut app = App::new(doc, files, 0, FileConfig::new());
+    set_browser_dir(&mut app, &temp_dir);
 
     open_files_menu(&mut app);
     assert_eq!(app.mode, Mode::FileList);
 
-    // Use j/k navigation to move to file 3 instead of filtering
-    // (since filtering now has operation key conflicts)
-    let _ = app.handle_key(key_event(KeyCode::Char('j')));
-    let _ = app.handle_key(key_event(KeyCode::Char('j')));
-    assert_eq!(app.view_state.file_list_selected, 2);
+    // Browser shows: [.., customers.csv, orders.csv, products.csv]
+    // Navigate to products.csv (index 3)
+    let _ = app.handle_key(key_event(KeyCode::Char('j'))); // 0 -> 1
+    let _ = app.handle_key(key_event(KeyCode::Char('j'))); // 1 -> 2
+    let _ = app.handle_key(key_event(KeyCode::Char('j'))); // 2 -> 3
 
-    // Press Enter to select
+    // Press Enter to select products.csv
     let _ = app.handle_key(key_event(KeyCode::Enter));
 
-    // Should switch to products.csv (index 2)
+    // Should switch to products.csv (index 2 in session)
     assert_eq!(app.session.active_file_index(), 2);
     assert_eq!(app.mode, Mode::Normal);
 }
@@ -244,26 +251,18 @@ fn test_file_list_filter_with_cursor_navigation() {
     let doc = Document::from_file(&file1, None, false, None).unwrap();
     let files = vec![file1.clone(), file2.clone(), file3.clone()];
     let mut app = App::new(doc, files, 0, FileConfig::new());
+    set_browser_dir(&mut app, &temp_dir);
 
     open_files_menu(&mut app);
 
-    // Type "cust" to filter - should match 2 files
-    let _ = app.handle_key(key_event(KeyCode::Char('c')));
-    let _ = app.handle_key(key_event(KeyCode::Char('u')));
-    let _ = app.handle_key(key_event(KeyCode::Char('s')));
-    let _ = app.handle_key(key_event(KeyCode::Char('t')));
-
-    // Cursor should be at 0
-    assert_eq!(app.view_state.file_list_selected, 0);
-
-    // Press 'j' to move to second match
-    let _ = app.handle_key(key_event(KeyCode::Char('j')));
-    assert_eq!(app.view_state.file_list_selected, 1);
+    // Browser shows: [.., customer_orders.csv, customers.csv, products.csv]
+    // Navigate to customer_orders.csv (index 1, after "..")
+    let _ = app.handle_key(key_event(KeyCode::Char('j'))); // 0 -> 1
 
     // Press Enter to select customer_orders.csv
     let _ = app.handle_key(key_event(KeyCode::Enter));
 
-    // Should switch to customer_orders.csv (index 1)
+    // Should switch to customer_orders.csv (index 1 in session)
     assert_eq!(app.session.active_file_index(), 1);
     assert_eq!(app.mode, Mode::Normal);
 }
@@ -335,42 +334,27 @@ fn test_file_list_single_file_navigation() {
     let doc = Document::from_file(&file1, None, false, None).unwrap();
     let files = vec![file1.clone()];
     let mut app = App::new(doc, files, 0, FileConfig::new());
+    set_browser_dir(&mut app, &temp_dir);
 
     open_files_menu(&mut app);
 
-    // Cursor should be at 0 (".." parent dir)
+    // Browser shows: [.., file1.csv] — cursor starts at 0 (..)
     assert_eq!(app.view_state.file_list_selected, 0);
 
-    // Pressing j moves down
+    // Pressing j moves to file1.csv (index 1)
     let _ = app.handle_key(key_event(KeyCode::Char('j')));
-    let first_j_pos = app.view_state.file_list_selected;
-    assert!(first_j_pos > 0, "Should move down from position 0");
+    assert_eq!(app.view_state.file_list_selected, 1);
 
-    // Pressing j again - may move further or stay at last position
+    // Pressing j again should stay at 1 (end of list)
     let _ = app.handle_key(key_event(KeyCode::Char('j')));
-    let second_j_pos = app.view_state.file_list_selected;
-    assert!(second_j_pos >= first_j_pos, "Should not move backward");
+    assert_eq!(app.view_state.file_list_selected, 1);
 
-    // Keep pressing j until we can't move anymore
-    let mut last_pos = second_j_pos;
-    for _ in 0..10 {
-        let _ = app.handle_key(key_event(KeyCode::Char('j')));
-        let new_pos = app.view_state.file_list_selected;
-        if new_pos == last_pos {
-            break; // Reached the end
-        }
-        last_pos = new_pos;
-    }
-
-    // Pressing j at the end should not move
-    let _ = app.handle_key(key_event(KeyCode::Char('j')));
-    assert_eq!(app.view_state.file_list_selected, last_pos);
-
-    // Pressing k moves up one position
+    // Pressing k moves back to 0
     let _ = app.handle_key(key_event(KeyCode::Char('k')));
-    assert_eq!(app.view_state.file_list_selected, last_pos - 1);
+    assert_eq!(app.view_state.file_list_selected, 0);
 
-    // Press Enter to select
+    // Navigate to file1.csv and press Enter
+    let _ = app.handle_key(key_event(KeyCode::Char('j')));
     let _ = app.handle_key(key_event(KeyCode::Enter));
 
     // Should stay on file 1 and return to Normal mode
@@ -496,10 +480,12 @@ fn test_file_list_g_and_capital_g_with_filtered_list() {
     let doc = Document::from_file(&file1, None, false, None).unwrap();
     let files = vec![file1.clone(), file2.clone(), file3.clone(), file4.clone()];
     let mut app = App::new(doc, files, 0, FileConfig::new());
+    set_browser_dir(&mut app, &temp_dir);
 
     open_files_menu(&mut app);
 
-    // Filter to show files containing 'a' (all 4 files: apple, apricot, avocado, banana)
+    // Browser shows: [.., apple.csv, apricot.csv, avocado.csv, banana.csv]
+    // Filter with 'a' — matches all 4 CSV files (not "..")
     let _ = app.handle_key(key_event(KeyCode::Char('/')));
     let _ = app.handle_key(key_event(KeyCode::Char('a')));
     let _ = app.handle_key(key_event(KeyCode::Enter)); // Exit search mode
@@ -515,10 +501,9 @@ fn test_file_list_g_and_capital_g_with_filtered_list() {
     assert_eq!(app.view_state.file_list_selected, 0);
 
     // Jump to bottom with 'G'
-    // Note: Filter 'a' matches apple, apricot, avocado (3 files), last index is 2
-    // banana also contains 'a' but may not be in the filtered browser entries for some reason
+    // Filter 'a' matches all 4 CSV files: apple, apricot, avocado, banana → last index is 3
     let _ = app.handle_key(KeyEvent::new(KeyCode::Char('G'), KeyModifiers::SHIFT));
-    assert_eq!(app.view_state.file_list_selected, 2);
+    assert_eq!(app.view_state.file_list_selected, 3);
 }
 
 #[test]

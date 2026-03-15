@@ -1,10 +1,10 @@
 //! UI rendering integration tests
-//! 
+//!
 //! Tests for the main UI rendering functions including table, status bar,
 //! file switcher, and overlay components.
 
-use lazycsv::{App, Document};
 use lazycsv::session::FileConfig;
+use lazycsv::{App, Document};
 use ratatui::{backend::TestBackend, Terminal};
 use std::path::PathBuf;
 
@@ -42,9 +42,11 @@ fn test_ui_renders_table() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
 
     // Get the rendered buffer
     let buffer = terminal.backend().buffer();
@@ -70,7 +72,6 @@ fn test_ui_renders_table() {
         content.contains("Alice") || content.contains("Bob"),
         "Should show row data"
     );
-
 }
 
 #[test]
@@ -85,9 +86,11 @@ fn test_ui_renders_help_overlay() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
 
     let buffer = terminal.backend().buffer();
     let content = buffer
@@ -101,7 +104,6 @@ fn test_ui_renders_help_overlay() {
         content.contains("Navigation") || content.contains("Keyboard"),
         "Should show help overlay with navigation info"
     );
-
 }
 
 #[test]
@@ -117,9 +119,11 @@ fn test_ui_renders_multi_file_switcher() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
 
     let buffer = terminal.backend().buffer();
     let content = buffer
@@ -130,7 +134,6 @@ fn test_ui_renders_multi_file_switcher() {
 
     // Should render without crashing with multiple files
     assert!(!content.is_empty());
-
 }
 
 #[test]
@@ -142,9 +145,11 @@ fn test_ui_shows_status_bar() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
 
     let buffer = terminal.backend().buffer();
     let content = buffer
@@ -158,7 +163,6 @@ fn test_ui_shows_status_bar() {
         content.contains("NORMAL") || content.contains(",A") || content.contains(",B"),
         "Should show status bar with mode and position info"
     );
-
 }
 
 #[test]
@@ -170,9 +174,11 @@ fn test_ui_column_letters_displayed() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
 
     let buffer = terminal.backend().buffer();
     let content = buffer
@@ -187,7 +193,6 @@ fn test_ui_column_letters_displayed() {
         content.contains("A") && content.contains("B"),
         "Should show column letters (A, B, C...)"
     );
-
 }
 
 #[test]
@@ -200,9 +205,11 @@ fn test_ui_shows_dirty_indicator() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
 
     let buffer = terminal.backend().buffer();
     let content = buffer
@@ -216,7 +223,6 @@ fn test_ui_shows_dirty_indicator() {
         content.contains("test.csv*"),
         "Should show asterisk for unsaved changes"
     );
-
 }
 
 // from ui_state_test.rs
@@ -257,10 +263,11 @@ fn test_ui_renders_with_empty_data() {
     let mut terminal = Terminal::new(backend).unwrap();
 
     // Should render without crashing
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
-
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
 }
 
 #[test]
@@ -272,9 +279,11 @@ fn test_ui_renders_with_single_cell() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
 
     let buffer = terminal.backend().buffer();
     let content = buffer
@@ -284,7 +293,6 @@ fn test_ui_renders_with_single_cell() {
         .collect::<String>();
 
     assert!(content.contains("single.csv"));
-
 }
 
 #[test]
@@ -298,10 +306,11 @@ fn test_ui_renders_with_small_terminal() {
     let mut terminal = Terminal::new(backend).unwrap();
 
     // Should render without crashing
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
-
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
 }
 
 #[test]
@@ -314,10 +323,11 @@ fn test_ui_renders_with_large_terminal() {
     let backend = TestBackend::new(200, 100);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
-
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
 }
 
 #[test]
@@ -330,9 +340,11 @@ fn test_ui_state_after_navigation() {
     let mut terminal = Terminal::new(backend).unwrap();
 
     // Initial render
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
 
     // Navigate
     let _ = app.handle_key(crossterm::event::KeyEvent::new(
@@ -341,10 +353,11 @@ fn test_ui_state_after_navigation() {
     ));
 
     // Render again
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
-
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
 }
 
 #[test]
@@ -357,16 +370,20 @@ fn test_ui_state_transitions_help_toggle() {
     let mut terminal = Terminal::new(backend).unwrap();
 
     // Render without help
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
     let buffer1 = terminal.backend().buffer().clone();
 
     // Toggle help on
     app.view_state.help_overlay_visible = true;
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
     let buffer2 = terminal.backend().buffer().clone();
 
     // Buffers should be different
@@ -374,14 +391,15 @@ fn test_ui_state_transitions_help_toggle() {
 
     // Toggle help off
     app.view_state.help_overlay_visible = false;
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
     let buffer3 = terminal.backend().buffer().clone();
 
     // Should match initial state
     assert_eq!(buffer1.content, buffer3.content);
-
 }
 
 #[test]
@@ -394,9 +412,11 @@ fn test_ui_status_bar_updates() {
     let mut terminal = Terminal::new(backend).unwrap();
 
     // Render with no status message
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
     let content1 = terminal
         .backend()
         .buffer()
@@ -407,9 +427,11 @@ fn test_ui_status_bar_updates() {
 
     // Set status message
     app.status_message = Some("Test message".into());
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
     let content2 = terminal
         .backend()
         .buffer()
@@ -421,7 +443,6 @@ fn test_ui_status_bar_updates() {
     // Content should be different
     assert_ne!(content1, content2);
     assert!(content2.contains("Test message"));
-
 }
 
 #[test]
@@ -433,9 +454,11 @@ fn test_ui_file_switcher_single_file() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
 
     let content = terminal
         .backend()
@@ -447,7 +470,6 @@ fn test_ui_file_switcher_single_file() {
 
     // Should render without crashing
     assert!(!content.is_empty());
-
 }
 
 #[test]
@@ -463,9 +485,11 @@ fn test_ui_file_switcher_multiple_files() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
 
     let content = terminal
         .backend()
@@ -477,7 +501,6 @@ fn test_ui_file_switcher_multiple_files() {
 
     // Should render without crashing with multiple files
     assert!(!content.is_empty());
-
 }
 
 #[test]
@@ -491,23 +514,26 @@ fn test_ui_dirty_indicator() {
     let mut terminal = Terminal::new(backend).unwrap();
 
     // Render clean state
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
     let buffer1 = terminal.backend().buffer().clone();
 
     // Make dirty
     app.document.is_dirty = true;
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
     let buffer2 = terminal.backend().buffer().clone();
 
     // The dirty state should cause a different render
     // (The asterisk may not be easily searchable in the buffer)
     // Just verify the buffers are different when dirty flag changes
     assert_ne!(buffer1.content, buffer2.content);
-
 }
 
 #[test]
@@ -519,9 +545,11 @@ fn test_ui_column_letters() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
 
     let content = terminal
         .backend()
@@ -534,7 +562,6 @@ fn test_ui_column_letters() {
     // Should show column letters
     assert!(content.contains("A"));
     assert!(content.contains("B"));
-
 }
 
 #[test]
@@ -546,9 +573,11 @@ fn test_ui_row_numbers() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
 
     let content = terminal
         .backend()
@@ -561,7 +590,6 @@ fn test_ui_row_numbers() {
     // Should show row numbers
     assert!(content.contains("1"));
     assert!(content.contains("2"));
-
 }
 
 #[test]
@@ -574,21 +602,24 @@ fn test_ui_responsive_to_selection() {
     let mut terminal = Terminal::new(backend).unwrap();
 
     // Render with row 1 selected (initial position with header_mode=true)
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
     let buffer1 = terminal.backend().buffer().clone();
 
     // Change selection to row 2
     app.view_state.table_state.select(Some(2));
-    terminal.draw(|frame| {
-        lazycsv::ui::render(frame, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
     let buffer2 = terminal.backend().buffer().clone();
 
     // Buffers should be different due to selection change
     assert_ne!(buffer1.content, buffer2.content);
-
 }
 
 // ===== Priority 2: UI Stress Tests =====
@@ -602,14 +633,15 @@ fn test_ui_extremely_narrow_terminal_20_columns() {
     let backend = TestBackend::new(20, 10); // Very narrow: 20 columns
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|f| {
-        lazycsv::ui::render(f, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|f| {
+            lazycsv::ui::render(f, &mut app);
+        })
+        .unwrap();
 
     // Should render without crashing
     let buffer = terminal.backend().buffer().clone();
     assert!(buffer.area.width == 20);
-
 }
 
 #[test]
@@ -621,14 +653,15 @@ fn test_ui_extremely_wide_terminal_500_columns() {
     let backend = TestBackend::new(500, 30); // Very wide: 500 columns
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|f| {
-        lazycsv::ui::render(f, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|f| {
+            lazycsv::ui::render(f, &mut app);
+        })
+        .unwrap();
 
     // Should render without crashing
     let buffer = terminal.backend().buffer().clone();
     assert!(buffer.area.width == 500);
-
 }
 
 #[test]
@@ -640,14 +673,15 @@ fn test_ui_very_tall_terminal_100_rows() {
     let backend = TestBackend::new(80, 100); // Very tall: 100 rows
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|f| {
-        lazycsv::ui::render(f, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|f| {
+            lazycsv::ui::render(f, &mut app);
+        })
+        .unwrap();
 
     // Should render without crashing
     let buffer = terminal.backend().buffer().clone();
     assert!(buffer.area.height == 100);
-
 }
 
 #[test]
@@ -666,9 +700,11 @@ fn test_ui_unicode_emoji_in_cells() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|f| {
-        lazycsv::ui::render(f, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|f| {
+            lazycsv::ui::render(f, &mut app);
+        })
+        .unwrap();
 
     // Should render without crashing
 }
@@ -683,9 +719,11 @@ fn test_ui_very_long_filename_200_chars() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|f| {
-        lazycsv::ui::render(f, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|f| {
+            lazycsv::ui::render(f, &mut app);
+        })
+        .unwrap();
 
     // Should render without crashing (filename should be truncated)
 }
@@ -704,9 +742,11 @@ fn test_ui_cell_with_very_long_content() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|f| {
-        lazycsv::ui::render(f, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|f| {
+            lazycsv::ui::render(f, &mut app);
+        })
+        .unwrap();
 
     // Should render without crashing (content should be truncated)
 }
@@ -727,9 +767,11 @@ fn test_ui_special_characters_in_cells() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|f| {
-        lazycsv::ui::render(f, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|f| {
+            lazycsv::ui::render(f, &mut app);
+        })
+        .unwrap();
 
     // Should render special characters without crashing
 }
@@ -743,9 +785,11 @@ fn test_ui_minimum_viable_terminal_10x5() {
     let backend = TestBackend::new(10, 5); // Minimal terminal
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|f| {
-        lazycsv::ui::render(f, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|f| {
+            lazycsv::ui::render(f, &mut app);
+        })
+        .unwrap();
 
     // Should handle gracefully even with tiny terminal
 }
@@ -779,10 +823,11 @@ fn test_ui_extreme_width_1x24() {
     let backend = TestBackend::new(1, 24); // Very narrow terminal
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|f| {
-        lazycsv::ui::render(f, &mut app);
-    }).unwrap();
-
+    terminal
+        .draw(|f| {
+            lazycsv::ui::render(f, &mut app);
+        })
+        .unwrap();
 }
 
 #[test]
@@ -794,10 +839,11 @@ fn test_ui_extreme_height_80x1() {
     let backend = TestBackend::new(80, 1); // Very short terminal
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|f| {
-        lazycsv::ui::render(f, &mut app);
-    }).unwrap();
-
+    terminal
+        .draw(|f| {
+            lazycsv::ui::render(f, &mut app);
+        })
+        .unwrap();
 }
 
 #[test]
@@ -820,9 +866,11 @@ fn test_ui_multi_byte_unicode_rendering() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|f| {
-        lazycsv::ui::render(f, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|f| {
+            lazycsv::ui::render(f, &mut app);
+        })
+        .unwrap();
 
     // Should render emoji (multi-byte Unicode) without crashing
     let buffer = terminal.backend().buffer();
@@ -834,12 +882,9 @@ fn test_ui_multi_byte_unicode_rendering() {
 
     // Verify headers are present
     assert!(
-        content.contains("Japanese")
-            || content.contains("Emoji")
-            || content.contains("Russian"),
+        content.contains("Japanese") || content.contains("Emoji") || content.contains("Russian"),
         "Should render headers"
     );
-
 }
 
 #[test]
@@ -859,9 +904,11 @@ fn test_ui_very_long_cell_truncation() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    terminal.draw(|f| {
-        lazycsv::ui::render(f, &mut app);
-    }).unwrap();
+    terminal
+        .draw(|f| {
+            lazycsv::ui::render(f, &mut app);
+        })
+        .unwrap();
 
     // Should handle long content with truncation
 }

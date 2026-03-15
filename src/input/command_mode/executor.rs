@@ -383,7 +383,10 @@ fn execute_width(app: &mut App, arg: Option<&str>) -> Result<InputResult> {
             for i in 0..col_count {
                 app.session.set_column_width(i, w);
             }
-            app.status_message = Some(StatusMessage::from(format!("All columns set to width {}", w)));
+            app.status_message = Some(StatusMessage::from(format!(
+                "All columns set to width {}",
+                w
+            )));
         } else {
             app.status_message = Some(StatusMessage::from("Width must be a number or 'auto'"));
         }
@@ -392,22 +395,33 @@ fn execute_width(app: &mut App, arg: Option<&str>) -> Result<InputResult> {
         let col_index = match excel_letter_to_column(col_spec) {
             Ok(idx) => idx,
             Err(_) => {
-                app.status_message = Some(StatusMessage::from(format!("Invalid column: {}", col_spec)));
+                app.status_message =
+                    Some(StatusMessage::from(format!("Invalid column: {}", col_spec)));
                 return Ok(InputResult::Continue);
             }
         };
 
         if col_index >= app.document.column_count() {
-            app.status_message = Some(StatusMessage::from(format!("Column {} does not exist", col_spec.to_uppercase())));
+            app.status_message = Some(StatusMessage::from(format!(
+                "Column {} does not exist",
+                col_spec.to_uppercase()
+            )));
             return Ok(InputResult::Continue);
         }
 
         if width_spec.eq_ignore_ascii_case("auto") {
             app.session.clear_column_width(col_index);
-            app.status_message = Some(StatusMessage::from(format!("Column {} set to auto width", col_spec.to_uppercase())));
+            app.status_message = Some(StatusMessage::from(format!(
+                "Column {} set to auto width",
+                col_spec.to_uppercase()
+            )));
         } else if let Ok(w) = width_spec.parse::<u16>() {
             app.session.set_column_width(col_index, w);
-            app.status_message = Some(StatusMessage::from(format!("Column {} width set to {}", col_spec.to_uppercase(), w)));
+            app.status_message = Some(StatusMessage::from(format!(
+                "Column {} width set to {}",
+                col_spec.to_uppercase(),
+                w
+            )));
         } else {
             app.status_message = Some(StatusMessage::from("Width must be a number or 'auto'"));
         }
