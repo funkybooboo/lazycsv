@@ -36,16 +36,27 @@ fn create_test_app() -> App {
 #[test]
 fn test_formula_sum_computed_value() {
     let mut app = create_test_app();
-    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=SUM(B1:B5)".to_string());
+    app.commit_cell_value(
+        RowIndex::new(6),
+        ColIndex::new(1),
+        "=SUM(B1:B5)".to_string(),
+    );
 
-    let computed = app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string();
+    let computed = app
+        .document
+        .cell(RowIndex::new(6), ColIndex::new(1))
+        .to_string();
     assert_eq!(computed, "150"); // 10+20+30+40+50
 }
 
 #[test]
 fn test_formula_bar_shows_formula() {
     let mut app = create_test_app();
-    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=SUM(B1:B5)".to_string());
+    app.commit_cell_value(
+        RowIndex::new(6),
+        ColIndex::new(1),
+        "=SUM(B1:B5)".to_string(),
+    );
 
     // cell_formula_or_value returns formula text, not the computed value
     let bar_text = app.cell_formula_or_value(RowIndex::new(6), ColIndex::new(1));
@@ -55,99 +66,215 @@ fn test_formula_bar_shows_formula() {
 #[test]
 fn test_formula_re_evaluates_on_change() {
     let mut app = create_test_app();
-    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=SUM(B1:B5)".to_string());
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "150");
+    app.commit_cell_value(
+        RowIndex::new(6),
+        ColIndex::new(1),
+        "=SUM(B1:B5)".to_string(),
+    );
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "150"
+    );
 
     // Change B1 from 10 to 100
     app.commit_cell_value(RowIndex::new(1), ColIndex::new(1), "100".to_string());
 
     // Formula should auto-update
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "240");
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "240"
+    );
 }
 
 #[test]
 fn test_formula_overwrite_removes_formula() {
     let mut app = create_test_app();
-    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=SUM(B1:B5)".to_string());
+    app.commit_cell_value(
+        RowIndex::new(6),
+        ColIndex::new(1),
+        "=SUM(B1:B5)".to_string(),
+    );
 
     // Overwrite with plain value
     app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "999".to_string());
 
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "999");
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "999"
+    );
     // cell_formula_or_value should return plain value (formula is gone)
-    assert_eq!(app.cell_formula_or_value(RowIndex::new(6), ColIndex::new(1)), "999");
+    assert_eq!(
+        app.cell_formula_or_value(RowIndex::new(6), ColIndex::new(1)),
+        "999"
+    );
 }
 
 #[test]
 fn test_formula_average() {
     let mut app = create_test_app();
-    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=AVERAGE(B1:B5)".to_string());
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "30");
+    app.commit_cell_value(
+        RowIndex::new(6),
+        ColIndex::new(1),
+        "=AVERAGE(B1:B5)".to_string(),
+    );
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "30"
+    );
 }
 
 #[test]
 fn test_formula_min() {
     let mut app = create_test_app();
-    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=MIN(B1:B5)".to_string());
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "10");
+    app.commit_cell_value(
+        RowIndex::new(6),
+        ColIndex::new(1),
+        "=MIN(B1:B5)".to_string(),
+    );
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "10"
+    );
 }
 
 #[test]
 fn test_formula_max() {
     let mut app = create_test_app();
-    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=MAX(B1:B5)".to_string());
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "50");
+    app.commit_cell_value(
+        RowIndex::new(6),
+        ColIndex::new(1),
+        "=MAX(B1:B5)".to_string(),
+    );
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "50"
+    );
 }
 
 #[test]
 fn test_formula_count() {
     let mut app = create_test_app();
-    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=COUNT(B1:B5)".to_string());
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "5");
+    app.commit_cell_value(
+        RowIndex::new(6),
+        ColIndex::new(1),
+        "=COUNT(B1:B5)".to_string(),
+    );
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "5"
+    );
 }
 
 #[test]
 fn test_formula_case_insensitive() {
     let mut app = create_test_app();
-    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=sum(B1:B5)".to_string());
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "150");
+    app.commit_cell_value(
+        RowIndex::new(6),
+        ColIndex::new(1),
+        "=sum(B1:B5)".to_string(),
+    );
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "150"
+    );
 }
 
 #[test]
 fn test_formula_comma_separated_cells() {
     let mut app = create_test_app();
-    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=SUM(B1,B3,B5)".to_string());
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "90"); // 10+30+50
+    app.commit_cell_value(
+        RowIndex::new(6),
+        ColIndex::new(1),
+        "=SUM(B1,B3,B5)".to_string(),
+    );
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "90"
+    ); // 10+30+50
 }
 
 #[test]
 fn test_formula_power() {
     let mut app = create_test_app();
-    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=POWER(B1, 2)".to_string());
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "100"); // 10^2
+    app.commit_cell_value(
+        RowIndex::new(6),
+        ColIndex::new(1),
+        "=POWER(B1, 2)".to_string(),
+    );
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "100"
+    ); // 10^2
 }
 
 #[test]
 fn test_formula_ceiling() {
     let mut app = create_test_app();
     // B3 = 30, CEILING(30, 7) = 35
-    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=CEILING(B3, 7)".to_string());
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "35");
+    app.commit_cell_value(
+        RowIndex::new(6),
+        ColIndex::new(1),
+        "=CEILING(B3, 7)".to_string(),
+    );
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "35"
+    );
 }
 
 #[test]
 fn test_formula_floor() {
     let mut app = create_test_app();
     // B3 = 30, FLOOR(30, 7) = 28
-    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=FLOOR(B3, 7)".to_string());
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "28");
+    app.commit_cell_value(
+        RowIndex::new(6),
+        ColIndex::new(1),
+        "=FLOOR(B3, 7)".to_string(),
+    );
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "28"
+    );
 }
 
 #[test]
 fn test_formula_concat() {
     let mut app = create_test_app();
-    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=CONCAT(A1, B1)".to_string());
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "A10");
+    app.commit_cell_value(
+        RowIndex::new(6),
+        ColIndex::new(1),
+        "=CONCAT(A1, B1)".to_string(),
+    );
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "A10"
+    );
 }
 
 #[test]
@@ -158,59 +285,130 @@ fn test_formula_concat_with_literal() {
         ColIndex::new(1),
         "=CONCAT(A1, \" = \", B1)".to_string(),
     );
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "A = 10");
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "A = 10"
+    );
 }
 
 #[test]
 fn test_formula_trim() {
     let mut app = create_test_app();
     // Set A6 to a string with extra spaces
-    app.document.set_cell(RowIndex::new(6), ColIndex::new(0), "  hello   world  ".to_string());
+    app.document.set_cell(
+        RowIndex::new(6),
+        ColIndex::new(0),
+        "  hello   world  ".to_string(),
+    );
     app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=TRIM(A6)".to_string());
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "hello world");
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "hello world"
+    );
 }
 
 #[test]
 fn test_formula_upper_lower_proper() {
     let mut app = create_test_app();
-    app.document.set_cell(RowIndex::new(6), ColIndex::new(0), "hello world".to_string());
+    app.document.set_cell(
+        RowIndex::new(6),
+        ColIndex::new(0),
+        "hello world".to_string(),
+    );
 
     app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=UPPER(A6)".to_string());
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "HELLO WORLD");
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "HELLO WORLD"
+    );
 
     app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=LOWER(A6)".to_string());
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "hello world");
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "hello world"
+    );
 
-    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=PROPER(A6)".to_string());
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "Hello World");
+    app.commit_cell_value(
+        RowIndex::new(6),
+        ColIndex::new(1),
+        "=PROPER(A6)".to_string(),
+    );
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "Hello World"
+    );
 }
 
 #[test]
 fn test_formula_left_right_mid() {
     let mut app = create_test_app();
-    app.document.set_cell(RowIndex::new(6), ColIndex::new(0), "Hello".to_string());
+    app.document
+        .set_cell(RowIndex::new(6), ColIndex::new(0), "Hello".to_string());
 
-    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=LEFT(A6, 3)".to_string());
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "Hel");
+    app.commit_cell_value(
+        RowIndex::new(6),
+        ColIndex::new(1),
+        "=LEFT(A6, 3)".to_string(),
+    );
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "Hel"
+    );
 
-    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=RIGHT(A6, 3)".to_string());
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "llo");
+    app.commit_cell_value(
+        RowIndex::new(6),
+        ColIndex::new(1),
+        "=RIGHT(A6, 3)".to_string(),
+    );
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "llo"
+    );
 
-    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=MID(A6, 2, 3)".to_string());
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "ell");
+    app.commit_cell_value(
+        RowIndex::new(6),
+        ColIndex::new(1),
+        "=MID(A6, 2, 3)".to_string(),
+    );
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "ell"
+    );
 }
 
 #[test]
 fn test_formula_substitute() {
     let mut app = create_test_app();
-    app.document.set_cell(RowIndex::new(6), ColIndex::new(0), "Old text Old".to_string());
+    app.document.set_cell(
+        RowIndex::new(6),
+        ColIndex::new(0),
+        "Old text Old".to_string(),
+    );
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
         "=SUBSTITUTE(A6, \"Old\", \"New\")".to_string(),
     );
     assert_eq!(
-        app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(),
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
         "New text New"
     );
 }
@@ -218,22 +416,35 @@ fn test_formula_substitute() {
 #[test]
 fn test_formula_replace() {
     let mut app = create_test_app();
-    app.document.set_cell(RowIndex::new(6), ColIndex::new(0), "Hello".to_string());
+    app.document
+        .set_cell(RowIndex::new(6), ColIndex::new(0), "Hello".to_string());
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
         "=REPLACE(A6, 2, 3, \"XYZ\")".to_string(),
     );
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "HXYZo");
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "HXYZo"
+    );
 }
 
 #[test]
 fn test_formula_today() {
     let mut app = create_test_app();
     app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=TODAY()".to_string());
-    let result = app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string();
+    let result = app
+        .document
+        .cell(RowIndex::new(6), ColIndex::new(1))
+        .to_string();
     // Should be YYYY-MM-DD format
-    assert!(result.len() == 10, "TODAY() should return date in YYYY-MM-DD format, got: {}", result);
+    assert!(
+        result.len() == 10,
+        "TODAY() should return date in YYYY-MM-DD format, got: {}",
+        result
+    );
     assert!(result.contains('-'), "TODAY() should contain dashes");
 }
 
@@ -246,7 +457,12 @@ fn test_formula_if_true() {
         ColIndex::new(1),
         "=IF(B1>5, \"High\", \"Low\")".to_string(),
     );
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "High");
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "High"
+    );
 }
 
 #[test]
@@ -258,7 +474,12 @@ fn test_formula_if_false() {
         ColIndex::new(1),
         "=IF(B1>100, \"High\", \"Low\")".to_string(),
     );
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "Low");
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "Low"
+    );
 }
 
 #[test]
@@ -270,7 +491,12 @@ fn test_formula_vlookup() {
         ColIndex::new(1),
         "=VLOOKUP(\"C\", A1:B5, 2, FALSE)".to_string(),
     );
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "30");
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "30"
+    );
 }
 
 // ===== Keyboard-driven test (full flow) =====
@@ -300,7 +526,10 @@ fn test_formula_via_keyboard() {
     let _ = app.handle_key(key(KeyCode::Enter)); // commit and move down
 
     // Check result: SUM(B2:B5) = 20+30+40+50 = 140
-    let computed = app.document.cell(RowIndex::new(1), ColIndex::new(1)).to_string();
+    let computed = app
+        .document
+        .cell(RowIndex::new(1), ColIndex::new(1))
+        .to_string();
     assert_eq!(computed, "140");
 
     // Check formula bar shows formula text
@@ -321,19 +550,47 @@ fn test_multiple_formulas_update() {
     let mut app = create_test_app();
 
     // Put SUM in B6
-    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=SUM(B1:B5)".to_string());
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "150");
+    app.commit_cell_value(
+        RowIndex::new(6),
+        ColIndex::new(1),
+        "=SUM(B1:B5)".to_string(),
+    );
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "150"
+    );
 
     // Put AVERAGE in A6
-    app.commit_cell_value(RowIndex::new(6), ColIndex::new(0), "=AVERAGE(B1:B5)".to_string());
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(0)).to_string(), "30");
+    app.commit_cell_value(
+        RowIndex::new(6),
+        ColIndex::new(0),
+        "=AVERAGE(B1:B5)".to_string(),
+    );
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(0))
+            .to_string(),
+        "30"
+    );
 
     // Change B2 from 20 to 120
     app.commit_cell_value(RowIndex::new(2), ColIndex::new(1), "120".to_string());
 
     // Both formulas should update
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "250"); // 10+120+30+40+50
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(0)).to_string(), "50");  // 250/5
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "250"
+    ); // 10+120+30+40+50
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(0))
+            .to_string(),
+        "50"
+    ); // 250/5
 }
 
 // ===== Formula completion popup =====
@@ -348,9 +605,15 @@ fn test_formula_completion_opens_on_equals() {
     let _ = app.handle_key(key(KeyCode::Char('=')));
 
     // Formula completion popup should be open
-    assert!(app.formula_completion.is_some(), "Completion popup should open after typing '='");
+    assert!(
+        app.formula_completion.is_some(),
+        "Completion popup should open after typing '='"
+    );
     let comp = app.formula_completion.as_ref().unwrap();
-    assert!(!comp.filtered_items().is_empty(), "Should have formula items");
+    assert!(
+        !comp.filtered_items().is_empty(),
+        "Should have formula items"
+    );
 }
 
 #[test]
@@ -452,12 +715,19 @@ fn goto(app: &mut App, row: usize, col: usize) {
 #[test]
 fn test_formula_datedif() {
     let mut app = create_test_app();
-    app.document.set_cell(RowIndex::new(6), ColIndex::new(0), "2024-01-01".to_string());
-    app.document.set_cell(RowIndex::new(1), ColIndex::new(0), "2024-03-15".to_string());
+    app.document
+        .set_cell(RowIndex::new(6), ColIndex::new(0), "2024-01-01".to_string());
+    app.document
+        .set_cell(RowIndex::new(1), ColIndex::new(0), "2024-03-15".to_string());
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
         "=DATEDIF(A6, A1, \"d\")".to_string(),
     );
-    assert_eq!(app.document.cell(RowIndex::new(6), ColIndex::new(1)).to_string(), "74");
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(6), ColIndex::new(1))
+            .to_string(),
+        "74"
+    );
 }

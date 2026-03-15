@@ -108,4 +108,3 @@ pub fn enter_insert_mode(app: &mut App, cursor: CursorPosition, content: Initial
     });
     app.mode = Mode::Insert;
 }
-

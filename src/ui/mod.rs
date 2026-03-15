@@ -2,6 +2,7 @@ pub mod file_manager;
 pub mod file_switcher;
 pub mod help;
 pub mod magnifier;
+pub mod modal;
 pub mod sql_editor;
 // mod sql_editor_helpers; // DEPRECATED: Old SQL editor code, removed in v0.11.0
 pub mod status_bar;
@@ -98,13 +99,12 @@ pub fn render(frame: &mut Frame, app: &mut App) {
 /// Render file operation prompt overlay
 fn render_file_operation_prompt(frame: &mut ratatui::Frame, app: &crate::app::App) {
     use ratatui::{
-        style::Style,
         text::Line,
-        widgets::{Block, Borders, Clear, Paragraph},
+        widgets::{Clear, Paragraph},
     };
 
-    // Small centered prompt (30% width, 3 lines height)
-    let area = help::centered_rect(40, 20, frame.area());
+    // Small centered prompt using standard small modal size
+    let area = modal::small_modal_rect(frame.area());
     frame.render_widget(Clear, area);
 
     let (title, prompt) = match &app.file_operation {
@@ -125,10 +125,7 @@ fn render_file_operation_prompt(frame: &mut ratatui::Frame, app: &crate::app::Ap
         None => (" File Operation ".to_string(), ""),
     };
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(title)
-        .style(Style::default());
+    let block = modal::standard_block(&title);
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -172,7 +169,11 @@ fn render_formula_completion(frame: &mut ratatui::Frame, app: &crate::app::App) 
     let popup_y = (frame_area.height / 3).max(2);
     let popup_x = 6_u16; // after row number column
 
-    let max_name_len = filtered.iter().map(|item| item.text.len()).max().unwrap_or(10);
+    let max_name_len = filtered
+        .iter()
+        .map(|item| item.text.len())
+        .max()
+        .unwrap_or(10);
     let title_width = if completion.filter.is_empty() {
         0
     } else {
@@ -198,12 +199,16 @@ fn render_formula_completion(frame: &mut ratatui::Frame, app: &crate::app::App) 
         .take(visible_count)
         .map(|(idx, item)| {
             let is_selected = idx == completion.selected;
+            let base_style = if is_selected {
+                modal::completion_selected_style()
+            } else {
+                modal::completion_unselected_style()
+            };
             let bg = if is_selected {
                 Color::Blue
             } else {
-                Color::DarkGray
+                modal::COLOR_POPUP_BG
             };
-            let base_style = Style::default().fg(Color::White).bg(bg);
             let tag_style = Style::default().fg(item.kind.color()).bg(bg);
             let highlight_style = base_style.add_modifier(Modifier::BOLD | Modifier::UNDERLINED);
 
@@ -248,7 +253,7 @@ fn render_formula_completion(frame: &mut ratatui::Frame, app: &crate::app::App) 
     let mut popup_block = Block::default()
         .borders(Borders::ALL)
         .title(" Formulas ")
-        .style(Style::default().bg(Color::DarkGray));
+        .style(Style::default().bg(modal::COLOR_POPUP_BG));
     if !completion.filter.is_empty() {
         popup_block = popup_block.title(format!(" /{} ", completion.filter));
     }

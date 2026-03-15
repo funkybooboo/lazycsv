@@ -42,7 +42,10 @@ fn test_delim_command_changes_delimiter() {
 
     // Initially, it should parse as 1 column (no commas found)
     assert_eq!(app.document.column_count(), 1);
-    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(0)), "Name;Age;City");
+    assert_eq!(
+        app.document.cell(RowIndex::new(0), ColIndex::new(0)),
+        "Name;Age;City"
+    );
 
     // Change delimiter to semicolon
     send_command(&mut app, "delim ;");
@@ -52,13 +55,22 @@ fn test_delim_command_changes_delimiter() {
 
     // Now should have 3 columns parsed correctly
     assert_eq!(app.document.column_count(), 3);
-    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(0)), "Name");
+    assert_eq!(
+        app.document.cell(RowIndex::new(0), ColIndex::new(0)),
+        "Name"
+    );
     assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(1)), "Age");
-    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(2)), "City");
+    assert_eq!(
+        app.document.cell(RowIndex::new(0), ColIndex::new(2)),
+        "City"
+    );
 
     // Data rows should be parsed correctly
     assert_eq!(app.document.data_row_count(), 2);
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "Alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "Alice"
+    );
     assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(1)), "30");
 }
 

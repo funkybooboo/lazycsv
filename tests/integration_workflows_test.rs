@@ -99,7 +99,6 @@ fn test_quit_workflow_dirty_state() {
     assert!(app.status_message.is_some());
 }
 
-
 #[test]
 fn test_rapid_key_sequence_workflow() {
     let csv_data = create_test_csv();
@@ -174,7 +173,6 @@ fn test_boundary_navigation_workflow() {
     assert_eq!(app.view_state.selected_column, ColIndex::new(2));
 }
 
-
 #[test]
 fn test_status_message_lifecycle() {
     let csv_data = create_test_csv();
@@ -193,8 +191,6 @@ fn test_status_message_lifecycle() {
     // Should have status message
     assert!(app.status_message.is_some());
 }
-
-
 
 #[test]
 fn test_help_spam_100_toggles() {
@@ -309,7 +305,6 @@ fn test_navigation_state_preserved_across_help() {
     assert_eq!(app.view_state.selected_column, col_before);
 }
 
-
 #[test]
 fn test_complete_session_load_navigate_switch_quit() {
     let temp_dir = TempDir::new().unwrap();
@@ -351,8 +346,6 @@ fn test_complete_session_load_navigate_switch_quit() {
     assert!(!app.should_quit);
 }
 
-
-
 #[test]
 fn test_help_during_multi_key_command() {
     let csv_data = create_test_csv();
@@ -380,7 +373,6 @@ fn test_help_during_multi_key_command() {
     // Should be in valid state regardless
     assert!(!app.should_quit);
 }
-
 
 #[test]
 fn test_status_message_lifecycle_complete() {

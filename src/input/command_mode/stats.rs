@@ -249,7 +249,10 @@ pub fn execute_stats(app: &mut App, arg: Option<&str>) -> Result<InputResult> {
     let msg = if nums.is_empty() {
         format!(
             "{}: count={}/{} distinct={}",
-            name, non_empty, total, distinct.len()
+            name,
+            non_empty,
+            total,
+            distinct.len()
         )
     } else {
         let sum: f64 = nums.iter().sum();

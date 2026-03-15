@@ -43,7 +43,11 @@ pub fn write_csv_atomic(document: &Document, path: &Path, delimiter: char) -> Re
 }
 
 /// Write CSV content to a writer
-pub fn write_csv_content<W: Write>(writer: &mut W, document: &Document, delimiter: char) -> Result<()> {
+pub fn write_csv_content<W: Write>(
+    writer: &mut W,
+    document: &Document,
+    delimiter: char,
+) -> Result<()> {
     // Write all rows (including header at row 0)
     for row in document.iter_rows() {
         write_csv_row(writer, &row, delimiter)?;

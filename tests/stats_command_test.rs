@@ -193,7 +193,11 @@ fn test_stats_numeric_column() {
     assert!(msg.contains("avg=12.5"), "expected avg=12.5, got: {}", msg);
     assert!(msg.contains("min=5"), "expected min=5, got: {}", msg);
     assert!(msg.contains("max=20"), "expected max=20, got: {}", msg);
-    assert!(msg.contains("count=4/4"), "expected count=4/4, got: {}", msg);
+    assert!(
+        msg.contains("count=4/4"),
+        "expected count=4/4, got: {}",
+        msg
+    );
     assert!(
         msg.contains("distinct=4"),
         "expected distinct=4, got: {}",
@@ -245,10 +249,7 @@ fn test_stats_case_insensitive_header() {
 fn test_stats_invalid_column() {
     let mut app = create_numeric_app();
     send_command(&mut app, "sum NonExistent");
-    assert_eq!(
-        status_message(&app),
-        "Column \"NonExistent\" not found"
-    );
+    assert_eq!(status_message(&app), "Column \"NonExistent\" not found");
 }
 
 #[test]

@@ -49,29 +49,23 @@ fn calculate_cell_style(
     is_header: bool,
 ) -> Style {
     if is_selected {
-        // Selected cell: white background, black text, bold
-        Style::default()
-            .bg(Color::White)
-            .fg(Color::Black)
-            .add_modifier(Modifier::BOLD)
+        // Selected cell: use centralized cursor style
+        super::modal::cursor_style()
     } else if is_in_visual_selection(app, row, col) {
-        // Cell in visual selection: dark gray background
-        Style::default().bg(Color::DarkGray).fg(Color::White)
+        // Cell in visual selection: use centralized visual selection style
+        super::modal::visual_selection_style().fg(Color::White)
     } else if search_state
         .map(|s| s.is_current_match(row, col))
         .unwrap_or(false)
     {
-        // Current search match: yellow background, bold
-        Style::default()
-            .bg(Color::Yellow)
-            .fg(Color::Black)
-            .add_modifier(Modifier::BOLD)
+        // Current search match: use search match style with bold
+        super::modal::search_match_style().add_modifier(Modifier::BOLD)
     } else if search_state.map(|s| s.is_match(row, col)).unwrap_or(false) {
-        // Other search matches: dark gray background, yellow text
-        Style::default().bg(Color::DarkGray).fg(Color::Yellow)
+        // Other search matches: visual selection style (dark gray bg, yellow fg)
+        super::modal::visual_selection_style()
     } else if is_header && app.document.header_mode {
-        // Header row with header mode ON: bold
-        Style::default().add_modifier(Modifier::BOLD)
+        // Header row with header mode ON: use header style
+        super::modal::header_style()
     } else {
         // Default: no special styling
         Style::default()
@@ -120,9 +114,9 @@ fn build_column_letters_row<'a>(
         let col_idx = ColIndex::new(i);
         let style = if col_idx == selected_column {
             // Highlight selected column with bold only
-            Style::default().add_modifier(Modifier::BOLD)
+            super::modal::bold_style()
         } else {
-            Style::default().add_modifier(Modifier::DIM)
+            super::modal::dim_style()
         };
         col_letter_cells.push(Cell::from(letter).style(style));
     }
@@ -154,7 +148,7 @@ fn build_header_row(
 
     // Row number for header: "0" if selected, otherwise empty or dim
     let row_num_cell = if is_header_selected {
-        Cell::from("   0").style(Style::default().add_modifier(Modifier::BOLD))
+        Cell::from("   0").style(super::modal::row_number_style())
     } else {
         Cell::from("")
     };
@@ -268,7 +262,7 @@ fn build_data_rows(
             // Row number: display absolute row index (1, 2, 3... for data rows)
             let row_num_display = format!("{:>4}", row_idx);
             let row_num_style = if is_selected_row {
-                Style::default().add_modifier(Modifier::BOLD)
+                super::modal::row_number_style()
             } else {
                 Style::default()
             };

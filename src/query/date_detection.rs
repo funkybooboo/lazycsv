@@ -241,7 +241,11 @@ fn is_dot_date(s: &str) -> bool {
         return false;
     }
 
-    match (parse_u32(parts[0]), parse_u32(parts[1]), parse_u32(parts[2])) {
+    match (
+        parse_u32(parts[0]),
+        parse_u32(parts[1]),
+        parse_u32(parts[2]),
+    ) {
         (Some(day), Some(month), Some(year)) => {
             if year < 1000 || year > 9999 || month < 1 || month > 12 || day < 1 || day > 31 {
                 return false;
@@ -293,15 +297,18 @@ fn is_valid_time_24h(s: &str) -> bool {
 
 fn is_valid_time_12h(s: &str) -> bool {
     let s = s.trim();
-    let (time_part, _has_ampm) =
-        if let Some(stripped) = s.strip_suffix("AM").or_else(|| s.strip_suffix("am"))
-            .or_else(|| s.strip_suffix("Am")).or_else(|| s.strip_suffix("PM"))
-            .or_else(|| s.strip_suffix("pm")).or_else(|| s.strip_suffix("Pm"))
-        {
-            (stripped.trim(), true)
-        } else {
-            return false;
-        };
+    let (time_part, _has_ampm) = if let Some(stripped) = s
+        .strip_suffix("AM")
+        .or_else(|| s.strip_suffix("am"))
+        .or_else(|| s.strip_suffix("Am"))
+        .or_else(|| s.strip_suffix("PM"))
+        .or_else(|| s.strip_suffix("pm"))
+        .or_else(|| s.strip_suffix("Pm"))
+    {
+        (stripped.trim(), true)
+    } else {
+        return false;
+    };
 
     let parts: Vec<&str> = time_part.split(':').collect();
     if parts.len() < 2 || parts.len() > 3 {
@@ -436,9 +443,17 @@ fn normalize_time(s: &str) -> Option<String> {
     let s = s.trim();
 
     // Check for AM/PM
-    let (time_part, ampm) = if let Some(stripped) = s.strip_suffix("AM").or_else(|| s.strip_suffix("am")).or_else(|| s.strip_suffix("Am")) {
+    let (time_part, ampm) = if let Some(stripped) = s
+        .strip_suffix("AM")
+        .or_else(|| s.strip_suffix("am"))
+        .or_else(|| s.strip_suffix("Am"))
+    {
         (stripped.trim(), Some(false))
-    } else if let Some(stripped) = s.strip_suffix("PM").or_else(|| s.strip_suffix("pm")).or_else(|| s.strip_suffix("Pm")) {
+    } else if let Some(stripped) = s
+        .strip_suffix("PM")
+        .or_else(|| s.strip_suffix("pm"))
+        .or_else(|| s.strip_suffix("Pm"))
+    {
         (stripped.trim(), Some(true))
     } else {
         (s.trim_end_matches('Z'), None)
@@ -571,7 +586,10 @@ mod tests {
 
     #[test]
     fn test_normalize_iso_passthrough() {
-        assert_eq!(normalize_to_iso("2024-04-20", DateFormat::Iso), "2024-04-20");
+        assert_eq!(
+            normalize_to_iso("2024-04-20", DateFormat::Iso),
+            "2024-04-20"
+        );
         assert_eq!(
             normalize_to_iso("2024-04-20 14:30:00", DateFormat::Iso),
             "2024-04-20 14:30:00"
@@ -637,7 +655,10 @@ mod tests {
     #[test]
     fn test_normalize_graceful_degradation() {
         // Unparseable values return as-is
-        assert_eq!(normalize_to_iso("not-a-date", DateFormat::SlashDayFirst), "not-a-date");
+        assert_eq!(
+            normalize_to_iso("not-a-date", DateFormat::SlashDayFirst),
+            "not-a-date"
+        );
         assert_eq!(normalize_to_iso("", DateFormat::Dot), "");
     }
 
@@ -654,9 +675,7 @@ mod tests {
 
     #[test]
     fn test_detect_numeric_column() {
-        let rows: Vec<Vec<String>> = (0..10)
-            .map(|i| vec![format!("{}", i * 100)])
-            .collect();
+        let rows: Vec<Vec<String>> = (0..10).map(|i| vec![format!("{}", i * 100)]).collect();
         let types = detect_column_types(&rows, 1);
         assert_eq!(types, vec![ColumnType::Numeric]);
     }

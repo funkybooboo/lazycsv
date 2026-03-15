@@ -13,11 +13,8 @@ use ratatui::{
     Frame,
 };
 
-/// Width percentage for SQL editor overlay
-const SQL_EDITOR_WIDTH_PERCENT: u16 = 80;
-
-/// Height percentage for SQL editor overlay
-const SQL_EDITOR_HEIGHT_PERCENT: u16 = 80;
+// Modal size constants moved to src/ui/modal.rs
+// SQL editor now uses standard 80% × 80% size (MODAL_LARGE_WIDTH/HEIGHT)
 
 /// Render the SQL editor overlay with vim editing
 ///
@@ -30,19 +27,14 @@ pub fn render_sql_editor_vim(
     completion: Option<&SqlCompletion>,
     diagnostics: &[SqlDiagnostic],
 ) {
-    let area = super::help::centered_rect(
-        SQL_EDITOR_WIDTH_PERCENT,
-        SQL_EDITOR_HEIGHT_PERCENT,
-        frame.area(),
-    );
+    let area = super::modal::large_modal_rect(frame.area());
 
-    // Clear background and render border with mode indicator
+    // Clear background and render border
     frame.render_widget(Clear, area);
 
-    let mode_str = vim_editor.mode().display_name();
-
-    let title = format!(" SQL Query - {} ", mode_str);
-    let block = Block::default().borders(Borders::ALL).title(title);
+    // Title without mode (mode shown in status bar instead)
+    let title = " SQL Query ";
+    let block = super::modal::standard_block(title);
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -92,7 +84,11 @@ fn render_completion_popup(
     let popup_y = query_area.y + cursor_line as u16 + 1;
 
     // 4 = tag "[K] " prefix width
-    let max_name_len = filtered.iter().map(|item| item.text.len()).max().unwrap_or(10);
+    let max_name_len = filtered
+        .iter()
+        .map(|item| item.text.len())
+        .max()
+        .unwrap_or(10);
     let title_width = if completion.filter.is_empty() {
         0
     } else {
@@ -118,8 +114,16 @@ fn render_completion_popup(
         .take(visible_count)
         .map(|(idx, item)| {
             let is_selected = idx == completion.selected;
-            let bg = if is_selected { Color::Blue } else { Color::DarkGray };
-            let base_style = Style::default().fg(Color::White).bg(bg);
+            let base_style = if is_selected {
+                super::modal::completion_selected_style()
+            } else {
+                super::modal::completion_unselected_style()
+            };
+            let bg = if is_selected {
+                Color::Blue
+            } else {
+                super::modal::COLOR_POPUP_BG
+            };
             let tag_style = Style::default().fg(item.kind.color()).bg(bg);
             let highlight_style = base_style.add_modifier(Modifier::BOLD | Modifier::UNDERLINED);
 
@@ -148,11 +152,14 @@ fn render_completion_popup(
                 }
             } else {
                 let padded = format!("{:<width$}", name, width = name_budget);
-                spans.push(Span::styled(padded, if is_selected {
-                    base_style.add_modifier(Modifier::BOLD)
-                } else {
-                    base_style
-                }));
+                spans.push(Span::styled(
+                    padded,
+                    if is_selected {
+                        base_style.add_modifier(Modifier::BOLD)
+                    } else {
+                        base_style
+                    },
+                ));
             }
 
             Line::from(spans)
@@ -162,7 +169,7 @@ fn render_completion_popup(
     frame.render_widget(Clear, popup_rect);
     let mut popup_block = Block::default()
         .borders(Borders::ALL)
-        .style(Style::default().bg(Color::DarkGray));
+        .style(Style::default().bg(super::modal::COLOR_POPUP_BG));
     if !completion.filter.is_empty() {
         popup_block = popup_block.title(format!(" /{} ", completion.filter));
     }
@@ -179,33 +186,35 @@ fn build_status_line<'a>(
     sql_error: Option<&str>,
     width: usize,
 ) -> Line<'a> {
-    let help_text = "? for help";
+    let help_text = "Ctrl+Enter: execute | :w/:q | Esc: exit";
 
-    if let Some(err) = sql_error {
-        // Error message on left, help on right
-        let error_text = format!("Error: {}", err);
-        let padding = width.saturating_sub(error_text.len() + help_text.len() + 2);
-        Line::from(vec![
-            Span::styled(
-                error_text,
-                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-            ),
-            Span::raw(" ".repeat(padding)),
-            Span::raw(help_text),
-        ])
+    // Left side: Mode or command buffer or error
+    let left = if let Some(err) = sql_error {
+        format!("Error: {}", err)
     } else if vim_editor.mode() == VimMode::Command {
-        // Command buffer on left, help on right
-        let cmd_text = format!(":{}", vim_editor.command_buffer());
-        let padding = width.saturating_sub(cmd_text.len() + help_text.len() + 1);
+        format!(":{}", vim_editor.command_buffer())
+    } else {
+        // Show mode using standard format
+        super::modal::format_mode_indicator(vim_editor.mode().display_name(), None)
+    };
+
+    // Build status line with mode/error on left, help on right
+    let padding = width.saturating_sub(left.len() + help_text.len());
+
+    if sql_error.is_some() {
+        // Error in red - use centralized error style
         Line::from(vec![
-            Span::styled(cmd_text, Style::default()),
+            Span::styled(left, super::modal::error_style()),
             Span::raw(" ".repeat(padding)),
             Span::raw(help_text),
         ])
     } else {
-        // Just help on right
-        let padding = width.saturating_sub(help_text.len());
-        Line::from(vec![Span::raw(" ".repeat(padding)), Span::raw(help_text)])
+        // Normal mode/command display
+        Line::from(vec![
+            Span::raw(left),
+            Span::raw(" ".repeat(padding)),
+            Span::raw(help_text),
+        ])
     }
 }
 
@@ -219,7 +228,10 @@ fn build_vim_editor_lines(vim_editor: &VimEditor) -> Vec<Line<'static>> {
 
     for (line_idx, line_text) in vim_editor.lines().iter().enumerate() {
         let line_num = format!("{:>width$} ", line_idx + 1, width = line_num_width);
-        let line_num_span = Span::styled(line_num, Style::default().fg(Color::DarkGray));
+        let line_num_span = Span::styled(
+            line_num,
+            Style::default().fg(super::modal::COLOR_LINE_NUMBER),
+        );
 
         if line_idx == cursor_line {
             // This line contains the cursor - highlight cursor position
@@ -232,25 +244,13 @@ fn build_vim_editor_lines(vim_editor: &VimEditor) -> Vec<Line<'static>> {
                 spans.push(Span::raw(before));
             }
 
-            // Cursor character (inverted)
+            // Cursor character (inverted) - use centralized cursor style
             if cursor_col < chars.len() {
                 let cursor_char = chars[cursor_col].to_string();
-                spans.push(Span::styled(
-                    cursor_char,
-                    Style::default()
-                        .fg(Color::Black)
-                        .bg(Color::White)
-                        .add_modifier(Modifier::BOLD),
-                ));
+                spans.push(Span::styled(cursor_char, super::modal::cursor_style()));
             } else {
                 // Cursor at end of line (show as space)
-                spans.push(Span::styled(
-                    " ",
-                    Style::default()
-                        .fg(Color::Black)
-                        .bg(Color::White)
-                        .add_modifier(Modifier::BOLD),
-                ));
+                spans.push(Span::styled(" ", super::modal::cursor_style()));
             }
 
             // Text after cursor

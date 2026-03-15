@@ -483,7 +483,9 @@ pub fn load_csv_into_sqlite(conn: &Connection, doc: &Document, table_name: &str)
                     }
                 })
                 .collect();
-            stmt.execute(rusqlite::params_from_iter(params.iter().map(|s: &String| s.as_str())))?;
+            stmt.execute(rusqlite::params_from_iter(
+                params.iter().map(|s: &String| s.as_str()),
+            ))?;
         } else {
             let params: Vec<&str> = (0..col_count)
                 .map(|j| row.get(j).map(|s| s.as_str()).unwrap_or(""))
@@ -600,7 +602,9 @@ fn load_csv_file_into_sqlite(
                     }
                 })
                 .collect();
-            stmt.execute(rusqlite::params_from_iter(params.iter().map(|s: &String| s.as_str())))?;
+            stmt.execute(rusqlite::params_from_iter(
+                params.iter().map(|s: &String| s.as_str()),
+            ))?;
         } else {
             let params: Vec<&str> = (0..col_count)
                 .map(|j| record.get(j).unwrap_or(""))
@@ -807,7 +811,9 @@ pub fn load_csv_into_sqlite_cancellable(
                     }
                 })
                 .collect();
-            stmt.execute(rusqlite::params_from_iter(params.iter().map(|s: &String| s.as_str())))?;
+            stmt.execute(rusqlite::params_from_iter(
+                params.iter().map(|s: &String| s.as_str()),
+            ))?;
         } else {
             let params: Vec<&str> = (0..col_count)
                 .map(|j| row.get(j).map(|s| s.as_str()).unwrap_or(""))
@@ -933,7 +939,9 @@ fn load_lazy_into_sqlite_cancellable(
                     }
                 })
                 .collect();
-            stmt.execute(rusqlite::params_from_iter(params.iter().map(|s: &String| s.as_str())))?;
+            stmt.execute(rusqlite::params_from_iter(
+                params.iter().map(|s: &String| s.as_str()),
+            ))?;
         } else {
             // Fast path: bind byte fields directly as &str without String allocation
             // (safe because mmap bytes remain valid for the duration)

@@ -94,9 +94,7 @@ fn bench_get_cell(c: &mut Criterion) {
                 // Access cells at various positions
                 let row = black_box(size / 2);
                 let col = black_box(5);
-                let cell = app
-                    .document
-                    .cell(RowIndex::new(row), ColIndex::new(col));
+                let cell = app.document.cell(RowIndex::new(row), ColIndex::new(col));
                 black_box(cell);
             });
         });

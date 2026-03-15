@@ -109,7 +109,10 @@ fn test_delete_single_column_c() {
     assert_eq!(app.document.column_count(), 4);
 
     // Check headers: A, B, D, E
-    assert_eq!(app.document.get_rows_range(0, 1)[0], vec!["A", "B", "D", "E"]);
+    assert_eq!(
+        app.document.get_rows_range(0, 1)[0],
+        vec!["A", "B", "D", "E"]
+    );
 }
 
 #[test]
@@ -245,7 +248,10 @@ fn test_move_columns_d_e_after_a() {
     send_command(&mut app, "D,E m A");
 
     assert_eq!(app.document.column_count(), 5);
-    assert_eq!(app.document.get_rows_range(0, 1)[0], vec!["A", "D", "E", "B", "C"]);
+    assert_eq!(
+        app.document.get_rows_range(0, 1)[0],
+        vec!["A", "D", "E", "B", "C"]
+    );
 }
 
 #[test]
@@ -258,7 +264,10 @@ fn test_move_column_to_end() {
     send_command(&mut app, "A,A m E");
 
     assert_eq!(app.document.column_count(), 5);
-    assert_eq!(app.document.get_rows_range(0, 1)[0], vec!["B", "C", "D", "E", "A"]);
+    assert_eq!(
+        app.document.get_rows_range(0, 1)[0],
+        vec!["B", "C", "D", "E", "A"]
+    );
 }
 
 #[test]
@@ -271,7 +280,10 @@ fn test_move_column_to_beginning() {
     send_command(&mut app, "E,E m 0");
 
     assert_eq!(app.document.column_count(), 5);
-    assert_eq!(app.document.get_rows_range(0, 1)[0], vec!["E", "A", "B", "C", "D"]);
+    assert_eq!(
+        app.document.get_rows_range(0, 1)[0],
+        vec!["E", "A", "B", "C", "D"]
+    );
 }
 
 #[test]
@@ -284,7 +296,10 @@ fn test_move_range_to_middle() {
     send_command(&mut app, "D,E m B");
 
     assert_eq!(app.document.column_count(), 5);
-    assert_eq!(app.document.get_rows_range(0, 1)[0], vec!["A", "B", "D", "E", "C"]);
+    assert_eq!(
+        app.document.get_rows_range(0, 1)[0],
+        vec!["A", "B", "D", "E", "C"]
+    );
 }
 
 #[test]
@@ -297,7 +312,10 @@ fn test_move_noop_already_in_place() {
     send_command(&mut app, "B,D m A");
 
     assert_eq!(app.document.column_count(), 5);
-    assert_eq!(app.document.get_rows_range(0, 1)[0], vec!["A", "B", "C", "D", "E"]);
+    assert_eq!(
+        app.document.get_rows_range(0, 1)[0],
+        vec!["A", "B", "C", "D", "E"]
+    );
     let msg = app.status_message.as_ref().unwrap().as_str();
     assert!(msg.contains("already in position"));
 }
@@ -326,7 +344,10 @@ fn test_move_dest_inside_source_is_noop() {
     send_command(&mut app, "B,D m C");
 
     assert_eq!(app.document.column_count(), 5);
-    assert_eq!(app.document.get_rows_range(0, 1)[0], vec!["A", "B", "C", "D", "E"]);
+    assert_eq!(
+        app.document.get_rows_range(0, 1)[0],
+        vec!["A", "B", "C", "D", "E"]
+    );
     let msg = app.status_message.as_ref().unwrap().as_str();
     assert!(msg.contains("already in position"));
 }
@@ -366,11 +387,23 @@ fn test_move_preserves_data_rows() {
     send_command(&mut app, "D,E m A");
 
     // Headers
-    assert_eq!(app.document.get_rows_range(0, 1)[0], vec!["A", "D", "E", "B", "C"]);
+    assert_eq!(
+        app.document.get_rows_range(0, 1)[0],
+        vec!["A", "D", "E", "B", "C"]
+    );
     // Data row 1
-    assert_eq!(app.document.get_rows_range(1, 2)[0], vec!["A1", "D1", "E1", "B1", "C1"]);
+    assert_eq!(
+        app.document.get_rows_range(1, 2)[0],
+        vec!["A1", "D1", "E1", "B1", "C1"]
+    );
     // Data row 2
-    assert_eq!(app.document.get_rows_range(2, 3)[0], vec!["A2", "D2", "E2", "B2", "C2"]);
+    assert_eq!(
+        app.document.get_rows_range(2, 3)[0],
+        vec!["A2", "D2", "E2", "B2", "C2"]
+    );
     // Data row 3
-    assert_eq!(app.document.get_rows_range(3, 4)[0], vec!["A3", "D3", "E3", "B3", "C3"]);
+    assert_eq!(
+        app.document.get_rows_range(3, 4)[0],
+        vec!["A3", "D3", "E3", "B3", "C3"]
+    );
 }

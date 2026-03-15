@@ -5,18 +5,13 @@
 //! screens.
 
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
-    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
 };
 
-/// Width percentage for help overlay (70% of terminal width)
-const HELP_OVERLAY_WIDTH_PERCENT: u16 = 70;
-
-/// Height percentage for help overlay (80% of terminal height)
-const HELP_OVERLAY_HEIGHT_PERCENT: u16 = 80;
+// Modal size constants moved to src/ui/modal.rs
+// Help overlay now uses standard 80% × 80% size (MODAL_LARGE_WIDTH/HEIGHT)
 
 /// Build the help text lines
 pub fn get_help_text() -> Vec<Line<'static>> {
@@ -28,13 +23,10 @@ fn build_help_text() -> Vec<Line<'static>> {
     vec![
         Line::from(Span::styled(
             "LazyCSV v0.6.0 - Keyboard Shortcuts",
-            Style::default().add_modifier(Modifier::BOLD),
+            super::modal::bold_style(),
         )),
         Line::from(""),
-        Line::from(Span::styled(
-            "NAVIGATION",
-            Style::default().add_modifier(Modifier::BOLD),
-        )),
+        Line::from(Span::styled("NAVIGATION", super::modal::bold_style())),
         Line::from("  hjkl / arrows      Move cursor (with count: 5j, 10h)"),
         Line::from("  w / b / e          Next/prev/last non-empty cell"),
         Line::from("  gg                 First data row (row 1 if header mode ON)"),
@@ -47,7 +39,7 @@ fn build_help_text() -> Vec<Line<'static>> {
         Line::from(""),
         Line::from(Span::styled(
             "COLUMN NAVIGATION",
-            Style::default().add_modifier(Modifier::BOLD),
+            super::modal::bold_style(),
         )),
         Line::from("  :cA                Jump to column A"),
         Line::from("  :cB                Jump to column B"),
@@ -55,10 +47,7 @@ fn build_help_text() -> Vec<Line<'static>> {
         Line::from("  :c1                Jump to column 1 (A)"),
         Line::from("  :c27               Jump to column 27 (AA)"),
         Line::from(""),
-        Line::from(Span::styled(
-            "COMMAND MODE",
-            Style::default().add_modifier(Modifier::BOLD),
-        )),
+        Line::from(Span::styled("COMMAND MODE", super::modal::bold_style())),
         Line::from("  :                  Enter command mode"),
         Line::from("  :q / :wq / :q!     Quit (save/force)"),
         Line::from("  :w / :W            Save file / all files"),
@@ -70,20 +59,14 @@ fn build_help_text() -> Vec<Line<'static>> {
         Line::from("  :sort! <col,...>   Sort descending by column(s)"),
         Line::from("  Esc                Cancel command"),
         Line::from(""),
-        Line::from(Span::styled(
-            "RANGE OPERATIONS",
-            Style::default().add_modifier(Modifier::BOLD),
-        )),
+        Line::from(Span::styled("RANGE OPERATIONS", super::modal::bold_style())),
         Line::from("  :5,10d             Delete rows 5-10"),
         Line::from("  :5,10y             Yank rows 5-10"),
         Line::from("  :%d / :%y          Delete/yank all data rows"),
         Line::from("  :.d / :.y          Delete/yank current row"),
         Line::from("  :$d / :$y          Delete/yank last row"),
         Line::from(""),
-        Line::from(Span::styled(
-            "INSERT MODE",
-            Style::default().add_modifier(Modifier::BOLD),
-        )),
+        Line::from(Span::styled("INSERT MODE", super::modal::bold_style())),
         Line::from("  i / a              Edit cell (cursor at end)"),
         Line::from("  I                  Edit cell (cursor at start)"),
         Line::from("  A                  Edit cell (cursor at end)"),
@@ -93,7 +76,7 @@ fn build_help_text() -> Vec<Line<'static>> {
         Line::from(""),
         Line::from(Span::styled(
             "INSERT MODE EDITING",
-            Style::default().add_modifier(Modifier::BOLD),
+            super::modal::bold_style(),
         )),
         Line::from("  Enter              Commit, move down"),
         Line::from("  Shift+Enter        Commit, move up"),
@@ -104,10 +87,7 @@ fn build_help_text() -> Vec<Line<'static>> {
         Line::from("  Ctrl+w             Delete word backward"),
         Line::from("  Ctrl+u             Delete to start"),
         Line::from(""),
-        Line::from(Span::styled(
-            "MAGNIFIER MODE",
-            Style::default().add_modifier(Modifier::BOLD),
-        )),
+        Line::from(Span::styled("MAGNIFIER MODE", super::modal::bold_style())),
         Line::from("  Space+m            Open magnifier (full vim editor)"),
         Line::from("  ZZ / :wq           Save and close magnifier"),
         Line::from("  :q!                Close without saving"),
@@ -117,27 +97,18 @@ fn build_help_text() -> Vec<Line<'static>> {
         Line::from("  dd / yy / p        Delete/yank/paste lines"),
         Line::from("  x / s              Delete/substitute char"),
         Line::from(""),
-        Line::from(Span::styled(
-            "ROW OPERATIONS",
-            Style::default().add_modifier(Modifier::BOLD),
-        )),
+        Line::from(Span::styled("ROW OPERATIONS", super::modal::bold_style())),
         Line::from("  o                  Insert row below, enter Insert"),
         Line::from("  O                  Insert row above, enter Insert"),
         Line::from("  dd                 Delete row"),
         Line::from("  yy                 Yank (copy) row"),
         Line::from("  p                  Paste row below"),
         Line::from(""),
-        Line::from(Span::styled(
-            "VIEWPORT & FILES",
-            Style::default().add_modifier(Modifier::BOLD),
-        )),
+        Line::from(Span::styled("VIEWPORT & FILES", super::modal::bold_style())),
         Line::from("  zt / zz / zb       Row at top/center/bottom"),
         Line::from("  Space+f            Open file menu"),
         Line::from(""),
-        Line::from(Span::styled(
-            "FILE MENU",
-            Style::default().add_modifier(Modifier::BOLD),
-        )),
+        Line::from(Span::styled("FILE MENU", super::modal::bold_style())),
         Line::from("  j/k                Navigate down/up"),
         Line::from("  gg / G             Jump to top/bottom"),
         Line::from("  h                  Go to parent directory"),
@@ -150,27 +121,18 @@ fn build_help_text() -> Vec<Line<'static>> {
         Line::from("  n                  Create new file"),
         Line::from("  q / Esc            Close file menu"),
         Line::from(""),
-        Line::from(Span::styled(
-            "SQL EDITOR",
-            Style::default().add_modifier(Modifier::BOLD),
-        )),
+        Line::from(Span::styled("SQL EDITOR", super::modal::bold_style())),
         Line::from("  Space+q            Open SQL query editor"),
         Line::from("  Enter              Execute query (results in output.csv)"),
         Line::from("  Shift+Enter        Insert newline in query"),
         Line::from("  Esc                Close editor without executing"),
         Line::from("  Ctrl+u             Clear query buffer"),
         Line::from(""),
-        Line::from(Span::styled(
-            "GLOBAL",
-            Style::default().add_modifier(Modifier::BOLD),
-        )),
+        Line::from(Span::styled("GLOBAL", super::modal::bold_style())),
         Line::from("  :q / :q!           Quit (force quit)"),
         Line::from("  ?                  Toggle this help"),
         Line::from(""),
-        Line::from(Span::styled(
-            "HELP NAVIGATION",
-            Style::default().add_modifier(Modifier::BOLD),
-        )),
+        Line::from(Span::styled("HELP NAVIGATION", super::modal::bold_style())),
         Line::from("  j/k                Scroll down/up one line"),
         Line::from("  Ctrl+d / Ctrl+u    Scroll down/up one page"),
         Line::from("  Ctrl+f / Ctrl+b    Scroll down/up one page"),
@@ -195,62 +157,51 @@ fn build_help_text() -> Vec<Line<'static>> {
 /// * `scroll_offset` - Vertical scroll offset for content
 /// * `search_query` - Optional search query to display
 pub fn render_help_overlay(frame: &mut Frame, scroll_offset: u16, search_query: Option<&str>) {
-    // Create centered area
-    let area = centered_rect(
-        HELP_OVERLAY_WIDTH_PERCENT,
-        HELP_OVERLAY_HEIGHT_PERCENT,
-        frame.area(),
-    );
+    // Create centered area using standard large modal size
+    let area = super::modal::large_modal_rect(frame.area());
 
     let help_text = build_help_text();
 
-    // Calculate if scrolling is needed
-    let content_height = help_text.len() as u16;
-    let visible_height = area.height.saturating_sub(2); // -2 for borders
-    let needs_scroll = content_height > visible_height;
-
-    // Build title with scroll indicator or search prompt
+    // Simplified title - navigation hints moved to status bar
     let title = if let Some(query) = search_query {
-        format!(" Help - Search: /{} ", query)
-    } else if needs_scroll {
-        let max_scroll = content_height.saturating_sub(visible_height);
-        if scroll_offset >= max_scroll {
-            " Help (END) ".to_string()
-        } else if scroll_offset > 0 {
-            format!(" Help ({}/{}) ", scroll_offset + 1, max_scroll + 1)
-        } else {
-            " Help (j/k to scroll, / to search) ".to_string()
-        }
+        format!(" Help: /{} ", query)
     } else {
-        " Help (/ to search) ".to_string()
+        " Help ".to_string()
     };
 
-    let help = Paragraph::new(help_text)
-        .block(Block::default().borders(Borders::ALL).title(title))
-        .scroll((scroll_offset, 0));
+    let block = Block::default().borders(Borders::ALL).title(title);
+    let inner = block.inner(area);
 
-    // Clear background
+    // Clear background and render border
     frame.render_widget(Clear, area);
-    frame.render_widget(help, area);
+    frame.render_widget(block, area);
+
+    // Split layout for content and status bar
+    let (content_area, status_area) = super::modal::split_with_status_bar(inner);
+
+    // Render help content
+    let paragraph = Paragraph::new(help_text).scroll((scroll_offset, 0));
+    frame.render_widget(paragraph, content_area);
+
+    // Render status bar with navigation hints
+    render_help_status_bar(frame, search_query, status_area);
 }
 
-/// Helper to create centered rectangle
-pub(super) fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    let popup_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Percentage((100 - percent_y) / 2),
-            Constraint::Percentage(percent_y),
-            Constraint::Percentage((100 - percent_y) / 2),
-        ])
-        .split(r);
+/// Render the help status bar with navigation hints
+fn render_help_status_bar(
+    frame: &mut Frame,
+    search_query: Option<&str>,
+    area: ratatui::layout::Rect,
+) {
+    let status_text = if let Some(pattern) = search_query {
+        // TODO: Add match tracking later (e.g., "match 5/12")
+        format!("/{}  | n/N: next/prev | Esc: close", pattern)
+    } else {
+        "j/k: scroll | /: search | Esc: close".to_string()
+    };
 
-    Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage((100 - percent_x) / 2),
-            Constraint::Percentage(percent_x),
-            Constraint::Percentage((100 - percent_x) / 2),
-        ])
-        .split(popup_layout[1])[1]
+    frame.render_widget(Paragraph::new(status_text), area);
 }
+
+// centered_rect() moved to src/ui/modal.rs
+// Use super::modal::centered_rect() or super::modal::large_modal_rect() instead

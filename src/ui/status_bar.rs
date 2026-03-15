@@ -4,12 +4,7 @@
 //! mode, cursor position, pending commands, and status messages.
 
 use crate::App;
-use ratatui::{
-    layout::Rect,
-    style::{Color, Style},
-    widgets::Paragraph,
-    Frame,
-};
+use ratatui::{layout::Rect, style::Style, widgets::Paragraph, Frame};
 
 /// Build a status line with left (mode), center (filename), and right (stats + help)
 fn build_three_part_status_line(left: &str, center: &str, right: &str, width: usize) -> String {
@@ -291,7 +286,7 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
     let status_text = build_status_text(app, &right_side, &pending_indicator, area.width as usize);
 
     let style = if app.external_modification_pending {
-        Style::default().fg(Color::Black).bg(Color::Green)
+        super::modal::mode_indicator_style()
     } else {
         Style::default()
     };

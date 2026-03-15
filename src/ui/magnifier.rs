@@ -6,17 +6,14 @@
 use crate::App;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Clear, Paragraph},
     Frame,
 };
 
-/// Popup width as percentage of terminal width
-const POPUP_WIDTH_PERCENT: u16 = 80;
-
-/// Popup height as percentage of terminal height
-const POPUP_HEIGHT_PERCENT: u16 = 80;
+// Modal size constants moved to src/ui/modal.rs
+// Magnifier now uses standard 80% × 80% size (MODAL_LARGE_WIDTH/HEIGHT)
 
 /// Minimum line number column width in characters
 const MIN_LINE_NUMBER_WIDTH: u16 = 2;
@@ -34,33 +31,27 @@ pub fn render_magnifier(frame: &mut Frame, app: &App, area: Rect) {
         None => return,
     };
 
-    // Create centered popup
-    let popup_area = super::help::centered_rect(POPUP_WIDTH_PERCENT, POPUP_HEIGHT_PERCENT, area);
+    // Create centered popup using standard large modal size
+    let popup_area = super::modal::large_modal_rect(area);
     frame.render_widget(Clear, popup_area);
 
     // Build and render main block with title
     let title = build_magnifier_title(magnifier);
-    let main_block = Block::default()
-        .title(title)
-        .borders(Borders::ALL)
-        .border_style(Style::default());
+    let main_block = super::modal::standard_block(&title);
 
     let inner = main_block.inner(popup_area);
     frame.render_widget(main_block, popup_area);
 
     // Split inner area: content + status bar
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Min(0), Constraint::Length(1)])
-        .split(inner);
+    let (content, status) = super::modal::split_with_status_bar(inner);
 
     // Render content area
-    render_content(frame, magnifier, chunks[0]);
+    render_content(frame, magnifier, content);
 
     // Render status bar
-    let status_text = build_magnifier_status_bar(magnifier, chunks[1].width as usize);
+    let status_text = build_magnifier_status_bar(magnifier, status.width as usize);
     let status_bar = Paragraph::new(status_text).style(Style::default());
-    frame.render_widget(status_bar, chunks[1]);
+    frame.render_widget(status_bar, status);
 }
 
 /// Build the magnifier title bar with cell position
@@ -96,9 +87,16 @@ fn build_magnifier_status_bar(
     let left_text = if magnifier.mode() == crate::magnifier::MagnifierMode::Command {
         format!(":{}", magnifier.command_buffer())
     } else if magnifier.mode() == crate::magnifier::MagnifierMode::Normal {
-        magnifier.pending_display().unwrap_or("").to_string()
+        // Show pending command if active, otherwise show NORMAL mode
+        let pending = magnifier.pending_display().unwrap_or("");
+        if !pending.is_empty() {
+            pending.to_string()
+        } else {
+            super::modal::format_mode_indicator("Normal", None)
+        }
     } else {
-        format!("-- {} --", magnifier.mode().display_name())
+        // Use standard format: " INSERT", " VISUAL" instead of "-- INSERT --"
+        super::modal::format_mode_indicator(magnifier.mode().display_name(), None)
     };
 
     // Right side: cursor position, percentage, and help tip
@@ -250,7 +248,7 @@ fn render_text_content(
     }
 
     if line_count == 0 {
-        let cursor_span = Span::styled(" ", Style::default().bg(Color::White).fg(Color::Black));
+        let cursor_span = Span::styled(" ", super::modal::cursor_style());
         lines.push(Line::from(vec![cursor_span]));
     }
 
@@ -309,8 +307,7 @@ fn render_line_with_highlights(
         start_col,
         end_col,
     ) {
-        let cursor_style = Style::default().bg(Color::White).fg(Color::Black);
-        spans.push(Span::styled(" ", cursor_style));
+        spans.push(Span::styled(" ", super::modal::cursor_style()));
     }
 
     // Add right scroll indicator if needed
@@ -351,8 +348,8 @@ fn get_char_style(
     let search_highlight = get_search_highlight(line_idx, col, search_matches, current_match);
 
     if is_cursor || is_selected {
-        // Cursor and selection take priority - explicit colors for visibility
-        Style::default().bg(Color::White).fg(Color::Black)
+        // Cursor and selection take priority - use centralized cursor style
+        super::modal::cursor_style()
     } else {
         // Search match or normal text
         search_highlight.unwrap_or_default()
@@ -427,9 +424,8 @@ mod tests {
     #[test]
     fn test_centered_rect_80_percent() {
         let area = Rect::new(0, 0, 100, 100);
-        let centered = super::super::help::centered_rect(80, 80, area);
+        let centered = super::super::modal::centered_rect(80, 80, area);
 
-        // Should be centered with 80% width and height
         assert_eq!(centered.width, 80);
         assert_eq!(centered.height, 80);
         assert_eq!(centered.x, 10); // (100 - 80) / 2
@@ -439,7 +435,7 @@ mod tests {
     #[test]
     fn test_centered_rect_50_percent() {
         let area = Rect::new(0, 0, 100, 100);
-        let centered = super::super::help::centered_rect(50, 50, area);
+        let centered = super::super::modal::centered_rect(50, 50, area);
 
         assert_eq!(centered.width, 50);
         assert_eq!(centered.height, 50);

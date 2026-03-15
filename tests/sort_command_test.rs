@@ -54,9 +54,15 @@ fn test_sort_ascending_by_column_number() {
     send_command(&mut app, "sort 1");
 
     // Column 1 is Name — sorted ascending: Alice, Bob, Charlie
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "Alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "Alice"
+    );
     assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(0)), "Bob");
-    assert_eq!(app.document.cell(RowIndex::new(3), ColIndex::new(0)), "Charlie");
+    assert_eq!(
+        app.document.cell(RowIndex::new(3), ColIndex::new(0)),
+        "Charlie"
+    );
 }
 
 #[test]
@@ -65,9 +71,15 @@ fn test_sort_ascending_by_header_name() {
 
     send_command(&mut app, "sort Name");
 
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "Alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "Alice"
+    );
     assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(0)), "Bob");
-    assert_eq!(app.document.cell(RowIndex::new(3), ColIndex::new(0)), "Charlie");
+    assert_eq!(
+        app.document.cell(RowIndex::new(3), ColIndex::new(0)),
+        "Charlie"
+    );
 }
 
 #[test]
@@ -76,9 +88,15 @@ fn test_sort_ascending_header_name_case_insensitive() {
 
     send_command(&mut app, "sort name");
 
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "Alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "Alice"
+    );
     assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(0)), "Bob");
-    assert_eq!(app.document.cell(RowIndex::new(3), ColIndex::new(0)), "Charlie");
+    assert_eq!(
+        app.document.cell(RowIndex::new(3), ColIndex::new(0)),
+        "Charlie"
+    );
 }
 
 #[test]
@@ -102,9 +120,15 @@ fn test_sort_descending_by_column_number() {
     send_command(&mut app, "sort! 1");
 
     // Name descending: Charlie, Bob, Alice
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "Charlie");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "Charlie"
+    );
     assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(0)), "Bob");
-    assert_eq!(app.document.cell(RowIndex::new(3), ColIndex::new(0)), "Alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(3), ColIndex::new(0)),
+        "Alice"
+    );
 }
 
 #[test]
@@ -141,13 +165,22 @@ fn test_sort_multi_column() {
 
     // LA comes first, then NYC; within each city, names are alphabetical
     assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "LA");
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(1)), "Alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(1)),
+        "Alice"
+    );
     assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(0)), "LA");
-    assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(1)), "Dave");
+    assert_eq!(
+        app.document.cell(RowIndex::new(2), ColIndex::new(1)),
+        "Dave"
+    );
     assert_eq!(app.document.cell(RowIndex::new(3), ColIndex::new(0)), "NYC");
     assert_eq!(app.document.cell(RowIndex::new(3), ColIndex::new(1)), "Bob");
     assert_eq!(app.document.cell(RowIndex::new(4), ColIndex::new(0)), "NYC");
-    assert_eq!(app.document.cell(RowIndex::new(4), ColIndex::new(1)), "Charlie");
+    assert_eq!(
+        app.document.cell(RowIndex::new(4), ColIndex::new(1)),
+        "Charlie"
+    );
 }
 
 #[test]
@@ -168,11 +201,17 @@ fn test_sort_multi_column_by_number() {
     send_command(&mut app, "sort 1,2");
 
     assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "LA");
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(1)), "Alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(1)),
+        "Alice"
+    );
     assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(0)), "NYC");
     assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(1)), "Bob");
     assert_eq!(app.document.cell(RowIndex::new(3), ColIndex::new(0)), "NYC");
-    assert_eq!(app.document.cell(RowIndex::new(3), ColIndex::new(1)), "Charlie");
+    assert_eq!(
+        app.document.cell(RowIndex::new(3), ColIndex::new(1)),
+        "Charlie"
+    );
 }
 
 // ===== Header stays fixed =====
@@ -184,9 +223,15 @@ fn test_sort_preserves_header() {
     send_command(&mut app, "sort 1");
 
     // Header row should remain unchanged
-    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(0)), "Name");
+    assert_eq!(
+        app.document.cell(RowIndex::new(0), ColIndex::new(0)),
+        "Name"
+    );
     assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(1)), "Age");
-    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(2)), "City");
+    assert_eq!(
+        app.document.cell(RowIndex::new(0), ColIndex::new(2)),
+        "City"
+    );
 }
 
 // ===== Dirty flag =====
@@ -329,7 +374,10 @@ fn test_sort_empty_cells() {
 
     // Empty string sorts before other strings
     assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "");
-    assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(0)), "Alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(2), ColIndex::new(0)),
+        "Alice"
+    );
     assert_eq!(app.document.cell(RowIndex::new(3), ColIndex::new(0)), "Bob");
 }
 
@@ -342,9 +390,15 @@ fn test_sort_by_column_letter() {
     // Column A is Name — sort ascending: Alice, Bob, Charlie
     send_command(&mut app, "sort A");
 
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "Alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "Alice"
+    );
     assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(0)), "Bob");
-    assert_eq!(app.document.cell(RowIndex::new(3), ColIndex::new(0)), "Charlie");
+    assert_eq!(
+        app.document.cell(RowIndex::new(3), ColIndex::new(0)),
+        "Charlie"
+    );
 }
 
 #[test]
@@ -353,9 +407,15 @@ fn test_sort_by_column_letter_lowercase() {
 
     send_command(&mut app, "sort a");
 
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "Alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "Alice"
+    );
     assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(0)), "Bob");
-    assert_eq!(app.document.cell(RowIndex::new(3), ColIndex::new(0)), "Charlie");
+    assert_eq!(
+        app.document.cell(RowIndex::new(3), ColIndex::new(0)),
+        "Charlie"
+    );
 }
 
 #[test]
@@ -376,11 +436,17 @@ fn test_sort_by_multiple_column_letters() {
     send_command(&mut app, "sort A,B");
 
     assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "LA");
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(1)), "Alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(1)),
+        "Alice"
+    );
     assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(0)), "NYC");
     assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(1)), "Bob");
     assert_eq!(app.document.cell(RowIndex::new(3), ColIndex::new(0)), "NYC");
-    assert_eq!(app.document.cell(RowIndex::new(3), ColIndex::new(1)), "Charlie");
+    assert_eq!(
+        app.document.cell(RowIndex::new(3), ColIndex::new(1)),
+        "Charlie"
+    );
 }
 
 #[test]
@@ -389,9 +455,15 @@ fn test_sort_descending_by_column_letter() {
 
     send_command(&mut app, "sort! A");
 
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "Charlie");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "Charlie"
+    );
     assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(0)), "Bob");
-    assert_eq!(app.document.cell(RowIndex::new(3), ColIndex::new(0)), "Alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(3), ColIndex::new(0)),
+        "Alice"
+    );
 }
 
 #[test]

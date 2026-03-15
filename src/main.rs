@@ -523,11 +523,7 @@ fn execute_sort_and_output(sort_spec: &str, cli_args: &cli::CliArgs) -> Result<(
         }
         if let Ok(num) = s.parse::<usize>() {
             if num == 0 || num > doc.column_count() {
-                anyhow::bail!(
-                    "Column {} out of range (1-{})",
-                    num,
-                    doc.column_count()
-                );
+                anyhow::bail!("Column {} out of range (1-{})", num, doc.column_count());
             }
             col_indices.push(num - 1);
         } else {

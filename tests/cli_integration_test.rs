@@ -53,7 +53,10 @@ fn test_default_csv_loading_integration() {
     let app = App::from_cli(args).unwrap();
 
     // rows[0] is header row
-    assert_eq!(app.document.get_rows_range(0, 1)[0], vec!["header1", "header2"]);
+    assert_eq!(
+        app.document.get_rows_range(0, 1)[0],
+        vec!["header1", "header2"]
+    );
     assert_eq!(app.document.get_rows_range(1, 2)[0], vec!["val1", "val2"]);
     assert_eq!(app.session.config().delimiter, None);
     assert!(!app.session.config().no_headers);
@@ -149,7 +152,10 @@ fn test_delimiter_and_no_headers_integration() {
     let app = App::from_cli(args).unwrap();
 
     // rows[0] is synthetic header row
-    assert_eq!(app.document.get_rows_range(0, 1)[0], vec!["Column 1", "Column 2"]);
+    assert_eq!(
+        app.document.get_rows_range(0, 1)[0],
+        vec!["Column 1", "Column 2"]
+    );
     assert_eq!(app.document.row_count(), 3); // header + 2 data rows
     assert_eq!(app.document.get_rows_range(1, 2)[0], vec!["a", "b"]);
     assert_eq!(app.document.get_rows_range(2, 3)[0], vec!["1", "2"]);
@@ -205,7 +211,7 @@ fn test_mixed_encoding_in_file() {
     match result {
         Ok(doc) => {
             assert!(doc.row_count() > 0); // Should have at least header row
-                                           // May contain replacement characters
+                                          // May contain replacement characters
         }
         Err(err) => {
             assert!(!err.to_string().is_empty());

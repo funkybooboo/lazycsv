@@ -130,7 +130,7 @@ LazyCSV treats CSV files in the same directory like Excel sheets. Open one file,
 
 ## Current Status
 
-**v0.11.0 Complete** (March 2026) - SQL editor with full vim modal editing, undo/redo system, and configuration support.
+**v0.12.0 Complete** (March 2026) - Yazi-inspired 3-column file browser with parent directory preview, current directory navigation, and file/CSV preview.
 
 **Completed Features:**
 - Fast CSV viewer/editor with vim navigation
@@ -149,8 +149,8 @@ LazyCSV treats CSV files in the same directory like Excel sheets. Open one file,
 - 700+ tests passing
 
 **Next Up:**
-- **v0.12.0** - Cell transforms (case toggle, sort, filter)
-- **v0.14.0** - SQL IntelliSense (auto-completion)
+- **v0.12.1** - UI System Testing
+- **v0.13.0** - Repository Organization & Structure
 - **v1.0.0** - Stable release
 
 See [plans/roadmap.md](plans/roadmap.md) for the complete detailed roadmap.

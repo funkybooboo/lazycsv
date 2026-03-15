@@ -15,14 +15,44 @@ LazyCSV keybindings follow vim conventions:
 - **Vim-First**: Every action accessible via vim-style keys
 - **Three-tier scope**: Cell (`x`) → Row (`dd`) → Column (`,dd`)
 
+## Keybinding Registry
+
+**New in v0.12.0:** All keybindings are centrally defined in `src/input/keybindings.rs`.
+
+### Programmatic Access
+
+```rust
+use crate::input::keybindings::{get_action, get_keybindings_for_mode, InputAction};
+use crate::app::Mode;
+use crossterm::event::{KeyCode, KeyModifiers};
+
+// Query what action a key performs
+let action = get_action(KeyCode::Char('h'), KeyModifiers::NONE, Mode::Normal);
+// Returns: Some(InputAction::NavigateLeft)
+
+// Get all keybindings for a mode
+let bindings = get_keybindings_for_mode(Mode::Normal);
+```
+
+### Consistency Guarantees
+
+The keybinding registry ensures:
+- **No duplicate bindings** - Each key+modifier combination maps to exactly one action per mode
+- **Esc always returns to Normal** - Consistent across Insert, Visual, Command, Search modes
+- **Same keys work the same way** - Navigation keys (hjkl, arrows) work identically in Normal and Visual modes
+- **Single source of truth** - All keybindings documented in one place
+
 ## Mode Indicators
 
-The current mode is always shown in the status bar:
-- `-- NORMAL --` - Navigation mode
-- `-- INSERT --` - Quick cell editing
-- `-- MAGNIFIER --` - Vim editor for power editing (multi-line cells)
-- `-- VISUAL --` / `-- VISUAL LINE --` / `-- COLUMN VISUAL --` - Selection modes
-- `-- COMMAND --` - Command input mode
+The current mode is always shown in the status bar (bottom-left):
+- ` NORMAL` - Navigation mode
+- ` INSERT` - Quick cell editing
+- ` MAGNIFIER` - Vim editor for power editing (multi-line cells)
+- ` VISUAL BLOCK` / ` VISUAL LINE` / ` VISUAL COLUMN` - Selection modes
+- `:command` - Command input mode (shows command buffer)
+- `/pattern` - Search mode (shows search pattern)
+
+**Format:** Space-padded uppercase (e.g., ` NORMAL`), not vim-style `-- NORMAL --`
 
 ---
 

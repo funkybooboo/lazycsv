@@ -11,22 +11,76 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::path::{Path, PathBuf};
 
 const SQL_KEYWORDS: &[&str] = &[
-    "SELECT", "FROM", "WHERE", "JOIN", "LEFT JOIN", "RIGHT JOIN",
-    "INNER JOIN", "CROSS JOIN", "ON", "GROUP BY", "ORDER BY",
-    "HAVING", "LIMIT", "OFFSET", "UNION", "UNION ALL", "DISTINCT",
-    "AS", "AND", "OR", "NOT", "IN", "BETWEEN", "LIKE", "IS NULL",
-    "IS NOT NULL", "EXISTS", "CASE", "WHEN", "THEN", "ELSE", "END",
-    "ASC", "DESC", "INSERT", "UPDATE", "DELETE", "SET", "VALUES",
-    "CREATE", "DROP", "ALTER", "TABLE",
+    "SELECT",
+    "FROM",
+    "WHERE",
+    "JOIN",
+    "LEFT JOIN",
+    "RIGHT JOIN",
+    "INNER JOIN",
+    "CROSS JOIN",
+    "ON",
+    "GROUP BY",
+    "ORDER BY",
+    "HAVING",
+    "LIMIT",
+    "OFFSET",
+    "UNION",
+    "UNION ALL",
+    "DISTINCT",
+    "AS",
+    "AND",
+    "OR",
+    "NOT",
+    "IN",
+    "BETWEEN",
+    "LIKE",
+    "IS NULL",
+    "IS NOT NULL",
+    "EXISTS",
+    "CASE",
+    "WHEN",
+    "THEN",
+    "ELSE",
+    "END",
+    "ASC",
+    "DESC",
+    "INSERT",
+    "UPDATE",
+    "DELETE",
+    "SET",
+    "VALUES",
+    "CREATE",
+    "DROP",
+    "ALTER",
+    "TABLE",
 ];
 
 const SQL_FUNCTIONS: &[&str] = &[
-    "COUNT", "SUM", "AVG", "MIN", "MAX",
-    "COALESCE", "IFNULL", "NULLIF",
-    "UPPER", "LOWER", "LENGTH", "TRIM", "SUBSTR", "REPLACE",
-    "CAST", "TYPEOF", "ABS", "ROUND",
-    "DATE", "TIME", "DATETIME", "STRFTIME",
-    "GROUP_CONCAT", "TOTAL",
+    "COUNT",
+    "SUM",
+    "AVG",
+    "MIN",
+    "MAX",
+    "COALESCE",
+    "IFNULL",
+    "NULLIF",
+    "UPPER",
+    "LOWER",
+    "LENGTH",
+    "TRIM",
+    "SUBSTR",
+    "REPLACE",
+    "CAST",
+    "TYPEOF",
+    "ABS",
+    "ROUND",
+    "DATE",
+    "TIME",
+    "DATETIME",
+    "STRFTIME",
+    "GROUP_CONCAT",
+    "TOTAL",
 ];
 
 /// The SQL clause context at the cursor position
@@ -77,25 +131,23 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             }
             KeyCode::Enter | KeyCode::Tab => {
                 // Get selected item info before clearing completion
-                let selected = app
-                    .sql_completion
-                    .as_ref()
-                    .and_then(|c| {
-                        let item = c.selected_item()?;
-                        Some((
-                            item.text.clone(),
-                            item.kind,
-                            item.template.clone(),
-                            item.template_steps.clone(),
-                            c.prefix_len,
-                        ))
-                    });
+                let selected = app.sql_completion.as_ref().and_then(|c| {
+                    let item = c.selected_item()?;
+                    Some((
+                        item.text.clone(),
+                        item.kind,
+                        item.template.clone(),
+                        item.template_steps.clone(),
+                        c.prefix_len,
+                    ))
+                });
                 app.sql_completion = None;
 
                 if let Some((text, kind, template, steps, prefix_len)) = selected {
                     if let Some(ref template_sql) = template {
                         // Template: replace entire editor content and position cursor at end
-                        let mut new_editor = crate::vim_editor::VimEditor::new(template_sql.clone());
+                        let mut new_editor =
+                            crate::vim_editor::VimEditor::new(template_sql.clone());
                         // Enter insert mode first so clamp_cursor allows cursor after last char
                         new_editor.enter_insert_mode();
                         let line_count = new_editor.line_count();
@@ -119,7 +171,10 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                             }
                             // Delete the already-typed prefix characters
                             for _ in 0..prefix_len {
-                                ed.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE));
+                                ed.handle_key(KeyEvent::new(
+                                    KeyCode::Backspace,
+                                    KeyModifiers::NONE,
+                                ));
                             }
                             // Insert the full completion text
                             for ch in text.chars() {
@@ -157,7 +212,9 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                 }
                 return Ok(InputResult::Continue);
             }
-            KeyCode::Char(ch) if key.modifiers == KeyModifiers::NONE || key.modifiers == KeyModifiers::SHIFT => {
+            KeyCode::Char(ch)
+                if key.modifiers == KeyModifiers::NONE || key.modifiers == KeyModifiers::SHIFT =>
+            {
                 if let Some(ref mut comp) = app.sql_completion {
                     comp.push_filter(ch);
                     // Dismiss if nothing matches
@@ -205,17 +262,15 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         let context = detect_completion_context(&text_before_cursor);
 
         let items: Vec<CompletionItem> = match context {
-            CompletionContext::From => {
-                files
-                    .iter()
-                    .map(|p| CompletionItem {
-                        text: crate::query::table_name_from_path(p),
-                        kind: CompletionKind::Table,
-                        template: None,
-                        template_steps: vec![],
-                    })
-                    .collect()
-            }
+            CompletionContext::From => files
+                .iter()
+                .map(|p| CompletionItem {
+                    text: crate::query::table_name_from_path(p),
+                    kind: CompletionKind::Table,
+                    template: None,
+                    template_steps: vec![],
+                })
+                .collect(),
             CompletionContext::AliasPrefix(alias) => {
                 let aliases = parse_table_aliases(&sql_text, &files);
                 let headers = if let Some(path) = resolve_alias(&alias, &aliases, &files) {
@@ -223,12 +278,15 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                 } else {
                     Vec::new()
                 };
-                headers.into_iter().map(|h| CompletionItem {
-                    text: h,
-                    kind: CompletionKind::Column,
-                    template: None,
-                    template_steps: vec![],
-                }).collect()
+                headers
+                    .into_iter()
+                    .map(|h| CompletionItem {
+                        text: h,
+                        kind: CompletionKind::Column,
+                        template: None,
+                        template_steps: vec![],
+                    })
+                    .collect()
             }
             CompletionContext::Select => {
                 let mut items = vec![CompletionItem {
@@ -245,24 +303,35 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             CompletionContext::Where => {
                 let mut items = column_items_from_query(&sql_text, &files);
                 items.extend(function_items());
-                items.extend(keyword_items(&["AND", "OR", "NOT", "IN", "BETWEEN", "LIKE", "IS NULL", "IS NOT NULL", "EXISTS"]));
+                items.extend(keyword_items(&[
+                    "AND",
+                    "OR",
+                    "NOT",
+                    "IN",
+                    "BETWEEN",
+                    "LIKE",
+                    "IS NULL",
+                    "IS NOT NULL",
+                    "EXISTS",
+                ]));
                 items
             }
-            CompletionContext::GroupBy => {
-                column_items_from_query(&sql_text, &files)
-            }
+            CompletionContext::GroupBy => column_items_from_query(&sql_text, &files),
             CompletionContext::OrderBy => {
                 let mut items = column_items_from_query(&sql_text, &files);
                 items.extend(keyword_items(&["ASC", "DESC"]));
                 items
             }
             CompletionContext::General => {
-                let mut items: Vec<CompletionItem> = SQL_KEYWORDS.iter().map(|kw| CompletionItem {
-                    text: kw.to_string(),
-                    kind: CompletionKind::Keyword,
-                    template: None,
-                    template_steps: vec![],
-                }).collect();
+                let mut items: Vec<CompletionItem> = SQL_KEYWORDS
+                    .iter()
+                    .map(|kw| CompletionItem {
+                        text: kw.to_string(),
+                        kind: CompletionKind::Keyword,
+                        template: None,
+                        template_steps: vec![],
+                    })
+                    .collect();
                 items.extend(function_items());
                 items.extend(column_items_from_query(&sql_text, &files));
                 items
@@ -335,8 +404,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                 let query = editor.content().trim().to_string();
                 app.sql_buffer = editor.content();
                 if query.is_empty() {
-                    app.status_message =
-                        Some(StatusMessage::new_owned("Empty query".to_string()));
+                    app.status_message = Some(StatusMessage::new_owned("Empty query".to_string()));
                     app.mode = Mode::Normal;
                     return Ok(InputResult::Continue);
                 }
@@ -400,7 +468,9 @@ fn execute_template_steps(app: &mut App) {
             }
             TemplateStep::PickColumn(alias) => {
                 app.sql_template_steps.remove(0);
-                let sql_text = app.sql_vim_editor.as_ref()
+                let sql_text = app
+                    .sql_vim_editor
+                    .as_ref()
                     .map(|ed| ed.content())
                     .unwrap_or_default();
                 let files = app.session.files().to_vec();
@@ -544,22 +614,28 @@ fn detect_completion_context(text_before_cursor: &str) -> CompletionContext {
 
 /// Build CompletionItems for SQL functions
 fn function_items() -> Vec<CompletionItem> {
-    SQL_FUNCTIONS.iter().map(|f| CompletionItem {
-        text: f.to_string(),
-        kind: CompletionKind::Function,
-        template: None,
-        template_steps: vec![],
-    }).collect()
+    SQL_FUNCTIONS
+        .iter()
+        .map(|f| CompletionItem {
+            text: f.to_string(),
+            kind: CompletionKind::Function,
+            template: None,
+            template_steps: vec![],
+        })
+        .collect()
 }
 
 /// Build CompletionItems for specific keywords
 fn keyword_items(keywords: &[&str]) -> Vec<CompletionItem> {
-    keywords.iter().map(|kw| CompletionItem {
-        text: kw.to_string(),
-        kind: CompletionKind::Keyword,
-        template: None,
-        template_steps: vec![],
-    }).collect()
+    keywords
+        .iter()
+        .map(|kw| CompletionItem {
+            text: kw.to_string(),
+            kind: CompletionKind::Keyword,
+            template: None,
+            template_steps: vec![],
+        })
+        .collect()
 }
 
 /// Get column CompletionItems from all tables referenced in the query
@@ -634,10 +710,41 @@ fn parse_table_aliases(sql: &str, files: &[PathBuf]) -> Vec<TableAlias> {
 
     let table_keywords = ["FROM", "JOIN"];
     let non_alias_keywords = [
-        "WHERE", "GROUP", "ORDER", "HAVING", "SET", "SELECT", "ON", "LIMIT", "LEFT", "RIGHT",
-        "INNER", "CROSS", "OUTER", "NATURAL", "JOIN", "FROM", "AS", "AND", "OR", "NOT", "IN",
-        "BETWEEN", "LIKE", "IS", "NULL", "TRUE", "FALSE", "CASE", "WHEN", "THEN", "ELSE", "END",
-        "UNION", "EXCEPT", "INTERSECT",
+        "WHERE",
+        "GROUP",
+        "ORDER",
+        "HAVING",
+        "SET",
+        "SELECT",
+        "ON",
+        "LIMIT",
+        "LEFT",
+        "RIGHT",
+        "INNER",
+        "CROSS",
+        "OUTER",
+        "NATURAL",
+        "JOIN",
+        "FROM",
+        "AS",
+        "AND",
+        "OR",
+        "NOT",
+        "IN",
+        "BETWEEN",
+        "LIKE",
+        "IS",
+        "NULL",
+        "TRUE",
+        "FALSE",
+        "CASE",
+        "WHEN",
+        "THEN",
+        "ELSE",
+        "END",
+        "UNION",
+        "EXCEPT",
+        "INTERSECT",
     ];
 
     // Build set of known table names for matching
@@ -805,7 +912,9 @@ fn build_template_items() -> Vec<CompletionItem> {
                 TemplateStep::PickTable,
                 TemplateStep::Text("\nGROUP BY ".to_string()),
                 TemplateStep::PickColumn("*".to_string()),
-                TemplateStep::Assemble("SELECT {column}, COUNT(*)\nFROM {table}\nGROUP BY {column}".to_string()),
+                TemplateStep::Assemble(
+                    "SELECT {column}, COUNT(*)\nFROM {table}\nGROUP BY {column}".to_string(),
+                ),
             ],
         },
         CompletionItem {

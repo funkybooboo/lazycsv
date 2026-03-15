@@ -66,11 +66,8 @@ impl Document {
             .to_string();
 
         // Lazy path: large files with default encoding use mmap + row-offset index
-        if encoding_label.is_none()
-            && crate::csv::row_storage::should_use_lazy(path)
-        {
-            let storage =
-                RowStorage::lazy_from_file(path, delimiter, no_headers)?;
+        if encoding_label.is_none() && crate::csv::row_storage::should_use_lazy(path) {
+            let storage = RowStorage::lazy_from_file(path, delimiter, no_headers)?;
             return Ok(Document {
                 storage,
                 filename,
@@ -273,12 +270,9 @@ impl Document {
             .to_string();
 
         // Lazy path: large files with default encoding use mmap + row-offset index
-        if encoding_label.is_none()
-            && crate::csv::row_storage::should_use_lazy(path)
-        {
-            let storage = RowStorage::lazy_from_file_cancellable(
-                path, delimiter, no_headers, cancelled,
-            )?;
+        if encoding_label.is_none() && crate::csv::row_storage::should_use_lazy(path) {
+            let storage =
+                RowStorage::lazy_from_file_cancellable(path, delimiter, no_headers, cancelled)?;
             return Ok(Document {
                 storage,
                 filename,
@@ -485,7 +479,11 @@ impl Document {
     /// Get data row count (excluding header row)
     pub fn data_row_count(&self) -> usize {
         let count = self.storage.row_count();
-        if count == 0 { 0 } else { count - 1 }
+        if count == 0 {
+            0
+        } else {
+            count - 1
+        }
     }
 
     /// Get column count
@@ -502,7 +500,8 @@ impl Document {
 
     /// Get column header by index (returns "" if out of bounds)
     pub fn header(&self, col_idx: ColIndex) -> String {
-        self.storage.header_row()
+        self.storage
+            .header_row()
             .get(col_idx.get())
             .cloned()
             .unwrap_or_default()
@@ -952,7 +951,10 @@ mod tests {
         assert!(result.is_ok());
         let csv_data = result.unwrap();
         // rows[0] is header, rows[1..] are data
-        assert_eq!(csv_data.cell(RowIndex::new(1), ColIndex::new(1)), "日本語テキスト");
+        assert_eq!(
+            csv_data.cell(RowIndex::new(1), ColIndex::new(1)),
+            "日本語テキスト"
+        );
         assert_eq!(csv_data.cell(RowIndex::new(2), ColIndex::new(1)), " Emoji");
         assert_eq!(csv_data.cell(RowIndex::new(3), ColIndex::new(1)), "ñóëü");
     }

@@ -61,9 +61,14 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
 
         // Jump to bottom (G in vim)
         (KeyCode::Char('G'), KeyModifiers::SHIFT) => {
-            let filtered_count = count_filtered_files(app);
-            if filtered_count > 0 {
-                app.view_state.file_list_selected = filtered_count - 1;
+            // Get browser entries for current directory
+            let current_dir = app.view_state.current_directory.clone();
+            if let Ok(entries) = scan_directory(&current_dir) {
+                let filter = app.input_state.file_filter_buffer.to_lowercase();
+                let filtered_count = count_filtered_browser_entries(&entries, &filter);
+                if filtered_count > 0 {
+                    app.view_state.file_list_selected = filtered_count - 1;
+                }
             }
             Ok(InputResult::Continue)
         }
@@ -107,9 +112,14 @@ fn handle_search_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         // Apply filter and exit search mode (or show error if no matches)
         KeyCode::Enter => {
             app.input_state.file_list_search_active = false;
-            let filtered_count = count_filtered_files(app);
-            if filtered_count == 0 && !app.input_state.file_filter_buffer.is_empty() {
-                app.status_message = Some(StatusMessage::from("No matching files"));
+            // Get browser entries for current directory
+            let current_dir = app.view_state.current_directory.clone();
+            if let Ok(entries) = scan_directory(&current_dir) {
+                let filter = app.input_state.file_filter_buffer.to_lowercase();
+                let filtered_count = count_filtered_browser_entries(&entries, &filter);
+                if filtered_count == 0 && !app.input_state.file_filter_buffer.is_empty() {
+                    app.status_message = Some(StatusMessage::from("No matching files"));
+                }
             }
             Ok(InputResult::Continue)
         }
@@ -143,23 +153,37 @@ fn cancel(app: &mut App) {
 
 /// Move file list selection down
 fn move_down(app: &mut App) {
-    let filtered_count = count_filtered_files(app);
-    if app.view_state.file_list_selected + 1 < filtered_count {
-        app.view_state.file_list_selected += 1;
+    // Get browser entries for current directory
+    let current_dir = app.view_state.current_directory.clone();
+    if let Ok(entries) = scan_directory(&current_dir) {
+        let filter = app.input_state.file_filter_buffer.to_lowercase();
+        let filtered_count = count_filtered_browser_entries(&entries, &filter);
+        if app.view_state.file_list_selected + 1 < filtered_count {
+            app.view_state.file_list_selected += 1;
+        }
     }
 }
 
-/// Count files matching current filter
-fn count_filtered_files(app: &App) -> usize {
-    let filter = app.input_state.file_filter_buffer.to_lowercase();
-    app.session
-        .files()
+/// Count browser entries matching current filter
+fn count_filtered_browser_entries(entries: &[BrowserEntry], filter: &str) -> usize {
+    entries
         .iter()
-        .filter(|path| file_matches_filter(path, &filter))
+        .filter(|entry| entry_matches_filter(entry, filter))
         .count()
 }
 
-/// Check if file matches filter
+/// Check if browser entry matches filter
+fn entry_matches_filter(entry: &BrowserEntry, filter: &str) -> bool {
+    if filter.is_empty() {
+        true
+    } else if let Some(name) = entry.filename() {
+        name.to_lowercase().contains(filter)
+    } else {
+        false
+    }
+}
+
+/// Check if file path matches filter (for session files)
 fn file_matches_filter(path: &std::path::Path, filter: &str) -> bool {
     if filter.is_empty() {
         true

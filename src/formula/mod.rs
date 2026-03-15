@@ -56,7 +56,11 @@ impl Arg {
             Arg::Range(refs) => refs.iter().map(|r| get_cell(r.row, r.col)).collect(),
             Arg::Number(n) => vec![format_number(*n)],
             Arg::Text(s) => vec![s.clone()],
-            Arg::Bool(b) => vec![if *b { "TRUE".to_string() } else { "FALSE".to_string() }],
+            Arg::Bool(b) => vec![if *b {
+                "TRUE".to_string()
+            } else {
+                "FALSE".to_string()
+            }],
         }
     }
 
@@ -66,7 +70,13 @@ impl Arg {
             Arg::Cell(r) => get_cell(r.row, r.col),
             Arg::Number(n) => format_number(*n),
             Arg::Text(s) => s.clone(),
-            Arg::Bool(b) => if *b { "TRUE".to_string() } else { "FALSE".to_string() },
+            Arg::Bool(b) => {
+                if *b {
+                    "TRUE".to_string()
+                } else {
+                    "FALSE".to_string()
+                }
+            }
             Arg::Range(refs) => {
                 if let Some(first) = refs.first() {
                     get_cell(first.row, first.col)
@@ -146,16 +156,12 @@ impl Formula {
                     format_number(nums.iter().sum::<f64>() / nums.len() as f64)
                 }
             }
-            FormulaFunc::Min => {
-                self.eval_aggregate(get_cell, |nums| {
-                    nums.iter().cloned().fold(f64::INFINITY, f64::min)
-                })
-            }
-            FormulaFunc::Max => {
-                self.eval_aggregate(get_cell, |nums| {
-                    nums.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
-                })
-            }
+            FormulaFunc::Min => self.eval_aggregate(get_cell, |nums| {
+                nums.iter().cloned().fold(f64::INFINITY, f64::min)
+            }),
+            FormulaFunc::Max => self.eval_aggregate(get_cell, |nums| {
+                nums.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
+            }),
             FormulaFunc::Count => {
                 let values = self.collect_all_values(get_cell);
                 let count = values.iter().filter(|v| !v.trim().is_empty()).count();
@@ -333,13 +339,17 @@ impl Formula {
 
         match op {
             SubstrOp::Left => {
-                let n = self.args.get(1)
+                let n = self
+                    .args
+                    .get(1)
                     .and_then(|a| a.resolve_number(get_cell))
                     .unwrap_or(1.0) as usize;
                 chars.iter().take(n).collect()
             }
             SubstrOp::Right => {
-                let n = self.args.get(1)
+                let n = self
+                    .args
+                    .get(1)
                     .and_then(|a| a.resolve_number(get_cell))
                     .unwrap_or(1.0) as usize;
                 let start = chars.len().saturating_sub(n);
@@ -347,10 +357,14 @@ impl Formula {
             }
             SubstrOp::Mid => {
                 // MID(text, start_num, num_chars) — start_num is 1-based
-                let start = self.args.get(1)
+                let start = self
+                    .args
+                    .get(1)
                     .and_then(|a| a.resolve_number(get_cell))
                     .unwrap_or(1.0) as usize;
-                let n = self.args.get(2)
+                let n = self
+                    .args
+                    .get(2)
                     .and_then(|a| a.resolve_number(get_cell))
                     .unwrap_or(1.0) as usize;
                 let start_idx = start.saturating_sub(1); // convert to 0-based
@@ -414,8 +428,8 @@ impl Formula {
         match unit.as_str() {
             "d" => format_number((end - start).num_days() as f64),
             "m" => {
-                let months = (end.year() - start.year()) * 12
-                    + (end.month() as i32 - start.month() as i32);
+                let months =
+                    (end.year() - start.year()) * 12 + (end.month() as i32 - start.month() as i32);
                 format_number(months as f64)
             }
             "y" => format_number((end.year() - start.year()) as f64),
@@ -439,7 +453,9 @@ impl Formula {
             Some(n) => n as usize,
             None => return "#VALUE!".to_string(),
         };
-        let exact = self.args.get(3)
+        let exact = self
+            .args
+            .get(3)
             .map(|a| {
                 let s = a.resolve_single(get_cell).to_uppercase();
                 s == "FALSE" || s == "0"
@@ -485,7 +501,9 @@ impl Formula {
             Some(n) => n as usize,
             None => return "#VALUE!".to_string(),
         };
-        let exact = self.args.get(3)
+        let exact = self
+            .args
+            .get(3)
             .map(|a| {
                 let s = a.resolve_single(get_cell).to_uppercase();
                 s == "FALSE" || s == "0"
@@ -524,11 +542,13 @@ impl Formula {
         }
         let condition = evaluate_condition(&self.args[0], get_cell);
         if condition {
-            self.args.get(1)
+            self.args
+                .get(1)
                 .map(|a| a.resolve_single(get_cell))
                 .unwrap_or_default()
         } else {
-            self.args.get(2)
+            self.args
+                .get(2)
                 .map(|a| a.resolve_single(get_cell))
                 .unwrap_or_else(|| "FALSE".to_string())
         }
@@ -677,8 +697,7 @@ fn parse_arg(token: &str) -> Option<Arg> {
     if token.contains(':') {
         let parts: Vec<&str> = token.splitn(2, ':').collect();
         if parts.len() == 2 {
-            if let (Some(start), Some(end)) = (parse_cell_ref(parts[0]), parse_cell_ref(parts[1]))
-            {
+            if let (Some(start), Some(end)) = (parse_cell_ref(parts[0]), parse_cell_ref(parts[1])) {
                 return Some(Arg::Range(expand_range(start, end)));
             }
         }
@@ -772,10 +791,7 @@ pub fn parse_formula(input: &str) -> Option<Formula> {
 
     // NOW() and TODAY() take no arguments
     if matches!(func, FormulaFunc::Now | FormulaFunc::Today) {
-        return Some(Formula {
-            func,
-            args: vec![],
-        });
+        return Some(Formula { func, args: vec![] });
     }
 
     let arg_tokens = split_args(args_str);
@@ -851,9 +867,7 @@ fn resolve_comparison_operand(s: &str, get_cell: &dyn Fn(usize, usize) -> String
         return get_cell(cell_ref.row, cell_ref.col);
     }
     // Try unquoting
-    if (s.starts_with('"') && s.ends_with('"'))
-        || (s.starts_with('\'') && s.ends_with('\''))
-    {
+    if (s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')) {
         return s[1..s.len() - 1].to_string();
     }
     s.to_string()
@@ -888,8 +902,12 @@ fn cmp_lte(a: &str, b: &str) -> bool {
         a <= b
     }
 }
-fn cmp_eq(a: &str, b: &str) -> bool { a == b }
-fn cmp_ne(a: &str, b: &str) -> bool { a != b }
+fn cmp_eq(a: &str, b: &str) -> bool {
+    a == b
+}
+fn cmp_ne(a: &str, b: &str) -> bool {
+    a != b
+}
 
 // ============================================================================
 // FormulaStore
@@ -1058,7 +1076,11 @@ mod tests {
     fn test_evaluate_power() {
         let f = parse_formula("=POWER(A1, 2)").unwrap();
         let result = f.evaluate(&|row, _col| {
-            if row == 1 { "3".to_string() } else { String::new() }
+            if row == 1 {
+                "3".to_string()
+            } else {
+                String::new()
+            }
         });
         assert_eq!(result, "9");
     }
@@ -1067,7 +1089,11 @@ mod tests {
     fn test_evaluate_ceiling() {
         let f = parse_formula("=CEILING(A1, 5)").unwrap();
         let result = f.evaluate(&|row, _col| {
-            if row == 1 { "23".to_string() } else { "5".to_string() }
+            if row == 1 {
+                "23".to_string()
+            } else {
+                "5".to_string()
+            }
         });
         assert_eq!(result, "25");
     }
@@ -1076,7 +1102,11 @@ mod tests {
     fn test_evaluate_floor() {
         let f = parse_formula("=FLOOR(A1, 5)").unwrap();
         let result = f.evaluate(&|row, _col| {
-            if row == 1 { "23".to_string() } else { "5".to_string() }
+            if row == 1 {
+                "23".to_string()
+            } else {
+                "5".to_string()
+            }
         });
         assert_eq!(result, "20");
     }
@@ -1087,9 +1117,13 @@ mod tests {
     fn test_evaluate_concat() {
         let f = parse_formula("=CONCAT(A1, \" \", B1)").unwrap();
         let result = f.evaluate(&|row, col| {
-            if row == 1 && col == 0 { "Hello".to_string() }
-            else if row == 1 && col == 1 { "World".to_string() }
-            else { String::new() }
+            if row == 1 && col == 0 {
+                "Hello".to_string()
+            } else if row == 1 && col == 1 {
+                "World".to_string()
+            } else {
+                String::new()
+            }
         });
         assert_eq!(result, "Hello World");
     }
@@ -1098,7 +1132,11 @@ mod tests {
     fn test_evaluate_trim() {
         let f = parse_formula("=TRIM(A1)").unwrap();
         let result = f.evaluate(&|row, _| {
-            if row == 1 { "  hello   world  ".to_string() } else { String::new() }
+            if row == 1 {
+                "  hello   world  ".to_string()
+            } else {
+                String::new()
+            }
         });
         assert_eq!(result, "hello world");
     }
@@ -1109,7 +1147,11 @@ mod tests {
         let f_lower = parse_formula("=LOWER(A1)").unwrap();
         let f_proper = parse_formula("=PROPER(A1)").unwrap();
         let get = |row: usize, _: usize| {
-            if row == 1 { "hello world".to_string() } else { String::new() }
+            if row == 1 {
+                "hello world".to_string()
+            } else {
+                String::new()
+            }
         };
         assert_eq!(f_upper.evaluate(&get), "HELLO WORLD");
         assert_eq!(f_lower.evaluate(&get), "hello world");
@@ -1122,7 +1164,11 @@ mod tests {
         let f_right = parse_formula("=RIGHT(A1, 3)").unwrap();
         let f_mid = parse_formula("=MID(A1, 2, 3)").unwrap();
         let get = |row: usize, _: usize| {
-            if row == 1 { "Hello".to_string() } else { String::new() }
+            if row == 1 {
+                "Hello".to_string()
+            } else {
+                String::new()
+            }
         };
         assert_eq!(f_left.evaluate(&get), "Hel");
         assert_eq!(f_right.evaluate(&get), "llo");
@@ -1133,7 +1179,11 @@ mod tests {
     fn test_evaluate_substitute() {
         let f = parse_formula("=SUBSTITUTE(A1, \"Old\", \"New\")").unwrap();
         let result = f.evaluate(&|row, _| {
-            if row == 1 { "Old text with Old parts".to_string() } else { String::new() }
+            if row == 1 {
+                "Old text with Old parts".to_string()
+            } else {
+                String::new()
+            }
         });
         assert_eq!(result, "New text with New parts");
     }
@@ -1142,7 +1192,11 @@ mod tests {
     fn test_evaluate_replace() {
         let f = parse_formula("=REPLACE(A1, 2, 3, \"XYZ\")").unwrap();
         let result = f.evaluate(&|row, _| {
-            if row == 1 { "Hello".to_string() } else { String::new() }
+            if row == 1 {
+                "Hello".to_string()
+            } else {
+                String::new()
+            }
         });
         assert_eq!(result, "HXYZo");
     }
@@ -1161,9 +1215,13 @@ mod tests {
     fn test_evaluate_datedif_days() {
         let f = parse_formula("=DATEDIF(A1, B1, \"d\")").unwrap();
         let result = f.evaluate(&|row, col| {
-            if row == 1 && col == 0 { "2024-01-01".to_string() }
-            else if row == 1 && col == 1 { "2024-01-31".to_string() }
-            else { String::new() }
+            if row == 1 && col == 0 {
+                "2024-01-01".to_string()
+            } else if row == 1 && col == 1 {
+                "2024-01-31".to_string()
+            } else {
+                String::new()
+            }
         });
         assert_eq!(result, "30");
     }
@@ -1172,9 +1230,13 @@ mod tests {
     fn test_evaluate_datedif_months() {
         let f = parse_formula("=DATEDIF(A1, B1, \"m\")").unwrap();
         let result = f.evaluate(&|row, col| {
-            if row == 1 && col == 0 { "2024-01-15".to_string() }
-            else if row == 1 && col == 1 { "2024-06-15".to_string() }
-            else { String::new() }
+            if row == 1 && col == 0 {
+                "2024-01-15".to_string()
+            } else if row == 1 && col == 1 {
+                "2024-06-15".to_string()
+            } else {
+                String::new()
+            }
         });
         assert_eq!(result, "5");
     }
@@ -1219,7 +1281,11 @@ mod tests {
     fn test_evaluate_if_true() {
         let f = parse_formula("=IF(A1>10, \"High\", \"Low\")").unwrap();
         let result = f.evaluate(&|row, _| {
-            if row == 1 { "15".to_string() } else { String::new() }
+            if row == 1 {
+                "15".to_string()
+            } else {
+                String::new()
+            }
         });
         assert_eq!(result, "High");
     }
@@ -1228,7 +1294,11 @@ mod tests {
     fn test_evaluate_if_false() {
         let f = parse_formula("=IF(A1>10, \"High\", \"Low\")").unwrap();
         let result = f.evaluate(&|row, _| {
-            if row == 1 { "5".to_string() } else { String::new() }
+            if row == 1 {
+                "5".to_string()
+            } else {
+                String::new()
+            }
         });
         assert_eq!(result, "Low");
     }

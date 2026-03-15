@@ -764,7 +764,7 @@ impl App {
         &mut self,
         row: crate::domain::position::RowIndex,
         col: crate::domain::position::ColIndex,
-    content: String,
+        content: String,
     ) {
         if let Some(formula) = crate::formula::parse_formula(&content) {
             // Evaluate using document cell values
@@ -789,10 +789,13 @@ impl App {
 
     /// Re-evaluate all formulas that reference the given cell.
     fn re_evaluate_formulas_referencing(&mut self, changed_row: usize, changed_col: usize) {
-        let dependents = self.formula_store.cells_referencing(changed_row, changed_col);
+        let dependents = self
+            .formula_store
+            .cells_referencing(changed_row, changed_col);
         for (r, c) in dependents {
             if let Some(formula) = self.formula_store.get_formula(r, c).cloned() {
-                let computed = formula.evaluate(&|row, col| self.document.storage.get_cell(row, col));
+                let computed =
+                    formula.evaluate(&|row, col| self.document.storage.get_cell(row, col));
                 self.document.storage.set_cell(r, c, computed);
             }
         }

@@ -87,9 +87,15 @@ fn test_capital_p_pastes_row_above() {
     // Selection stays at row 2 (the pasted row)
     assert_eq!(app.selected_row().unwrap().get(), 2);
     // The pasted row should contain the yanked content
-    assert_eq!(app.document.get_rows_range(2, 3)[0], vec!["A1", "B1", "C1", "D1", "E1"]);
+    assert_eq!(
+        app.document.get_rows_range(2, 3)[0],
+        vec!["A1", "B1", "C1", "D1", "E1"]
+    );
     // The original row 2 (A2...) is now at row 3
-    assert_eq!(app.document.get_rows_range(3, 4)[0], vec!["A2", "B2", "C2", "D2", "E2"]);
+    assert_eq!(
+        app.document.get_rows_range(3, 4)[0],
+        vec!["A2", "B2", "C2", "D2", "E2"]
+    );
     assert!(app
         .status_message
         .as_ref()
@@ -173,8 +179,14 @@ fn test_comma_dd_deletes_current_column() {
 
     assert_eq!(app.document.column_count(), 4);
     // Column A removed — first column is now B
-    assert_eq!(app.document.get_rows_range(0, 1)[0], vec!["B", "C", "D", "E"]);
-    assert_eq!(app.document.get_rows_range(1, 2)[0], vec!["B1", "C1", "D1", "E1"]);
+    assert_eq!(
+        app.document.get_rows_range(0, 1)[0],
+        vec!["B", "C", "D", "E"]
+    );
+    assert_eq!(
+        app.document.get_rows_range(1, 2)[0],
+        vec!["B1", "C1", "D1", "E1"]
+    );
     assert!(app.document.is_dirty);
     assert!(app
         .status_message
@@ -563,8 +575,16 @@ fn test_comma_dd_then_comma_p_round_trip() {
     assert_eq!(app.document.column_count(), 5);
     // The pasted column should contain B data
     let paste_col = app.view_state.selected_column.get();
-    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(paste_col)), "B");
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(paste_col)), "B1");
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(0), ColIndex::new(paste_col)),
+        "B"
+    );
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(1), ColIndex::new(paste_col)),
+        "B1"
+    );
 }
 
 #[test]
@@ -585,7 +605,10 @@ fn test_dd_then_capital_p_round_trip() {
 
     // Pasted row should match
     let pasted_idx = app.selected_row().unwrap().get();
-    assert_eq!(app.document.get_rows_range(pasted_idx, pasted_idx + 1)[0], row1);
+    assert_eq!(
+        app.document.get_rows_range(pasted_idx, pasted_idx + 1)[0],
+        row1
+    );
 }
 
 // ============================================================================
@@ -754,7 +777,10 @@ fn test_5yy_then_p_pastes_5_rows() {
     assert_eq!(app.document.row_count(), 16); // 11 + 5 pasted
                                               // Rows 9-13 should be R1A..R5A
     assert_eq!(app.document.cell(RowIndex::new(9), ColIndex::new(0)), "R1A");
-    assert_eq!(app.document.cell(RowIndex::new(13), ColIndex::new(0)), "R5A");
+    assert_eq!(
+        app.document.cell(RowIndex::new(13), ColIndex::new(0)),
+        "R5A"
+    );
     // Selection should be on last pasted row (13)
     assert_eq!(app.selected_row().unwrap().get(), 13);
     assert!(app
@@ -785,7 +811,10 @@ fn test_5yy_then_capital_p_pastes_5_rows_above() {
     assert_eq!(app.document.row_count(), 16); // 11 + 5 pasted
                                               // Rows 8-12 should be R1A..R5A
     assert_eq!(app.document.cell(RowIndex::new(8), ColIndex::new(0)), "R1A");
-    assert_eq!(app.document.cell(RowIndex::new(12), ColIndex::new(0)), "R5A");
+    assert_eq!(
+        app.document.cell(RowIndex::new(12), ColIndex::new(0)),
+        "R5A"
+    );
     // Selection stays at row 8 (first pasted row)
     assert_eq!(app.selected_row().unwrap().get(), 8);
     assert!(app
@@ -805,14 +834,20 @@ fn test_cc_clears_row_enters_insert() {
     assert_eq!(app.selected_row().unwrap().get(), 1);
 
     // Verify row 1 has content
-    assert_eq!(app.document.get_rows_range(1, 2)[0], vec!["A1", "B1", "C1", "D1", "E1"]);
+    assert_eq!(
+        app.document.get_rows_range(1, 2)[0],
+        vec!["A1", "B1", "C1", "D1", "E1"]
+    );
 
     // cc
     app.handle_key(key(KeyCode::Char('c'))).unwrap();
     app.handle_key(key(KeyCode::Char('c'))).unwrap();
 
     // All cells cleared
-    assert_eq!(app.document.get_rows_range(1, 2)[0], vec!["", "", "", "", ""]);
+    assert_eq!(
+        app.document.get_rows_range(1, 2)[0],
+        vec!["", "", "", "", ""]
+    );
     // Should be in insert mode
     assert_eq!(app.mode, Mode::Insert);
     // Cursor at first column
@@ -1093,8 +1128,24 @@ fn test_3_comma_dd_then_comma_p_round_trip() {
     assert_eq!(app.document.column_count(), 5); // A E B C D
                                                 // Verify B, C, D are pasted back
     let paste_start = app.view_state.selected_column.get();
-    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(paste_start)), "B");
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(paste_start)), "B1");
-    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(paste_start + 1)), "C");
-    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(paste_start + 2)), "D");
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(0), ColIndex::new(paste_start)),
+        "B"
+    );
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(1), ColIndex::new(paste_start)),
+        "B1"
+    );
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(0), ColIndex::new(paste_start + 1)),
+        "C"
+    );
+    assert_eq!(
+        app.document
+            .cell(RowIndex::new(0), ColIndex::new(paste_start + 2)),
+        "D"
+    );
 }

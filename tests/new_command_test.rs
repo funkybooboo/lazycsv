@@ -38,9 +38,15 @@ fn test_new_command_with_headers() {
 
     // Should create document with 3 columns
     assert_eq!(app.document.column_count(), 3);
-    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(0)), "Name");
+    assert_eq!(
+        app.document.cell(RowIndex::new(0), ColIndex::new(0)),
+        "Name"
+    );
     assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(1)), "Age");
-    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(2)), "City");
+    assert_eq!(
+        app.document.cell(RowIndex::new(0), ColIndex::new(2)),
+        "City"
+    );
 
     // Should have only header row (0 data rows)
     assert_eq!(app.document.data_row_count(), 0);
@@ -67,7 +73,10 @@ fn test_new_command_without_headers() {
 
     // Should create document with 1 column named "Column 1"
     assert_eq!(app.document.column_count(), 1);
-    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(0)), "Column 1");
+    assert_eq!(
+        app.document.cell(RowIndex::new(0), ColIndex::new(0)),
+        "Column 1"
+    );
 
     // Should have only header row
     assert_eq!(app.document.data_row_count(), 0);
@@ -131,9 +140,18 @@ fn test_new_command_with_spaces_in_headers() {
     send_command(&mut app, "new First Name,Last Name,Email Address");
 
     assert_eq!(app.document.column_count(), 3);
-    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(0)), "First Name");
-    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(1)), "Last Name");
-    assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(2)), "Email Address");
+    assert_eq!(
+        app.document.cell(RowIndex::new(0), ColIndex::new(0)),
+        "First Name"
+    );
+    assert_eq!(
+        app.document.cell(RowIndex::new(0), ColIndex::new(1)),
+        "Last Name"
+    );
+    assert_eq!(
+        app.document.cell(RowIndex::new(0), ColIndex::new(2)),
+        "Email Address"
+    );
 }
 
 #[test]

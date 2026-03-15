@@ -27,9 +27,7 @@ pub fn should_use_lazy(path: &Path) -> bool {
 /// Dual-mode row storage.
 pub enum RowStorage {
     /// Fully materialized rows (existing behavior).
-    InMemory {
-        rows: Vec<Vec<String>>,
-    },
+    InMemory { rows: Vec<Vec<String>> },
     /// Lazy disk-backed storage with row-offset index.
     Lazy(Box<LazyStorage>),
 }
@@ -61,11 +59,7 @@ impl RowStorage {
     }
 
     /// Create lazy storage by memory-mapping a file and building a row-offset index.
-    pub fn lazy_from_file(
-        path: &Path,
-        delimiter: Option<u8>,
-        no_headers: bool,
-    ) -> Result<Self> {
+    pub fn lazy_from_file(path: &Path, delimiter: Option<u8>, no_headers: bool) -> Result<Self> {
         let file = std::fs::File::open(path)
             .context(format!("Failed to open file: {}", path.display()))?;
         let mmap = unsafe { memmap2::MmapOptions::new().map(&file)? };
@@ -93,9 +87,7 @@ impl RowStorage {
 
         let col_count = header.len();
 
-        let cache = LruCache::new(
-            NonZeroUsize::new(ROW_CACHE_SIZE).unwrap(),
-        );
+        let cache = LruCache::new(NonZeroUsize::new(ROW_CACHE_SIZE).unwrap());
 
         Ok(RowStorage::Lazy(Box::new(LazyStorage {
             mmap,
@@ -138,9 +130,7 @@ impl RowStorage {
         };
 
         let col_count = header.len();
-        let cache = LruCache::new(
-            NonZeroUsize::new(ROW_CACHE_SIZE).unwrap(),
-        );
+        let cache = LruCache::new(NonZeroUsize::new(ROW_CACHE_SIZE).unwrap());
 
         Ok(RowStorage::Lazy(Box::new(LazyStorage {
             mmap,
@@ -175,9 +165,7 @@ impl RowStorage {
     /// For InMemory, clones the row. For Lazy, checks edits, then cache, then parses.
     pub fn get_row(&self, idx: usize) -> Vec<String> {
         match self {
-            RowStorage::InMemory { rows } => {
-                rows.get(idx).cloned().unwrap_or_default()
-            }
+            RowStorage::InMemory { rows } => rows.get(idx).cloned().unwrap_or_default(),
             RowStorage::Lazy(s) => s.get_row(idx),
         }
     }
@@ -185,12 +173,11 @@ impl RowStorage {
     /// Get a cell value. Returns "" if out of bounds.
     pub fn get_cell(&self, row_idx: usize, col_idx: usize) -> String {
         match self {
-            RowStorage::InMemory { rows } => {
-                rows.get(row_idx)
-                    .and_then(|r| r.get(col_idx))
-                    .cloned()
-                    .unwrap_or_default()
-            }
+            RowStorage::InMemory { rows } => rows
+                .get(row_idx)
+                .and_then(|r| r.get(col_idx))
+                .cloned()
+                .unwrap_or_default(),
             RowStorage::Lazy(s) => {
                 if row_idx == 0 {
                     return s.header.get(col_idx).cloned().unwrap_or_default();
@@ -207,9 +194,7 @@ impl RowStorage {
     /// Get the header row (row 0).
     pub fn header_row(&self) -> &[String] {
         match self {
-            RowStorage::InMemory { rows } => {
-                rows.first().map(|r| r.as_slice()).unwrap_or(&[])
-            }
+            RowStorage::InMemory { rows } => rows.first().map(|r| r.as_slice()).unwrap_or(&[]),
             RowStorage::Lazy(s) => &s.header,
         }
     }
@@ -221,18 +206,16 @@ impl RowStorage {
             return vec![];
         }
         match self {
-            RowStorage::InMemory { rows } => {
-                rows[start..end].to_vec()
-            }
-            RowStorage::Lazy(s) => {
-                (start..end).map(|i| {
+            RowStorage::InMemory { rows } => rows[start..end].to_vec(),
+            RowStorage::Lazy(s) => (start..end)
+                .map(|i| {
                     if i == 0 {
                         s.header.clone()
                     } else {
                         s.get_row(i)
                     }
-                }).collect()
-            }
+                })
+                .collect(),
         }
     }
 
@@ -608,11 +591,9 @@ fn parse_single_row(bytes: &[u8], delimiter: u8) -> Vec<String> {
     if reader.read_byte_record(&mut record).unwrap_or(false) {
         record
             .iter()
-            .map(|field| {
-                match std::str::from_utf8(field) {
-                    Ok(s) => s.to_owned(),
-                    Err(_) => String::from_utf8_lossy(field).into_owned(),
-                }
+            .map(|field| match std::str::from_utf8(field) {
+                Ok(s) => s.to_owned(),
+                Err(_) => String::from_utf8_lossy(field).into_owned(),
             })
             .collect()
     } else {
@@ -695,10 +676,7 @@ mod tests {
 
     #[test]
     fn test_in_memory_set_cell() {
-        let rows = vec![
-            vec!["A".into()],
-            vec!["1".into()],
-        ];
+        let rows = vec![vec!["A".into()], vec!["1".into()]];
         let mut storage = RowStorage::in_memory(rows);
 
         let old = storage.set_cell(1, 0, "2".into());
@@ -724,11 +702,7 @@ mod tests {
 
     #[test]
     fn test_in_memory_iter_rows() {
-        let rows = vec![
-            vec!["H".into()],
-            vec!["1".into()],
-            vec!["2".into()],
-        ];
+        let rows = vec![vec!["H".into()], vec!["1".into()], vec!["2".into()]];
         let storage = RowStorage::in_memory(rows);
 
         let collected: Vec<_> = storage.iter_rows().collect();

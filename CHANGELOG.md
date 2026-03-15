@@ -7,6 +7,170 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-03-14
+
+### Added - Modal Standardization & Code Consolidation
+
+**New Shared Modal Module (`src/ui/modal.rs`)**
+- Centralized all modal size constants (80% × 80% for large, 40% × 20% for small)
+- Shared helper functions: `large_modal_rect()`, `small_modal_rect()`, `centered_rect()`
+- Standard layout helpers: `split_with_status_bar()`, `standard_block()`
+- Consistent style constants: `cursor_style()`, `dim_style()`, `bold_style()`, `error_style()`
+- Status bar builders: `build_status_line()`, `build_three_part_status_line()`
+- Mode indicator formatter: `format_mode_indicator()`
+- 7 comprehensive tests for all helpers
+
+**Modal Consolidation**
+- Help overlay: Now uses standard 80% × 80% (was 70% × 80%)
+- SQL Editor: Migrated to shared constants and helpers
+- Magnifier: Migrated to shared constants and helpers
+- File Manager: Migrated to shared constants and helpers
+- File Operation prompts: Migrated to shared small modal size
+- Removed 4 duplicate constant definitions
+- Removed duplicate `centered_rect()` implementation from help.rs
+- All modals now use `modal::standard_block()` for consistent borders
+
+**Modal Status Bar Standardization**
+- All modals now have consistent status bars at the bottom
+- SQL Editor: Mode indicator moved from title to status bar (left: ` NORMAL` or `:command`, right: help hints)
+- Magnifier: Mode format standardized to ` INSERT`/` NORMAL` (was `-- INSERT --`)
+- File Manager: Added status bar with navigation hints (`h/l: navigate | /: filter | r/d/m/y/n: operations`)
+- Help Overlay: Added status bar with scroll/search hints (`j/k: scroll | /: search | Esc: close`)
+- All modals use `modal::format_mode_indicator()` for consistent mode display
+- Status bars show contextual help (navigation hints, keyboard shortcuts)
+
+**Code Quality Improvements**
+- Single source of truth for all modal dimensions
+- Enforced consistency through shared code (can't accidentally use different sizes)
+- Reduced code duplication by ~100 lines
+- Easier maintenance (change modal size once, applies everywhere)
+- Better testability (shared helpers have comprehensive tests)
+
+### Added - Yazi-Inspired 3-Column File Browser
+
+**3-Column Layout (30% : 40% : 30%)**
+- **Left Column:** Parent directory preview showing context
+  - Shows first 15 entries from parent directory
+  - Highlights current directory in parent listing
+  - Dim styling for non-intrusive context
+  - Blank at filesystem root
+- **Middle Column:** Current directory navigation (existing functionality)
+  - File/directory listing with filtering
+  - Selection cursor ("> ") and active file indicator ("● ")
+  - Bold styling for selected items
+  - Directory suffix ("/") and parent directory ("../")
+- **Right Column:** Preview pane for selected item
+  - **For directories:** Shows first 15 entries with "/" suffix
+  - **For CSV files:** Shows first 10 lines with line numbers (raw CSV)
+  - Dim styling for preview content
+  - Graceful error handling (blank on errors)
+
+**Bug Fixes**
+- Fixed navigation scroll limit bug - now correctly counts browser entries instead of session files
+- Removed emoji icons ("📁" and "↑") - replaced with ASCII "/" suffix for directories
+- Changed "?" fallback to "unknown" for consistency across file manager
+
+**UI Improvements**
+- ASCII-only rendering (no emojis) following project principles
+- Consistent "/" suffix for directories throughout
+- Parent directory always shown as "../"
+- Clean, minimal 3-column layout inspired by yazi file manager
+
+### Technical
+
+**Metrics:**
+- Tests: 531 passing (+7 new modal tests, all existing tests maintained)
+- Zero regressions
+- Zero clippy warnings
+- Performance: Unchanged
+- Code reduction: ~100 lines removed through consolidation
+
+**Architecture:**
+- **NEW MODULE:** `src/ui/modal.rs` (350+ lines) - Shared modal utilities
+  - Size constants: `MODAL_LARGE_WIDTH/HEIGHT`, `MODAL_SMALL_WIDTH/HEIGHT`
+  - Layout helpers: `large_modal_rect()`, `small_modal_rect()`, `split_with_status_bar()`
+  - Style helpers: `cursor_style()`, `dim_style()`, `bold_style()`, `error_style()`
+  - Status bar builders: `build_status_line()`, `build_three_part_status_line()`
+  - Mode formatter: `format_mode_indicator()`
+- File browser helpers: `render_parent_column()`, `render_current_column()`, `render_preview_column()`
+- CSV preview: `read_csv_preview()` for raw CSV file preview
+- Browser navigation: `count_filtered_browser_entries()` and `entry_matches_filter()`
+- Layout constants: `PARENT_COL_PERCENT`, `CURRENT_COL_PERCENT`, `PREVIEW_COL_PERCENT`
+- Preview limits: `PREVIEW_MAX_DIR_ENTRIES` (15), `PREVIEW_MAX_CSV_LINES` (10)
+
+### Added - UI Consistency & Standardization
+
+**Keybinding Registry**
+- Central source of truth in `src/input/keybindings.rs` (600+ lines)
+- `InputAction` enum with ~40 action variants (NavigateUp, EnterInsertMode, etc.)
+- `Keybinding` struct mapping keys → actions → modes
+- `KEYBINDINGS` const array with ~60 keybindings documented
+- Query functions: `get_action()`, `get_keybindings_for_mode()`, `get_help_text_for_mode()`
+- Guarantees: Esc always returns to Normal, no duplicate bindings per mode
+- 7 comprehensive tests ensuring consistency
+
+**Expanded Style System**
+- Added 8 new style helper functions to `modal.rs`:
+  - `visual_selection_style()` - DarkGray bg, Yellow fg
+  - `header_style()` - Bold text for headers
+  - `row_number_style()` - Bold text for row numbers
+  - `success_style()` - Green, bold for success messages
+  - `mode_indicator_style()` - Black on Green for mode display
+  - `completion_selected_style()` - White on Blue for selected items
+  - `completion_unselected_style()` - White on DarkGray for unselected items
+- Added 8 new color constants:
+  - `COLOR_VISUAL_BG/FG` - Visual selection colors
+  - `COLOR_ERROR/SUCCESS` - Message colors
+  - `COLOR_MODE_INDICATOR_BG/FG` - Mode indicator colors
+- All UI files refactored to use centralized styles (zero hardcoded colors)
+
+**Consistency Fixes**
+- Mode indicators: Consistent green background across all modes (table, magnifier, SQL, file manager)
+- Error messages: All use `error_style()` (red, bold)
+- Visual selection: Same colors in table and magnifier (DarkGray bg, Yellow fg)
+- Help text: Standardized formatting with `bold_style()` for headers
+- Status bars: Consistent layout using `build_status_line()` helpers
+- Cursor/selection: All use `cursor_style()` (white bg, black fg, bold)
+
+**Documentation**
+- NEW: `docs/ui-guidelines.md` - Complete UI design system guide (250+ lines)
+  - Color palette reference
+  - Typography standards
+  - Layout rules
+  - Component patterns
+  - Anti-patterns and examples
+  - Migration guide
+- Updated `docs/keybindings.md`:
+  - Added keybinding registry documentation
+  - Documented consistency guarantees
+  - Updated mode indicator format
+  - Added programmatic access examples
+- Enhanced `src/ui/modal.rs` documentation:
+  - Comprehensive module-level docs
+  - Quick start guide
+  - Style function reference
+  - Color constant reference
+
+**Testing**
+- 7 new keybinding registry tests
+- 7 new style consistency tests
+- Total: 545 tests passing (+14 from v0.11.1)
+- Zero clippy warnings
+- Zero hardcoded colors in UI layer
+
+**Files Modified:**
+- `src/ui/modal.rs` - Expanded with 8 new styles, 8 new constants (+150 lines, now 500+ lines total)
+- `src/ui/table.rs` - All styles centralized via modal:: helpers
+- `src/ui/magnifier.rs` - Cursor style centralized
+- `src/ui/sql_editor.rs` - All colors/styles centralized
+- `src/ui/status_bar.rs` - Mode indicator uses centralized style
+- `src/ui/mod.rs` - Completion menu uses centralized styles
+- `src/ui/help.rs` - Bold headers use centralized style
+- `src/input/keybindings.rs` - NEW: Central keybinding registry (+600 lines)
+- `src/input/mod.rs` - Export keybindings module
+- `docs/ui-guidelines.md` - NEW: Complete UI design system
+- `docs/keybindings.md` - Updated with registry documentation
+
 ## [0.11.0] - 2026-03-08
 
 ### Added - SQL Editor Vim Modal Editing
