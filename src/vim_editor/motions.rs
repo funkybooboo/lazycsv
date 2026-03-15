@@ -46,7 +46,7 @@ impl VimEditor {
 
     /// Move to end of line ($)
     pub fn move_to_line_end(&mut self) {
-        let line_len = self.current_line().len();
+        let line_len = self.current_line().chars().count();
         self.cursor.1 = if self.mode == VimMode::Insert {
             line_len
         } else {
@@ -117,16 +117,18 @@ impl VimEditor {
     /// Helper: Move to next word once
     fn move_next_word_once(&mut self) {
         let line = self.current_line().to_string();
+        let char_count = line.chars().count();
         let mut col = self.cursor.1;
 
-        if col >= line.len() {
+        if col >= char_count {
             // At end of line, move to next line
             if self.cursor.0 < self.lines.len() - 1 {
                 self.cursor.0 += 1;
                 self.cursor.1 = 0;
                 let new_line = self.current_line().to_string();
+                let new_char_count = new_line.chars().count();
                 // Skip leading whitespace
-                while self.cursor.1 < new_line.len()
+                while self.cursor.1 < new_char_count
                     && Self::is_whitespace_at(&new_line, self.cursor.1)
                 {
                     self.cursor.1 += 1;
@@ -137,22 +139,24 @@ impl VimEditor {
         }
 
         // Skip current word (non-whitespace)
-        while col < line.len() && !Self::is_whitespace_at(&line, col) {
+        while col < char_count && !Self::is_whitespace_at(&line, col) {
             col += 1;
         }
 
         // Skip whitespace to next word
-        while col < line.len() && Self::is_whitespace_at(&line, col) {
+        while col < char_count && Self::is_whitespace_at(&line, col) {
             col += 1;
         }
 
         // If we reached end of line, move to next line
-        if col >= line.len() && self.cursor.0 < self.lines.len() - 1 {
+        if col >= char_count && self.cursor.0 < self.lines.len() - 1 {
             self.cursor.0 += 1;
             self.cursor.1 = 0;
             let new_line = self.current_line().to_string();
+            let new_char_count = new_line.chars().count();
             // Skip leading whitespace on new line
-            while self.cursor.1 < new_line.len() && Self::is_whitespace_at(&new_line, self.cursor.1)
+            while self.cursor.1 < new_char_count
+                && Self::is_whitespace_at(&new_line, self.cursor.1)
             {
                 self.cursor.1 += 1;
             }
@@ -172,7 +176,7 @@ impl VimEditor {
             if self.cursor.0 > 0 {
                 self.cursor.0 -= 1;
                 let line = self.current_line().to_string();
-                self.cursor.1 = line.len().saturating_sub(1);
+                self.cursor.1 = line.chars().count().saturating_sub(1);
             }
             self.clamp_cursor();
             return;
@@ -200,25 +204,26 @@ impl VimEditor {
     /// Helper: Move to end of word once
     fn move_end_word_once(&mut self) {
         let line = self.current_line().to_string();
+        let char_count = line.chars().count();
         let mut col = self.cursor.1;
 
         // Move forward at least one character
-        if col < line.len() {
+        if col < char_count {
             col += 1;
         }
 
         // Skip whitespace
-        while col < line.len() && Self::is_whitespace_at(&line, col) {
+        while col < char_count && Self::is_whitespace_at(&line, col) {
             col += 1;
         }
 
         // Move to end of word (find next whitespace or end)
-        while col < line.len() && !Self::is_whitespace_at(&line, col) {
+        while col < char_count && !Self::is_whitespace_at(&line, col) {
             col += 1;
         }
 
         // Position on last character of word (one before whitespace)
-        if col > 0 && col <= line.len() {
+        if col > 0 && col <= char_count {
             col -= 1;
         }
 

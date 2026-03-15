@@ -819,9 +819,9 @@ fn test_ui_multi_byte_unicode_rendering() {
             vec!["Hello".to_string(), "🎊😀".to_string(), "World".to_string()],
             vec!["Test".to_string(), "".to_string(), "Data".to_string()],
         ],
-        "unicode.csv".to_string(),
+        "unicode 国家.csv".to_string(),
     );
-    let csv_files = vec![PathBuf::from("unicode.csv")];
+    let csv_files = vec![PathBuf::from("unicode 国家.csv")];
     let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
     let backend = TestBackend::new(80, 24);

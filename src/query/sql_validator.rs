@@ -10,7 +10,7 @@ use crate::app::{DiagnosticSeverity, SqlDiagnostic};
 use crate::query::error_enhancer::levenshtein_distance;
 use crate::query::table_name_from_path;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// SQL keywords that should not be treated as identifiers
 const SQL_KEYWORDS: &[&str] = &[
@@ -25,16 +25,6 @@ const SQL_KEYWORDS: &[&str] = &[
     "TYPEOF", "ABS", "ROUND", "DATE", "TIME", "DATETIME", "STRFTIME",
     "GROUP_CONCAT", "TOTAL", "EXCEPT", "INTERSECT",
 ];
-
-/// Read just the header row from a CSV file.
-fn read_csv_headers(path: &Path) -> Option<Vec<String>> {
-    let mut reader = csv::ReaderBuilder::new()
-        .has_headers(true)
-        .from_path(path)
-        .ok()?;
-    let headers = reader.headers().ok()?.clone();
-    Some(headers.iter().map(String::from).collect())
-}
 
 /// A token with its position in the source text
 #[derive(Debug, Clone)]
@@ -132,12 +122,41 @@ fn tokenize_with_positions(sql: &str) -> Vec<LocatedToken> {
             continue;
         }
 
+        // Double-quoted identifier
+        if ch == '"' {
+            let start_col = col;
+            let start_line = line;
+            i += 1;
+            col += 1;
+            let content_start = i;
+            while i < len && chars[i] != '"' {
+                if chars[i] == '\n' {
+                    line += 1;
+                    col = 0;
+                } else {
+                    col += 1;
+                }
+                i += 1;
+            }
+            let text: String = chars[content_start..i].iter().collect();
+            if i < len {
+                i += 1; // skip closing quote
+                col += 1;
+            }
+            tokens.push(LocatedToken {
+                text,
+                line: start_line,
+                col: start_col,
+            });
+            continue;
+        }
+
         // Identifier or keyword
-        if ch.is_ascii_alphabetic() || ch == '_' {
+        if ch.is_alphabetic() || ch == '_' {
             let start_col = col;
             let start_line = line;
             let start_i = i;
-            while i < len && (chars[i].is_ascii_alphanumeric() || chars[i] == '_') {
+            while i < len && (chars[i].is_alphanumeric() || chars[i] == '_') {
                 i += 1;
                 col += 1;
             }
@@ -158,20 +177,31 @@ fn tokenize_with_positions(sql: &str) -> Vec<LocatedToken> {
     tokens
 }
 
-/// Build a map from table name (lowercase) to its file path and column headers.
-fn build_schema(files: &[PathBuf]) -> HashMap<String, (PathBuf, Vec<String>)> {
+/// Build a map from table name (lowercase) to its file path and column headers,
+/// using a pre-built header map (from SchemaCache) instead of reading from disk.
+fn build_schema(
+    files: &[PathBuf],
+    header_map: &HashMap<PathBuf, Vec<String>>,
+) -> HashMap<String, (PathBuf, Vec<String>)> {
     let mut schema = HashMap::new();
     for path in files {
-        let table = table_name_from_path(path).to_ascii_lowercase();
-        if let Some(headers) = read_csv_headers(path) {
-            schema.insert(table, (path.clone(), headers));
+        let table = table_name_from_path(path).to_lowercase();
+        if let Some(headers) = header_map.get(path) {
+            schema.insert(table, (path.clone(), headers.clone()));
         }
     }
     schema
 }
 
 /// Run all validation checks on the SQL text.
-pub fn validate(sql: &str, files: &[PathBuf]) -> Vec<SqlDiagnostic> {
+///
+/// `schema_map` provides pre-cached CSV headers keyed by file path,
+/// so the validator does not need to read from disk.
+pub fn validate(
+    sql: &str,
+    files: &[PathBuf],
+    schema_map: &HashMap<PathBuf, Vec<String>>,
+) -> Vec<SqlDiagnostic> {
     if sql.trim().is_empty() {
         return Vec::new();
     }
@@ -181,7 +211,7 @@ pub fn validate(sql: &str, files: &[PathBuf]) -> Vec<SqlDiagnostic> {
         return Vec::new();
     }
 
-    let schema = build_schema(files);
+    let schema = build_schema(files, schema_map);
     let known_tables: Vec<String> = schema.keys().cloned().collect();
 
     let mut diagnostics = Vec::new();
@@ -259,7 +289,7 @@ fn parse_table_references(tokens: &[LocatedToken], known_tables: &[String]) -> V
                 break;
             }
 
-            let table_lower = tokens[i].text.to_ascii_lowercase();
+            let table_lower = tokens[i].text.to_lowercase();
             i += 1;
 
             if !known_tables.contains(&table_lower) {
@@ -278,7 +308,7 @@ fn parse_table_references(tokens: &[LocatedToken], known_tables: &[String]) -> V
                 && tokens[i].text != ","
                 && tokens[i].text != "("
             {
-                alias = Some(tokens[i].text.to_ascii_lowercase());
+                alias = Some(tokens[i].text.to_lowercase());
                 i += 1;
             }
 
@@ -333,7 +363,7 @@ fn check_unknown_tables(
                 break;
             }
 
-            let table_lower = tokens[i].text.to_ascii_lowercase();
+            let table_lower = tokens[i].text.to_lowercase();
             let tok = &tokens[i];
             i += 1;
 
@@ -359,7 +389,7 @@ fn check_unknown_tables(
                 diagnostics.push(SqlDiagnostic {
                     line: tok.line,
                     col_start: tok.col,
-                    col_end: tok.col + tok.text.len(),
+                    col_end: tok.col + tok.text.chars().count(),
                     message: msg,
                     severity: DiagnosticSeverity::Error,
                 });
@@ -406,7 +436,7 @@ fn check_missing_join_conditions(
                 diagnostics.push(SqlDiagnostic {
                     line: join_tok.line,
                     col_start: join_tok.col,
-                    col_end: join_tok.col + join_tok.text.len(),
+                    col_end: join_tok.col + join_tok.text.chars().count(),
                     message: "JOIN without ON condition".to_string(),
                     severity: DiagnosticSeverity::Warning,
                 });
@@ -443,7 +473,7 @@ fn collect_all_columns(tables: &[ResolvedTable]) -> Vec<String> {
     let mut columns = Vec::new();
     for table in tables {
         for h in &table.headers {
-            let lower = h.to_ascii_lowercase();
+            let lower = h.to_lowercase();
             if !columns.contains(&lower) {
                 columns.push(lower);
             }
@@ -457,7 +487,7 @@ fn build_column_table_map(tables: &[ResolvedTable]) -> HashMap<String, Vec<Strin
     let mut map: HashMap<String, Vec<String>> = HashMap::new();
     for table in tables {
         for h in &table.headers {
-            map.entry(h.to_ascii_lowercase())
+            map.entry(h.to_lowercase())
                 .or_default()
                 .push(table.name.clone());
         }
@@ -488,13 +518,18 @@ fn find_column_positions(tokens: &[LocatedToken], table_refs: &[TableRef]) -> Ve
             continue;
         }
 
+        // Skip function arguments (identifier preceded by '(')
+        if i > 0 && tokens[i - 1].text == "(" {
+            continue;
+        }
+
         // Skip table reference positions
         if table_ref_indices.contains(&i) {
             continue;
         }
 
         // Skip known aliases
-        if known_aliases.contains(&tokens[i].text.to_ascii_lowercase()) {
+        if known_aliases.contains(&tokens[i].text.to_lowercase()) {
             continue;
         }
 
@@ -511,7 +546,7 @@ fn find_column_positions(tokens: &[LocatedToken], table_refs: &[TableRef]) -> Ve
         }
 
         // Skip known table names used standalone (might be alias)
-        if known_table_names.contains(&tokens[i].text.to_ascii_lowercase()) {
+        if known_table_names.contains(&tokens[i].text.to_lowercase()) {
             continue;
         }
 
@@ -588,14 +623,14 @@ fn check_unknown_columns(
 
     for &idx in &col_positions {
         let tok = &tokens[idx];
-        let col_lower = tok.text.to_ascii_lowercase();
+        let col_lower = tok.text.to_lowercase();
 
         // Check if preceded by "." (qualified: table.column)
         let is_qualified = idx >= 2 && tokens[idx - 1].text == ".";
 
         if is_qualified {
             // Get the qualifier (table name or alias)
-            let qualifier = tokens[idx - 2].text.to_ascii_lowercase();
+            let qualifier = tokens[idx - 2].text.to_lowercase();
 
             // Resolve qualifier to table name
             let table_name = table_refs
@@ -605,7 +640,7 @@ fn check_unknown_columns(
 
             if let Some(table) = table_name {
                 if let Some((_, headers)) = schema.get(table.as_str()) {
-                    let headers_lower: Vec<String> = headers.iter().map(|h| h.to_ascii_lowercase()).collect();
+                    let headers_lower: Vec<String> = headers.iter().map(|h| h.to_lowercase()).collect();
                     if !headers_lower.contains(&col_lower) {
                         let mut msg = format!("Unknown column '{}'", tok.text);
                         let suggestions = find_similar(&col_lower, &headers_lower, 2);
@@ -615,7 +650,7 @@ fn check_unknown_columns(
                         diagnostics.push(SqlDiagnostic {
                             line: tok.line,
                             col_start: tok.col,
-                            col_end: tok.col + tok.text.len(),
+                            col_end: tok.col + tok.text.chars().count(),
                             message: msg,
                             severity: DiagnosticSeverity::Error,
                         });
@@ -633,7 +668,7 @@ fn check_unknown_columns(
                 diagnostics.push(SqlDiagnostic {
                     line: tok.line,
                     col_start: tok.col,
-                    col_end: tok.col + tok.text.len(),
+                    col_end: tok.col + tok.text.chars().count(),
                     message: msg,
                     severity: DiagnosticSeverity::Error,
                 });
@@ -663,14 +698,14 @@ fn check_ambiguous_columns(
         }
 
         let tok = &tokens[idx];
-        let col_lower = tok.text.to_ascii_lowercase();
+        let col_lower = tok.text.to_lowercase();
 
         if let Some(tables) = column_to_tables.get(&col_lower) {
             if tables.len() > 1 {
                 diagnostics.push(SqlDiagnostic {
                     line: tok.line,
                     col_start: tok.col,
-                    col_end: tok.col + tok.text.len(),
+                    col_end: tok.col + tok.text.chars().count(),
                     message: format!(
                         "Ambiguous column '{}' exists in tables: {}",
                         tok.text,
@@ -714,6 +749,21 @@ mod tests {
         (tmp, path)
     }
 
+    /// Build a schema map by reading CSV headers from the given file paths.
+    fn build_test_schema(files: &[PathBuf]) -> HashMap<PathBuf, Vec<String>> {
+        files
+            .iter()
+            .filter_map(|p| {
+                let mut rdr = csv::ReaderBuilder::new()
+                    .has_headers(true)
+                    .from_path(p)
+                    .ok()?;
+                let hdrs = rdr.headers().ok()?.iter().map(String::from).collect();
+                Some((p.clone(), hdrs))
+            })
+            .collect()
+    }
+
     #[test]
     fn test_unknown_table() {
         let dir = tempfile::tempdir().unwrap();
@@ -721,7 +771,8 @@ mod tests {
         std::fs::write(&path, "id,name\n1,Alice\n").unwrap();
 
         let files = vec![path];
-        let diags = validate("SELECT * FROM nonexistent", &files);
+        let schema = build_test_schema(&files);
+        let diags = validate("SELECT * FROM nonexistent", &files, &schema);
         assert_eq!(diags.len(), 1);
         assert!(diags[0].message.contains("Unknown table"));
         assert_eq!(diags[0].severity, DiagnosticSeverity::Error);
@@ -734,7 +785,8 @@ mod tests {
         std::fs::write(&path, "id,name\n1,Alice\n").unwrap();
 
         let files = vec![path];
-        let diags = validate("SELECT * FROM users", &files);
+        let schema = build_test_schema(&files);
+        let diags = validate("SELECT * FROM users", &files, &schema);
         // Should have no table errors (may have column diagnostics for *)
         assert!(diags.iter().all(|d| !d.message.contains("Unknown table")));
     }
@@ -746,7 +798,8 @@ mod tests {
         std::fs::write(&path, "id,name\n1,Alice\n").unwrap();
 
         let files = vec![path];
-        let diags = validate("SELECT nonexistent FROM users", &files);
+        let schema = build_test_schema(&files);
+        let diags = validate("SELECT nonexistent FROM users", &files, &schema);
         assert!(diags.iter().any(|d| d.message.contains("Unknown column")));
     }
 
@@ -757,7 +810,8 @@ mod tests {
         std::fs::write(&path, "id,name\n1,Alice\n").unwrap();
 
         let files = vec![path];
-        let diags = validate("SELECT name FROM users", &files);
+        let schema = build_test_schema(&files);
+        let diags = validate("SELECT name FROM users", &files, &schema);
         assert!(diags.iter().all(|d| !d.message.contains("Unknown column")));
     }
 
@@ -770,7 +824,8 @@ mod tests {
         std::fs::write(&p2, "id,user_id\n1,1\n").unwrap();
 
         let files = vec![p1, p2];
-        let diags = validate("SELECT * FROM users JOIN orders", &files);
+        let schema = build_test_schema(&files);
+        let diags = validate("SELECT * FROM users JOIN orders", &files, &schema);
         assert!(diags.iter().any(|d| d.message.contains("JOIN without ON")));
     }
 
@@ -783,7 +838,8 @@ mod tests {
         std::fs::write(&p2, "id,user_id\n1,1\n").unwrap();
 
         let files = vec![p1, p2];
-        let diags = validate("SELECT * FROM users JOIN orders ON users.id = orders.user_id", &files);
+        let schema = build_test_schema(&files);
+        let diags = validate("SELECT * FROM users JOIN orders ON users.id = orders.user_id", &files, &schema);
         assert!(diags.iter().all(|d| !d.message.contains("JOIN without ON")));
     }
 
@@ -796,7 +852,8 @@ mod tests {
         std::fs::write(&p2, "id,user_id\n1,1\n").unwrap();
 
         let files = vec![p1, p2];
-        let diags = validate("SELECT * FROM users CROSS JOIN orders", &files);
+        let schema = build_test_schema(&files);
+        let diags = validate("SELECT * FROM users CROSS JOIN orders", &files, &schema);
         assert!(diags.iter().all(|d| !d.message.contains("JOIN without ON")));
     }
 
@@ -809,9 +866,11 @@ mod tests {
         std::fs::write(&p2, "id,amount\n1,100\n").unwrap();
 
         let files = vec![p1, p2];
+        let schema = build_test_schema(&files);
         let diags = validate(
             "SELECT id FROM users JOIN orders ON users.id = orders.id",
             &files,
+            &schema,
         );
         assert!(diags.iter().any(|d| d.message.contains("Ambiguous column")));
     }
@@ -823,13 +882,26 @@ mod tests {
         std::fs::write(&path, "id,name,email\n1,Alice,a@b.c\n").unwrap();
 
         let files = vec![path];
-        let diags = validate("SELECT nmae FROM users", &files);
+        let schema = build_test_schema(&files);
+        let diags = validate("SELECT nmae FROM users", &files, &schema);
         assert!(diags.iter().any(|d| d.message.contains("Did you mean")));
     }
 
     #[test]
+    fn test_function_arguments_not_flagged() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("orders.csv");
+        std::fs::write(&path, "id,amount\n1,100\n").unwrap();
+
+        let files = vec![path];
+        let schema = build_test_schema(&files);
+        let diags = validate("SELECT SUM(amount), COUNT(*) FROM orders", &files, &schema);
+        assert!(diags.iter().all(|d| !d.message.contains("Unknown column")));
+    }
+
+    #[test]
     fn test_empty_query() {
-        let diags = validate("", &[]);
+        let diags = validate("", &[], &HashMap::new());
         assert!(diags.is_empty());
     }
 }

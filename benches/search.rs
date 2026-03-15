@@ -256,7 +256,7 @@ fn bench_unicode_search(c: &mut Criterion) {
             ]
         })
         .collect();
-    let doc = Document::new(headers, data_rows, "unicode.csv".to_string());
+    let doc = Document::new(headers, data_rows, "unicode 国家.csv".to_string());
 
     group.bench_function("search_japanese", |b| {
         b.iter(|| {

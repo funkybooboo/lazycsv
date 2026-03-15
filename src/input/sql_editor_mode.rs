@@ -8,7 +8,7 @@ use crate::input::{InputResult, StatusMessage};
 use crate::vim_editor::VimMode;
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 const SQL_KEYWORDS: &[&str] = &[
     "SELECT",
@@ -153,7 +153,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                         let line_count = new_editor.line_count();
                         if line_count > 0 {
                             let last_line = line_count - 1;
-                            let last_col = new_editor.lines()[last_line].len();
+                            let last_col = new_editor.lines()[last_line].chars().count();
                             new_editor.set_cursor_for_test(last_line, last_col);
                         }
                         app.sql_vim_editor = Some(new_editor);
@@ -176,8 +176,9 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                                     KeyModifiers::NONE,
                                 ));
                             }
-                            // Insert the full completion text
-                            for ch in text.chars() {
+                            // Insert the full completion text, quoting if needed
+                            let insert_text = quote_if_needed(&text);
+                            for ch in insert_text.chars() {
                                 ed.handle_key(KeyEvent::new(KeyCode::Char(ch), KeyModifiers::NONE));
                             }
                         }
@@ -274,7 +275,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             CompletionContext::AliasPrefix(alias) => {
                 let aliases = parse_table_aliases(&sql_text, &files);
                 let headers = if let Some(path) = resolve_alias(&alias, &aliases, &files) {
-                    read_csv_headers(&path).unwrap_or_default()
+                    app.schema_cache.get_or_read(&path).unwrap_or_default()
                 } else {
                     Vec::new()
                 };
@@ -295,13 +296,13 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                     template: None,
                     template_steps: vec![],
                 }];
-                items.extend(column_items_from_query(&sql_text, &files));
+                items.extend(column_items_from_query(&sql_text, &files, &mut app.schema_cache));
                 items.extend(function_items());
                 items.extend(keyword_items(&["DISTINCT", "CASE"]));
                 items
             }
             CompletionContext::Where => {
-                let mut items = column_items_from_query(&sql_text, &files);
+                let mut items = column_items_from_query(&sql_text, &files, &mut app.schema_cache);
                 items.extend(function_items());
                 items.extend(keyword_items(&[
                     "AND",
@@ -316,9 +317,9 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                 ]));
                 items
             }
-            CompletionContext::GroupBy => column_items_from_query(&sql_text, &files),
+            CompletionContext::GroupBy => column_items_from_query(&sql_text, &files, &mut app.schema_cache),
             CompletionContext::OrderBy => {
-                let mut items = column_items_from_query(&sql_text, &files);
+                let mut items = column_items_from_query(&sql_text, &files, &mut app.schema_cache);
                 items.extend(keyword_items(&["ASC", "DESC"]));
                 items
             }
@@ -333,7 +334,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                     })
                     .collect();
                 items.extend(function_items());
-                items.extend(column_items_from_query(&sql_text, &files));
+                items.extend(column_items_from_query(&sql_text, &files, &mut app.schema_cache));
                 items
             }
         };
@@ -418,7 +419,13 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     if let Some(ref ed) = app.sql_vim_editor {
         let sql_text = ed.content();
         let files = app.session.files().to_vec();
-        app.sql_diagnostics = crate::query::sql_validator::validate(&sql_text, &files);
+        // Build schema from cache for validator
+        let schema: std::collections::HashMap<std::path::PathBuf, Vec<String>> = files
+            .iter()
+            .filter_map(|p| app.schema_cache.get_or_read(p).map(|h| (p.clone(), h)))
+            .collect();
+        app.sql_diagnostics =
+            crate::query::sql_validator::validate(&sql_text, &files, &schema);
     }
 
     Ok(InputResult::Continue)
@@ -481,7 +488,7 @@ fn execute_template_steps(app: &mut App) {
                     let mut cols = Vec::new();
                     let mut seen = std::collections::HashSet::new();
                     for path in referenced {
-                        if let Ok(hdrs) = read_csv_headers(path) {
+                        if let Some(hdrs) = app.schema_cache.get_or_read(path) {
                             for h in hdrs {
                                 if seen.insert(h.clone()) {
                                     cols.push(h);
@@ -494,7 +501,7 @@ fn execute_template_steps(app: &mut App) {
                     // Resolve a specific alias to its table's columns
                     let aliases = parse_table_aliases(&sql_text, &files);
                     resolve_alias(&alias, &aliases, &files)
-                        .and_then(|path| read_csv_headers(&path).ok())
+                        .and_then(|path| app.schema_cache.get_or_read(&path))
                         .unwrap_or_default()
                 };
 
@@ -515,11 +522,12 @@ fn execute_template_steps(app: &mut App) {
             TemplateStep::RepeatLastColumn => {
                 app.sql_template_steps.remove(0);
                 if let Some(ref col) = app.sql_template_last_column {
+                    let quoted = quote_if_needed(col);
                     if let Some(ref mut ed) = app.sql_vim_editor {
                         if ed.mode() != VimMode::Insert {
                             ed.enter_insert_mode();
                         }
-                        insert_text_into_editor(ed, col);
+                        insert_text_into_editor(ed, &quoted);
                     }
                 }
             }
@@ -527,13 +535,15 @@ fn execute_template_steps(app: &mut App) {
                 app.sql_template_steps.remove(0);
                 let table = app.sql_template_last_table.as_deref().unwrap_or("table");
                 let column = app.sql_template_last_column.as_deref().unwrap_or("column");
-                let sql = fmt.replace("{table}", table).replace("{column}", column);
+                let table_q = quote_if_needed(table);
+                let column_q = quote_if_needed(column);
+                let sql = fmt.replace("{table}", &table_q).replace("{column}", &column_q);
                 let mut new_editor = crate::vim_editor::VimEditor::new(sql);
                 new_editor.enter_insert_mode();
                 let line_count = new_editor.line_count();
                 if line_count > 0 {
                     let last_line = line_count - 1;
-                    let last_col = new_editor.lines()[last_line].len();
+                    let last_col = new_editor.lines()[last_line].chars().count();
                     new_editor.set_cursor_for_test(last_line, last_col);
                 }
                 app.sql_vim_editor = Some(new_editor);
@@ -542,13 +552,27 @@ fn execute_template_steps(app: &mut App) {
     }
 }
 
+/// Check if an identifier needs double-quoting for SQL.
+fn needs_quoting(identifier: &str) -> bool {
+    identifier.chars().any(|c| !c.is_alphanumeric() && c != '_')
+}
+
+/// Wrap an identifier in double quotes if it contains special characters.
+fn quote_if_needed(identifier: &str) -> String {
+    if needs_quoting(identifier) {
+        format!("\"{}\"", identifier)
+    } else {
+        identifier.to_string()
+    }
+}
+
 /// Get the SQL text up to the cursor position as a single string.
 fn text_up_to_cursor(sql: &str, cursor_line: usize, cursor_col: usize) -> String {
     let mut result = String::new();
     for (i, line) in sql.lines().enumerate() {
         if i == cursor_line {
-            let end = cursor_col.min(line.len());
-            result.push_str(&line[..end]);
+            let prefix: String = line.chars().take(cursor_col).collect();
+            result.push_str(&prefix);
             break;
         }
         result.push_str(line);
@@ -560,13 +584,17 @@ fn text_up_to_cursor(sql: &str, cursor_line: usize, cursor_col: usize) -> String
 /// Extract the partial word immediately before the cursor.
 /// Used to pre-fill the completion filter and to know how many chars to replace on accept.
 fn word_before_cursor(text_before_cursor: &str) -> &str {
-    let bytes = text_before_cursor.as_bytes();
-    let mut end = bytes.len();
-    // Walk backwards over word characters
-    while end > 0 && (bytes[end - 1].is_ascii_alphanumeric() || bytes[end - 1] == b'_') {
-        end -= 1;
+    // Walk backwards over chars that are alphanumeric (including Unicode) or underscore,
+    // tracking the byte offset so we can return a valid &str slice.
+    let mut byte_offset = text_before_cursor.len();
+    for ch in text_before_cursor.chars().rev() {
+        if ch.is_alphanumeric() || ch == '_' {
+            byte_offset -= ch.len_utf8();
+        } else {
+            break;
+        }
     }
-    &text_before_cursor[end..]
+    &text_before_cursor[byte_offset..]
 }
 
 /// Determine the SQL clause context at cursor position.
@@ -639,12 +667,16 @@ fn keyword_items(keywords: &[&str]) -> Vec<CompletionItem> {
 }
 
 /// Get column CompletionItems from all tables referenced in the query
-fn column_items_from_query(sql: &str, files: &[PathBuf]) -> Vec<CompletionItem> {
+fn column_items_from_query(
+    sql: &str,
+    files: &[PathBuf],
+    schema_cache: &mut crate::app::SchemaCache,
+) -> Vec<CompletionItem> {
     let referenced = crate::query::files_referenced_by_query(sql, files);
     let mut columns = Vec::new();
     let mut seen = std::collections::HashSet::new();
     for path in referenced {
-        if let Ok(headers) = read_csv_headers(path) {
+        if let Some(headers) = schema_cache.get_or_read(path) {
             for h in headers {
                 if seen.insert(h.clone()) {
                     columns.push(CompletionItem {
@@ -660,15 +692,6 @@ fn column_items_from_query(sql: &str, files: &[PathBuf]) -> Vec<CompletionItem> 
     columns
 }
 
-/// Read just the header row from a CSV file (first line).
-fn read_csv_headers(path: &Path) -> Result<Vec<String>> {
-    let mut reader = csv::ReaderBuilder::new()
-        .has_headers(true)
-        .from_path(path)?;
-
-    let headers = reader.headers()?.clone();
-    Ok(headers.iter().map(String::from).collect())
-}
 
 /// Check if cursor is right after "alias." and return the alias name.
 /// e.g. "select t." → Some("t"), "select t.col" → None (already typing)
@@ -683,7 +706,7 @@ fn alias_prefix_at_cursor(text_before_cursor: &str) -> Option<String> {
     let word: String = before_dot
         .chars()
         .rev()
-        .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+        .take_while(|c| c.is_alphanumeric() || *c == '_')
         .collect::<Vec<char>>()
         .into_iter()
         .rev()
@@ -750,7 +773,7 @@ fn parse_table_aliases(sql: &str, files: &[PathBuf]) -> Vec<TableAlias> {
     // Build set of known table names for matching
     let known_tables: Vec<String> = files
         .iter()
-        .map(|p| crate::query::table_name_from_path(p).to_ascii_lowercase())
+        .map(|p| crate::query::table_name_from_path(p).to_lowercase())
         .collect();
 
     let mut aliases = Vec::new();
@@ -781,7 +804,7 @@ fn parse_table_aliases(sql: &str, files: &[PathBuf]) -> Vec<TableAlias> {
 
             // This should be a table name
             let table_name = tokens[i].to_string();
-            let table_lower = table_name.to_ascii_lowercase();
+            let table_lower = table_name.to_lowercase();
             i += 1;
 
             // Check if it's a known table
@@ -813,12 +836,12 @@ fn parse_table_aliases(sql: &str, files: &[PathBuf]) -> Vec<TableAlias> {
 
 /// Resolve an alias (or table name) to a file path.
 fn resolve_alias(alias: &str, aliases: &[TableAlias], files: &[PathBuf]) -> Option<PathBuf> {
-    let alias_lower = alias.to_ascii_lowercase();
+    let alias_lower = alias.to_lowercase();
 
     // First check if it matches any alias
     for entry in aliases {
         if let Some(ref a) = entry.alias {
-            if a.to_ascii_lowercase() == alias_lower {
+            if a.to_lowercase() == alias_lower {
                 return find_file_for_table(&entry.table_name, files);
             }
         }
@@ -826,7 +849,7 @@ fn resolve_alias(alias: &str, aliases: &[TableAlias], files: &[PathBuf]) -> Opti
 
     // Then check if it's a direct table name
     for entry in aliases {
-        if entry.table_name.to_ascii_lowercase() == alias_lower {
+        if entry.table_name.to_lowercase() == alias_lower {
             return find_file_for_table(&entry.table_name, files);
         }
     }
@@ -837,10 +860,10 @@ fn resolve_alias(alias: &str, aliases: &[TableAlias], files: &[PathBuf]) -> Opti
 
 /// Find the file path for a given table name.
 fn find_file_for_table(table_name: &str, files: &[PathBuf]) -> Option<PathBuf> {
-    let table_lower = table_name.to_ascii_lowercase();
+    let table_lower = table_name.to_lowercase();
     files
         .iter()
-        .find(|p| crate::query::table_name_from_path(p).to_ascii_lowercase() == table_lower)
+        .find(|p| crate::query::table_name_from_path(p).to_lowercase() == table_lower)
         .cloned()
 }
 
@@ -865,8 +888,13 @@ fn tokenize_sql(sql: &str) -> Vec<String> {
                 tokens.push(std::mem::take(&mut current));
             }
             tokens.push(".".to_string());
-        } else {
+        } else if ch.is_alphanumeric() || ch == '_' {
             current.push(ch);
+        } else {
+            // Skip operators and other non-identifier characters
+            if !current.is_empty() {
+                tokens.push(std::mem::take(&mut current));
+            }
         }
     }
     if !current.is_empty() {

@@ -1,4 +1,4 @@
-ID,Name,Country,Greeting,Emoji,Currency,Description
+ID,名字,国家,问候语,表情符号,货币,The Description
 1,Tanaka Yuki,Japan,こんにちは,🇯🇵,¥1234,日本語テスト
 2,Kim Min-jun,Korea,안녕하세요,🇰🇷,₩5000,한국어 테스트
 3,Zhang Wei,China,你好,🇨🇳,¥888,中文测试

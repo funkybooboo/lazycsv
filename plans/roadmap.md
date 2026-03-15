@@ -41,7 +41,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.17.0 | Advanced Filtering & Conditional Views | [ ] | TBD |
 | v0.17.1 | Module Organization & Cleanup | [ ] | TBD |
 | v0.18.0 | SQL IntelliSense & Auto-completion | [x] | TBD |
-| v0.18.1 | SQL IntelliSense Polish & Testing | [ ] | TBD |
+| v0.18.1 | SQL IntelliSense Polish & Testing | [x] | 606 |
 | v0.19.0 | Column Resize & Advanced Column Operations | [ ] | TBD |
 | v0.19.1 | Documentation & Maintainability | [ ] | TBD |
 | v0.20.0 | Data Analysis, Statistics & Cell Formulas | [~] | 88 |
@@ -170,11 +170,11 @@ Advanced filtering with multiple conditions and saved filter presets.
 **[v0.17.1](versions/v0.17.1.md) - Module Organization & Cleanup**  
 Filter system cleanup with clear abstractions and comprehensive testing.  
 
-**[v0.18.0](versions/v0.18.0.md) - SQL IntelliSense & Auto-completion**  
-SQL IntelliSense with table/column auto-completion and syntax validation.  
+**[v0.18.0](versions/v0.18.0.md) - SQL IntelliSense & Auto-completion**
+SQL IntelliSense with table/column auto-completion and syntax validation.
 
-**[v0.18.1](versions/v0.18.1.md) - SQL IntelliSense Polish & Testing**  
-IntelliSense system refinement with improved accuracy and performance.  
+**[v0.18.1](versions/v0.18.1.md) - SQL IntelliSense Polish & Testing** ✅ COMPLETE
+Schema caching, fuzzy matching, Unicode support, auto-quoting for identifiers with spaces, comprehensive error prevention with inline diagnostics, query templates, and 50 integration tests. Fixed multiple Unicode/multi-byte panics across VimEditor and SQL systems.  
 
 **[v0.19.0](versions/v0.19.0.md) - Column Resize & Advanced Column Operations**  
 Interactive column resizing with visual feedback and advanced column manipulation.  

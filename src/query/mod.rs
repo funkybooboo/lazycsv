@@ -94,21 +94,14 @@ use std::sync::atomic::AtomicBool;
 /// use lazycsv::query::table_name_from_path;
 ///
 /// assert_eq!(table_name_from_path(Path::new("sales.csv")), "sales");
-/// assert_eq!(table_name_from_path(Path::new("my-data.csv")), "my_data");
-/// assert_eq!(table_name_from_path(Path::new("data@2024.csv")), "data_2024");
+/// assert_eq!(table_name_from_path(Path::new("my-data.csv")), "my-data");
+/// assert_eq!(table_name_from_path(Path::new("unicode 国家.csv")), "unicode 国家");
 /// ```
 pub fn table_name_from_path(path: &Path) -> String {
-    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("table");
-
-    stem.chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '_' {
-                c
-            } else {
-                '_'
-            }
-        })
-        .collect()
+    path.file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("table")
+        .to_string()
 }
 
 /// Determine which session files are referenced by a SQL query.
@@ -120,7 +113,7 @@ pub fn table_name_from_path(path: &Path) -> String {
 /// If no files match (e.g. query uses a subquery or expression with no table),
 /// returns all files as a safe fallback so the query can still execute.
 pub fn files_referenced_by_query<'a>(query: &str, files: &'a [PathBuf]) -> Vec<&'a PathBuf> {
-    let query_lower = query.to_ascii_lowercase();
+    let query_lower = query.to_lowercase();
 
     // Extract all identifiers from the query: bare words and "quoted identifiers"
     let identifiers = extract_sql_identifiers(&query_lower);
@@ -128,7 +121,7 @@ pub fn files_referenced_by_query<'a>(query: &str, files: &'a [PathBuf]) -> Vec<&
     let mut matched: Vec<&PathBuf> = files
         .iter()
         .filter(|path| {
-            let table = table_name_from_path(path).to_ascii_lowercase();
+            let table = table_name_from_path(path).to_lowercase();
             identifiers.contains(&table)
         })
         .collect();
@@ -145,21 +138,21 @@ pub fn files_referenced_by_query<'a>(query: &str, files: &'a [PathBuf]) -> Vec<&
 /// Returns a set of lowercase identifier strings.
 fn extract_sql_identifiers(sql: &str) -> std::collections::HashSet<String> {
     let mut ids = std::collections::HashSet::new();
-    let bytes = sql.as_bytes();
-    let len = bytes.len();
+    let chars: Vec<char> = sql.chars().collect();
+    let len = chars.len();
     let mut i = 0;
 
     while i < len {
-        let ch = bytes[i];
+        let ch = chars[i];
 
         // Skip string literals (single-quoted)
-        if ch == b'\'' {
+        if ch == '\'' {
             i += 1;
             while i < len {
-                if bytes[i] == b'\'' {
+                if chars[i] == '\'' {
                     i += 1;
                     // Escaped quote ''
-                    if i < len && bytes[i] == b'\'' {
+                    if i < len && chars[i] == '\'' {
                         i += 1;
                         continue;
                     }
@@ -171,14 +164,14 @@ fn extract_sql_identifiers(sql: &str) -> std::collections::HashSet<String> {
         }
 
         // Double-quoted identifier
-        if ch == b'"' {
+        if ch == '"' {
             i += 1;
             let start = i;
-            while i < len && bytes[i] != b'"' {
+            while i < len && chars[i] != '"' {
                 i += 1;
             }
             if i > start {
-                let ident = String::from_utf8_lossy(&bytes[start..i]).to_string();
+                let ident: String = chars[start..i].iter().collect();
                 ids.insert(ident);
             }
             if i < len {
@@ -188,12 +181,12 @@ fn extract_sql_identifiers(sql: &str) -> std::collections::HashSet<String> {
         }
 
         // Bare identifier (word)
-        if ch.is_ascii_alphabetic() || ch == b'_' {
+        if ch.is_alphabetic() || ch == '_' {
             let start = i;
-            while i < len && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
+            while i < len && (chars[i].is_alphanumeric() || chars[i] == '_') {
                 i += 1;
             }
-            let word = String::from_utf8_lossy(&bytes[start..i]).to_string();
+            let word: String = chars[start..i].iter().collect();
             ids.insert(word);
             continue;
         }
@@ -213,24 +206,24 @@ fn extract_sql_identifiers(sql: &str) -> std::collections::HashSet<String> {
 /// (`"myfile.csv"`). Preserves string literals unchanged.
 pub fn strip_csv_extensions(sql: &str) -> String {
     let extensions: &[&str] = &[".csv", ".tsv", ".txt"];
-    let bytes = sql.as_bytes();
-    let len = bytes.len();
-    let mut result = String::with_capacity(len);
+    let chars: Vec<char> = sql.chars().collect();
+    let len = chars.len();
+    let mut result = String::with_capacity(sql.len());
     let mut i = 0;
 
     while i < len {
-        let ch = bytes[i];
+        let ch = chars[i];
 
         // Preserve single-quoted string literals as-is
-        if ch == b'\'' {
+        if ch == '\'' {
             result.push('\'');
             i += 1;
             while i < len {
-                result.push(bytes[i] as char);
-                if bytes[i] == b'\'' {
+                result.push(chars[i]);
+                if chars[i] == '\'' {
                     i += 1;
                     // Escaped quote ''
-                    if i < len && bytes[i] == b'\'' {
+                    if i < len && chars[i] == '\'' {
                         result.push('\'');
                         i += 1;
                         continue;
@@ -243,15 +236,15 @@ pub fn strip_csv_extensions(sql: &str) -> String {
         }
 
         // Double-quoted identifier — strip extension inside quotes
-        if ch == b'"' {
+        if ch == '"' {
             result.push('"');
             i += 1;
             let start = i;
-            while i < len && bytes[i] != b'"' {
+            while i < len && chars[i] != '"' {
                 i += 1;
             }
-            let ident = &sql[start..i];
-            let stripped = strip_extension(ident, extensions);
+            let ident: String = chars[start..i].iter().collect();
+            let stripped = strip_extension(&ident, extensions);
             result.push_str(&stripped);
             if i < len {
                 result.push('"');
@@ -261,40 +254,40 @@ pub fn strip_csv_extensions(sql: &str) -> String {
         }
 
         // Bare identifier (word) possibly followed by .csv
-        if ch.is_ascii_alphabetic() || ch == b'_' {
+        if ch.is_alphabetic() || ch == '_' {
             let start = i;
-            while i < len && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
+            while i < len && (chars[i].is_alphanumeric() || chars[i] == '_') {
                 i += 1;
             }
-            let word = &sql[start..i];
+            let word: String = chars[start..i].iter().collect();
 
             // Check for trailing .ext (e.g. "myfile.csv")
             let mut matched_ext = false;
             for ext in extensions {
-                let ext_bytes = ext.as_bytes();
-                if i + ext_bytes.len() <= len
-                    && sql[i..i + ext_bytes.len()].eq_ignore_ascii_case(ext)
-                {
-                    // Make sure the extension isn't followed by more identifier chars
-                    // (e.g. "myfile.csvdata" should NOT be stripped)
-                    let after = i + ext_bytes.len();
-                    if after >= len
-                        || (!bytes[after].is_ascii_alphanumeric() && bytes[after] != b'_')
-                    {
-                        result.push_str(word);
-                        i = after;
-                        matched_ext = true;
-                        break;
+                let ext_chars: Vec<char> = ext.chars().collect();
+                if i + ext_chars.len() <= len {
+                    let candidate: String = chars[i..i + ext_chars.len()].iter().collect();
+                    if candidate.eq_ignore_ascii_case(ext) {
+                        // Make sure the extension isn't followed by more identifier chars
+                        let after = i + ext_chars.len();
+                        if after >= len
+                            || (!chars[after].is_alphanumeric() && chars[after] != '_')
+                        {
+                            result.push_str(&word);
+                            i = after;
+                            matched_ext = true;
+                            break;
+                        }
                     }
                 }
             }
             if !matched_ext {
-                result.push_str(word);
+                result.push_str(&word);
             }
             continue;
         }
 
-        result.push(ch as char);
+        result.push(ch);
         i += 1;
     }
 
@@ -303,8 +296,9 @@ pub fn strip_csv_extensions(sql: &str) -> String {
 
 fn strip_extension(ident: &str, extensions: &[&str]) -> String {
     for ext in extensions {
-        if ident.len() > ext.len() && ident[ident.len() - ext.len()..].eq_ignore_ascii_case(ext) {
-            return ident[..ident.len() - ext.len()].to_string();
+        if ident.ends_with(ext) || ident.to_ascii_lowercase().ends_with(ext) {
+            let trimmed_len = ident.chars().count() - ext.chars().count();
+            return ident.chars().take(trimmed_len).collect();
         }
     }
     ident.to_string()
@@ -1130,15 +1124,18 @@ mod tests {
     }
 
     #[test]
-    fn test_table_name_strips_extension() {
+    fn test_table_name_preserves_special_chars() {
         let path = PathBuf::from("my-file.csv");
-        assert_eq!(table_name_from_path(&path), "my_file");
+        assert_eq!(table_name_from_path(&path), "my-file");
     }
 
     #[test]
-    fn test_table_name_replaces_special_chars() {
+    fn test_table_name_preserves_spaces_and_unicode() {
         let path = PathBuf::from("my file (1).csv");
-        assert_eq!(table_name_from_path(&path), "my_file__1_");
+        assert_eq!(table_name_from_path(&path), "my file (1)");
+
+        let path = PathBuf::from("unicode 国家.csv");
+        assert_eq!(table_name_from_path(&path), "unicode 国家");
     }
 
     #[test]

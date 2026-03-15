@@ -148,23 +148,33 @@ impl SqlCompletion {
         Self {
             all_items: items,
             filter: prefix.to_string(),
-            prefix_len: prefix.len(),
+            prefix_len: prefix.chars().count(),
             selected: 0,
             scroll_offset: 0,
         }
     }
 
     /// Get the filtered list of items matching the current filter.
+    /// Uses fuzzy matching: characters must appear in order but not contiguously.
+    /// Results are sorted by match quality (prefix > substring > fuzzy).
     pub fn filtered_items(&self) -> Vec<&CompletionItem> {
         if self.filter.is_empty() {
-            self.all_items.iter().collect()
-        } else {
-            let filter_lower = self.filter.to_ascii_lowercase();
-            self.all_items
-                .iter()
-                .filter(|item| item.text.to_ascii_lowercase().contains(&filter_lower))
-                .collect()
+            return self.all_items.iter().collect();
         }
+
+        let filter_lower = self.filter.to_lowercase();
+        let mut scored: Vec<(i32, &CompletionItem)> = self
+            .all_items
+            .iter()
+            .filter_map(|item| {
+                let name_lower = item.text.to_lowercase();
+                fuzzy_match_score(&name_lower, &filter_lower).map(|score| (score, item))
+            })
+            .collect();
+
+        // Sort by score descending (higher = better match)
+        scored.sort_by(|a, b| b.0.cmp(&a.0));
+        scored.into_iter().map(|(_, item)| item).collect()
     }
 
     pub fn move_down(&mut self) {
@@ -204,6 +214,61 @@ impl SqlCompletion {
     }
 }
 
+/// Fuzzy match a name against a filter pattern.
+///
+/// Returns a score if the filter characters appear in order within the name.
+/// Higher scores indicate better matches:
+/// - 100: exact match
+/// - 90: prefix match
+/// - 80: substring (contiguous) match
+/// - 50-79: fuzzy match (bonus for consecutive chars and early matches)
+/// - None: no match
+fn fuzzy_match_score(name: &str, filter: &str) -> Option<i32> {
+    if filter.is_empty() {
+        return Some(0);
+    }
+    if name == filter {
+        return Some(100);
+    }
+    if name.starts_with(filter) {
+        return Some(90);
+    }
+    if name.contains(filter) {
+        return Some(80);
+    }
+
+    // Fuzzy: each filter char must appear in order
+    let mut name_chars = name.chars().peekable();
+    let mut score: i32 = 50;
+    let mut last_match_pos = 0usize;
+
+    for (fi, fc) in filter.chars().enumerate() {
+        let mut found = false;
+        let mut pos = last_match_pos;
+        for nc in name_chars.by_ref() {
+            if nc == fc {
+                // Bonus for consecutive matches
+                if fi > 0 && pos == last_match_pos {
+                    score += 3;
+                }
+                // Bonus for matching near the start
+                if pos < 3 {
+                    score += 2;
+                }
+                last_match_pos = pos + 1;
+                found = true;
+                break;
+            }
+            pos += 1;
+        }
+        if !found {
+            return None;
+        }
+    }
+
+    Some(score)
+}
+
 /// Severity level for a SQL diagnostic
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DiagnosticSeverity {
@@ -224,6 +289,59 @@ pub struct SqlDiagnostic {
     pub message: String,
     /// Severity level
     pub severity: DiagnosticSeverity,
+}
+
+/// Cached CSV header schema for a single file.
+#[derive(Debug, Clone)]
+struct CachedSchema {
+    headers: Vec<String>,
+    mtime: std::time::SystemTime,
+}
+
+/// Cache of CSV headers keyed by file path, invalidated by mtime changes.
+/// Avoids re-reading headers from disk on every keystroke (validation) and
+/// every Ctrl+N (completions).
+#[derive(Debug, Default)]
+pub struct SchemaCache {
+    cache: std::collections::HashMap<std::path::PathBuf, CachedSchema>,
+}
+
+impl SchemaCache {
+    /// Return cached headers if the file's mtime hasn't changed, otherwise
+    /// re-read from disk and update the cache. Returns `None` on read failure
+    /// (failures are not cached).
+    pub fn get_headers(&mut self, path: &std::path::Path) -> Option<Vec<String>> {
+        let meta = std::fs::metadata(path).ok()?;
+        let mtime = meta.modified().ok()?;
+
+        if let Some(cached) = self.cache.get(path) {
+            if cached.mtime == mtime {
+                return Some(cached.headers.clone());
+            }
+        }
+
+        // Read headers from CSV
+        let mut reader = csv::ReaderBuilder::new()
+            .has_headers(true)
+            .from_path(path)
+            .ok()?;
+        let headers: Vec<String> = reader.headers().ok()?.iter().map(String::from).collect();
+
+        self.cache.insert(
+            path.to_path_buf(),
+            CachedSchema {
+                headers: headers.clone(),
+                mtime,
+            },
+        );
+
+        Some(headers)
+    }
+
+    /// Convenience alias for `get_headers` – returns a cloned `Vec<String>`.
+    pub fn get_or_read(&mut self, path: &std::path::Path) -> Option<Vec<String>> {
+        self.get_headers(path)
+    }
 }
 
 /// A step in a multi-part query template.
@@ -467,6 +585,9 @@ pub struct App {
     /// Cached SQLite connection for repeated SQL queries
     pub sqlite_cache: Option<SqliteCache>,
 
+    /// Cached CSV header schemas (avoids re-reading from disk on every keystroke)
+    pub schema_cache: SchemaCache,
+
     /// True when an external file modification has been detected and we're waiting for user response
     pub external_modification_pending: bool,
 
@@ -622,6 +743,7 @@ impl App {
             magnifier_state: None,
             should_quit: false,
             sqlite_cache: None,
+            schema_cache: SchemaCache::default(),
             external_modification_pending: false,
             search_state: None,
             search_buffer: String::new(),

@@ -73,8 +73,8 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             Ok(InputResult::Continue)
         }
 
-        // Open selected file
-        (KeyCode::Enter, _) => select_file(app),
+        // Open selected file (same as 'l' — uses browser entries, not session files)
+        (KeyCode::Enter, _) => navigate_into_selected(app),
 
         // Yazi-style directory navigation
         (KeyCode::Char('h'), KeyModifiers::NONE) => {
@@ -180,54 +180,6 @@ fn entry_matches_filter(entry: &BrowserEntry, filter: &str) -> bool {
         name.to_lowercase().contains(filter)
     } else {
         false
-    }
-}
-
-/// Check if file path matches filter (for session files)
-fn file_matches_filter(path: &std::path::Path, filter: &str) -> bool {
-    if filter.is_empty() {
-        true
-    } else {
-        path.file_name()
-            .and_then(|n| n.to_str())
-            .map(|s| s.to_lowercase().contains(filter))
-            .unwrap_or(false)
-    }
-}
-
-/// Select file from filtered list
-fn select_file(app: &mut App) -> Result<InputResult> {
-    let filter = app.input_state.file_filter_buffer.to_lowercase();
-    let filtered_files: Vec<(usize, &std::path::PathBuf)> = app
-        .session
-        .files()
-        .iter()
-        .enumerate()
-        .filter(|(_, path)| file_matches_filter(path, &filter))
-        .collect();
-
-    if filtered_files.is_empty() {
-        app.status_message = Some(StatusMessage::from("No matching files"));
-        return Ok(InputResult::Continue);
-    }
-
-    let selected_idx = app
-        .view_state
-        .file_list_selected
-        .min(filtered_files.len() - 1);
-    let target_index = filtered_files[selected_idx].0;
-    let current = app.session.active_file_index();
-
-    if target_index != current {
-        switch_to_index(app, target_index, current);
-    }
-
-    cancel(app);
-
-    if target_index != current {
-        Ok(InputResult::ReloadFile)
-    } else {
-        Ok(InputResult::Continue)
     }
 }
 

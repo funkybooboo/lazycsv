@@ -9,41 +9,54 @@ impl VimEditor {
 
     /// Insert character at cursor position (in Insert mode)
     pub fn insert_char(&mut self, c: char) {
-        let col = self.cursor.1;
+        let char_col = self.cursor.1;
         let line = self.current_line_mut();
-        let col = col.min(line.len());
-        line.insert(col, c);
-        self.cursor.1 = col + 1;
+        let char_count = line.chars().count();
+        let char_col = char_col.min(char_count);
+        // Convert char position to byte position for String::insert
+        let byte_pos = line.char_indices()
+            .nth(char_col)
+            .map(|(i, _)| i)
+            .unwrap_or(line.len());
+        line.insert(byte_pos, c);
+        self.cursor.1 = char_col + 1;
     }
 
     /// Delete character before cursor (Backspace in Insert mode)
     pub fn delete_char_before(&mut self) {
         if self.cursor.1 > 0 {
-            let col = self.cursor.1 - 1;
+            let char_col = self.cursor.1 - 1;
             let line = self.current_line_mut();
-            if col < line.len() {
-                line.remove(col);
+            let char_count = line.chars().count();
+            if char_col < char_count {
+                // Convert char position to byte position for String::remove
+                if let Some((byte_pos, _)) = line.char_indices().nth(char_col) {
+                    line.remove(byte_pos);
+                }
             }
-            self.cursor.1 = col;
+            self.cursor.1 = char_col;
         } else if self.cursor.0 > 0 {
             // At start of line - join with previous line
             let current_line = self.lines.remove(self.cursor.0);
             self.cursor.0 -= 1;
-            let prev_line_len = self.lines[self.cursor.0].len();
+            let prev_line_chars = self.lines[self.cursor.0].chars().count();
             self.lines[self.cursor.0].push_str(&current_line);
-            self.cursor.1 = prev_line_len;
+            self.cursor.1 = prev_line_chars;
         }
     }
 
     /// Delete character at cursor (Delete key in Insert mode)
     pub fn delete_char_at(&mut self) {
-        let col = self.cursor.1;
+        let char_col = self.cursor.1;
         let line_idx = self.cursor.0;
 
         if line_idx < self.lines.len() {
             let line = &mut self.lines[line_idx];
-            if col < line.len() {
-                line.remove(col);
+            let char_count = line.chars().count();
+            if char_col < char_count {
+                if let Some((byte_pos, _)) = line.char_indices().nth(char_col) {
+                    line.remove(byte_pos);
+                }
                 return;
             }
         }
@@ -57,10 +70,14 @@ impl VimEditor {
 
     /// Insert newline at cursor (Enter in Insert mode)
     pub fn newline(&mut self) {
-        let col = self.cursor.1;
+        let char_col = self.cursor.1;
         let line_idx = self.cursor.0;
 
-        let rest = self.lines[line_idx].split_off(col);
+        let byte_pos = self.lines[line_idx].char_indices()
+            .nth(char_col)
+            .map(|(i, _)| i)
+            .unwrap_or(self.lines[line_idx].len());
+        let rest = self.lines[line_idx].split_off(byte_pos);
         self.cursor.0 = line_idx + 1;
         self.lines.insert(self.cursor.0, rest);
         self.cursor.1 = 0;
@@ -72,10 +89,13 @@ impl VimEditor {
 
     /// Delete character under cursor (x in Normal mode)
     pub fn delete_char(&mut self) {
-        let col = self.cursor.1;
+        let char_col = self.cursor.1;
         let line = self.current_line_mut();
-        if col < line.len() {
-            line.remove(col);
+        let char_count = line.chars().count();
+        if char_col < char_count {
+            if let Some((byte_pos, _)) = line.char_indices().nth(char_col) {
+                line.remove(byte_pos);
+            }
         }
         self.clamp_cursor();
     }

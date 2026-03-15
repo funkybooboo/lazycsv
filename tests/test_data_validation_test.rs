@@ -84,7 +84,7 @@ fn test_sparse_csv() {
 
 #[test]
 fn test_unicode_csv() {
-    let doc = load_test_csv("unicode.csv");
+    let doc = load_test_csv("unicode 国家.csv");
     assert_eq!(doc.column_count(), 7, "unicode.csv should have 7 columns");
     assert_eq!(doc.row_count(), 16, "unicode.csv should have 15 rows");
 

@@ -121,14 +121,14 @@ fn enhance_syntax_error(err_str: &str, query: &str) -> anyhow::Error {
                     .map(|i| pos + i)
                     .unwrap_or(query.len());
                 let line = &query[line_start..line_end];
-                let col = pos - line_start;
+                let col_chars = query[line_start..pos].chars().count();
 
                 return anyhow!(
                     "Syntax error near '{}' at column {}:\n  {}\n  {}^",
                     token,
-                    col + 1,
+                    col_chars + 1,
                     line,
-                    " ".repeat(col)
+                    " ".repeat(col_chars)
                 );
             }
         }
@@ -213,8 +213,10 @@ fn find_similar_columns(target: &str, candidates: &[String], max_results: usize)
 
 /// Calculate Levenshtein distance between two strings
 pub fn levenshtein_distance(s1: &str, s2: &str) -> usize {
-    let len1 = s1.len();
-    let len2 = s2.len();
+    let s1_chars: Vec<char> = s1.chars().collect();
+    let s2_chars: Vec<char> = s2.chars().collect();
+    let len1 = s1_chars.len();
+    let len2 = s2_chars.len();
 
     if len1 == 0 {
         return len2;
@@ -233,9 +235,6 @@ pub fn levenshtein_distance(s1: &str, s2: &str) -> usize {
     for j in 0..=len2 {
         matrix[0][j] = j;
     }
-
-    let s1_chars: Vec<char> = s1.chars().collect();
-    let s2_chars: Vec<char> = s2.chars().collect();
 
     for i in 1..=len1 {
         for j in 1..=len2 {
@@ -264,6 +263,10 @@ mod tests {
         assert_eq!(levenshtein_distance("abc", "abd"), 1);
         assert_eq!(levenshtein_distance("abc", "abcd"), 1);
         assert_eq!(levenshtein_distance("abc", "xyz"), 3);
+        // Unicode: multi-byte characters should not panic
+        assert_eq!(levenshtein_distance("国家", "国家"), 0);
+        assert_eq!(levenshtein_distance("国家", "国"), 1);
+        assert_eq!(levenshtein_distance("café", "cafe"), 1);
     }
 
     #[test]
