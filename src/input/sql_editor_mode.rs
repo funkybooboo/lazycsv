@@ -3,7 +3,7 @@
 //! This module handles keyboard input when the user is editing SQL queries
 //! (after pressing 'q' in Normal mode). Delegates to VimEditor for text editing.
 
-use crate::app::{App, CompletionItem, CompletionKind, Mode, SqlCompletion};
+use crate::app::{App, CompletionItem, CompletionKind, Mode, SqlCompletion, TemplateStep};
 use crate::input::{InputResult, StatusMessage};
 use crate::vim_editor::VimMode;
 use anyhow::Result;
@@ -76,29 +76,69 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                 return Ok(InputResult::Continue);
             }
             KeyCode::Enter | KeyCode::Tab => {
-                // Insert selected item at cursor, replacing the already-typed prefix
+                // Get selected item info before clearing completion
                 let selected = app
                     .sql_completion
                     .as_ref()
                     .and_then(|c| {
                         let item = c.selected_item()?;
-                        Some((item.text.clone(), c.prefix_len))
+                        Some((
+                            item.text.clone(),
+                            item.kind,
+                            item.template.clone(),
+                            item.template_steps.clone(),
+                            c.prefix_len,
+                        ))
                     });
                 app.sql_completion = None;
 
-                if let Some((text, prefix_len)) = selected {
-                    if let Some(ref mut ed) = app.sql_vim_editor {
-                        if ed.mode() != VimMode::Insert {
-                            ed.enter_insert_mode();
+                if let Some((text, kind, template, steps, prefix_len)) = selected {
+                    if let Some(ref template_sql) = template {
+                        // Template: replace entire editor content and position cursor at end
+                        let mut new_editor = crate::vim_editor::VimEditor::new(template_sql.clone());
+                        // Enter insert mode first so clamp_cursor allows cursor after last char
+                        new_editor.enter_insert_mode();
+                        let line_count = new_editor.line_count();
+                        if line_count > 0 {
+                            let last_line = line_count - 1;
+                            let last_col = new_editor.lines()[last_line].len();
+                            new_editor.set_cursor_for_test(last_line, last_col);
                         }
-                        // Delete the already-typed prefix characters
-                        for _ in 0..prefix_len {
-                            ed.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE));
+                        app.sql_vim_editor = Some(new_editor);
+
+                        // Store remaining template steps
+                        app.sql_template_steps = steps;
+
+                        // Execute pending steps (will show table picker if next step is PickTable)
+                        execute_template_steps(app);
+                    } else {
+                        // Normal completion: insert at cursor
+                        if let Some(ref mut ed) = app.sql_vim_editor {
+                            if ed.mode() != VimMode::Insert {
+                                ed.enter_insert_mode();
+                            }
+                            // Delete the already-typed prefix characters
+                            for _ in 0..prefix_len {
+                                ed.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE));
+                            }
+                            // Insert the full completion text
+                            for ch in text.chars() {
+                                ed.handle_key(KeyEvent::new(KeyCode::Char(ch), KeyModifiers::NONE));
+                            }
                         }
-                        // Insert the full completion text
-                        for ch in text.chars() {
-                            ed.handle_key(KeyEvent::new(KeyCode::Char(ch), KeyModifiers::NONE));
+                        // Record for RepeatLastColumn / Assemble
+                        if !app.sql_template_steps.is_empty() {
+                            match kind {
+                                CompletionKind::Table => {
+                                    app.sql_template_last_table = Some(text.clone());
+                                }
+                                CompletionKind::Column => {
+                                    app.sql_template_last_column = Some(text.clone());
+                                }
+                                _ => {}
+                            }
                         }
+                        execute_template_steps(app);
                     }
                 }
                 return Ok(InputResult::Continue);
@@ -129,18 +169,34 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             }
             KeyCode::Esc => {
                 app.sql_completion = None;
+                app.sql_template_steps.clear();
+                app.sql_template_last_column = None;
+                app.sql_template_last_table = None;
                 return Ok(InputResult::Continue);
             }
             _ => {
                 // Any other key dismisses the completion and is processed normally
                 app.sql_completion = None;
+                app.sql_template_steps.clear();
+                app.sql_template_last_column = None;
+                app.sql_template_last_table = None;
             }
         }
     }
 
-    // --- Ctrl+N: context-aware completion ---
+    // --- Ctrl+N: context-aware completion (or templates if empty) ---
     if key.code == KeyCode::Char('n') && key.modifiers.contains(KeyModifiers::CONTROL) {
         let sql_text = editor.content();
+
+        // If editor is empty, show query templates instead of completions
+        if sql_text.trim().is_empty() {
+            let items = build_template_items();
+            if !items.is_empty() {
+                app.sql_completion = Some(SqlCompletion::new(items, ""));
+            }
+            return Ok(InputResult::Continue);
+        }
+
         let (cursor_line, cursor_col) = editor.cursor();
 
         let text_before_cursor = text_up_to_cursor(&sql_text, cursor_line, cursor_col);
@@ -155,6 +211,8 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                     .map(|p| CompletionItem {
                         text: crate::query::table_name_from_path(p),
                         kind: CompletionKind::Table,
+                        template: None,
+                        template_steps: vec![],
                     })
                     .collect()
             }
@@ -168,10 +226,17 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                 headers.into_iter().map(|h| CompletionItem {
                     text: h,
                     kind: CompletionKind::Column,
+                    template: None,
+                    template_steps: vec![],
                 }).collect()
             }
             CompletionContext::Select => {
-                let mut items = vec![CompletionItem { text: "*".to_string(), kind: CompletionKind::Keyword }];
+                let mut items = vec![CompletionItem {
+                    text: "*".to_string(),
+                    kind: CompletionKind::Keyword,
+                    template: None,
+                    template_steps: vec![],
+                }];
                 items.extend(column_items_from_query(&sql_text, &files));
                 items.extend(function_items());
                 items.extend(keyword_items(&["DISTINCT", "CASE"]));
@@ -195,6 +260,8 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                 let mut items: Vec<CompletionItem> = SQL_KEYWORDS.iter().map(|kw| CompletionItem {
                     text: kw.to_string(),
                     kind: CompletionKind::Keyword,
+                    template: None,
+                    template_steps: vec![],
                 }).collect();
                 items.extend(function_items());
                 items.extend(column_items_from_query(&sql_text, &files));
@@ -279,7 +346,130 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         }
     }
 
+    // Run inline validation after each keystroke
+    if let Some(ref ed) = app.sql_vim_editor {
+        let sql_text = ed.content();
+        let files = app.session.files().to_vec();
+        app.sql_diagnostics = crate::query::sql_validator::validate(&sql_text, &files);
+    }
+
     Ok(InputResult::Continue)
+}
+
+/// Insert text into a VimEditor, handling newlines as Enter key presses.
+fn insert_text_into_editor(ed: &mut crate::vim_editor::VimEditor, text: &str) {
+    for ch in text.chars() {
+        if ch == '\n' {
+            ed.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+        } else {
+            ed.handle_key(KeyEvent::new(KeyCode::Char(ch), KeyModifiers::NONE));
+        }
+    }
+}
+
+/// Drain pending template steps, inserting literal text and stopping at the
+/// first `PickTable` or `PickColumn` step to show a completion popup.
+fn execute_template_steps(app: &mut App) {
+    while let Some(step) = app.sql_template_steps.first().cloned() {
+        match step {
+            TemplateStep::Text(text) => {
+                app.sql_template_steps.remove(0);
+                if let Some(ref mut ed) = app.sql_vim_editor {
+                    if ed.mode() != VimMode::Insert {
+                        ed.enter_insert_mode();
+                    }
+                    insert_text_into_editor(ed, &text);
+                }
+            }
+            TemplateStep::PickTable => {
+                app.sql_template_steps.remove(0);
+                let files = app.session.files().to_vec();
+                let items: Vec<CompletionItem> = files
+                    .iter()
+                    .map(|p| CompletionItem {
+                        text: crate::query::table_name_from_path(p),
+                        kind: CompletionKind::Table,
+                        template: None,
+                        template_steps: vec![],
+                    })
+                    .collect();
+                if !items.is_empty() {
+                    app.sql_completion = Some(SqlCompletion::new(items, ""));
+                }
+                break;
+            }
+            TemplateStep::PickColumn(alias) => {
+                app.sql_template_steps.remove(0);
+                let sql_text = app.sql_vim_editor.as_ref()
+                    .map(|ed| ed.content())
+                    .unwrap_or_default();
+                let files = app.session.files().to_vec();
+
+                let headers = if alias == "*" {
+                    // Collect columns from all tables referenced in the query
+                    let referenced = crate::query::files_referenced_by_query(&sql_text, &files);
+                    let mut cols = Vec::new();
+                    let mut seen = std::collections::HashSet::new();
+                    for path in referenced {
+                        if let Ok(hdrs) = read_csv_headers(path) {
+                            for h in hdrs {
+                                if seen.insert(h.clone()) {
+                                    cols.push(h);
+                                }
+                            }
+                        }
+                    }
+                    cols
+                } else {
+                    // Resolve a specific alias to its table's columns
+                    let aliases = parse_table_aliases(&sql_text, &files);
+                    resolve_alias(&alias, &aliases, &files)
+                        .and_then(|path| read_csv_headers(&path).ok())
+                        .unwrap_or_default()
+                };
+
+                let items: Vec<CompletionItem> = headers
+                    .into_iter()
+                    .map(|h| CompletionItem {
+                        text: h,
+                        kind: CompletionKind::Column,
+                        template: None,
+                        template_steps: vec![],
+                    })
+                    .collect();
+                if !items.is_empty() {
+                    app.sql_completion = Some(SqlCompletion::new(items, ""));
+                }
+                break;
+            }
+            TemplateStep::RepeatLastColumn => {
+                app.sql_template_steps.remove(0);
+                if let Some(ref col) = app.sql_template_last_column {
+                    if let Some(ref mut ed) = app.sql_vim_editor {
+                        if ed.mode() != VimMode::Insert {
+                            ed.enter_insert_mode();
+                        }
+                        insert_text_into_editor(ed, col);
+                    }
+                }
+            }
+            TemplateStep::Assemble(fmt) => {
+                app.sql_template_steps.remove(0);
+                let table = app.sql_template_last_table.as_deref().unwrap_or("table");
+                let column = app.sql_template_last_column.as_deref().unwrap_or("column");
+                let sql = fmt.replace("{table}", table).replace("{column}", column);
+                let mut new_editor = crate::vim_editor::VimEditor::new(sql);
+                new_editor.enter_insert_mode();
+                let line_count = new_editor.line_count();
+                if line_count > 0 {
+                    let last_line = line_count - 1;
+                    let last_col = new_editor.lines()[last_line].len();
+                    new_editor.set_cursor_for_test(last_line, last_col);
+                }
+                app.sql_vim_editor = Some(new_editor);
+            }
+        }
+    }
 }
 
 /// Get the SQL text up to the cursor position as a single string.
@@ -357,6 +547,8 @@ fn function_items() -> Vec<CompletionItem> {
     SQL_FUNCTIONS.iter().map(|f| CompletionItem {
         text: f.to_string(),
         kind: CompletionKind::Function,
+        template: None,
+        template_steps: vec![],
     }).collect()
 }
 
@@ -365,6 +557,8 @@ fn keyword_items(keywords: &[&str]) -> Vec<CompletionItem> {
     keywords.iter().map(|kw| CompletionItem {
         text: kw.to_string(),
         kind: CompletionKind::Keyword,
+        template: None,
+        template_steps: vec![],
     }).collect()
 }
 
@@ -380,6 +574,8 @@ fn column_items_from_query(sql: &str, files: &[PathBuf]) -> Vec<CompletionItem> 
                     columns.push(CompletionItem {
                         text: h,
                         kind: CompletionKind::Column,
+                        template: None,
+                        template_steps: vec![],
                     });
                 }
             }
@@ -570,4 +766,58 @@ fn tokenize_sql(sql: &str) -> Vec<String> {
         tokens.push(current);
     }
     tokens
+}
+
+/// Build query template items.
+///
+/// Returns 4 templates: select-all, join-two, group-count, order-limit.
+/// Templates that reference a table name leave the table position blank and
+/// Templates that reference a table name use `TemplateStep::PickTable` steps
+/// to trigger a FROM-context completion popup, letting the user pick interactively.
+fn build_template_items() -> Vec<CompletionItem> {
+    use crate::app::TemplateStep;
+    vec![
+        CompletionItem {
+            text: "Select All".to_string(),
+            kind: CompletionKind::Keyword,
+            template: Some("SELECT *\nFROM ".to_string()),
+            template_steps: vec![TemplateStep::PickTable],
+        },
+        CompletionItem {
+            text: "Join Two Tables".to_string(),
+            kind: CompletionKind::Keyword,
+            template: Some("SELECT *\nFROM ".to_string()),
+            template_steps: vec![
+                TemplateStep::PickTable,
+                TemplateStep::Text(" a\nJOIN ".to_string()),
+                TemplateStep::PickTable,
+                TemplateStep::Text(" b ON a.".to_string()),
+                TemplateStep::PickColumn("a".to_string()),
+                TemplateStep::Text(" = b.".to_string()),
+                TemplateStep::PickColumn("b".to_string()),
+            ],
+        },
+        CompletionItem {
+            text: "Group & Count".to_string(),
+            kind: CompletionKind::Keyword,
+            template: Some("SELECT *\nFROM ".to_string()),
+            template_steps: vec![
+                TemplateStep::PickTable,
+                TemplateStep::Text("\nGROUP BY ".to_string()),
+                TemplateStep::PickColumn("*".to_string()),
+                TemplateStep::Assemble("SELECT {column}, COUNT(*)\nFROM {table}\nGROUP BY {column}".to_string()),
+            ],
+        },
+        CompletionItem {
+            text: "Order & Limit".to_string(),
+            kind: CompletionKind::Keyword,
+            template: Some("SELECT *\nFROM ".to_string()),
+            template_steps: vec![
+                TemplateStep::PickTable,
+                TemplateStep::Text("\nORDER BY ".to_string()),
+                TemplateStep::PickColumn("*".to_string()),
+                TemplateStep::Text("\nLIMIT 10".to_string()),
+            ],
+        },
+    ]
 }

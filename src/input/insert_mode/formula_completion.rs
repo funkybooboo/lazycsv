@@ -41,6 +41,8 @@ fn formula_items() -> Vec<CompletionItem> {
         .map(|(name, _)| CompletionItem {
             text: name.to_string(),
             kind: CompletionKind::Function,
+            template: None,
+            template_steps: vec![],
         })
         .collect()
 }

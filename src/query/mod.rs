@@ -61,7 +61,8 @@
 //! All operations check for cancellation every 1000 rows, allowing responsive Ctrl+C handling.
 
 mod date_detection;
-mod error_enhancer;
+pub mod error_enhancer;
+pub mod sql_validator;
 
 use crate::cancel::{self, CancelledError};
 use crate::csv::Document;

@@ -212,7 +212,7 @@ fn find_similar_columns(target: &str, candidates: &[String], max_results: usize)
 }
 
 /// Calculate Levenshtein distance between two strings
-fn levenshtein_distance(s1: &str, s2: &str) -> usize {
+pub fn levenshtein_distance(s1: &str, s2: &str) -> usize {
     let len1 = s1.len();
     let len2 = s2.len();
 

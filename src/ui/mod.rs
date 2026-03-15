@@ -69,6 +69,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
                 vim_editor,
                 app.sql_error.as_deref(),
                 app.sql_completion.as_ref(),
+                &app.sql_diagnostics,
             );
         }
     }

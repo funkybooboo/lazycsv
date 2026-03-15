@@ -3,7 +3,7 @@
 //! Displays a centered modal popup for typing and executing SQL queries
 //! against loaded CSV tables with full vim editing capabilities.
 
-use crate::app::{SqlCompletion, COMPLETION_MAX_VISIBLE};
+use crate::app::{DiagnosticSeverity, SqlCompletion, SqlDiagnostic, COMPLETION_MAX_VISIBLE};
 use crate::vim_editor::{VimEditor, VimMode};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -28,6 +28,7 @@ pub fn render_sql_editor_vim(
     vim_editor: &VimEditor,
     sql_error: Option<&str>,
     completion: Option<&SqlCompletion>,
+    diagnostics: &[SqlDiagnostic],
 ) {
     let area = super::help::centered_rect(
         SQL_EDITOR_WIDTH_PERCENT,
@@ -45,16 +46,21 @@ pub fn render_sql_editor_vim(
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    // Split area for query text and status line
+    // Split area for query text, diagnostic tooltip, and status line
     let (query_area, status_area) = split_editor_area(inner);
 
-    // Render query text with line numbers and cursor
-    let lines = build_vim_editor_lines(vim_editor);
+    // Render query text with line numbers, cursor, and diagnostic squiggles
+    let lines = build_vim_editor_lines_with_diagnostics(vim_editor, diagnostics);
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, query_area);
 
-    // Render status bar with error/command/help
-    let status_line = build_status_line(vim_editor, sql_error, status_area.width as usize);
+    // Build status line - show first diagnostic message if any, otherwise normal status
+    let first_diag_at_cursor = find_diagnostic_at_cursor(vim_editor, diagnostics);
+    let status_line = if let Some(diag) = first_diag_at_cursor {
+        build_diagnostic_status_line(diag, status_area.width as usize)
+    } else {
+        build_status_line(vim_editor, sql_error, status_area.width as usize)
+    };
     let status_paragraph = Paragraph::new(vec![status_line]);
     frame.render_widget(status_paragraph, status_area);
 
@@ -264,6 +270,145 @@ fn build_vim_editor_lines(vim_editor: &VimEditor) -> Vec<Line<'static>> {
     }
 
     display_lines
+}
+
+/// Build display lines with diagnostic squiggly underlines.
+///
+/// For each source line that has diagnostics, an extra line with red `~` characters
+/// is inserted below it to indicate the problematic span.
+fn build_vim_editor_lines_with_diagnostics(
+    vim_editor: &VimEditor,
+    diagnostics: &[SqlDiagnostic],
+) -> Vec<Line<'static>> {
+    if diagnostics.is_empty() {
+        return build_vim_editor_lines(vim_editor);
+    }
+
+    let (cursor_line, cursor_col) = vim_editor.cursor();
+    let line_count = vim_editor.line_count();
+    let line_num_width = format!("{}", line_count).len();
+
+    let mut display_lines = Vec::new();
+
+    for (line_idx, line_text) in vim_editor.lines().iter().enumerate() {
+        let line_num = format!("{:>width$} ", line_idx + 1, width = line_num_width);
+        let line_num_span = Span::styled(line_num.clone(), Style::default().fg(Color::DarkGray));
+
+        if line_idx == cursor_line {
+            let chars: Vec<char> = line_text.chars().collect();
+            let mut spans = vec![line_num_span];
+
+            if cursor_col > 0 {
+                let before: String = chars[..cursor_col.min(chars.len())].iter().collect();
+                spans.push(Span::raw(before));
+            }
+
+            if cursor_col < chars.len() {
+                let cursor_char = chars[cursor_col].to_string();
+                spans.push(Span::styled(
+                    cursor_char,
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                ));
+            } else {
+                spans.push(Span::styled(
+                    " ",
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                ));
+            }
+
+            if cursor_col + 1 < chars.len() {
+                let after: String = chars[cursor_col + 1..].iter().collect();
+                spans.push(Span::raw(after));
+            }
+
+            display_lines.push(Line::from(spans));
+        } else {
+            display_lines.push(Line::from(vec![
+                line_num_span,
+                Span::raw(line_text.clone()),
+            ]));
+        }
+
+        // Add squiggly underline line for diagnostics on this line
+        let line_diags: Vec<&SqlDiagnostic> = diagnostics
+            .iter()
+            .filter(|d| d.line == line_idx)
+            .collect();
+
+        if !line_diags.is_empty() {
+            let gutter = " ".repeat(line_num_width + 1);
+            let squiggles = build_squiggle_line(&line_diags, line_text.len());
+            let mut spans = vec![Span::raw(gutter)];
+            spans.extend(squiggles);
+            display_lines.push(Line::from(spans));
+        }
+    }
+
+    display_lines
+}
+
+/// Build squiggly underline spans for a set of diagnostics on a single line.
+///
+/// Produces spans of spaces (for gaps) and `~` characters (for diagnostics)
+/// colored by severity: red for errors, yellow for warnings.
+fn build_squiggle_line(diagnostics: &[&SqlDiagnostic], _line_len: usize) -> Vec<Span<'static>> {
+    // Sort diagnostics by column start
+    let mut sorted: Vec<&&SqlDiagnostic> = diagnostics.iter().collect();
+    sorted.sort_by_key(|d| d.col_start);
+
+    let mut spans = Vec::new();
+    let mut pos = 0;
+
+    for diag in sorted {
+        if diag.col_start > pos {
+            spans.push(Span::raw(" ".repeat(diag.col_start - pos)));
+        }
+        let len = diag.col_end.saturating_sub(diag.col_start).max(1);
+        let color = match diag.severity {
+            DiagnosticSeverity::Error => Color::Red,
+            DiagnosticSeverity::Warning => Color::Yellow,
+        };
+        spans.push(Span::styled(
+            "~".repeat(len),
+            Style::default().fg(color),
+        ));
+        pos = diag.col_end;
+    }
+
+    spans
+}
+
+/// Find the first diagnostic whose span covers the current cursor position.
+fn find_diagnostic_at_cursor<'a>(
+    vim_editor: &VimEditor,
+    diagnostics: &'a [SqlDiagnostic],
+) -> Option<&'a SqlDiagnostic> {
+    let (cursor_line, cursor_col) = vim_editor.cursor();
+    diagnostics
+        .iter()
+        .find(|d| d.line == cursor_line && cursor_col >= d.col_start && cursor_col < d.col_end)
+}
+
+/// Build a status line showing a diagnostic message.
+fn build_diagnostic_status_line(diag: &SqlDiagnostic, width: usize) -> Line<'static> {
+    let (prefix, color) = match diag.severity {
+        DiagnosticSeverity::Error => ("Error: ", Color::Red),
+        DiagnosticSeverity::Warning => ("Warning: ", Color::Yellow),
+    };
+    let msg = format!("{}{}", prefix, diag.message);
+    let help_text = "? for help";
+    let padding = width.saturating_sub(msg.len() + help_text.len() + 2);
+    Line::from(vec![
+        Span::styled(msg, Style::default().fg(color).add_modifier(Modifier::BOLD)),
+        Span::raw(" ".repeat(padding)),
+        Span::raw(help_text.to_string()),
+    ])
 }
 
 /// Split the editor area into query text area and status area.

@@ -119,6 +119,12 @@ impl CompletionKind {
 pub struct CompletionItem {
     pub text: String,
     pub kind: CompletionKind,
+    /// If set, selecting this item replaces the entire editor content
+    /// (used for query templates).
+    pub template: Option<String>,
+    /// If set, these steps are executed after the template is inserted.
+    /// Each step is either literal text or a table-pick prompt.
+    pub template_steps: Vec<TemplateStep>,
 }
 
 /// SQL completion popup state
@@ -196,6 +202,47 @@ impl SqlCompletion {
         let filtered = self.filtered_items();
         filtered.get(self.selected).copied()
     }
+}
+
+/// Severity level for a SQL diagnostic
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DiagnosticSeverity {
+    Error,
+    Warning,
+}
+
+/// A pre-execution diagnostic marker in the SQL editor
+#[derive(Debug, Clone)]
+pub struct SqlDiagnostic {
+    /// 0-based line number
+    pub line: usize,
+    /// 0-based start column (inclusive)
+    pub col_start: usize,
+    /// 0-based end column (exclusive)
+    pub col_end: usize,
+    /// Human-readable message
+    pub message: String,
+    /// Severity level
+    pub severity: DiagnosticSeverity,
+}
+
+/// A step in a multi-part query template.
+#[derive(Debug, Clone)]
+pub enum TemplateStep {
+    /// Insert literal text at cursor.
+    Text(String),
+    /// Prompt the user to pick a table name via completion popup.
+    PickTable,
+    /// Prompt the user to pick a column from the table aliased as `alias`
+    /// in the current query. The alias is resolved at execution time.
+    /// Use `"*"` to pick from all referenced tables.
+    PickColumn(String),
+    /// Insert the same column name that was last picked via `PickColumn`.
+    RepeatLastColumn,
+    /// Replace the entire editor content with a format string.
+    /// `{table}` is replaced with the last picked table name,
+    /// `{column}` is replaced with the last picked column name.
+    Assemble(String),
 }
 
 /// Visual mode selection anchor and type
@@ -399,6 +446,18 @@ pub struct App {
     /// SQL table-name completion popup state (None when not showing)
     pub sql_completion: Option<SqlCompletion>,
 
+    /// Pre-execution SQL diagnostics (inline error/warning markers)
+    pub sql_diagnostics: Vec<SqlDiagnostic>,
+
+    /// Pending template steps to execute after each table/column selection.
+    pub sql_template_steps: Vec<TemplateStep>,
+
+    /// Last column name picked via a template `PickColumn` step.
+    pub sql_template_last_column: Option<String>,
+
+    /// Last table name picked via a template `PickTable` step.
+    pub sql_template_last_table: Option<String>,
+
     /// Magnifier state for complex cell editing (None when not in magnifier mode)
     pub magnifier_state: Option<crate::magnifier::MagnifierState>,
 
@@ -556,6 +615,10 @@ impl App {
             sql_error: None,
             sql_vim_editor: None,
             sql_completion: None,
+            sql_diagnostics: Vec::new(),
+            sql_template_steps: Vec::new(),
+            sql_template_last_column: None,
+            sql_template_last_table: None,
             magnifier_state: None,
             should_quit: false,
             sqlite_cache: None,
