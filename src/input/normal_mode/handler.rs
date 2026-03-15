@@ -224,6 +224,22 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             editing::insert_row_above(app);
         }
 
+        // Column width: '+' - increase current column width by 2
+        KeyCode::Char('+') if help::is_navigation_allowed(app) => {
+            let col = app.view_state.selected_column.get();
+            let current = app.session.column_width(col).unwrap_or(15);
+            app.session.set_column_width(col, current.saturating_add(2).min(200));
+            return Ok(InputResult::Continue);
+        }
+
+        // Column width: '-' - decrease current column width by 2
+        KeyCode::Char('-') if help::is_navigation_allowed(app) => {
+            let col = app.view_state.selected_column.get();
+            let current = app.session.column_width(col).unwrap_or(15);
+            app.session.set_column_width(col, current.saturating_sub(2).max(4));
+            return Ok(InputResult::Continue);
+        }
+
         // Comma leader - start column command sequence
         KeyCode::Char(',') if help::is_navigation_allowed(app) => {
             app.input_state.set_pending_command(PendingCommand::Comma);

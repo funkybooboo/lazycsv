@@ -352,10 +352,16 @@ fn calculate_column_widths(
         return (constraints, raw_widths);
     }
 
-    // Calculate ideal width for each column based on content
+    // Calculate ideal width for each column based on content (or use manual width)
     let mut ideal_widths: Vec<u16> = Vec::with_capacity(visible_col_count);
     for col_idx in start_col..end_col {
-        // Get header width
+        // Check for manually set width first
+        if let Some(manual_width) = app.session.column_width(col_idx) {
+            ideal_widths.push(manual_width.max(MIN_COLUMN_WIDTH));
+            continue;
+        }
+
+        // Auto-size: get header width
         let header_len = app
             .document
             .header(ColIndex::new(col_idx))

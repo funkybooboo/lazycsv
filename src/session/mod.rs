@@ -76,6 +76,10 @@ pub struct Session {
 
     /// Last-known modification times for files (used to detect external changes)
     file_mtimes: HashMap<PathBuf, SystemTime>,
+
+    /// Per-file manual column widths (sparse: only stores explicitly set widths).
+    /// Key is column index, value is width in characters.
+    column_widths: HashMap<PathBuf, HashMap<usize, u16>>,
 }
 
 impl Session {
@@ -91,6 +95,7 @@ impl Session {
             document_cache: HashMap::new(),
             query_output_files: HashSet::new(),
             file_mtimes: HashMap::new(),
+            column_widths: HashMap::new(),
         }
     }
 
@@ -162,6 +167,38 @@ impl Session {
     pub fn set_header_mode(&mut self, mode: bool) {
         self.header_modes
             .insert(self.files[self.active_file_index].clone(), mode);
+    }
+
+    /// Get manual column width for a specific column of the current file.
+    /// Returns None if no manual width is set (use auto-sizing).
+    pub fn column_width(&self, col_index: usize) -> Option<u16> {
+        self.column_widths
+            .get(&self.files[self.active_file_index])
+            .and_then(|widths| widths.get(&col_index))
+            .copied()
+    }
+
+    /// Set manual column width for a specific column of the current file.
+    pub fn set_column_width(&mut self, col_index: usize, width: u16) {
+        let file = self.files[self.active_file_index].clone();
+        self.column_widths
+            .entry(file)
+            .or_default()
+            .insert(col_index, width);
+    }
+
+    /// Clear manual column width for a specific column (revert to auto-sizing).
+    pub fn clear_column_width(&mut self, col_index: usize) {
+        let file = &self.files[self.active_file_index];
+        if let Some(widths) = self.column_widths.get_mut(file) {
+            widths.remove(&col_index);
+        }
+    }
+
+    /// Clear all manual column widths for the current file.
+    pub fn clear_all_column_widths(&mut self) {
+        let file = &self.files[self.active_file_index];
+        self.column_widths.remove(file);
     }
 
     /// Get delimiter for a specific file (default: ',')

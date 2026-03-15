@@ -124,6 +124,7 @@ pub fn execute(app: &mut App) -> Result<InputResult> {
         "avg" | "average" => super::stats::execute_avg(app, _arg),
         "count" => super::stats::execute_count(app, _arg),
         "distinct" => super::stats::execute_distinct(app, _arg),
+        "width" | "resize" => execute_width(app, _arg),
         _ => {
             // Unknown command
             app.status_message = Some(StatusMessage::from(format!("Unknown command: :{}", cmd)));
@@ -344,6 +345,74 @@ fn execute_filename(app: &mut App, arg: Option<&str>) -> Result<InputResult> {
 fn execute_clear_search(app: &mut App) -> Result<InputResult> {
     app.search_state = None;
     app.status_message = Some(StatusMessage::from("Search cleared"));
+    Ok(InputResult::Continue)
+}
+
+/// Execute :width/:resize command
+///
+/// Usage:
+///   :width A 20   - Set column A width to 20 characters
+///   :width B auto - Auto-size column B (clear manual width)
+///   :width * auto - Auto-size all columns (clear all manual widths)
+///   :width * 15   - Set all columns to 15 characters
+fn execute_width(app: &mut App, arg: Option<&str>) -> Result<InputResult> {
+    let arg = match arg {
+        Some(a) if !a.is_empty() => a,
+        _ => {
+            app.status_message = Some(StatusMessage::from("Usage: :width <column> <size|auto>"));
+            return Ok(InputResult::Continue);
+        }
+    };
+
+    let parts: Vec<&str> = arg.split_whitespace().collect();
+    if parts.len() != 2 {
+        app.status_message = Some(StatusMessage::from("Usage: :width <column> <size|auto>"));
+        return Ok(InputResult::Continue);
+    }
+
+    let col_spec = parts[0];
+    let width_spec = parts[1];
+
+    if col_spec == "*" {
+        // Apply to all columns
+        if width_spec.eq_ignore_ascii_case("auto") {
+            app.session.clear_all_column_widths();
+            app.status_message = Some(StatusMessage::from("All columns set to auto width"));
+        } else if let Ok(w) = width_spec.parse::<u16>() {
+            let col_count = app.document.column_count();
+            for i in 0..col_count {
+                app.session.set_column_width(i, w);
+            }
+            app.status_message = Some(StatusMessage::from(format!("All columns set to width {}", w)));
+        } else {
+            app.status_message = Some(StatusMessage::from("Width must be a number or 'auto'"));
+        }
+    } else {
+        // Parse column letter(s) to index
+        let col_index = match excel_letter_to_column(col_spec) {
+            Ok(idx) => idx,
+            Err(_) => {
+                app.status_message = Some(StatusMessage::from(format!("Invalid column: {}", col_spec)));
+                return Ok(InputResult::Continue);
+            }
+        };
+
+        if col_index >= app.document.column_count() {
+            app.status_message = Some(StatusMessage::from(format!("Column {} does not exist", col_spec.to_uppercase())));
+            return Ok(InputResult::Continue);
+        }
+
+        if width_spec.eq_ignore_ascii_case("auto") {
+            app.session.clear_column_width(col_index);
+            app.status_message = Some(StatusMessage::from(format!("Column {} set to auto width", col_spec.to_uppercase())));
+        } else if let Ok(w) = width_spec.parse::<u16>() {
+            app.session.set_column_width(col_index, w);
+            app.status_message = Some(StatusMessage::from(format!("Column {} width set to {}", col_spec.to_uppercase(), w)));
+        } else {
+            app.status_message = Some(StatusMessage::from("Width must be a number or 'auto'"));
+        }
+    }
+
     Ok(InputResult::Continue)
 }
 
