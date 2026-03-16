@@ -14,3 +14,7 @@ ID,Name,Description,Formula,Path
 13,Percent%Test,50% off,%change,100%
 14,Caret^Power,2^10,A^B,path^
 15,Mixed!@#$%,All!@#$%^&*(),=!@#$%,/!@#/$%/^
+16,New Line,"I
+have
+newlines","More
+newlines",/home/user

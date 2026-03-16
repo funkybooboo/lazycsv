@@ -140,26 +140,9 @@ impl Document {
         no_headers: bool,
         encoding_label: Option<String>,
     ) -> Result<usize> {
-        // Fast path: stream from disk with ByteRecord to avoid full-file read,
-        // UTF-8 decode, and per-row String allocation.
+        // Fast path: use memchr-based newline counting (same as TUI index builder).
         if encoding_label.is_none() {
-            let file = std::fs::File::open(path)
-                .context(format!("Failed to open file: {}", path.display()))?;
-            let reader = std::io::BufReader::with_capacity(256 * 1024, file);
-
-            let mut builder = csv::ReaderBuilder::new();
-            builder.has_headers(!no_headers);
-            if let Some(d) = delimiter {
-                builder.delimiter(d);
-            }
-
-            let mut csv_reader = builder.from_reader(reader);
-            let mut count = 0usize;
-            let mut record = csv::ByteRecord::new();
-            while csv_reader.read_byte_record(&mut record)? {
-                count += 1;
-            }
-            return Ok(count);
+            return crate::csv::row_storage::count_rows_fast(path, no_headers);
         }
 
         // Slow path: custom encoding requires full decode first

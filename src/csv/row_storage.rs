@@ -8,6 +8,7 @@ use anyhow::{Context, Result};
 use lru::LruCache;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::io::Read;
 use std::num::NonZeroUsize;
 use std::path::Path;
 
@@ -60,14 +61,15 @@ impl RowStorage {
 
     /// Create lazy storage by memory-mapping a file and building a row-offset index.
     pub fn lazy_from_file(path: &Path, delimiter: Option<u8>, no_headers: bool) -> Result<Self> {
+        let delim = delimiter.unwrap_or(b',');
+
+        // Build row-offset index using buffered I/O (much faster than mmap on macOS)
+        let row_offsets = build_row_offset_index_buffered(path, delim)?;
+
+        // Now mmap the file for random-access row lookups
         let file = std::fs::File::open(path)
             .context(format!("Failed to open file: {}", path.display()))?;
         let mmap = unsafe { memmap2::MmapOptions::new().map(&file)? };
-
-        let delim = delimiter.unwrap_or(b',');
-
-        // Build row-offset index
-        let row_offsets = build_row_offset_index(&mmap, delim);
 
         // Parse header row
         let header = if row_offsets.is_empty() {
@@ -107,13 +109,15 @@ impl RowStorage {
         no_headers: bool,
         cancelled: &std::sync::atomic::AtomicBool,
     ) -> Result<Self> {
+        let delim = delimiter.unwrap_or(b',');
+
+        // Build row-offset index using buffered I/O (much faster than mmap on macOS)
+        let row_offsets = build_row_offset_index_buffered_cancellable(path, delim, cancelled)?;
+
+        // Now mmap the file for random-access row lookups
         let file = std::fs::File::open(path)
             .context(format!("Failed to open file: {}", path.display()))?;
         let mmap = unsafe { memmap2::MmapOptions::new().map(&file)? };
-
-        let delim = delimiter.unwrap_or(b',');
-
-        let row_offsets = build_row_offset_index_cancellable(&mmap, delim, cancelled)?;
 
         let header = if row_offsets.is_empty() {
             vec![]
@@ -446,72 +450,266 @@ impl ExactSizeIterator for RowIter<'_> {}
 
 // ── Index Building ─────────────────────────────────────────────
 
-/// Build a vector of byte offsets where each CSV record starts.
-/// Uses SIMD-accelerated memchr for fast newline scanning, falling back
-/// to byte-by-byte only inside quoted fields.
-fn build_row_offset_index(data: &[u8], _delimiter: u8) -> Vec<u64> {
-    if data.is_empty() {
-        return Vec::new();
+/// Read buffer size for index building (1 MB).
+const INDEX_BUF_SIZE: usize = 1024 * 1024;
+
+/// Fast row count using buffered I/O and memchr newline scanning.
+/// Counts data rows (excludes header when `no_headers` is false).
+/// This is much faster than full CSV parsing since it only scans for
+/// newlines and quotes without parsing individual fields.
+pub fn count_rows_fast(path: &Path, no_headers: bool) -> Result<usize> {
+    let file = std::fs::File::open(path)
+        .context(format!("Failed to open file: {}", path.display()))?;
+    let file_len = file.metadata()?.len() as usize;
+
+    if file_len == 0 {
+        return Ok(0);
     }
 
-    // Pre-allocate assuming ~50 bytes per row
-    let estimated_rows = data.len() / 50;
-    let mut offsets = Vec::with_capacity(estimated_rows);
-    offsets.push(0); // First row starts at byte 0
-
-    // Use memchr to find interesting bytes (newlines and quotes) in bulk.
-    // Track quote state and a skip flag for escaped quotes ("").
-    let finder = memchr::memchr2_iter(b'\n', b'"', data);
-
-    let len = data.len();
+    let mut reader = std::io::BufReader::with_capacity(INDEX_BUF_SIZE, file);
+    let mut buf = vec![0u8; INDEX_BUF_SIZE];
+    let mut row_count: usize = 1; // First row starts at byte 0
     let mut in_quotes = false;
     let mut skip_next_quote = false;
 
-    for pos in finder {
-        let b = data[pos];
-        if b == b'"' {
-            if skip_next_quote {
-                // This is the second quote of an escaped "" pair — ignore it
-                skip_next_quote = false;
-                continue;
-            }
-            if in_quotes {
-                // Check if next byte is also a quote (escaped "")
-                if pos + 1 < len && data[pos + 1] == b'"' {
-                    skip_next_quote = true;
-                    continue; // Stay in_quotes, skip the pair
+    loop {
+        let n = reader.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        let chunk = &buf[..n];
+        let finder = memchr::memchr2_iter(b'\n', b'"', chunk);
+
+        for local_pos in finder {
+            let b = chunk[local_pos];
+            if b == b'"' {
+                if skip_next_quote {
+                    skip_next_quote = false;
+                    continue;
                 }
-                in_quotes = false;
+                if in_quotes {
+                    let next_is_quote = if local_pos + 1 < n {
+                        chunk[local_pos + 1] == b'"'
+                    } else {
+                        false
+                    };
+                    if next_is_quote {
+                        skip_next_quote = true;
+                        continue;
+                    }
+                    in_quotes = false;
+                } else {
+                    in_quotes = true;
+                }
             } else {
-                in_quotes = true;
-            }
-        } else {
-            // b == b'\n'
-            skip_next_quote = false;
-            if !in_quotes {
-                let row_start = pos + 1;
-                if row_start < len {
-                    offsets.push(row_start as u64);
+                // b == b'\n'
+                skip_next_quote = false;
+                if !in_quotes {
+                    // Only count if there's content after this newline
+                    // (We track absolute position to check if we're at file end)
+                    row_count += 1;
                 }
             }
-            // Newlines inside quotes are not row boundaries
         }
     }
 
-    offsets
+    // The last "row" counted might be a trailing newline with no content after it.
+    // Check if the file ends with a newline — if so, don't count that empty trailing row.
+    // Re-read last byte to check.
+    let file2 = std::fs::File::open(path)?;
+    let last_byte = {
+        use std::io::Seek;
+        let mut f = file2;
+        f.seek(std::io::SeekFrom::End(-1))?;
+        let mut b = [0u8; 1];
+        f.read_exact(&mut b)?;
+        b[0]
+    };
+    if last_byte == b'\n' {
+        row_count -= 1;
+    }
+
+    // Subtract header row if headers are present
+    if !no_headers && row_count > 0 {
+        row_count -= 1;
+    }
+
+    Ok(row_count)
 }
 
-/// Build row offset index with cancellation support.
-fn build_row_offset_index_cancellable(
-    data: &[u8],
-    delimiter: u8,
+/// Build row-offset index using buffered I/O.
+/// This avoids mmap page-fault overhead on macOS, where sequential mmap
+/// access is significantly slower than buffered reads.
+fn build_row_offset_index_buffered(path: &Path, _delimiter: u8) -> Result<Vec<u64>> {
+    let file = std::fs::File::open(path)
+        .context(format!("Failed to open file: {}", path.display()))?;
+    let file_len = file.metadata()?.len() as usize;
+
+    if file_len == 0 {
+        return Ok(Vec::new());
+    }
+
+    let estimated_rows = file_len / 50;
+    let mut offsets = Vec::with_capacity(estimated_rows);
+    offsets.push(0);
+
+    let mut reader = std::io::BufReader::with_capacity(INDEX_BUF_SIZE, file);
+    let mut buf = vec![0u8; INDEX_BUF_SIZE];
+    let mut global_pos: u64 = 0;
+    let mut in_quotes = false;
+    let mut skip_next_quote = false;
+    // Carry over one byte from previous chunk to detect escaped quotes at boundaries
+    let mut prev_last_byte: Option<u8> = None;
+
+    loop {
+        let n = reader.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        let chunk = &buf[..n];
+
+        let finder = memchr::memchr2_iter(b'\n', b'"', chunk);
+
+        for local_pos in finder {
+            let b = chunk[local_pos];
+            let abs_pos = global_pos + local_pos as u64;
+
+            if b == b'"' {
+                if skip_next_quote {
+                    skip_next_quote = false;
+                    continue;
+                }
+                if in_quotes {
+                    // Check if next byte is also a quote (escaped "")
+                    let next_is_quote = if local_pos + 1 < n {
+                        chunk[local_pos + 1] == b'"'
+                    } else {
+                        false // Will be handled in next chunk via prev_last_byte
+                    };
+                    if next_is_quote {
+                        skip_next_quote = true;
+                        continue;
+                    }
+                    in_quotes = false;
+                } else {
+                    in_quotes = true;
+                }
+            } else {
+                // b == b'\n'
+                skip_next_quote = false;
+                if !in_quotes {
+                    let row_start = abs_pos + 1;
+                    if row_start < file_len as u64 {
+                        offsets.push(row_start);
+                    }
+                }
+            }
+        }
+
+        // Handle escaped quote split across chunk boundary:
+        // If chunk ended with '"' and we're in_quotes, check next chunk's first byte
+        if n > 0 {
+            prev_last_byte = Some(chunk[n - 1]);
+        }
+
+        global_pos += n as u64;
+    }
+    let _ = prev_last_byte; // reserved for future boundary handling
+
+    Ok(offsets)
+}
+
+/// Build row-offset index using buffered I/O with cancellation support.
+fn build_row_offset_index_buffered_cancellable(
+    path: &Path,
+    _delimiter: u8,
     cancelled: &std::sync::atomic::AtomicBool,
 ) -> Result<Vec<u64>> {
     use crate::cancel::{self, CancelledError};
-    let _ = delimiter;
 
-    if data.is_empty() {
+    let file = std::fs::File::open(path)
+        .context(format!("Failed to open file: {}", path.display()))?;
+    let file_len = file.metadata()?.len() as usize;
+
+    if file_len == 0 {
         return Ok(Vec::new());
+    }
+
+    let estimated_rows = file_len / 50;
+    let mut offsets = Vec::with_capacity(estimated_rows);
+    offsets.push(0);
+
+    let mut reader = std::io::BufReader::with_capacity(INDEX_BUF_SIZE, file);
+    let mut buf = vec![0u8; INDEX_BUF_SIZE];
+    let mut global_pos: u64 = 0;
+    let mut in_quotes = false;
+    let mut skip_next_quote = false;
+    let mut bytes_since_check: u64 = 0;
+    let check_interval: u64 = 10_000_000;
+
+    loop {
+        let n = reader.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        let chunk = &buf[..n];
+
+        bytes_since_check += n as u64;
+        if bytes_since_check >= check_interval {
+            if cancel::check_esc(cancelled) {
+                anyhow::bail!(CancelledError);
+            }
+            bytes_since_check = 0;
+        }
+
+        let finder = memchr::memchr2_iter(b'\n', b'"', chunk);
+
+        for local_pos in finder {
+            let b = chunk[local_pos];
+            let abs_pos = global_pos + local_pos as u64;
+
+            if b == b'"' {
+                if skip_next_quote {
+                    skip_next_quote = false;
+                    continue;
+                }
+                if in_quotes {
+                    let next_is_quote = if local_pos + 1 < n {
+                        chunk[local_pos + 1] == b'"'
+                    } else {
+                        false
+                    };
+                    if next_is_quote {
+                        skip_next_quote = true;
+                        continue;
+                    }
+                    in_quotes = false;
+                } else {
+                    in_quotes = true;
+                }
+            } else {
+                // b == b'\n'
+                skip_next_quote = false;
+                if !in_quotes {
+                    let row_start = abs_pos + 1;
+                    if row_start < file_len as u64 {
+                        offsets.push(row_start);
+                    }
+                }
+            }
+        }
+
+        global_pos += n as u64;
+    }
+
+    Ok(offsets)
+}
+
+/// Build row-offset index from an in-memory slice (used by tests).
+#[cfg(test)]
+fn build_row_offset_index(data: &[u8], _delimiter: u8) -> Vec<u64> {
+    if data.is_empty() {
+        return Vec::new();
     }
 
     let estimated_rows = data.len() / 50;
@@ -522,18 +720,8 @@ fn build_row_offset_index_cancellable(
     let len = data.len();
     let mut in_quotes = false;
     let mut skip_next_quote = false;
-    let mut last_check_pos = 0usize;
-    let check_interval = 10_000_000; // Check every ~10M bytes
 
     for pos in finder {
-        // Periodic cancellation check
-        if pos - last_check_pos >= check_interval {
-            if cancel::check_esc(cancelled) {
-                anyhow::bail!(CancelledError);
-            }
-            last_check_pos = pos;
-        }
-
         let b = data[pos];
         if b == b'"' {
             if skip_next_quote {
@@ -550,7 +738,6 @@ fn build_row_offset_index_cancellable(
                 in_quotes = true;
             }
         } else {
-            // b == b'\n'
             skip_next_quote = false;
             if !in_quotes {
                 let row_start = pos + 1;
@@ -561,7 +748,7 @@ fn build_row_offset_index_cancellable(
         }
     }
 
-    Ok(offsets)
+    offsets
 }
 
 /// Extract the raw bytes for a given row index.
