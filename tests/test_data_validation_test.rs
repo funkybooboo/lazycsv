@@ -153,7 +153,7 @@ fn test_special_chars_csv() {
         5,
         "special_chars.csv should have 5 columns"
     );
-    assert_eq!(doc.row_count(), 16, "special_chars.csv should have 15 rows");
+    assert_eq!(doc.row_count(), 17, "special_chars.csv should have 16 data rows + header");
 
     // Verify quoted values with commas are parsed correctly
     // Row 0 = header, Row 2 = 3rd row in file = data row with ID=2

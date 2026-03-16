@@ -10,10 +10,6 @@ pub mod table;
 pub mod utils;
 pub mod view_state;
 
-/// Maximum number of columns to display simultaneously
-/// This prevents horizontal overflow on standard terminals
-pub const MAX_VISIBLE_COLS: usize = 10;
-
 use crate::App;
 use ratatui::{
     layout::{Constraint, Direction, Layout},

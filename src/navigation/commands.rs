@@ -5,7 +5,7 @@
 
 use crate::app::App;
 use crate::domain::position::ColIndex;
-use crate::ui::{ViewportMode, MAX_VISIBLE_COLS};
+use crate::ui::ViewportMode;
 use anyhow::Result;
 use crossterm::event::KeyCode;
 
@@ -84,9 +84,9 @@ fn handle_column_boundary(app: &mut App, code: KeyCode) {
             app.view_state.selected_column =
                 ColIndex::new(app.document.column_count().saturating_sub(1));
             // Adjust horizontal offset to show last column
-            if app.document.column_count() > MAX_VISIBLE_COLS {
+            if app.document.column_count() > app.view_state.visible_cols_count {
                 app.view_state.column_scroll_offset =
-                    app.document.column_count() - MAX_VISIBLE_COLS;
+                    app.document.column_count() - app.view_state.visible_cols_count;
             }
             app.view_state.viewport_mode = ViewportMode::Auto;
         }
@@ -233,10 +233,10 @@ pub fn move_right_by(app: &mut App, count: usize) {
         .min(app.document.column_count().saturating_sub(1));
     app.view_state.selected_column = ColIndex::new(new_col);
     if app.view_state.selected_column.get()
-        >= app.view_state.column_scroll_offset + MAX_VISIBLE_COLS
+        >= app.view_state.column_scroll_offset + app.view_state.visible_cols_count
     {
         app.view_state.column_scroll_offset =
-            app.view_state.selected_column.get() - MAX_VISIBLE_COLS + 1;
+            app.view_state.selected_column.get() - app.view_state.visible_cols_count + 1;
     }
     app.view_state.viewport_mode = ViewportMode::Auto;
 }
@@ -276,8 +276,8 @@ pub fn goto_column(app: &mut App, column_letter: &str) {
             // Update horizontal scroll
             if col_idx < app.view_state.column_scroll_offset {
                 app.view_state.column_scroll_offset = col_idx;
-            } else if col_idx >= app.view_state.column_scroll_offset + MAX_VISIBLE_COLS {
-                app.view_state.column_scroll_offset = col_idx - MAX_VISIBLE_COLS + 1;
+            } else if col_idx >= app.view_state.column_scroll_offset + app.view_state.visible_cols_count {
+                app.view_state.column_scroll_offset = col_idx - app.view_state.visible_cols_count + 1;
             }
 
             app.view_state.viewport_mode = ViewportMode::Auto;
@@ -313,8 +313,8 @@ pub fn goto_column_by_number(app: &mut App, col_num: usize) {
     // Update horizontal scroll
     if col_idx < app.view_state.column_scroll_offset {
         app.view_state.column_scroll_offset = col_idx;
-    } else if col_idx >= app.view_state.column_scroll_offset + MAX_VISIBLE_COLS {
-        app.view_state.column_scroll_offset = col_idx - MAX_VISIBLE_COLS + 1;
+    } else if col_idx >= app.view_state.column_scroll_offset + app.view_state.visible_cols_count {
+        app.view_state.column_scroll_offset = col_idx - app.view_state.visible_cols_count + 1;
     }
 
     app.view_state.viewport_mode = ViewportMode::Auto;
@@ -404,8 +404,8 @@ pub fn end_word(app: &mut App) {
 fn update_horizontal_scroll(app: &mut App, target_col: usize) {
     if target_col < app.view_state.column_scroll_offset {
         app.view_state.column_scroll_offset = target_col;
-    } else if target_col >= app.view_state.column_scroll_offset + MAX_VISIBLE_COLS {
-        app.view_state.column_scroll_offset = target_col - MAX_VISIBLE_COLS + 1;
+    } else if target_col >= app.view_state.column_scroll_offset + app.view_state.visible_cols_count {
+        app.view_state.column_scroll_offset = target_col - app.view_state.visible_cols_count + 1;
     }
 }
 

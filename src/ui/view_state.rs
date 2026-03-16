@@ -50,6 +50,9 @@ pub struct ViewState {
 
     /// Current directory for file browser (yazi-style navigation)
     pub current_directory: std::path::PathBuf,
+
+    /// Number of columns that fit in the current terminal width (updated during rendering)
+    pub visible_cols_count: usize,
 }
 
 impl Default for ViewState {
@@ -67,6 +70,7 @@ impl Default for ViewState {
             help_search_match_index: 0,
             current_directory: std::env::current_dir()
                 .unwrap_or_else(|_| std::path::PathBuf::from(".")),
+            visible_cols_count: 10, // default, updated each render frame
         }
     }
 }

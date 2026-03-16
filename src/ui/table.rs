@@ -3,7 +3,7 @@
 //! This module renders the CSV data table with row numbers, column letters,
 //! and headers. Implements virtual scrolling for performance with large files.
 
-use super::{utils::column_to_excel_letter, MAX_VISIBLE_COLS};
+use super::utils::column_to_excel_letter;
 use crate::app::Mode;
 use crate::domain::position::{ColIndex, RowIndex};
 use crate::App;
@@ -95,10 +95,60 @@ fn is_in_visual_selection(app: &App, row: RowIndex, col: ColIndex) -> bool {
     }
 }
 
-/// Calculate the visible column range based on horizontal scroll offset
-fn calculate_visible_columns(start_col: usize, total_cols: usize) -> (usize, usize) {
-    let end_col = (start_col + MAX_VISIBLE_COLS).min(total_cols);
+/// Calculate the visible column range dynamically based on available terminal width.
+/// Fits as many columns as possible given their ideal widths.
+fn calculate_visible_columns(
+    app: &crate::App,
+    start_col: usize,
+    total_cols: usize,
+    available_width: u16,
+) -> (usize, usize) {
+    let usable_width = available_width.saturating_sub(ROW_NUMBER_COLUMN_WIDTH);
+    let mut used_width: u16 = 0;
+    let mut end_col = start_col;
+
+    for col_idx in start_col..total_cols {
+        let col_width = ideal_column_width(app, col_idx);
+        if used_width + col_width > usable_width && end_col > start_col {
+            break;
+        }
+        used_width += col_width;
+        end_col += 1;
+    }
+
+    // Always show at least one column
+    if end_col == start_col && start_col < total_cols {
+        end_col = start_col + 1;
+    }
+
     (start_col, end_col)
+}
+
+/// Compute the ideal display width for a single column (used for layout decisions).
+fn ideal_column_width(app: &crate::App, col_idx: usize) -> u16 {
+    // Manual override
+    if let Some(manual_width) = app.session.column_width(col_idx) {
+        return manual_width.max(MIN_COLUMN_WIDTH);
+    }
+
+    let header_len = app
+        .document
+        .header(ColIndex::new(col_idx))
+        .len()
+        .max(column_to_excel_letter(col_idx).len());
+
+    let sample_rows = app
+        .document
+        .get_rows_range(0, 100.min(app.document.row_count()));
+    let max_data_len = sample_rows
+        .iter()
+        .filter_map(|row| row.get(col_idx))
+        .map(|s| s.chars().count())
+        .max()
+        .unwrap_or(0);
+
+    let ideal = (header_len.max(max_data_len) + 2) as u16;
+    ideal.clamp(MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH)
 }
 
 /// Build the column letters row (A, B, C...) with highlighting for selected column
@@ -422,10 +472,14 @@ fn calculate_column_widths(
 pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     let csv = &app.document;
 
-    // Calculate visible columns
+    // Calculate visible columns dynamically based on terminal width
     let start_col = app.view_state.column_scroll_offset;
-    let (start_col, end_col) = calculate_visible_columns(start_col, csv.column_count());
+    let (start_col, end_col) =
+        calculate_visible_columns(app, start_col, csv.column_count(), area.width);
     let visible_col_count = end_col - start_col;
+
+    // Store for navigation code to use
+    app.view_state.visible_cols_count = visible_col_count;
 
     if visible_col_count == 0 {
         let title = Paragraph::new(format!(" {} (no columns)", csv.filename))
@@ -538,7 +592,22 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::csv::Document;
+    use crate::session::FileConfig;
     use crate::ui::ViewportMode;
+    use std::path::PathBuf;
+
+    fn create_test_app_with_cols(num_cols: usize) -> App {
+        let headers: Vec<String> = (0..num_cols).map(|i| format!("Col{}", i)).collect();
+        let mut data_rows = Vec::new();
+        for i in 0..5 {
+            let row: Vec<String> = (0..num_cols).map(|c| format!("{}", i + c)).collect();
+            data_rows.push(row);
+        }
+        let document = Document::new(headers, data_rows, "test.csv".to_string());
+        let csv_files = vec![PathBuf::from("test.csv")];
+        App::new(document, csv_files, 0, FileConfig::new())
+    }
 
     #[test]
     fn test_calculate_scroll_offset_auto_mode_near_top() {
@@ -712,28 +781,38 @@ mod tests {
     }
 
     #[test]
-    fn test_calculate_visible_columns_normal() {
-        let (start, end) = calculate_visible_columns(0, 50);
+    fn test_calculate_visible_columns_fits_based_on_width() {
+        // With a wide terminal, more columns should fit
+        let app = create_test_app_with_cols(5);
+        let (start, end) = calculate_visible_columns(&app, 0, 5, 200);
         assert_eq!(start, 0);
-        assert!(end <= 50);
-        assert!(end <= start + MAX_VISIBLE_COLS);
+        assert_eq!(end, 5); // All 5 columns fit in 200 chars
+    }
+
+    #[test]
+    fn test_calculate_visible_columns_narrow_terminal() {
+        let app = create_test_app_with_cols(5);
+        // Very narrow — only a couple columns should fit
+        let (start, end) = calculate_visible_columns(&app, 0, 5, 25);
+        assert_eq!(start, 0);
+        assert!(end >= 1); // At least one column always shown
+        assert!(end <= 5);
     }
 
     #[test]
     fn test_calculate_visible_columns_scrolled() {
-        let (start, end) = calculate_visible_columns(10, 50);
-        assert_eq!(start, 10);
-        assert!(end <= 50);
-        assert_eq!(end - start, MAX_VISIBLE_COLS.min(50 - 10));
+        let app = create_test_app_with_cols(5);
+        let (start, end) = calculate_visible_columns(&app, 2, 5, 200);
+        assert_eq!(start, 2);
+        assert_eq!(end, 5); // Remaining 3 columns fit
     }
 
     #[test]
-    fn test_calculate_visible_columns_at_end() {
-        let total_cols = 30;
-        let start_col = 25;
-        let (start, end) = calculate_visible_columns(start_col, total_cols);
-        assert_eq!(start, 25);
-        assert_eq!(end, 30);
-        assert!(end - start <= MAX_VISIBLE_COLS);
+    fn test_calculate_visible_columns_many_cols_wide_terminal() {
+        // With 20 columns and a wide terminal, should show more than old limit of 10
+        let app = create_test_app_with_cols(20);
+        let (start, end) = calculate_visible_columns(&app, 0, 20, 250);
+        assert_eq!(start, 0);
+        assert!(end > 10); // Should exceed old MAX_VISIBLE_COLS of 10
     }
 }
