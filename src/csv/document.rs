@@ -802,29 +802,22 @@ impl Document {
     }
 
     /// Sort data rows by the given column indices.
-    pub fn sort_by_columns(&mut self, col_indices: &[usize], ascending: bool) {
-        let rows = self.rows_mut();
-        if rows.len() <= 2 {
-            return;
+    /// Uses parallel sort and avoids materializing lazy storage.
+    /// Returns `true` if sort completed, `false` if cancelled.
+    pub fn sort_by_columns(
+        &mut self,
+        col_indices: &[usize],
+        ascending: bool,
+        cancelled: &std::sync::atomic::AtomicBool,
+    ) -> bool {
+        let completed = self
+            .storage
+            .sort_by_columns(col_indices, ascending, cancelled);
+        if completed {
+            self.is_dirty = true;
+            self.generation += 1;
         }
-        let data = &mut rows[1..];
-        data.sort_by(|a, b| {
-            for &col in col_indices {
-                let va = a.get(col).map(|s| s.as_str()).unwrap_or("");
-                let vb = b.get(col).map(|s| s.as_str()).unwrap_or("");
-                let ord = match (va.parse::<f64>(), vb.parse::<f64>()) {
-                    (Ok(na), Ok(nb)) => na.partial_cmp(&nb).unwrap_or(std::cmp::Ordering::Equal),
-                    _ => va.cmp(vb),
-                };
-                let ord = if ascending { ord } else { ord.reverse() };
-                if ord != std::cmp::Ordering::Equal {
-                    return ord;
-                }
-            }
-            std::cmp::Ordering::Equal
-        });
-        self.is_dirty = true;
-        self.generation += 1;
+        completed
     }
 
     /// Toggle header mode
@@ -863,6 +856,18 @@ impl Document {
             is_dirty: false,
             header_mode: true,
             delimiter: ',',
+            generation: 0,
+        }
+    }
+
+    /// Create a document from existing storage (e.g., pre-built lazy storage).
+    pub fn from_storage(storage: RowStorage, filename: String, delimiter: char) -> Self {
+        Document {
+            storage,
+            filename,
+            is_dirty: false,
+            header_mode: true,
+            delimiter,
             generation: 0,
         }
     }
@@ -1784,7 +1789,8 @@ mod tests {
         );
 
         let mut doc = doc;
-        doc.sort_by_columns(&[0], true); // Sort by Name ascending
+        let no_cancel = std::sync::atomic::AtomicBool::new(false);
+        doc.sort_by_columns(&[0], true, &no_cancel); // Sort by Name ascending
 
         assert_eq!(doc.cell(RowIndex::new(1), ColIndex::new(0)), "Alice");
         assert_eq!(doc.cell(RowIndex::new(2), ColIndex::new(0)), "Bob");
@@ -1805,7 +1811,8 @@ mod tests {
         );
 
         let mut doc = doc;
-        doc.sort_by_columns(&[0], false); // Sort descending
+        let no_cancel = std::sync::atomic::AtomicBool::new(false);
+        doc.sort_by_columns(&[0], false, &no_cancel); // Sort descending
 
         assert_eq!(doc.cell(RowIndex::new(1), ColIndex::new(0)), "35");
         assert_eq!(doc.cell(RowIndex::new(2), ColIndex::new(0)), "30");
@@ -1825,7 +1832,8 @@ mod tests {
         );
 
         let mut doc = doc;
-        doc.sort_by_columns(&[0, 1], true); // Sort by Dept then Name
+        let no_cancel = std::sync::atomic::AtomicBool::new(false);
+        doc.sort_by_columns(&[0, 1], true, &no_cancel); // Sort by Dept then Name
 
         // IT before Sales, then alphabetically within same dept
         assert_eq!(doc.cell(RowIndex::new(1), ColIndex::new(0)), "IT");

@@ -37,9 +37,13 @@ pub enum RowStorage {
 pub struct LazyStorage {
     /// Memory-mapped file bytes.
     mmap: memmap2::Mmap,
-    /// Byte offset of the start of each CSV record.
+    /// Byte offset of the start of each CSV record (monotonically increasing).
     /// Index 0 = header row, index 1 = first data row, etc.
+    /// These stay in original file order so get_row_bytes can use offsets[i+1] as end boundary.
     row_offsets: Vec<u64>,
+    /// Optional sort indirection: logical row index → physical row_offsets index.
+    /// When None, logical == physical. When Some, row access goes through this mapping.
+    sort_order: Option<Vec<usize>>,
     /// Parsed header row (always materialized).
     header: Vec<String>,
     /// Number of columns (from header).
@@ -48,7 +52,7 @@ pub struct LazyStorage {
     delimiter: u8,
     /// LRU cache of recently parsed rows.
     row_cache: RefCell<LruCache<usize, Vec<String>>>,
-    /// Edit overlay: row_index -> edited row.
+    /// Edit overlay: logical row_index -> edited row.
     /// Takes priority over mmap data.
     edits: HashMap<usize, Vec<String>>,
 }
@@ -94,6 +98,7 @@ impl RowStorage {
         Ok(RowStorage::Lazy(Box::new(LazyStorage {
             mmap,
             row_offsets,
+            sort_order: None,
             header,
             col_count,
             delimiter: delim,
@@ -139,6 +144,7 @@ impl RowStorage {
         Ok(RowStorage::Lazy(Box::new(LazyStorage {
             mmap,
             row_offsets,
+            sort_order: None,
             header,
             col_count,
             delimiter: delim,
@@ -345,6 +351,112 @@ impl RowStorage {
             RowStorage::Lazy(s) => Some(s),
         }
     }
+
+    /// Sort data rows by column indices using parallel sort with cancellation.
+    /// For Lazy storage: extracts sort keys and reorders row_offsets (no materialization).
+    /// For InMemory storage: uses parallel sort directly on the rows.
+    /// Returns `true` if sort completed, `false` if cancelled.
+    pub fn sort_by_columns(
+        &mut self,
+        col_indices: &[usize],
+        ascending: bool,
+        cancelled: &std::sync::atomic::AtomicBool,
+    ) -> bool {
+        use rayon::prelude::*;
+        use std::sync::atomic::Ordering;
+
+        match self {
+            RowStorage::InMemory { rows } => {
+                if rows.len() <= 2 {
+                    return true;
+                }
+                let data = &mut rows[1..];
+                data.par_sort_by(|a, b| {
+                    if cancelled.load(Ordering::Relaxed) {
+                        return std::cmp::Ordering::Equal;
+                    }
+                    compare_rows(a, b, col_indices, ascending)
+                });
+                !cancelled.load(Ordering::Relaxed)
+            }
+            RowStorage::Lazy(s) => {
+                let count = s.row_offsets.len();
+                if count <= 2 {
+                    return true;
+                }
+
+                // Phase 1: Extract sort keys in parallel (cancellable)
+                let keys: Vec<Option<Vec<SortKey>>> = (1..count)
+                    .into_par_iter()
+                    .map(|i| {
+                        if cancelled.load(Ordering::Relaxed) {
+                            return None;
+                        }
+                        let row_bytes = get_row_bytes(&s.mmap, &s.row_offsets, i);
+                        Some(extract_sort_keys(row_bytes, s.delimiter, col_indices))
+                    })
+                    .collect();
+
+                if cancelled.load(Ordering::Relaxed) {
+                    return false;
+                }
+
+                // Unwrap keys (all Some since we weren't cancelled)
+                let keys: Vec<Vec<SortKey>> =
+                    keys.into_iter().map(|k| k.unwrap_or_default()).collect();
+
+                // Phase 2: Parallel sort indices by keys (cancellable)
+                let mut indices: Vec<usize> = (0..keys.len()).collect();
+
+                indices.par_sort_by(|&ai, &bi| {
+                    if cancelled.load(Ordering::Relaxed) {
+                        return std::cmp::Ordering::Equal;
+                    }
+                    let ka = &keys[ai];
+                    let kb = &keys[bi];
+                    for i in 0..ka.len() {
+                        let ord = ka[i].cmp(&kb[i]);
+                        let ord = if ascending { ord } else { ord.reverse() };
+                        if ord != std::cmp::Ordering::Equal {
+                            return ord;
+                        }
+                    }
+                    std::cmp::Ordering::Equal
+                });
+
+                if cancelled.load(Ordering::Relaxed) {
+                    return false;
+                }
+
+                // Phase 3: Set sort_order indirection (row_offsets stay in original file order)
+                // indices[new_data_pos] = old_data_idx (0-based)
+                // sort_order[new_data_pos] = physical row_offsets index (1-based)
+                let order: Vec<usize> = indices.iter().map(|&i| i + 1).collect();
+
+                // Reorder edits map to match new logical positions
+                if !s.edits.is_empty() {
+                    let old_edits = std::mem::take(&mut s.edits);
+                    // Build reverse mapping: old_logical_idx -> new_logical_idx
+                    // old_logical_idx = old_data_idx + 1, new_logical_idx = new_data_pos + 1
+                    let mut reverse_map: HashMap<usize, usize> = HashMap::new();
+                    for (new_pos, &old_data_idx) in indices.iter().enumerate() {
+                        reverse_map.insert(old_data_idx + 1, new_pos + 1);
+                    }
+                    for (old_row_idx, row_data) in old_edits {
+                        if let Some(&new_row_idx) = reverse_map.get(&old_row_idx) {
+                            s.edits.insert(new_row_idx, row_data);
+                        }
+                    }
+                }
+
+                s.sort_order = Some(order);
+
+                // Clear row cache since logical indices have changed
+                s.row_cache.borrow_mut().clear();
+                true
+            }
+        }
+    }
 }
 
 // Helper to avoid confusion — in lazy mode, row 0 is the header
@@ -354,6 +466,26 @@ fn idx_to_row(idx: usize) -> usize {
 }
 
 impl LazyStorage {
+    /// Map a logical row index to a physical row_offsets index.
+    /// When sorted, logical indices go through the sort_order indirection.
+    /// Header (index 0) always maps to physical 0.
+    fn physical_idx(&self, logical_idx: usize) -> usize {
+        if logical_idx == 0 {
+            return 0;
+        }
+        match &self.sort_order {
+            Some(order) => {
+                let data_idx = logical_idx - 1;
+                if data_idx < order.len() {
+                    order[data_idx]
+                } else {
+                    logical_idx
+                }
+            }
+            None => logical_idx,
+        }
+    }
+
     /// Raw mmap bytes for byte-level search.
     pub fn raw_bytes(&self) -> &[u8] {
         &self.mmap
@@ -362,6 +494,11 @@ impl LazyStorage {
     /// Row offset table.
     pub fn row_offsets(&self) -> &[u64] {
         &self.row_offsets
+    }
+
+    /// Sort order indirection (if sorted).
+    pub fn sort_order(&self) -> Option<&[usize]> {
+        self.sort_order.as_deref()
     }
 
     /// Delimiter byte.
@@ -379,12 +516,13 @@ impl LazyStorage {
         &self.edits
     }
 
-    /// Get the raw bytes for a specific row index.
+    /// Get the raw bytes for a specific logical row index.
     pub fn row_bytes(&self, idx: usize) -> &[u8] {
-        get_row_bytes(&self.mmap, &self.row_offsets, idx)
+        let phys = self.physical_idx(idx);
+        get_row_bytes(&self.mmap, &self.row_offsets, phys)
     }
 
-    /// Parse a single row by index (public for search).
+    /// Parse a single row by logical index (public for search).
     pub fn parse_row_public(&self, idx: usize) -> Vec<String> {
         self.get_row(idx)
     }
@@ -411,12 +549,13 @@ impl LazyStorage {
         row
     }
 
-    /// Parse a row directly from the memory-mapped bytes.
-    fn parse_row(&self, idx: usize) -> Vec<String> {
-        if idx >= self.row_offsets.len() {
+    /// Parse a row directly from the memory-mapped bytes using physical index.
+    fn parse_row(&self, logical_idx: usize) -> Vec<String> {
+        let phys = self.physical_idx(logical_idx);
+        if phys >= self.row_offsets.len() {
             return vec![];
         }
-        let bytes = get_row_bytes(&self.mmap, &self.row_offsets, idx);
+        let bytes = get_row_bytes(&self.mmap, &self.row_offsets, phys);
         parse_single_row(bytes, self.delimiter)
     }
 }
@@ -458,8 +597,8 @@ const INDEX_BUF_SIZE: usize = 1024 * 1024;
 /// This is much faster than full CSV parsing since it only scans for
 /// newlines and quotes without parsing individual fields.
 pub fn count_rows_fast(path: &Path, no_headers: bool) -> Result<usize> {
-    let file = std::fs::File::open(path)
-        .context(format!("Failed to open file: {}", path.display()))?;
+    let file =
+        std::fs::File::open(path).context(format!("Failed to open file: {}", path.display()))?;
     let file_len = file.metadata()?.len() as usize;
 
     if file_len == 0 {
@@ -541,8 +680,8 @@ pub fn count_rows_fast(path: &Path, no_headers: bool) -> Result<usize> {
 /// This avoids mmap page-fault overhead on macOS, where sequential mmap
 /// access is significantly slower than buffered reads.
 fn build_row_offset_index_buffered(path: &Path, _delimiter: u8) -> Result<Vec<u64>> {
-    let file = std::fs::File::open(path)
-        .context(format!("Failed to open file: {}", path.display()))?;
+    let file =
+        std::fs::File::open(path).context(format!("Failed to open file: {}", path.display()))?;
     let file_len = file.metadata()?.len() as usize;
 
     if file_len == 0 {
@@ -627,8 +766,8 @@ fn build_row_offset_index_buffered_cancellable(
 ) -> Result<Vec<u64>> {
     use crate::cancel::{self, CancelledError};
 
-    let file = std::fs::File::open(path)
-        .context(format!("Failed to open file: {}", path.display()))?;
+    let file =
+        std::fs::File::open(path).context(format!("Failed to open file: {}", path.display()))?;
     let file_len = file.metadata()?.len() as usize;
 
     if file_len == 0 {
@@ -749,6 +888,74 @@ fn build_row_offset_index(data: &[u8], _delimiter: u8) -> Vec<u64> {
     }
 
     offsets
+}
+
+// ── Sort Key Helpers ───────────────────────────────────────────
+
+/// Pre-parsed sort key for efficient comparison.
+#[derive(Clone, PartialEq)]
+enum SortKey {
+    Numeric(f64),
+    Text(String),
+}
+
+impl Eq for SortKey {}
+
+impl PartialOrd for SortKey {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for SortKey {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (SortKey::Numeric(a), SortKey::Numeric(b)) => {
+                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+            }
+            (SortKey::Text(a), SortKey::Text(b)) => a.cmp(b),
+            // Numeric sorts before text
+            (SortKey::Numeric(_), SortKey::Text(_)) => std::cmp::Ordering::Less,
+            (SortKey::Text(_), SortKey::Numeric(_)) => std::cmp::Ordering::Greater,
+        }
+    }
+}
+
+/// Extract sort keys from raw row bytes for the given column indices.
+fn extract_sort_keys(row_bytes: &[u8], delimiter: u8, col_indices: &[usize]) -> Vec<SortKey> {
+    let row = parse_single_row(row_bytes, delimiter);
+    col_indices
+        .iter()
+        .map(|&col| {
+            let val = row.get(col).map(|s| s.as_str()).unwrap_or("");
+            match val.parse::<f64>() {
+                Ok(n) => SortKey::Numeric(n),
+                Err(_) => SortKey::Text(val.to_owned()),
+            }
+        })
+        .collect()
+}
+
+/// Compare two in-memory rows by column indices.
+fn compare_rows(
+    a: &[String],
+    b: &[String],
+    col_indices: &[usize],
+    ascending: bool,
+) -> std::cmp::Ordering {
+    for &col in col_indices {
+        let va = a.get(col).map(|s| s.as_str()).unwrap_or("");
+        let vb = b.get(col).map(|s| s.as_str()).unwrap_or("");
+        let ord = match (va.parse::<f64>(), vb.parse::<f64>()) {
+            (Ok(na), Ok(nb)) => na.partial_cmp(&nb).unwrap_or(std::cmp::Ordering::Equal),
+            _ => va.cmp(vb),
+        };
+        let ord = if ascending { ord } else { ord.reverse() };
+        if ord != std::cmp::Ordering::Equal {
+            return ord;
+        }
+    }
+    std::cmp::Ordering::Equal
 }
 
 /// Extract the raw bytes for a given row index.

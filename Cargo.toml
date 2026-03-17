@@ -25,6 +25,7 @@ memmap2 = "0.9"
 lru = "0.16"
 memchr = "2"
 chrono = "0.4"
+rayon = "1.10"
 
 [profile.release]
 opt-level = 3

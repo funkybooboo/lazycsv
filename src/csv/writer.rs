@@ -25,14 +25,19 @@ pub fn write_csv_atomic(document: &Document, path: &Path, delimiter: char) -> Re
     // Create temp file in same directory for atomic rename
     let temp_path = path.with_extension("tmp");
 
-    // Write to temp file
+    // Write to temp file with buffering for performance
     {
-        let mut file = fs::File::create(&temp_path)
+        let file = fs::File::create(&temp_path)
             .context(format!("Failed to create temp file: {:?}", temp_path))?;
+        let mut writer = std::io::BufWriter::with_capacity(1024 * 1024, file);
 
-        write_csv_content(&mut file, document, delimiter).context("Failed to write CSV content")?;
+        write_csv_content(&mut writer, document, delimiter)
+            .context("Failed to write CSV content")?;
 
-        // Ensure all data is written
+        // Flush buffer and ensure all data is written to disk
+        let file = writer
+            .into_inner()
+            .map_err(|e| anyhow::anyhow!("Failed to flush write buffer: {}", e))?;
         file.sync_all().context("Failed to sync file to disk")?;
     }
 
@@ -48,11 +53,59 @@ pub fn write_csv_content<W: Write>(
     document: &Document,
     delimiter: char,
 ) -> Result<()> {
-    // Write all rows (including header at row 0)
-    for row in document.iter_rows() {
-        write_csv_row(writer, &row, delimiter)?;
+    use crate::csv::row_storage::RowStorage;
+
+    match &document.storage {
+        RowStorage::Lazy(s) => {
+            // Fast path: write raw mmap bytes for unedited rows, avoiding parse + re-serialize.
+            // Header is always written from parsed data (it may differ from raw bytes).
+            write_csv_row(writer, s.header(), delimiter)?;
+
+            let count = s.row_offsets().len();
+            let edits = s.edits();
+            let raw = s.raw_bytes();
+            let offsets = s.row_offsets();
+            let sort_order = s.sort_order();
+
+            for logical_idx in 1..count {
+                if let Some(edited_row) = edits.get(&logical_idx) {
+                    // Edited row: write from parsed data with proper escaping
+                    write_csv_row(writer, edited_row, delimiter)?;
+                } else {
+                    // Unedited row: copy raw bytes directly from mmap
+                    let phys = match sort_order {
+                        Some(order) => order[logical_idx - 1],
+                        None => logical_idx,
+                    };
+                    let start = offsets[phys] as usize;
+                    let end = if phys + 1 < offsets.len() {
+                        offsets[phys + 1] as usize
+                    } else {
+                        raw.len()
+                    };
+                    // Write raw bytes (already includes delimiter, quotes, etc.)
+                    let row_bytes = &raw[start..end];
+                    // Trim trailing \r\n or \n, we'll add our own newline
+                    let mut trim_end = row_bytes.len();
+                    while trim_end > 0
+                        && (row_bytes[trim_end - 1] == b'\n' || row_bytes[trim_end - 1] == b'\r')
+                    {
+                        trim_end -= 1;
+                    }
+                    writer.write_all(&row_bytes[..trim_end])?;
+                    writeln!(writer)?;
+                }
+            }
+            Ok(())
+        }
+        RowStorage::InMemory { .. } => {
+            // Standard path: write all rows with escaping
+            for row in document.iter_rows() {
+                write_csv_row(writer, &row, delimiter)?;
+            }
+            Ok(())
+        }
     }
-    Ok(())
 }
 
 /// Write a single CSV row with proper escaping
@@ -209,5 +262,115 @@ mod tests {
         // Verify new content
         let content = fs::read_to_string(&file_path).unwrap();
         assert_eq!(content, "A,B\n1,2\n");
+    }
+
+    #[test]
+    fn test_write_sorted_lazy_file() {
+        use crate::csv::row_storage::RowStorage;
+
+        // Create a temp CSV file
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("sort_test.csv");
+        fs::write(&file_path, "Name,Value\nCharlie,3\nAlice,1\nBob,2\n").unwrap();
+
+        // Force load as lazy storage (bypasses size threshold)
+        let storage = RowStorage::lazy_from_file(&file_path, None, false).unwrap();
+        let mut doc = Document::from_storage(storage, "sort_test.csv".to_string(), ',');
+        assert!(doc.storage.is_lazy(), "Should be lazy storage");
+
+        // Verify pre-sort order
+        assert_eq!(doc.iter_rows().nth(1).unwrap()[0], "Charlie");
+        assert_eq!(doc.iter_rows().nth(2).unwrap()[0], "Alice");
+        assert_eq!(doc.iter_rows().nth(3).unwrap()[0], "Bob");
+
+        // Sort by Name (column 0) ascending
+        let no_cancel = std::sync::atomic::AtomicBool::new(false);
+        doc.sort_by_columns(&[0], true, &no_cancel);
+        assert!(doc.storage.is_lazy(), "Should still be lazy after sort");
+
+        // Verify sorted order via get_row
+        assert_eq!(doc.iter_rows().nth(1).unwrap()[0], "Alice");
+        assert_eq!(doc.iter_rows().nth(2).unwrap()[0], "Bob");
+        assert_eq!(doc.iter_rows().nth(3).unwrap()[0], "Charlie");
+
+        // Write to buffer and verify output is sorted
+        let mut output = Vec::new();
+        write_csv_content(&mut output, &doc, ',').unwrap();
+        let result = String::from_utf8(output).unwrap();
+        let lines: Vec<&str> = result.trim().split('\n').collect();
+        assert_eq!(lines[0], "Name,Value");
+        assert_eq!(lines[1], "Alice,1");
+        assert_eq!(lines[2], "Bob,2");
+        assert_eq!(lines[3], "Charlie,3");
+    }
+
+    #[test]
+    fn test_write_sorted_lazy_file_crlf() {
+        use crate::csv::row_storage::RowStorage;
+
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("crlf_test.csv");
+        // Write with \r\n line endings (like Windows/weather file)
+        fs::write(
+            &file_path,
+            "Name,Value\r\nCharlie,3\r\nAlice,1\r\nBob,2\r\n",
+        )
+        .unwrap();
+
+        let storage = RowStorage::lazy_from_file(&file_path, None, false).unwrap();
+        let mut doc = Document::from_storage(storage, "crlf_test.csv".to_string(), ',');
+
+        let no_cancel = std::sync::atomic::AtomicBool::new(false);
+        doc.sort_by_columns(&[0], true, &no_cancel);
+
+        // Verify sorted in memory
+        assert_eq!(doc.iter_rows().nth(1).unwrap()[0], "Alice");
+        assert_eq!(doc.iter_rows().nth(2).unwrap()[0], "Bob");
+        assert_eq!(doc.iter_rows().nth(3).unwrap()[0], "Charlie");
+
+        // Write to buffer
+        let mut output = Vec::new();
+        write_csv_content(&mut output, &doc, ',').unwrap();
+        let result = String::from_utf8(output).unwrap();
+        // Normalize line endings for comparison
+        let result = result.replace("\r\n", "\n");
+        let lines: Vec<&str> = result.trim().split('\n').collect();
+        assert_eq!(lines.len(), 4, "Should have header + 3 data rows");
+        assert_eq!(lines[0], "Name,Value");
+        assert_eq!(lines[1], "Alice,1");
+        assert_eq!(lines[2], "Bob,2");
+        assert_eq!(lines[3], "Charlie,3");
+    }
+
+    #[test]
+    fn test_write_sorted_lazy_file_atomic_roundtrip() {
+        use crate::csv::row_storage::RowStorage;
+
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("roundtrip.csv");
+        fs::write(
+            &file_path,
+            "ID,Name,Score\n3,Charlie,90\n1,Alice,85\n2,Bob,95\n",
+        )
+        .unwrap();
+
+        // Load as lazy, sort by ID (numeric), save, re-read
+        let storage = RowStorage::lazy_from_file(&file_path, None, false).unwrap();
+        let mut doc = Document::from_storage(storage, "roundtrip.csv".to_string(), ',');
+
+        let no_cancel = std::sync::atomic::AtomicBool::new(false);
+        doc.sort_by_columns(&[0], true, &no_cancel);
+
+        // Write atomically
+        let out_path = temp_dir.path().join("output.csv");
+        write_csv_atomic(&doc, &out_path, ',').unwrap();
+
+        // Re-read and verify sorted order on disk
+        let content = fs::read_to_string(&out_path).unwrap();
+        let lines: Vec<&str> = content.trim().split('\n').collect();
+        assert_eq!(lines[0], "ID,Name,Score");
+        assert_eq!(lines[1], "1,Alice,85");
+        assert_eq!(lines[2], "2,Bob,95");
+        assert_eq!(lines[3], "3,Charlie,90");
     }
 }

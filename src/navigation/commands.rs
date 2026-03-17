@@ -276,8 +276,11 @@ pub fn goto_column(app: &mut App, column_letter: &str) {
             // Update horizontal scroll
             if col_idx < app.view_state.column_scroll_offset {
                 app.view_state.column_scroll_offset = col_idx;
-            } else if col_idx >= app.view_state.column_scroll_offset + app.view_state.visible_cols_count {
-                app.view_state.column_scroll_offset = col_idx - app.view_state.visible_cols_count + 1;
+            } else if col_idx
+                >= app.view_state.column_scroll_offset + app.view_state.visible_cols_count
+            {
+                app.view_state.column_scroll_offset =
+                    col_idx - app.view_state.visible_cols_count + 1;
             }
 
             app.view_state.viewport_mode = ViewportMode::Auto;
@@ -404,7 +407,8 @@ pub fn end_word(app: &mut App) {
 fn update_horizontal_scroll(app: &mut App, target_col: usize) {
     if target_col < app.view_state.column_scroll_offset {
         app.view_state.column_scroll_offset = target_col;
-    } else if target_col >= app.view_state.column_scroll_offset + app.view_state.visible_cols_count {
+    } else if target_col >= app.view_state.column_scroll_offset + app.view_state.visible_cols_count
+    {
         app.view_state.column_scroll_offset = target_col - app.view_state.visible_cols_count + 1;
     }
 }

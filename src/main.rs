@@ -271,20 +271,32 @@ fn handle_sort_document(
 ) -> Result<()> {
     let direction = if ascending { "ascending" } else { "descending" };
     app.status_message = Some(lazycsv::input::StatusMessage::new_persistent(format!(
-        "Sorting by {} {}...",
+        "Sorting by {} {}... (Esc to cancel)",
         description, direction
     )));
     terminal
         .draw(|frame| ui::render(frame, app))
         .context("Failed to render UI")?;
 
-    app.document.sort_by_columns(&col_indices, ascending);
-    let current_file = app.current_file().clone();
-    app.session.mark_dirty(&current_file);
-    app.status_message = Some(lazycsv::input::StatusMessage::from(format!(
-        "Sorted by {} {}",
-        description, direction
-    )));
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let watcher = lazycsv::cancel::EscWatcher::spawn(&cancelled);
+    let completed = app
+        .document
+        .sort_by_columns(&col_indices, ascending, &cancelled);
+    watcher.stop();
+
+    if completed {
+        let current_file = app.current_file().clone();
+        app.session.mark_dirty(&current_file);
+        app.status_message = Some(lazycsv::input::StatusMessage::from(format!(
+            "Sorted by {} {}",
+            description, direction
+        )));
+    } else {
+        app.status_message = Some(lazycsv::input::StatusMessage::from(
+            "Sort cancelled".to_string(),
+        ));
+    }
     Ok(())
 }
 
@@ -554,8 +566,9 @@ fn execute_sort_and_output(sort_spec: &str, cli_args: &cli::CliArgs) -> Result<(
         anyhow::bail!("No valid columns specified in sort: {}", sort_spec);
     }
 
-    // Sort the document
-    doc.sort_by_columns(&col_indices, ascending);
+    // Sort the document (non-interactive, no cancellation)
+    let no_cancel = AtomicBool::new(false);
+    doc.sort_by_columns(&col_indices, ascending, &no_cancel);
 
     // Write sorted CSV to stdout
     let delimiter = doc.delimiter;

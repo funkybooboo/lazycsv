@@ -19,7 +19,9 @@ fn send_command(app: &mut App, cmd: &str) {
         description,
     }) = app.handle_key(key_event(KeyCode::Enter))
     {
-        app.document.sort_by_columns(&col_indices, ascending);
+        let no_cancel = std::sync::atomic::AtomicBool::new(false);
+        app.document
+            .sort_by_columns(&col_indices, ascending, &no_cancel);
         let current_file = app.current_file().clone();
         app.session.mark_dirty(&current_file);
         let direction = if ascending { "ascending" } else { "descending" };
