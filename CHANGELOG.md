@@ -2,6 +2,28 @@
 
 All notable changes to LazyCSV will be documented in this file.
 
+## [Unreleased] - Header Row Simplification
+
+### BREAKING CHANGES
+- **Removed header mode toggle** - The `:ht` command has been removed
+- **Removed header navigation commands** - `gh` (go to header) and `gd` (go to first data row) commands removed
+- **Row 0 is now a regular first row** - No special formatting, bolding, or pinning
+- **Row numbers now 1-based** - Display shows 1, 2, 3... (internally still 0-indexed)
+- **`gg` now goes to row 1** - Previously went to row 1 (first data row) with header mode ON, now always goes to row 1 (internally row 0)
+
+### Changed
+- Row 0 scrolls like any other row (no longer pinned at top)
+- Row 0 has no special styling (no bold text)
+- Removed `header_mode` field from Document and Session
+- Removed `data_row_count()` function (use `row_count()` instead)
+- SQL queries still use row 1 for column names, rows 2+ for data (unchanged behavior)
+
+### Technical Details
+- Simplified UI rendering by removing separate header row rendering
+- Reduced TABLE_HEADER_HEIGHT from 4 to 3
+- Updated all navigation logic to treat row 0 as a regular row
+- Row number display now shows 1-based numbers for user clarity
+
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 

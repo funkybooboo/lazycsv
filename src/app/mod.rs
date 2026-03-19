@@ -706,17 +706,12 @@ impl App {
         current_file_index: usize,
         file_config: crate::session::FileConfig,
     ) -> Self {
-        // Create session first to check header_mode
+        // Create session
         let session = Session::new(csv_files, current_file_index, file_config);
 
-        // Initialize view state - start at row 1 if header_mode ON (default), row 0 if OFF
+        // Initialize view state - start at row 0 (displays as row 1)
         let mut view_state = ViewState::default();
-        let initial_row = if csv_data.header_mode && csv_data.row_count() > 1 {
-            1 // Skip header row, go to first data row
-        } else {
-            0
-        };
-        view_state.table_state.select(Some(initial_row));
+        view_state.table_state.select(Some(0));
 
         // Create input state
         let input_state = InputState::new();
@@ -1104,12 +1099,8 @@ impl App {
             std::thread::spawn(move || drop(old_storage));
             self.document = cached.clone();
             self.view_state = ViewState::default();
-            let initial_row = if self.document.header_mode && self.document.row_count() > 1 {
-                1
-            } else {
-                0
-            };
-            self.view_state.table_state.select(Some(initial_row));
+            // Start at row 0 (displays as row 1)
+            self.view_state.table_state.select(Some(0));
             return Ok(true);
         }
 
@@ -1137,12 +1128,8 @@ impl App {
                 // Record new mtime so we don't re-prompt for this version
                 self.session.record_file_mtime(&file_path);
                 self.view_state = ViewState::default();
-                let initial_row = if self.document.header_mode && self.document.row_count() > 1 {
-                    1
-                } else {
-                    0
-                };
-                self.view_state.table_state.select(Some(initial_row));
+                // Start at row 0 (displays as row 1)
+                self.view_state.table_state.select(Some(0));
                 Ok(true)
             }
             Err(e) => {
@@ -1306,8 +1293,8 @@ mod tests {
         let csv_files = vec![PathBuf::from("test.csv")];
         let app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        // With header_mode ON (default), starts at row 1 (first data row)
-        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
+        // Always starts at row 0 (displays as row 1)
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
         assert_eq!(app.view_state.selected_column, ColIndex::new(0));
         assert!(!app.should_quit);
         assert!(!app.view_state.help_overlay_visible);
@@ -1319,12 +1306,16 @@ mod tests {
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        // Starts at row 1, move down to row 2
+        // Starts at row 0, move down to row 1
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
+        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
+
+        // Move down to row 2
+        app.handle_key(key_event(KeyCode::Down)).unwrap();
         assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
 
         // Move down to row 3 (last row)
-        app.handle_key(key_event(KeyCode::Down)).unwrap();
+        app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
         assert_eq!(app.selected_row(), Some(RowIndex::new(3)));
 
         // Try to go beyond last row - should stay at last row
@@ -1343,7 +1334,7 @@ mod tests {
         app.handle_key(key_event(KeyCode::Char('k'))).unwrap();
         assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
 
-        // Can now navigate to row 0 (header row)
+        // Can navigate to row 0
         app.handle_key(key_event(KeyCode::Up)).unwrap();
         assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 
@@ -1392,10 +1383,10 @@ mod tests {
         app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
         assert_eq!(app.selected_row(), Some(RowIndex::new(3))); // Last row
 
-        // gg - Go to first data row (row 1 with header_mode=true)
+        // gg - Go to first row (row 0)
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-        assert_eq!(app.selected_row(), Some(RowIndex::new(1))); // First data row
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0))); // First row
     }
 
     #[test]
@@ -1527,12 +1518,13 @@ mod tests {
 
     #[test]
     fn test_multi_key_gg_goes_to_first_row() {
-        // Setup: Create app (starts at row 1), move to last row
+        // Setup: Create app (starts at row 0), move to last row
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Move to last row (row 3)
+        app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
         assert_eq!(app.selected_row(), Some(RowIndex::new(3)));
@@ -1541,18 +1533,18 @@ mod tests {
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
 
-        // Should go to row 1 (first data row, with header_mode=true)
-        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
+        // Should go to row 0 (first row)
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
     }
 
     #[test]
     fn test_multi_key_g_goes_to_last_row() {
-        // Setup: Create app (starts at row 1)
+        // Setup: Create app (starts at row 0)
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 
         // Press G to go to last row
         app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
@@ -1563,19 +1555,19 @@ mod tests {
 
     #[test]
     fn test_multi_key_2g_goes_to_row_2() {
-        // Setup: Create app (starts at row 1 with header_mode=true)
+        // Setup: Create app (starts at row 0)
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 
         // Press '2' to start count prefix
         app.handle_key(key_event(KeyCode::Char('2'))).unwrap();
         // Press 'G' to execute go to row 2
         app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
 
-        // 2G should go to absolute row 2 (second data row)
+        // 2G should go to absolute row 2
         assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
     }
 
@@ -1583,20 +1575,20 @@ mod tests {
 
     #[test]
     fn test_count_prefix_2j_moves_down_2_rows() {
-        // Setup: Create app (starts at row 1 with header_mode=true)
+        // Setup: Create app (starts at row 0)
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 
         // Press '2' to set count prefix
         app.handle_key(key_event(KeyCode::Char('2'))).unwrap();
         // Press 'j' to move down 2 rows
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
 
-        // Should be at row 3 (moved down 2 rows from row 1)
-        assert_eq!(app.selected_row(), Some(RowIndex::new(3)));
+        // Should be at row 2 (moved down 2 rows from row 0)
+        assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
     }
 
     #[test]
@@ -1620,7 +1612,7 @@ mod tests {
 
     #[test]
     fn test_count_prefix_clears_after_use() {
-        // Setup: Create app (starts at row 1)
+        // Setup: Create app (starts at row 0)
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
@@ -1629,21 +1621,20 @@ mod tests {
         app.handle_key(key_event(KeyCode::Char('2'))).unwrap();
         // Use it with 'j' to move down 2 rows
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-        assert_eq!(app.selected_row(), Some(RowIndex::new(3)));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
 
         // Now press 'j' again without count - should only move 1 row
-        // But we're at last row, so we stay at row 3
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-        assert_eq!(app.selected_row(), Some(RowIndex::new(3))); // Stays at last row
+        assert_eq!(app.selected_row(), Some(RowIndex::new(3)));
 
-        // Move back to row 1 (gg goes to row 1 with header_mode=true)
+        // Move back to row 0 (gg goes to row 0)
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 
         // Press 'j' without count - should move only 1 row (count was cleared)
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-        assert_eq!(app.selected_row(), Some(RowIndex::new(2))); // Only moved 1 row, not 2
+        assert_eq!(app.selected_row(), Some(RowIndex::new(1))); // Only moved 1 row, not 2
     }
 
     // ========== v0.1.2: Error Handling Tests ==========
@@ -1783,7 +1774,7 @@ mod tests {
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 
         // Press '3' then 'G' to go to absolute row 3
         app.handle_key(key_event(KeyCode::Char('3'))).unwrap();
@@ -1811,20 +1802,20 @@ mod tests {
 
     #[test]
     fn test_sequential_navigation_workflow() {
-        // Setup: Create app (starts at row 1)
+        // Setup: Create app (starts at row 0)
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
         // Complex navigation sequence
-        app.handle_key(key_event(KeyCode::Char('j'))).unwrap(); // Down to row 2
+        app.handle_key(key_event(KeyCode::Char('j'))).unwrap(); // Down to row 1
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap(); // Right to col 1
-        app.handle_key(key_event(KeyCode::Char('j'))).unwrap(); // Down to row 3
+        app.handle_key(key_event(KeyCode::Char('j'))).unwrap(); // Down to row 2
         app.handle_key(key_event(KeyCode::Char('h'))).unwrap(); // Left to col 0
-        app.handle_key(key_event(KeyCode::Char('k'))).unwrap(); // Up to row 2
+        app.handle_key(key_event(KeyCode::Char('k'))).unwrap(); // Up to row 1
 
-        // Should be at row 2, col 0
-        assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
+        // Should be at row 1, col 0
+        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
         assert_eq!(app.view_state.selected_column, ColIndex::new(0));
     }
 
@@ -1885,16 +1876,16 @@ mod tests {
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        // Start at row 6 (move 5 times from row 1)
+        // Start at row 5 (move 5 times from row 0)
         for _ in 0..5 {
             app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
         }
-        assert_eq!(app.selected_row(), Some(RowIndex::new(6)));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(5)));
 
         // Page up should move up (typically ~20 rows, but we only have 10)
         app.handle_key(key_event(KeyCode::PageUp)).unwrap();
-        // Should be at row 6 or lower
-        assert!(app.selected_row().unwrap().get() <= 6);
+        // Should be at row 5 or lower
+        assert!(app.selected_row().unwrap().get() <= 5);
 
         // Page down should move down
         app.handle_key(key_event(KeyCode::PageDown)).unwrap();
@@ -1940,18 +1931,18 @@ mod tests {
 
     #[test]
     fn test_file_switch_preserves_position() {
-        // Setup: Create app, navigate to row 3, column 2
+        // Setup: Create app, navigate to row 2, column 2
         let csv_data = create_test_csv_data();
         let csv_files = vec![PathBuf::from("file1.csv"), PathBuf::from("file2.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        // Navigate to row 3, column 2 (move 2 rows down from row 1, 2 columns right)
+        // Navigate to row 2, column 2 (move 2 rows down from row 0, 2 columns right)
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
 
-        assert_eq!(app.selected_row(), Some(RowIndex::new(3)));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
         assert_eq!(app.view_state.selected_column, ColIndex::new(2));
 
         // Note: In real app, file switch would reload and reset position
@@ -1971,12 +1962,12 @@ mod tests {
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        // Execute gg - should go to row 1 (first data row with header_mode=true)
+        // Execute gg - should go to row 0 (first row)
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
 
-        // Should be at row 1 (the only data row)
-        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
+        // Should be at row 0
+        assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
     }
 
     #[test]
@@ -2091,16 +2082,10 @@ mod tests {
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        // Should start at row 1 (first data row with header_mode=true)
-        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
-
-        // Move up from first data row - should move to row 0 (header row)
-        app.handle_key(key_event(KeyCode::Char('k'))).unwrap();
-
-        // Should now be at row 0 (header row)
+        // Should start at row 0 (first row)
         assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 
-        // Try to move up again - should stay at row 0
+        // Try to move up from first row - should stay at row 0
         app.handle_key(key_event(KeyCode::Char('k'))).unwrap();
         assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
     }
@@ -2152,9 +2137,9 @@ mod tests {
         app.handle_key(key_event(KeyCode::Char('0'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
 
-        // Should have moved to first column, then down one row
+        // Should have moved to first column, then down one row (from row 0 to row 1)
         assert_eq!(app.view_state.selected_column, ColIndex::new(0));
-        assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
     }
 
     // ===== Priority 2: State Management Tests =====
@@ -2319,9 +2304,9 @@ mod tests {
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        // Move to next row (row 2)
+        // Move to next row (row 1)
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-        assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
 
         // Execute zt (viewport top)
         app.handle_key(key_event(KeyCode::Char('z'))).unwrap();
@@ -2343,9 +2328,9 @@ mod tests {
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        // Move to next row (row 2)
+        // Move to next row (row 1)
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-        assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
 
         // Execute zz (viewport center)
         app.handle_key(key_event(KeyCode::Char('z'))).unwrap();
@@ -2370,9 +2355,9 @@ mod tests {
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-        // Move to next row (row 2)
+        // Move to next row (row 1)
         app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-        assert_eq!(app.selected_row(), Some(RowIndex::new(2)));
+        assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
 
         // Execute zb (viewport bottom)
         app.handle_key(key_event(KeyCode::Char('z'))).unwrap();
@@ -2656,8 +2641,8 @@ mod tests {
 
         app.save_and_close_magnifier();
 
-        // Check that multiline content was saved
-        let cell = app.document.cell(RowIndex::new(1), ColIndex::new(0));
+        // Check that multiline content was saved (app starts at row 0)
+        let cell = app.document.cell(RowIndex::new(0), ColIndex::new(0));
         assert_eq!(cell, "L1\nL2");
     }
 

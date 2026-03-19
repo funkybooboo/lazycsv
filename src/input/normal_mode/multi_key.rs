@@ -27,16 +27,6 @@ pub fn handle(app: &mut App, first: PendingCommand, second: KeyCode) -> Result<I
             commands::goto_first_row(app);
         }
 
-        // gh - Go to header row (row 0)
-        (PendingCommand::G, KeyCode::Char('h')) => {
-            commands::goto_header_row(app);
-        }
-
-        // gd - Go to first data row (row 1)
-        (PendingCommand::G, KeyCode::Char('d')) => {
-            commands::goto_first_data_row(app);
-        }
-
         // gv - Reselect last visual selection
         (PendingCommand::G, KeyCode::Char('v')) => {
             commands::reselect_visual(app);

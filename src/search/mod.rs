@@ -410,8 +410,8 @@ fn find_matches_lazy(lazy: &LazyStorage, pattern: &str) -> Vec<(RowIndex, ColInd
         }
     }
 
-    // Step 4: Also search the header row (index 0).
-    // The header might already be in candidates from byte scan, but ensure it's checked.
+    // Step 4: Also search row 0.
+    // Row 0 might already be in candidates from byte scan, but ensure it's checked.
     if !candidate_rows.contains(&0) {
         let header = lazy.header();
         for (col_idx, cell) in header.iter().enumerate() {

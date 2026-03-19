@@ -51,11 +51,11 @@ fn column_display_name(app: &App, col_idx: usize) -> String {
         .unwrap_or_else(|| format!("Column {}", col_idx + 1))
 }
 
-/// Iterate over data cell values for a column (skips header row).
+/// Iterate over data cell values for a column.
 fn data_values(app: &App, col_idx: usize) -> Vec<String> {
     let row_count = app.document.row_count();
-    let start = if app.document.header_mode { 1 } else { 0 };
-    (start..row_count)
+    // Collect all rows - no special treatment for row 0
+    (0..row_count)
         .map(|r| app.document.storage.get_cell(r, col_idx))
         .collect()
 }
@@ -289,7 +289,7 @@ mod tests {
 
     #[test]
     fn test_format_number_decimal() {
-        assert_eq!(format_number(3.14), "3.14");
+        assert_eq!(format_number(3.15), "3.15");
         assert_eq!(format_number(1.5), "1.5");
         assert_eq!(format_number(0.1234), "0.1234");
     }
@@ -297,7 +297,7 @@ mod tests {
     #[test]
     fn test_parse_numeric_valid() {
         assert_eq!(parse_numeric("42"), Some(42.0));
-        assert_eq!(parse_numeric("3.14"), Some(3.14));
+        assert_eq!(parse_numeric("3.15"), Some(3.15));
         assert_eq!(parse_numeric("-10"), Some(-10.0));
         assert_eq!(parse_numeric("  42  "), Some(42.0));
         assert_eq!(parse_numeric("1,234.56"), Some(1234.56));

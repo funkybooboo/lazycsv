@@ -146,7 +146,7 @@ fn test_average_alias() {
 fn test_count_full_column() {
     let mut app = create_numeric_app();
     send_command(&mut app, "count Name");
-    assert_eq!(status_message(&app), "Name: 4 non-empty / 4 total");
+    assert_eq!(status_message(&app), "Name: 5 non-empty / 5 total");
 }
 
 #[test]
@@ -154,7 +154,7 @@ fn test_count_with_empty_values() {
     let mut app = create_mixed_app();
     send_command(&mut app, "count Value");
     // Row B has empty Value, rest have values
-    assert_eq!(status_message(&app), "Value: 4 non-empty / 5 total");
+    assert_eq!(status_message(&app), "Value: 5 non-empty / 6 total");
 }
 
 #[test]
@@ -162,7 +162,7 @@ fn test_count_status_with_empty() {
     let mut app = create_mixed_app();
     send_command(&mut app, "count Status");
     // Row E has empty Status
-    assert_eq!(status_message(&app), "Status: 4 non-empty / 5 total");
+    assert_eq!(status_message(&app), "Status: 5 non-empty / 6 total");
 }
 
 // ===== :distinct =====
@@ -171,7 +171,7 @@ fn test_count_status_with_empty() {
 fn test_distinct_unique_values() {
     let mut app = create_numeric_app();
     send_command(&mut app, "distinct Name");
-    assert_eq!(status_message(&app), "Name: 4 distinct values");
+    assert_eq!(status_message(&app), "Name: 5 distinct values");
 }
 
 #[test]
@@ -179,7 +179,7 @@ fn test_distinct_with_duplicates() {
     let mut app = create_mixed_app();
     send_command(&mut app, "distinct Status");
     // "active" (×3), "inactive" (×1), "" (×1, not counted)
-    assert_eq!(status_message(&app), "Status: 2 distinct values");
+    assert_eq!(status_message(&app), "Status: 3 distinct values");
 }
 
 // ===== :stats =====
@@ -194,13 +194,13 @@ fn test_stats_numeric_column() {
     assert!(msg.contains("min=5"), "expected min=5, got: {}", msg);
     assert!(msg.contains("max=20"), "expected max=20, got: {}", msg);
     assert!(
-        msg.contains("count=4/4"),
-        "expected count=4/4, got: {}",
+        msg.contains("count=5/5"),
+        "expected count=5/5 (all rows including row 0), got: {}",
         msg
     );
     assert!(
-        msg.contains("distinct=4"),
-        "expected distinct=4, got: {}",
+        msg.contains("distinct=5"),
+        "expected distinct=5 (all rows including row 0), got: {}",
         msg
     );
 }
@@ -210,15 +210,15 @@ fn test_stats_text_column() {
     let mut app = create_mixed_app();
     send_command(&mut app, "stats Status");
     let msg = status_message(&app);
-    // Text column — no sum/avg/min/max, just count and distinct
+    // Text column — no sum/avg/min/max, just count and distinct (includes row 0)
     assert!(
-        msg.contains("count=4/5"),
-        "expected count=4/5, got: {}",
+        msg.contains("count=5/6"),
+        "expected count=5/6 (all rows), got: {}",
         msg
     );
     assert!(
-        msg.contains("distinct=2"),
-        "expected distinct=2, got: {}",
+        msg.contains("distinct=3"),
+        "expected distinct=3 (Status, active, inactive), got: {}",
         msg
     );
     assert!(!msg.contains("sum="), "should not have sum for text column");

@@ -67,7 +67,7 @@ That's it! Press `?` in the app for full keybindings.
 | Key | Action |
 |-----|--------|
 | `hjkl` or arrows | Move around (with count: `5j`, `10h`) |
-| `gg` / `gh` / `gd` | Jump to first row / header row / data row |
+| `gg` | Jump to first row (row 0) |
 | `G` / `5G` | Jump to last row / row 5 |
 | `:B` / `:A5` | Jump to column B or cell A5 |
 | `w` / `b` / `e` | Next/prev/last non-empty cell |
@@ -80,7 +80,7 @@ That's it! Press `?` in the app for full keybindings.
 | `/` | Search (regex) |
 | `:sql` | SQL query mode |
 | `:files` | File picker dialog |
-| `:ht` | Toggle header mode |
+
 | `Esc` | Cancel loading/queries |
 | `zt` / `zz` / `zb` | Position row at top/center/bottom |
 | `[` / `]` | Switch CSV files |

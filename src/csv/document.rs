@@ -22,9 +22,6 @@ pub struct Document {
     /// Track unsaved changes
     pub is_dirty: bool,
 
-    /// Header mode toggle - when ON, row 0 is styled/frozen as header
-    pub header_mode: bool,
-
     /// Delimiter character for this file
     pub delimiter: char,
 
@@ -50,7 +47,6 @@ impl Document {
             storage: RowStorage::in_memory(rows),
             filename,
             is_dirty: false,
-            header_mode: true,
             delimiter: delimiter.map(|d| d as char).unwrap_or(','),
             generation: 0,
             xlsx_formulas: vec![],
@@ -114,7 +110,6 @@ impl Document {
                 storage,
                 filename,
                 is_dirty: false,
-                header_mode: true,
                 delimiter: delimiter.map(|d| d as char).unwrap_or(','),
                 generation: 0,
                 xlsx_formulas: vec![],
@@ -132,7 +127,6 @@ impl Document {
                 storage: RowStorage::in_memory(rows),
                 filename,
                 is_dirty: false,
-                header_mode: true,
                 delimiter: delimiter.map(|d| d as char).unwrap_or(','),
                 generation: 0,
                 xlsx_formulas: vec![],
@@ -154,7 +148,6 @@ impl Document {
             storage: RowStorage::in_memory(all_rows),
             filename,
             is_dirty: false,
-            header_mode: true,
             delimiter: delimiter.map(|d| d as char).unwrap_or(','),
             generation: 0,
             xlsx_formulas: vec![],
@@ -349,7 +342,6 @@ impl Document {
                 storage,
                 filename,
                 is_dirty: false,
-                header_mode: true,
                 delimiter: delimiter.map(|d| d as char).unwrap_or(','),
                 generation: 0,
                 xlsx_formulas: vec![],
@@ -369,7 +361,6 @@ impl Document {
                 storage: RowStorage::in_memory(rows),
                 filename,
                 is_dirty: false,
-                header_mode: true,
                 delimiter: delimiter.map(|d| d as char).unwrap_or(','),
                 generation: 0,
                 xlsx_formulas: vec![],
@@ -395,7 +386,6 @@ impl Document {
             storage: RowStorage::in_memory(all_rows),
             filename,
             is_dirty: false,
-            header_mode: true,
             delimiter: delimiter.map(|d| d as char).unwrap_or(','),
             generation: 0,
             xlsx_formulas: vec![],
@@ -477,7 +467,7 @@ impl Document {
 
         let mut csv_reader = builder.from_reader(reader);
 
-        // Build header row
+        // Build row 0 (column names)
         let header_row: Vec<String> = if no_headers {
             let byte_headers = csv_reader.byte_headers()?;
             (1..=byte_headers.len())
@@ -545,20 +535,9 @@ impl Document {
 
     // ── Read-only accessors (work with both InMemory and Lazy) ──
 
-    /// Get total row count (including header row)
-    /// Row 0 = header, Row 1+ = data rows
+    /// Get total row count
     pub fn row_count(&self) -> usize {
         self.storage.row_count()
-    }
-
-    /// Get data row count (excluding header row)
-    pub fn data_row_count(&self) -> usize {
-        let count = self.storage.row_count();
-        if count == 0 {
-            0
-        } else {
-            count - 1
-        }
     }
 
     /// Get column count
@@ -567,7 +546,7 @@ impl Document {
     }
 
     /// Get specific cell value (returns "" if out of bounds)
-    /// row_idx is absolute: 0 = header row, 1 = first data row, etc.
+    /// row_idx is absolute: 0 = first row, 1 = second row, etc.
     #[allow(dead_code)]
     pub fn cell(&self, row_idx: RowIndex, col_idx: ColIndex) -> String {
         self.storage.get_cell(row_idx.get(), col_idx.get())
@@ -601,7 +580,7 @@ impl Document {
     // ── Mutation (materializes lazy storage on structural changes) ──
 
     /// Set a cell value (returns old value, sets is_dirty = true)
-    /// row_idx is absolute: 0 = header row, 1 = first data row, etc.
+    /// row_idx is absolute: 0 = first row, 1 = second row, etc.
     pub fn set_cell(
         &mut self,
         row_idx: RowIndex,
@@ -912,11 +891,6 @@ impl Document {
         completed
     }
 
-    /// Toggle header mode
-    pub fn toggle_header_mode(&mut self) {
-        self.header_mode = !self.header_mode;
-    }
-
     /// Take ownership of the storage, leaving empty storage behind.
     /// Used for background deallocation of old document data.
     pub fn take_storage(&mut self) -> RowStorage {
@@ -932,7 +906,6 @@ impl Document {
             storage: RowStorage::in_memory(all_rows),
             filename,
             is_dirty: false,
-            header_mode: true,
             delimiter: ',',
             generation: 0,
             xlsx_formulas: vec![],
@@ -947,7 +920,6 @@ impl Document {
             storage: RowStorage::in_memory(all_rows),
             filename,
             is_dirty: false,
-            header_mode: true,
             delimiter: ',',
             generation: 0,
             xlsx_formulas: vec![],
@@ -960,7 +932,6 @@ impl Document {
             storage,
             filename,
             is_dirty: false,
-            header_mode: true,
             delimiter,
             generation: 0,
             xlsx_formulas: vec![],
@@ -1938,24 +1909,6 @@ mod tests {
     }
 
     #[test]
-    fn test_toggle_header_mode() {
-        let doc = Document::new(
-            vec!["A".to_string()],
-            vec![vec!["1".to_string()]],
-            "test.csv".to_string(),
-        );
-
-        let mut doc = doc;
-        assert!(doc.header_mode); // Default is true
-
-        doc.toggle_header_mode();
-        assert!(!doc.header_mode);
-
-        doc.toggle_header_mode();
-        assert!(doc.header_mode);
-    }
-
-    #[test]
     fn test_move_columns_single() {
         let doc = Document::new(
             vec!["A".to_string(), "B".to_string(), "C".to_string()],
@@ -1992,17 +1945,5 @@ mod tests {
 
         doc.delete_row(RowIndex::new(2));
         assert_eq!(doc.generation, 3);
-    }
-
-    #[test]
-    fn test_data_row_count() {
-        let doc = Document::new(
-            vec!["A".to_string()],
-            vec![vec!["1".to_string()], vec!["2".to_string()]],
-            "test.csv".to_string(),
-        );
-
-        assert_eq!(doc.row_count(), 3); // 1 header + 2 data
-        assert_eq!(doc.data_row_count(), 2); // Only data rows
     }
 }

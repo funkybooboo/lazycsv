@@ -642,15 +642,15 @@ fn test_last_edit_position_tracked() {
     let mut app = create_test_app();
     assert!(app.last_edit_position.is_none());
 
-    // Make an edit at row 1, col 0 (first data row)
+    // Make an edit at row 0 (index 0), col 0 (app starts at row 0)
     app.handle_key(key_event(KeyCode::Char('s'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('X'))).unwrap();
     app.handle_key(key_event(KeyCode::Enter)).unwrap();
 
-    // Last edit position should be set to row 1, col 0
+    // Last edit position should be set to row index 0, col 0
     assert!(app.last_edit_position.is_some());
     let (row, col) = app.last_edit_position.unwrap();
-    assert_eq!(row.get(), 1);
+    assert_eq!(row.get(), 0);
     assert_eq!(col.get(), 0);
 }
 
@@ -751,14 +751,14 @@ fn test_enter_at_last_row() {
 #[test]
 fn test_shift_enter_at_first_row() {
     let mut app = create_test_app();
-    assert_eq!(app.selected_row().unwrap().get(), 1); // First data row
+    assert_eq!(app.selected_row().unwrap().get(), 0); // App starts at row 0
 
     app.handle_key(key_event(KeyCode::Char('i'))).unwrap();
     app.handle_key(shift_key_event(KeyCode::Enter)).unwrap();
 
     // Should be in Normal mode
     assert_eq!(app.mode, Mode::Normal);
-    // Should move to header row (row 0)
+    // Should stay at row 0 (can't go above first row)
     assert_eq!(app.selected_row().unwrap().get(), 0);
 }
 
@@ -927,10 +927,13 @@ fn test_insert_row_cells_are_empty() {
 fn test_paste_row_content_matches_yanked() {
     let mut app = create_test_app();
 
-    // Get the first data row content (rows[1] is first data row with new navigation)
+    // Move to row 1 (first data row)
+    app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
+
+    // Get the first data row content (row 1)
     let original_row: Vec<String> = app.document.get_rows_range(1, 2)[0].clone();
 
-    // Yank first row
+    // Yank row 1
     app.handle_key(key_event(KeyCode::Char('y'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('y'))).unwrap();
 
@@ -957,13 +960,13 @@ fn test_paste_row_content_matches_yanked() {
 fn test_cursor_position_after_typing_and_commit() {
     let mut app = create_test_app();
 
-    // Start at row 1, col 0 (first data row)
+    // Start at row 0, col 0 (app starts at row 0)
     app.handle_key(key_event(KeyCode::Char('s'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('X'))).unwrap();
     app.handle_key(key_event(KeyCode::Tab)).unwrap();
 
-    // Should now be at row 1, col 1
-    assert_eq!(app.selected_row().unwrap().get(), 1);
+    // Should now be at row 0, col 1
+    assert_eq!(app.selected_row().unwrap().get(), 0);
     assert_eq!(app.view_state.selected_column.get(), 1);
 }
 
@@ -989,8 +992,8 @@ fn test_multiple_enter_commits_traverse_column() {
     let row_count = app.document.row_count();
 
     // Edit and Enter through rows (stop before last since Enter won't go beyond)
-    // Start at row 1 (first data row), so loop from 1 to row_count-1
-    for row in 1..(row_count) {
+    // Start at row 0, so loop from 0 to row_count-1
+    for row in 0..(row_count) {
         assert_eq!(app.selected_row().unwrap().get(), row);
         app.handle_key(key_event(KeyCode::Char('i'))).unwrap();
         app.handle_key(key_event(KeyCode::Enter)).unwrap();
@@ -1053,14 +1056,14 @@ fn test_capital_o_at_first_row_inserts_at_beginning() {
     let mut app = create_test_app();
     let initial_count = app.document.row_count();
 
-    // Make sure we're at first data row (row 1 with header_mode=true)
-    assert_eq!(app.selected_row().unwrap().get(), 1);
+    // App starts at row 0
+    assert_eq!(app.selected_row().unwrap().get(), 0);
 
     app.handle_key(key_event(KeyCode::Char('O'))).unwrap();
 
-    // New row should be inserted at row 1 (before current row)
+    // New row should be inserted at row 0 (before current row)
     assert_eq!(app.document.row_count(), initial_count + 1);
-    assert_eq!(app.selected_row().unwrap().get(), 1);
+    assert_eq!(app.selected_row().unwrap().get(), 0);
 }
 
 #[test]

@@ -845,21 +845,6 @@ fn find_similar(target: &str, candidates: &[String], max_results: usize) -> Vec<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
-    use tempfile::NamedTempFile;
-
-    fn create_csv(name: &str, headers: &str) -> (NamedTempFile, PathBuf) {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join(name);
-        let mut f = std::fs::File::create(&path).unwrap();
-        writeln!(f, "{}", headers).unwrap();
-        writeln!(f, "dummy,data,row").unwrap();
-        // Keep dir alive by leaking it (test only)
-        std::mem::forget(dir);
-        let tmp = NamedTempFile::new().unwrap();
-        (tmp, path)
-    }
-
     /// Build a schema map by reading CSV headers from the given file paths.
     fn build_test_schema(files: &[PathBuf]) -> HashMap<PathBuf, Vec<String>> {
         files

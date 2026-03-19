@@ -254,14 +254,14 @@ fn test_empty_document_with_header() {
     assert_eq!(doc.row_count(), 1);
     assert_eq!(doc.column_count(), 3);
 
-    // Header row position
-    let header_pos = Position::from_raw(0, 0);
-    assert!(header_pos.row.get() < doc.row_count());
-    assert!(header_pos.col.get() < doc.column_count());
+    // Row 0 position
+    let row0_pos = Position::from_raw(0, 0);
+    assert!(row0_pos.row.get() < doc.row_count());
+    assert!(row0_pos.col.get() < doc.column_count());
 
-    // First data row would be out of bounds
-    let first_data = RowIndex::new(1);
-    assert!(first_data.get() >= doc.row_count());
+    // Row 1 would be out of bounds
+    let row1 = RowIndex::new(1);
+    assert!(row1.get() >= doc.row_count());
 }
 
 #[test]

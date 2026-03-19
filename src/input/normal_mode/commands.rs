@@ -17,34 +17,6 @@ pub fn goto_first_row(app: &mut App) {
     app.status_message = Some(StatusMessage::from("Jumped to first row"));
 }
 
-/// gh - Go to header row (row 0)
-pub fn goto_header_row(app: &mut App) {
-    app.input_state.clear_pending_command();
-    if !app.document.header_mode {
-        app.status_message = Some(StatusMessage::from(
-            "Header mode is OFF (use :ht to enable)",
-        ));
-    } else if app.document.row_count() == 0 {
-        app.status_message = Some(StatusMessage::from("Empty document"));
-    } else {
-        // Move to row 0 (header row), keeping current column
-        app.view_state.table_state.select(Some(0));
-        app.status_message = Some(StatusMessage::from("Moved to header row"));
-    }
-}
-
-/// gd - Go to first data row (row 1)
-pub fn goto_first_data_row(app: &mut App) {
-    app.input_state.clear_pending_command();
-    if app.document.row_count() <= 1 {
-        app.status_message = Some(StatusMessage::from("No data rows"));
-    } else {
-        // Move to row 1 (first data row)
-        app.view_state.table_state.select(Some(1));
-        app.status_message = Some(StatusMessage::from("Moved to first data row"));
-    }
-}
-
 /// gv - Reselect last visual selection
 pub fn reselect_visual(app: &mut App) {
     app.input_state.clear_pending_command();
@@ -99,12 +71,6 @@ pub fn delete_rows(app: &mut App) {
         .map(|n| n.get())
         .unwrap_or(1);
     if let Some(row_idx) = app.selected_row() {
-        // If deleting row 0 (header), turn header_mode OFF
-        if row_idx.get() == 0 {
-            app.document.header_mode = false;
-            app.session.set_header_mode(false);
-        }
-
         let end_idx = RowIndex::new(row_idx.get() + count - 1);
         let deleted = app.document.delete_rows(row_idx, end_idx);
         let deleted_count = deleted.len();
@@ -118,15 +84,10 @@ pub fn delete_rows(app: &mut App) {
                 app.view_state.table_state.select(Some(row_count - 1));
             }
 
-            if row_idx.get() == 0 {
-                app.status_message =
-                    Some(StatusMessage::from("Header row deleted, header mode OFF"));
-            } else {
-                app.status_message = Some(StatusMessage::new_owned(format!(
-                    "{} row(s) deleted",
-                    deleted_count
-                )));
-            }
+            app.status_message = Some(StatusMessage::new_owned(format!(
+                "{} row(s) deleted",
+                deleted_count
+            )));
         }
     }
 }

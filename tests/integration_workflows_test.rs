@@ -30,13 +30,13 @@ fn test_complete_navigation_workflow() {
     // User workflow: Navigate to bottom-right, then back to top-left
     app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('$'))).unwrap();
-    assert_eq!(app.selected_row(), Some(RowIndex::new(3))); // Last data row (row 3)
+    assert_eq!(app.selected_row(), Some(RowIndex::new(3))); // Last row (row index 3)
     assert_eq!(app.view_state.selected_column, ColIndex::new(2));
 
-    // gg - Go to first data row (multi-key command, header_mode=true)
+    // gg - Go to first row (row index 0)
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-    assert_eq!(app.selected_row(), Some(RowIndex::new(1))); // First data row
+    assert_eq!(app.selected_row(), Some(RowIndex::new(0))); // First row
 
     // 0 - Go to first column
     app.handle_key(key_event(KeyCode::Char('0'))).unwrap();
@@ -128,7 +128,7 @@ fn test_zigzag_navigation_workflow() {
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('l'))).unwrap();
 
-    assert_eq!(app.selected_row(), Some(RowIndex::new(3))); // row 1 + 2 = row 3
+    assert_eq!(app.selected_row(), Some(RowIndex::new(2))); // row 0 + 2 = row 2
     assert_eq!(app.view_state.selected_column, ColIndex::new(2));
 }
 
@@ -157,7 +157,7 @@ fn test_boundary_navigation_workflow() {
         app.handle_key(key_event(KeyCode::Char('k'))).unwrap();
         app.handle_key(key_event(KeyCode::Char('h'))).unwrap();
     }
-    assert_eq!(app.selected_row(), Some(RowIndex::new(0))); // Stops at header row
+    assert_eq!(app.selected_row(), Some(RowIndex::new(0))); // Stops at row 0
     assert_eq!(app.view_state.selected_column, ColIndex::new(0));
 
     // Go to opposite corner
@@ -280,7 +280,7 @@ fn test_error_recovery_from_invalid_sequence() {
 
     // Next command should work normally
     app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
-    assert_eq!(app.selected_row(), Some(RowIndex::new(2))); // row 1 + 1 = row 2
+    assert_eq!(app.selected_row(), Some(RowIndex::new(1))); // row 0 + 1 = row 1
 }
 
 #[test]

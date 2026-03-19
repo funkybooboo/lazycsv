@@ -20,8 +20,6 @@ pub enum InputAction {
     NavigateToLastRow,
     NavigateToFirstColumn,
     NavigateToLastColumn,
-    NavigateToHeaderRow,
-    NavigateToFirstDataRow,
     NavigateNextWord,
     NavigatePrevWord,
     NavigateEndWord,

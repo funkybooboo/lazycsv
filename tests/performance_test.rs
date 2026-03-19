@@ -36,7 +36,7 @@ fn test_load_100_columns_completes_quickly() {
 
     assert!(result.is_ok(), "Failed to load wide CSV");
     let doc = result.unwrap();
-    assert_eq!(doc.column_count(), 100); // Header row has 100 columns
+    assert_eq!(doc.column_count(), 100); // Row 0 has 100 columns
     assert_eq!(doc.row_count(), 1001); // 1 header + 1000 data rows
 
     println!("Loaded 100 columns in {:?}", duration);

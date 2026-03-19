@@ -100,9 +100,7 @@ The current mode is always shown in the status bar (bottom-left):
 
 | Key | Action |
 |-----|--------|
-| `gg` | Jump to first row (or first data row if header mode ON) |
-| `gh` | Jump to header row (row 0) - requires header mode ON |
-| `gd` | Jump to first data row (row 1) |
+| `gg` | Jump to first row (row 0) |
 | `G` | Jump to last row |
 | `<number>G` | Jump to specific row (e.g., `15G`) |
 | `0` | Jump to first column |
@@ -255,16 +253,10 @@ Commands show clear error messages instead of silently clamping:
 
 | Command | Action |
 |---------|--------|
-| `:ht` | Toggle header mode ON/OFF |
-| `gh` | Go to header row (row 0) - requires header mode ON |
-| `gd` | Go to first data row (row 1) |
-
-**Header Mode Behavior:**
-- When ON: Row 0 is styled as header, `gg` goes to row 1 (first data row)
-- When OFF: Row 0 is treated as regular data, `gg` goes to row 0
-- Header row is always row 0 (no special storage)
-- Edit headers by using `gh` to navigate to row 0, then `i`/`a`/`s` to edit
-- Per-file setting (not persisted to CSV file)
+**Row Navigation:**
+- Row 0 is the first row (typically contains column names)
+- All rows are treated equally - no special behavior
+- Use `gg` to jump to row 0, `i`/`a`/`s` to edit any cell
 
 ---
 
@@ -319,10 +311,10 @@ The comma `,` key acts as a leader for all column-level operations, following th
 **Notes:**
 - Comma is a silent leader (no visual feedback, vim standard)
 - After paste, cursor moves to the new column
-- Yanked columns include the header row
-- Column operations work on entire columns (all rows + header)
+- Yanked columns include all rows (row 0, row 1, etc.)
+- Column operations work on entire columns (all rows)
 - New columns get auto-generated names like "Column D"
-- Use `gh` to navigate to header row, then `i` to edit header names
+- Use `gg` to navigate to row 0, then `i` to edit column names
 
 ### Visual Selection
 

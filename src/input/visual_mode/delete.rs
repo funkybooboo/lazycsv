@@ -99,7 +99,7 @@ fn delete_lines(app: &mut App, start_row: RowIndex, end_row: RowIndex) {
     )));
 
     // Adjust cursor position
-    if app.document.data_row_count() > 0 {
+    if app.document.row_count() > 0 {
         let new_row = start_row.get().min(app.document.row_count() - 1);
         app.view_state.table_state.select(Some(new_row));
     } else {

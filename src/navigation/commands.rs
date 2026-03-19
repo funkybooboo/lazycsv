@@ -146,15 +146,9 @@ fn select_previous_page(app: &mut App) {
 }
 
 /// Go to first row (gg command)
-/// When header_mode is ON: goes to row 1 (first data row)
-/// When header_mode is OFF: goes to row 0
+/// Always goes to row 0 (displays as row 1)
 pub fn goto_first_row(app: &mut App) {
-    let target_row = if app.document.header_mode && app.document.row_count() > 1 {
-        1 // Skip header, go to first data row
-    } else {
-        0
-    };
-    app.view_state.table_state.select(Some(target_row));
+    app.view_state.table_state.select(Some(0));
     app.view_state.viewport_mode = ViewportMode::Auto;
 }
 
@@ -176,7 +170,7 @@ pub fn goto_line(app: &mut App, line_number: usize) {
     let row_count = app.document.row_count();
 
     // Line numbers are 1-indexed in vim, and map to absolute rows 1, 2, 3...
-    // (Row 0 is the header and is accessed via gg when header_mode OFF)
+    // (Row 0 is accessed via gg)
     if line_number == 0 {
         app.status_message = Some(StatusMessage::from("Line number must be >= 1"));
         return;
@@ -453,8 +447,8 @@ mod tests {
 
         goto_first_row(&mut app);
 
-        // With header_mode=true (default), gg goes to row 1
-        assert_eq!(app.view_state.table_state.selected(), Some(1));
+        // gg always goes to row 0 (displays as row 1)
+        assert_eq!(app.view_state.table_state.selected(), Some(0));
         assert_eq!(app.view_state.viewport_mode, ViewportMode::Auto);
     }
 
@@ -550,7 +544,7 @@ mod tests {
 
         move_up_by(&mut app, 100);
 
-        // Now stops at row 0 (can navigate to header row)
+        // Stops at row 0
         assert_eq!(app.view_state.table_state.selected(), Some(0));
     }
 
@@ -776,6 +770,9 @@ mod tests {
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
+        // Move to row 1 (data row) to test word motion
+        app.view_state.table_state.select(Some(1));
+
         // At column 0 (non-empty)
         assert_eq!(app.view_state.selected_column, ColIndex::new(0));
 
@@ -807,6 +804,9 @@ mod tests {
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
+        // Move to row 1 (data row) to test word motion
+        app.view_state.table_state.select(Some(1));
+
         // Start at last column
         app.view_state.selected_column = ColIndex::new(3);
 
@@ -826,6 +826,9 @@ mod tests {
         );
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+        // Move to row 1 (data row) to test word motion
+        app.view_state.table_state.select(Some(1));
 
         // Start at column 0 (empty)
         assert_eq!(app.view_state.selected_column, ColIndex::new(0));
@@ -864,6 +867,9 @@ mod tests {
         );
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+        // Move to row 1 (data row) to test word motion
+        app.view_state.table_state.select(Some(1));
 
         // Start at column 0 ("a")
         assert_eq!(app.view_state.selected_column, ColIndex::new(0));

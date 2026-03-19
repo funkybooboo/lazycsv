@@ -37,8 +37,8 @@ fn test_5g_jumps_to_row_5() {
     let files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(doc, files, 0, FileConfig::new());
 
-    // Start at row 1
-    assert_eq!(app.view_state.table_state.selected(), Some(1));
+    // Start at row 0
+    assert_eq!(app.view_state.table_state.selected(), Some(0));
 
     // Type 5g to jump to row 5
     let _ = app.handle_key(key_event(KeyCode::Char('5')));
@@ -101,13 +101,13 @@ fn test_cell_jump_removed_use_c_command_and_row_jump() {
     let files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(doc, files, 0, FileConfig::new());
 
-    // Start at row 1, column A
-    assert_eq!(app.view_state.table_state.selected(), Some(1));
+    // Start at row 0, column A
+    assert_eq!(app.view_state.table_state.selected(), Some(0));
     assert_eq!(app.view_state.selected_column.get(), 0);
 
-    // Jump to cell B1 using :cB then stay at row 1
+    // Jump to cell B using :cB then stay at row 0
     send_command(&mut app, "cB");
-    assert_eq!(app.view_state.table_state.selected(), Some(1));
+    assert_eq!(app.view_state.table_state.selected(), Some(0));
     assert_eq!(app.view_state.selected_column.get(), 1);
 }
 

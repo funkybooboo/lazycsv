@@ -15,7 +15,7 @@ fn test_delimiter_integration() {
 
     let app = App::from_cli(args).unwrap();
 
-    // rows[0] is header row
+    // rows[0] is row 0 (column names)
     assert_eq!(app.document.get_rows_range(0, 1)[0], vec!["a", "b", "c"]);
     assert_eq!(app.document.get_rows_range(1, 2)[0], vec!["1", "2", "3"]);
     assert_eq!(app.session.config().delimiter, Some(b';'));
@@ -32,7 +32,7 @@ fn test_no_headers_integration() {
 
     let app = App::from_cli(args).unwrap();
 
-    // rows[0] is synthetic header row
+    // rows[0] is synthetic row 0 (column names)
     assert_eq!(
         app.document.get_rows_range(0, 1)[0],
         vec!["Column 1", "Column 2", "Column 3"]
@@ -52,7 +52,7 @@ fn test_default_csv_loading_integration() {
     let args = CliArgs::try_parse_from(["lazycsv", file_path.to_str().unwrap()]).unwrap();
     let app = App::from_cli(args).unwrap();
 
-    // rows[0] is header row
+    // rows[0] is row 0 (column names)
     assert_eq!(
         app.document.get_rows_range(0, 1)[0],
         vec!["header1", "header2"]
@@ -73,7 +73,7 @@ fn test_directory_path_integration() {
     let args = CliArgs::try_parse_from(["lazycsv", temp_dir.path().to_str().unwrap()]).unwrap();
     let app = App::from_cli(args).unwrap();
 
-    // rows[0] is header row
+    // rows[0] is row 0 (column names)
     assert_eq!(app.document.get_rows_range(0, 1)[0], vec!["h1", "h2"]);
     assert_eq!(app.session.files().len(), 2);
     assert_eq!(app.session.active_file_index(), 0);
@@ -110,7 +110,7 @@ fn test_encoding_integration() {
         lazycsv::Document::from_file(&file_path, None, false, Some("utf-16le".to_string()))
             .unwrap();
 
-    // rows[0] is header row
+    // rows[0] is row 0 (column names)
     assert_eq!(csv_data.get_rows_range(0, 1)[0], vec!["h1", "h2"]);
     assert_eq!(csv_data.get_rows_range(1, 2)[0], vec!["val1", "val2"]);
 }
@@ -151,7 +151,7 @@ fn test_delimiter_and_no_headers_integration() {
 
     let app = App::from_cli(args).unwrap();
 
-    // rows[0] is synthetic header row
+    // rows[0] is synthetic row 0 (column names)
     assert_eq!(
         app.document.get_rows_range(0, 1)[0],
         vec!["Column 1", "Column 2"]
@@ -184,7 +184,7 @@ fn test_invalid_utf8_bytes_error() {
     match result {
         Ok(doc) => {
             // Parsed with replacement characters - acceptable behavior
-            assert!(doc.row_count() > 0); // Should have at least header row
+            assert!(doc.row_count() > 0); // Should have at least row 0
         }
         Err(err) => {
             // Failed to parse - also acceptable
@@ -210,7 +210,7 @@ fn test_mixed_encoding_in_file() {
 
     match result {
         Ok(doc) => {
-            assert!(doc.row_count() > 0); // Should have at least header row
+            assert!(doc.row_count() > 0); // Should have at least row 0
                                           // May contain replacement characters
         }
         Err(err) => {

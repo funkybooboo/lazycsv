@@ -48,14 +48,11 @@ fn test_new_command_with_headers() {
         "City"
     );
 
-    // Should have only header row (0 data rows)
-    assert_eq!(app.document.data_row_count(), 0);
+    // Should have only row 0 (1 total row)
+    assert_eq!(app.document.row_count(), 1);
 
     // Should be marked as dirty
     assert!(app.document.is_dirty);
-
-    // Header mode should be enabled
-    assert!(app.document.header_mode);
 }
 
 #[test]
@@ -78,14 +75,11 @@ fn test_new_command_without_headers() {
         "Column 1"
     );
 
-    // Should have only header row
-    assert_eq!(app.document.data_row_count(), 0);
+    // Should have only row 0 (1 total row)
+    assert_eq!(app.document.row_count(), 1);
 
     // Should be marked as dirty
     assert!(app.document.is_dirty);
-
-    // Header mode should be enabled
-    assert!(app.document.header_mode);
 }
 
 #[test]
@@ -104,7 +98,7 @@ fn test_new_command_single_header() {
     // Should create document with 1 column
     assert_eq!(app.document.column_count(), 1);
     assert_eq!(app.document.cell(RowIndex::new(0), ColIndex::new(0)), "ID");
-    assert_eq!(app.document.data_row_count(), 0);
+    assert_eq!(app.document.row_count(), 1);
 }
 
 #[test]

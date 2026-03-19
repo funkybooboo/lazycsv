@@ -69,6 +69,9 @@ fn create_test_app() -> App {
 fn test_capital_p_pastes_row_above() {
     let mut app = create_test_app();
 
+    // Move to row 1 (first data row)
+    app.handle_key(key(KeyCode::Char('j'))).unwrap();
+
     // Yank current row (row 1: A1 B1 C1 D1 E1)
     app.handle_key(key(KeyCode::Char('y'))).unwrap();
     app.handle_key(key(KeyCode::Char('y'))).unwrap();
@@ -283,14 +286,14 @@ fn test_comma_p_without_column_buffer_shows_error() {
 // ============================================================================
 
 #[test]
-fn test_comma_capital_p_pastes_column_left() {
+fn test_capital_p_pastes_column_left() {
     let mut app = create_test_app();
 
-    // Move to column 2 (C)
+    // Move to column 2
     app.handle_key(key(KeyCode::Char('l'))).unwrap();
     app.handle_key(key(KeyCode::Char('l'))).unwrap();
 
-    // Yank column C
+    // Yank column 2 (C)
     app.handle_key(key(KeyCode::Char(','))).unwrap();
     app.handle_key(key(KeyCode::Char('y'))).unwrap();
     app.handle_key(key(KeyCode::Char('y'))).unwrap();
@@ -591,6 +594,9 @@ fn test_comma_dd_then_comma_p_round_trip() {
 fn test_dd_then_capital_p_round_trip() {
     let mut app = create_test_app();
 
+    // Move to row 1 (first data row)
+    app.handle_key(key(KeyCode::Char('j'))).unwrap();
+
     // Get row 1 content before delete
     let row1: Vec<String> = app.document.get_rows_range(1, 2)[0].clone();
 
@@ -622,7 +628,7 @@ fn test_dd_then_capital_p_round_trip() {
 ///   ...
 ///   Row 10:         R10A R10B R10C
 ///
-/// App starts at row 1, column 0.
+/// App starts at row 0, column 0.
 fn create_large_test_app() -> App {
     let headers = vec!["H1".into(), "H2".into(), "H3".into()];
     let data_rows: Vec<Vec<String>> = (1..=10)
@@ -641,6 +647,9 @@ fn create_large_test_app() -> App {
 fn test_5dd_deletes_5_rows() {
     let mut app = create_large_test_app();
     assert_eq!(app.document.row_count(), 11); // header + 10 data rows
+
+    // Move to row 1 (first data row)
+    app.handle_key(key(KeyCode::Char('j'))).unwrap();
     assert_eq!(app.selected_row().unwrap().get(), 1);
 
     // Type 5dd
@@ -661,8 +670,8 @@ fn test_5dd_deletes_5_rows() {
 #[test]
 fn test_dd_count_clamps_to_available_rows() {
     let mut app = create_large_test_app();
-    // Move to row 9 (second-to-last data row)
-    for _ in 0..8 {
+    // Move to row 9 (second-to-last data row, from row 0 need 9 moves)
+    for _ in 0..9 {
         app.handle_key(key(KeyCode::Char('j'))).unwrap();
     }
     assert_eq!(app.selected_row().unwrap().get(), 9);
@@ -685,6 +694,9 @@ fn test_dd_count_clamps_to_available_rows() {
 fn test_5dd_stores_in_row_buffer_as_region() {
     let mut app = create_large_test_app();
 
+    // Move to row 1 (first data row)
+    app.handle_key(key(KeyCode::Char('j'))).unwrap();
+
     // 5dd from row 1
     app.handle_key(key(KeyCode::Char('5'))).unwrap();
     app.handle_key(key(KeyCode::Char('d'))).unwrap();
@@ -705,6 +717,9 @@ fn test_5dd_stores_in_row_buffer_as_region() {
 #[test]
 fn test_5yy_yanks_5_rows() {
     let mut app = create_large_test_app();
+
+    // Move to row 1 (first data row)
+    app.handle_key(key(KeyCode::Char('j'))).unwrap();
 
     // 5yy from row 1
     app.handle_key(key(KeyCode::Char('5'))).unwrap();
@@ -729,8 +744,8 @@ fn test_5yy_yanks_5_rows() {
 #[test]
 fn test_yy_count_clamps_to_available_rows() {
     let mut app = create_large_test_app();
-    // Move to row 9
-    for _ in 0..8 {
+    // Move to row 9 (from row 0, need 9 moves)
+    for _ in 0..9 {
         app.handle_key(key(KeyCode::Char('j'))).unwrap();
     }
     assert_eq!(app.selected_row().unwrap().get(), 9);
@@ -760,12 +775,15 @@ fn test_yy_count_clamps_to_available_rows() {
 fn test_5yy_then_p_pastes_5_rows() {
     let mut app = create_large_test_app();
 
+    // Move to row 1 (first data row)
+    app.handle_key(key(KeyCode::Char('j'))).unwrap();
+
     // 5yy from row 1
     app.handle_key(key(KeyCode::Char('5'))).unwrap();
     app.handle_key(key(KeyCode::Char('y'))).unwrap();
     app.handle_key(key(KeyCode::Char('y'))).unwrap();
 
-    // Move to row 8
+    // Move to row 8 (7 more moves from row 1)
     for _ in 0..7 {
         app.handle_key(key(KeyCode::Char('j'))).unwrap();
     }
@@ -794,12 +812,15 @@ fn test_5yy_then_p_pastes_5_rows() {
 fn test_5yy_then_capital_p_pastes_5_rows_above() {
     let mut app = create_large_test_app();
 
+    // Move to row 1 (first data row)
+    app.handle_key(key(KeyCode::Char('j'))).unwrap();
+
     // 5yy from row 1
     app.handle_key(key(KeyCode::Char('5'))).unwrap();
     app.handle_key(key(KeyCode::Char('y'))).unwrap();
     app.handle_key(key(KeyCode::Char('y'))).unwrap();
 
-    // Move to row 8
+    // Move to row 8 (7 more moves from row 1)
     for _ in 0..7 {
         app.handle_key(key(KeyCode::Char('j'))).unwrap();
     }
@@ -831,6 +852,9 @@ fn test_5yy_then_capital_p_pastes_5_rows_above() {
 #[test]
 fn test_cc_clears_row_enters_insert() {
     let mut app = create_test_app();
+
+    // Move to row 1 (first data row)
+    app.handle_key(key(KeyCode::Char('j'))).unwrap();
     assert_eq!(app.selected_row().unwrap().get(), 1);
 
     // Verify row 1 has content

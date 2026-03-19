@@ -314,12 +314,8 @@ fn handle_switch_document(
     app.session.mark_dirty(&result_path);
 
     app.view_state = lazycsv::ui::ViewState::default();
-    let initial_row = if app.document.header_mode && app.document.row_count() > 1 {
-        1
-    } else {
-        0
-    };
-    app.view_state.table_state.select(Some(initial_row));
+    // Start at row 0 (displays as row 1)
+    app.view_state.table_state.select(Some(0));
     Ok(())
 }
 
@@ -628,7 +624,7 @@ fn execute_count_mode(cli_args: &cli::CliArgs) -> Result<()> {
         let mut parts = Vec::new();
         if cli_args.rows {
             let count = if doc.row_count() > 0 {
-                doc.row_count() - 1 // subtract header row
+                doc.row_count() - 1 // subtract row 0 (which typically contains column names)
             } else {
                 0
             };

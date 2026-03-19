@@ -24,7 +24,7 @@ fn test_empty_file_0_bytes() {
     let doc = Document::from_file(&file_path, None, false, None).unwrap();
 
     // Empty file should have:
-    // - 1 row (empty header row)
+    // - 1 row (empty row 0)
     // - 0 columns
     println!(
         "Empty file: row_count={}, column_count={}",
@@ -95,18 +95,16 @@ fn test_app_new_with_header_only_document() {
     let files = vec![file_path.clone()];
     let app = App::new(doc, files, 0, FileConfig::new());
 
-    // With header mode ON and only 1 row (the header), cursor should be on row 0
-    // because there's no data row to move to
+    // With only 1 row, cursor should be on row 0
     println!(
-        "App with header-only doc: selected_row={:?}, header_mode={}",
-        app.selected_row(),
-        app.document.header_mode
+        "App with header-only doc: selected_row={:?}",
+        app.selected_row()
     );
 
     assert_eq!(
         app.selected_row(),
         Some(RowIndex::new(0)),
-        "With only header row, cursor should be on row 0"
+        "With only one row, cursor should be on row 0"
     );
 }
 
@@ -161,7 +159,8 @@ fn test_delete_last_data_row_moves_to_header() {
     let files = vec![file_path.clone()];
     let mut app = App::new(doc, files, 0, FileConfig::new());
 
-    // Start on row 1 (first data row)
+    // Start on row 0, move to row 1 (first data row)
+    app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
     assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
     assert_eq!(app.document.row_count(), 2); // header + 1 data row
 
@@ -169,14 +168,14 @@ fn test_delete_last_data_row_moves_to_header() {
     app.handle_key(key_event(KeyCode::Char('d'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('d'))).unwrap();
 
-    // Should now have only header row
+    // Should now have only row 0
     assert_eq!(
         app.document.row_count(),
         1,
-        "After deleting last data row, only header remains"
+        "After deleting last row, only row 0 remains"
     );
 
-    // Cursor should move to row 0 (header row)
+    // Cursor should move to row 0
     assert_eq!(
         app.selected_row(),
         Some(RowIndex::new(0)),

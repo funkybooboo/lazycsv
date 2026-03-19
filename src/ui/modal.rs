@@ -40,7 +40,7 @@
 //! # Available Styles
 //!
 //! - `cursor_style()` - White bg, black fg, bold (for cursor/selection)
-//! - `bold_style()` - Bold text (headers, row numbers)
+//! - `bold_style()` - Bold text (row numbers)
 //! - `dim_style()` - Dimmed text (previews, hints)
 //! - `error_style()` - Red, bold (error messages)
 //! - `success_style()` - Green, bold (success messages)
@@ -124,11 +124,6 @@ pub fn search_match_style() -> Style {
 /// Visual selection style (dark gray background, yellow text)
 pub fn visual_selection_style() -> Style {
     Style::default().bg(COLOR_VISUAL_BG).fg(COLOR_VISUAL_FG)
-}
-
-/// Header style (bold text for table headers, section headers)
-pub fn header_style() -> Style {
-    Style::default().add_modifier(Modifier::BOLD)
 }
 
 /// Row number style (bold text for row numbers in table)

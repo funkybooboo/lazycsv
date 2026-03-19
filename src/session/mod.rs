@@ -59,9 +59,6 @@ pub struct Session {
     /// Configuration for CSV parsing
     config: FileConfig,
 
-    /// Per-file header mode settings (true = header row styled/frozen)
-    header_modes: HashMap<PathBuf, bool>,
-
     /// Per-file delimiter settings
     delimiters: HashMap<PathBuf, char>,
 
@@ -89,7 +86,6 @@ impl Session {
             files,
             active_file_index,
             config,
-            header_modes: HashMap::new(),
             delimiters: HashMap::new(),
             dirty_files: HashSet::new(),
             document_cache: HashMap::new(),
@@ -153,20 +149,6 @@ impl Session {
     /// Check if there are multiple files in the session
     pub fn has_multiple_files(&self) -> bool {
         self.files.len() > 1
-    }
-
-    /// Get header mode for the current file (default: true)
-    pub fn header_mode(&self) -> bool {
-        self.header_modes
-            .get(&self.files[self.active_file_index])
-            .copied()
-            .unwrap_or(true) // Default: header mode ON
-    }
-
-    /// Set header mode for the current file
-    pub fn set_header_mode(&mut self, mode: bool) {
-        self.header_modes
-            .insert(self.files[self.active_file_index].clone(), mode);
     }
 
     /// Get manual column width for a specific column of the current file.
@@ -284,10 +266,7 @@ impl Session {
         if let Some(doc) = self.document_cache.remove(&old_path) {
             self.document_cache.insert(new_path.clone(), doc);
         }
-        // Migrate header mode and delimiter settings
-        if let Some(mode) = self.header_modes.remove(&old_path) {
-            self.header_modes.insert(new_path.clone(), mode);
-        }
+        // Migrate delimiter settings
         if let Some(delim) = self.delimiters.remove(&old_path) {
             self.delimiters.insert(new_path.clone(), delim);
         }
@@ -344,7 +323,7 @@ impl Session {
     }
 
     /// Remove a file from the session by path.
-    /// Cleans up dirty_files, document_cache, query_output_files, header_modes,
+    /// Cleans up dirty_files, document_cache, query_output_files,
     /// delimiters, and adjusts active_file_index. Returns true if a file was removed.
     pub fn remove_file(&mut self, path: &Path) -> bool {
         let Some(idx) = self.files.iter().position(|p| p == path) else {
@@ -355,7 +334,6 @@ impl Session {
         self.dirty_files.remove(&removed);
         self.document_cache.remove(&removed);
         self.query_output_files.remove(&removed);
-        self.header_modes.remove(&removed);
         self.delimiters.remove(&removed);
         self.file_mtimes.remove(&removed);
 
@@ -600,18 +578,16 @@ mod tests {
     }
 
     #[test]
-    fn test_rename_migrates_header_mode_and_delimiter() {
+    fn test_rename_migrates_delimiter() {
         let files = test_files();
         let config = FileConfig::new();
         let mut session = Session::new(files.clone(), 0, config);
 
-        session.set_header_mode(false);
         session.set_delimiter(files[0].clone(), ';');
 
         let new_path = PathBuf::from("renamed.csv");
         session.rename_current_file(new_path.clone());
 
-        assert!(!session.header_mode());
         assert_eq!(session.delimiter(&new_path), ';');
     }
 

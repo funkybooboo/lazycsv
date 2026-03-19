@@ -560,7 +560,7 @@ The rendering system uses virtual scrolling to maintain constant-time performanc
 │                                                               │
 │  5. Build row components                                     │
 │     • build_column_letters_row() - A, B, C...                │
-│     • build_header_row() - Column names                      │
+│     • build_row_0() - First row (typically column names)     │
 │     • build_data_rows() - Visible data with styling          │
 │                                                               │
 │  6. Apply cell styling                                       │

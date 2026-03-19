@@ -65,8 +65,8 @@ fn test_delim_command_changes_delimiter() {
         "City"
     );
 
-    // Data rows should be parsed correctly
-    assert_eq!(app.document.data_row_count(), 2);
+    // All rows (header + data) should be parsed correctly
+    assert_eq!(app.document.row_count(), 3);
     assert_eq!(
         app.document.cell(RowIndex::new(1), ColIndex::new(0)),
         "Alice"

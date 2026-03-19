@@ -601,7 +601,7 @@ fn test_ui_responsive_to_selection() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
 
-    // Render with row 1 selected (initial position with header_mode=true)
+    // Render with row 0 selected (initial position)
     terminal
         .draw(|frame| {
             lazycsv::ui::render(frame, &mut app);

@@ -270,8 +270,8 @@ fn test_pending_g_command_no_timeout() {
 
     // Should have executed and cleared pending state
     assert_eq!(app.input_state.pending_command, None);
-    // With header_mode ON, gg goes to first data row (row 1)
-    assert_eq!(app.selected_row(), Some(RowIndex::new(1)));
+    // gg goes to first row (row 0)
+    assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 }
 
 #[test]

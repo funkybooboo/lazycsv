@@ -169,6 +169,9 @@ fn test_W_saves_all_dirty_files() {
     let files = vec![file1.clone(), file2.clone()];
     let mut app = App::new(doc, files, 0, FileConfig::new());
 
+    // Move to row 1 (first data row)
+    app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
+
     // Edit file1 - use 's' to replace cell content
     app.handle_key(key_event(KeyCode::Char('s'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('Q'))).unwrap();
@@ -186,8 +189,9 @@ fn test_W_saves_all_dirty_files() {
     // Switch to file2
     app.session.next_file();
     app.document = Document::from_file(&file2, None, false, None).unwrap();
-    // Reset view state after loading new doc
-    app.view_state.table_state.select(Some(1));
+    // Reset view state after loading new doc - start at row 0, then move to row 1
+    app.view_state.table_state.select(Some(0));
+    app.handle_key(key_event(KeyCode::Char('j'))).unwrap();
 
     // Edit file2 - use 's' to replace cell content
     app.handle_key(key_event(KeyCode::Char('s'))).unwrap();

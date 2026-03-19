@@ -597,7 +597,7 @@ fn range_bounds(refs: &[CellRef]) -> (usize, usize, usize, usize) {
 
 /// Parse a cell reference like "A1", "B10", "AA3" into a CellRef.
 /// Row numbers in formulas map directly to document row indices (matching the TUI gutter).
-/// Row 0 = header row, Row 1 = first data row.
+/// Row 0 = first row, Row 1 = second row, etc.
 fn parse_cell_ref(s: &str) -> Option<CellRef> {
     let s = s.trim();
     if s.is_empty() {
@@ -983,7 +983,7 @@ mod tests {
         assert_eq!(parse_cell_ref("A1"), Some(CellRef { row: 1, col: 0 }));
         assert_eq!(parse_cell_ref("B3"), Some(CellRef { row: 3, col: 1 }));
         assert_eq!(parse_cell_ref("AA1"), Some(CellRef { row: 1, col: 26 }));
-        assert_eq!(parse_cell_ref("A0"), Some(CellRef { row: 0, col: 0 })); // header row
+        assert_eq!(parse_cell_ref("A0"), Some(CellRef { row: 0, col: 0 })); // first row
         assert_eq!(parse_cell_ref("1A"), None);
         assert_eq!(parse_cell_ref("A"), None);
         assert_eq!(parse_cell_ref("1"), None);

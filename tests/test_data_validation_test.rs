@@ -338,19 +338,19 @@ fn test_navigation_on_sparse_data() {
     // Navigate down
     app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE))
         .unwrap();
-    assert_eq!(app.selected_row(), Some(RowIndex::new(2))); // row 1 + 1 = row 2
+    assert_eq!(app.selected_row(), Some(RowIndex::new(1))); // row 0 + 1 = row 1
 
     // Navigate to last row
     app.handle_key(KeyEvent::new(KeyCode::Char('G'), KeyModifiers::NONE))
         .unwrap();
-    assert_eq!(app.selected_row(), Some(RowIndex::new(15))); // 16 total rows (15 data + 1 header), last = row 15
+    assert_eq!(app.selected_row(), Some(RowIndex::new(15))); // 16 total rows, last = row 15
 
-    // Navigate to first data row
+    // Navigate to first row
     app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::NONE))
         .unwrap();
     app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::NONE))
         .unwrap();
-    assert_eq!(app.selected_row(), Some(RowIndex::new(1))); // First data row with header_mode ON
+    assert_eq!(app.selected_row(), Some(RowIndex::new(0))); // First row
 }
 
 #[test]
@@ -394,7 +394,7 @@ fn test_navigation_on_single_column() {
     // Navigate down should work
     app.handle_key(KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE))
         .unwrap();
-    assert_eq!(app.selected_row(), Some(RowIndex::new(2))); // row 1 + 1 = row 2
+    assert_eq!(app.selected_row(), Some(RowIndex::new(1))); // row 0 + 1 = row 1
 }
 
 // =============================================================================

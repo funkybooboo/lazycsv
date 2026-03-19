@@ -224,7 +224,7 @@ fn test_sort_preserves_header() {
 
     send_command(&mut app, "sort 1");
 
-    // Header row should remain unchanged
+    // Row 0 should remain unchanged (sort operates on rows 1+)
     assert_eq!(
         app.document.cell(RowIndex::new(0), ColIndex::new(0)),
         "Name"

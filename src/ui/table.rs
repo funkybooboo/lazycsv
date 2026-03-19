@@ -14,8 +14,8 @@ use ratatui::{
     Frame,
 };
 
-/// Height reserved for title bar, horizontal rule, column letters, and header row
-const TABLE_HEADER_HEIGHT: u16 = 4;
+/// Height reserved for title bar, horizontal rule, and column letters
+const TABLE_HEADER_HEIGHT: u16 = 3;
 
 /// Height reserved for status bar (1)
 const STATUS_BAR_HEIGHT: u16 = 1;
@@ -23,19 +23,18 @@ const STATUS_BAR_HEIGHT: u16 = 1;
 /// Width allocated for the row number column
 const ROW_NUMBER_COLUMN_WIDTH: u16 = 5;
 
-/// Offset added to selected position to account for column letters and header rows
-const HEADER_ROW_OFFSET: usize = 2;
+/// Offset added to selected position to account for column letters row
+const HEADER_ROW_OFFSET: usize = 1;
 
 /// Calculate cell style based on selection, search matches, and visual mode
 ///
 /// # Arguments
 ///
-/// * `app` - Application state containing visual selection and header mode
+/// * `app` - Application state containing visual selection
 /// * `search_state` - Optional search state for match highlighting
 /// * `row` - Row index of the cell
 /// * `col` - Column index of the cell
 /// * `is_selected` - Whether this is the currently selected cell
-/// * `is_header` - Whether this cell is in the header row
 ///
 /// # Returns
 ///
@@ -46,7 +45,6 @@ fn calculate_cell_style(
     row: RowIndex,
     col: ColIndex,
     is_selected: bool,
-    is_header: bool,
 ) -> Style {
     if is_selected {
         // Selected cell: use centralized cursor style
@@ -63,9 +61,6 @@ fn calculate_cell_style(
     } else if search_state.map(|s| s.is_match(row, col)).unwrap_or(false) {
         // Other search matches: visual selection style (dark gray bg, yellow fg)
         super::modal::visual_selection_style()
-    } else if is_header && app.document.header_mode {
-        // Header row with header mode ON: use header style
-        super::modal::header_style()
     } else {
         // Default: no special styling
         Style::default()
@@ -174,59 +169,6 @@ fn build_column_letters_row<'a>(
     Row::new(col_letter_cells).height(1)
 }
 
-/// Build the header row with column names
-/// Highlights the selected column if the cursor is on row 0 (header row)
-fn build_header_row(
-    app: &App,
-    start_col: usize,
-    end_col: usize,
-    selected_row: Option<usize>,
-) -> Row<'static> {
-    let is_header_selected = selected_row == Some(0);
-    let selected_col = app.view_state.selected_column;
-    let search_state = app.search_state.as_ref();
-    let is_insert_mode = app.mode == Mode::Insert;
-
-    // Get edit buffer content if editing a header cell
-    let edit_content = if is_header_selected && is_insert_mode {
-        app.edit_buffer
-            .as_ref()
-            .map(|buf| format_edit_buffer(&buf.content, buf.cursor))
-    } else {
-        None
-    };
-
-    // Row number for header: "0" if selected, otherwise empty or dim
-    let row_num_cell = if is_header_selected {
-        Cell::from("   0").style(super::modal::row_number_style())
-    } else {
-        Cell::from("")
-    };
-    let mut header_cells = vec![row_num_cell];
-
-    for i in start_col..end_col {
-        let is_selected_cell = is_header_selected && ColIndex::new(i) == selected_col;
-        let ri = RowIndex::new(0);
-        let ci = ColIndex::new(i);
-
-        // Show edit buffer content when editing this header cell
-        let header_text = if is_selected_cell && is_insert_mode {
-            if let Some(ref content) = edit_content {
-                content.clone()
-            } else {
-                app.document.header(ci).to_string()
-            }
-        } else {
-            app.document.header(ci).to_string()
-        };
-
-        let style = calculate_cell_style(app, search_state, ri, ci, is_selected_cell, true);
-        header_cells.push(Cell::from(header_text).style(style));
-    }
-
-    Row::new(header_cells).height(1)
-}
-
 /// Calculate scroll offset based on viewport mode and selected row
 fn calculate_scroll_offset(
     selected_idx: usize,
@@ -309,7 +251,7 @@ fn build_data_rows(
             let row_idx = scroll_offset + idx_in_window;
             let is_selected_row = selected_row_idx == Some(row_idx);
 
-            // Row number: display absolute row index (1, 2, 3... for data rows)
+            // Row number: display row index as-is (already 1-based)
             let row_num_display = format!("{:>4}", row_idx);
             let row_num_style = if is_selected_row {
                 super::modal::row_number_style()
@@ -364,7 +306,7 @@ fn build_data_rows(
                 // Highlight current cell with background color
                 let ri = RowIndex::new(row_idx);
                 let ci = ColIndex::new(col_idx);
-                let style = calculate_cell_style(app, search_state, ri, ci, is_selected, false);
+                let style = calculate_cell_style(app, search_state, ri, ci, is_selected);
 
                 cells.push(Cell::from(display_text).style(style));
             }
@@ -488,11 +430,9 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
         return;
     }
 
-    // Build column letters and header rows
+    // Build column letters row
     let col_letters_row =
         build_column_letters_row(start_col, end_col, app.view_state.selected_column);
-    let selected_row = app.selected_row().map(|r| r.get());
-    let header_row = build_header_row(app, start_col, end_col, selected_row);
 
     // Calculate visible viewport for virtual scrolling
     let table_height = area
@@ -510,9 +450,8 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
         &app.view_state.viewport_mode,
     );
 
-    // Get visible rows for current viewport (rows 1+, excluding header at row 0)
-    // Start from row 1 (first data row) since header is rendered separately
-    let data_start = scroll_offset.max(1); // Never show row 0 in data area
+    // Get visible rows for current viewport (all rows, starting from scroll offset)
+    let data_start = scroll_offset;
     let end_row = (data_start + table_height).min(csv.row_count());
     let visible_rows_vec = if data_start < csv.row_count() {
         csv.get_rows_range(data_start, end_row)
@@ -534,10 +473,8 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
         &raw_widths,
     );
 
-    // Combine column letters + headers + data
-    let all_rows = std::iter::once(col_letters_row)
-        .chain(std::iter::once(header_row))
-        .chain(rows);
+    // Combine column letters row + data rows
+    let all_rows = std::iter::once(col_letters_row).chain(rows);
 
     // Split area: title bar + horizontal rule + table content
     let chunks = Layout::default()
@@ -575,7 +512,7 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
 
     // Render stateful widget with adjusted selection state
     // Virtual scrolling requires adjusting the selected position to be relative
-    // to the visible window, plus offset for column letters and header rows
+    // to the visible window, plus offset for column letters row
     let mut adjusted_state = app.view_state.table_state;
     if let Some(selected) = adjusted_state.selected() {
         let position_in_window = if selected >= scroll_offset && selected < end_row {

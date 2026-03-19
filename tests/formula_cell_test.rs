@@ -505,9 +505,10 @@ fn test_formula_vlookup() {
 fn test_formula_via_keyboard() {
     let mut app = create_test_app();
 
-    // Navigate to B1 (row 1, col 1) — gg goes to first data row (row 1)
+    // Navigate to B1 (row 1, col 1) — gg goes to row 0, then j to row 1
     let _ = app.handle_key(key(KeyCode::Char('g')));
     let _ = app.handle_key(key(KeyCode::Char('g')));
+    let _ = app.handle_key(key(KeyCode::Char('j'))); // move to row 1
     let _ = app.handle_key(key(KeyCode::Char('l'))); // move to col 1
 
     // Verify we're at B1 which has value "10"
@@ -700,13 +701,16 @@ fn test_formula_completion_dismiss_on_open_paren() {
 
 /// Navigate to a specific data row/col (0-indexed from first data row)
 fn goto(app: &mut App, row: usize, col: usize) {
+    // Go to first row (row 0)
     let _ = app.handle_key(key(KeyCode::Char('g')));
     let _ = app.handle_key(key(KeyCode::Char('g')));
+    // Move down to target row
     for _ in 0..row {
         let _ = app.handle_key(key(KeyCode::Char('j')));
     }
-    let _ = app.handle_key(key(KeyCode::Char('g')));
-    let _ = app.handle_key(key(KeyCode::Char('h')));
+    // Go to first column (column 0)
+    let _ = app.handle_key(key(KeyCode::Char('0')));
+    // Move right to target column
     for _ in 0..col {
         let _ = app.handle_key(key(KeyCode::Char('l')));
     }

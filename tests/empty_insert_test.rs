@@ -58,7 +58,7 @@ fn test_o_on_header_only_file() {
 
     assert_eq!(app.document.row_count(), 1); // Only header
     assert_eq!(app.document.column_count(), 3);
-    assert_eq!(app.selected_row(), Some(RowIndex::new(0))); // On header row
+    assert_eq!(app.selected_row(), Some(RowIndex::new(0))); // On row 0
 
     // Press 'o' to insert first data row
     app.handle_key(key_event(KeyCode::Char('o'))).unwrap();

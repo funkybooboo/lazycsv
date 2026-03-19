@@ -156,7 +156,7 @@ fn test_binary_file_treated_as_csv() {
     match result {
         Ok(doc) => {
             // Parsed with replacement characters - acceptable
-            assert!(doc.row_count() > 0); // Should have at least header row
+            assert!(doc.row_count() > 0); // Should have at least row 0
         }
         Err(err) => {
             // Failed to parse - also acceptable

@@ -19,6 +19,13 @@ fn test_magnifier_open_edit_save_close_workflow() {
     let files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(doc, files, 0, lazycsv::session::FileConfig::new());
 
+    // Move to row 1 (first data row)
+    app.handle_key(crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Char('j'),
+        crossterm::event::KeyModifiers::NONE,
+    ))
+    .unwrap();
+
     // Initial state: no magnifier
     assert!(app.magnifier_state.is_none());
     assert!(!app.document.is_dirty);
@@ -142,6 +149,13 @@ fn test_magnifier_vim_motions_workflow() {
     let files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(doc, files, 0, lazycsv::session::FileConfig::new());
 
+    // Move to row 1 (first data row)
+    app.handle_key(crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Char('j'),
+        crossterm::event::KeyModifiers::NONE,
+    ))
+    .unwrap();
+
     // Open magnifier on "Engineer" cell
     app.view_state.selected_column = lazycsv::domain::position::ColIndex::new(1);
     app.open_magnifier();
@@ -205,6 +219,13 @@ fn test_magnifier_empty_cell() {
 
     let files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(doc, files, 0, lazycsv::session::FileConfig::new());
+
+    // Move to row 1 (first data row)
+    app.handle_key(crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Char('j'),
+        crossterm::event::KeyModifiers::NONE,
+    ))
+    .unwrap();
 
     // Open magnifier on empty cell
     app.open_magnifier();

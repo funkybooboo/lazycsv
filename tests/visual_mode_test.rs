@@ -226,6 +226,9 @@ fn test_visual_column_esc_exits() {
 fn test_visual_block_d_deletes_cells() {
     let mut app = create_test_app();
 
+    // Move to row 1
+    app.handle_key(key(KeyCode::Char('j'))).unwrap();
+
     // Select 2x2 block starting at A1
     app.handle_key(key(KeyCode::Char('v'))).unwrap();
     app.handle_key(key(KeyCode::Char('l'))).unwrap();
@@ -277,6 +280,9 @@ fn test_visual_block_d_deletes_cells() {
 fn test_visual_block_d_stores_in_region_buffer() {
     let mut app = create_test_app();
 
+    // Move to row 1
+    app.handle_key(key(KeyCode::Char('j'))).unwrap();
+
     app.handle_key(key(KeyCode::Char('v'))).unwrap();
     app.handle_key(key(KeyCode::Char('l'))).unwrap();
     app.handle_key(key(KeyCode::Char('j'))).unwrap();
@@ -318,6 +324,9 @@ fn test_visual_line_d_deletes_rows() {
 #[test]
 fn test_visual_line_d_stores_in_row_buffer() {
     let mut app = create_test_app();
+
+    // Move to row 1
+    app.handle_key(key(KeyCode::Char('j'))).unwrap();
 
     app.handle_key(key(KeyCode::Char('V'))).unwrap();
     app.handle_key(key(KeyCode::Char('j'))).unwrap();
@@ -376,6 +385,9 @@ fn test_visual_column_d_stores_in_column_buffer() {
 #[test]
 fn test_visual_block_y_yanks_region() {
     let mut app = create_test_app();
+
+    // Move to row 1
+    app.handle_key(key(KeyCode::Char('j'))).unwrap();
 
     app.handle_key(key(KeyCode::Char('v'))).unwrap();
     app.handle_key(key(KeyCode::Char('l'))).unwrap();
@@ -460,6 +472,9 @@ fn test_visual_column_y_yanks_columns() {
 fn test_visual_block_p_pastes_over_selection() {
     let mut app = create_test_app();
 
+    // Move to row 1
+    app.handle_key(key(KeyCode::Char('j'))).unwrap();
+
     // Yank a 2x2 region from A1
     app.handle_key(key(KeyCode::Char('v'))).unwrap();
     app.handle_key(key(KeyCode::Char('l'))).unwrap();
@@ -508,6 +523,9 @@ fn test_visual_block_p_pastes_over_selection() {
 #[test]
 fn test_visual_line_p_replaces_rows() {
     let mut app = create_test_app();
+
+    // Move to row 1
+    app.handle_key(key(KeyCode::Char('j'))).unwrap();
 
     // Yank row 1
     app.handle_key(key(KeyCode::Char('V'))).unwrap();
@@ -605,6 +623,9 @@ fn test_gv_without_previous_selection_shows_error() {
 #[test]
 fn test_visual_block_single_cell_selection() {
     let mut app = create_test_app();
+
+    // Move to row 1
+    app.handle_key(key(KeyCode::Char('j'))).unwrap();
 
     app.handle_key(key(KeyCode::Char('v'))).unwrap();
     // Don't move, just delete

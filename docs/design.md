@@ -122,7 +122,6 @@ This document translates the functionality described in the [Features Guide](fea
 
 ### Typography
 - **Monospace font** - Terminal default
-- **Header row** - Bold
 - **Current cell** - Reversed (black bg, white fg or vice versa)
 - **Column letters** - Dimmed
 

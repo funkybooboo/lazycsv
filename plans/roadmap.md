@@ -221,7 +221,7 @@ Production-ready release with comprehensive documentation and polish.
 - **Truly Hybrid:** Balance vim power with spreadsheet familiarity. Support both vim keys (hjkl) and arrow keys, vim commands and spreadsheet-like operations.
 - **Three-Tier Operator System:** Cell (`x`) → Row (`dd`) → Column (`,dd`). Comma as leader for CSV-specific column operations.
 - **Simplified Navigation:** Use `g` suffix for jumps: `5g` (row 5), `:cB` (column B). Reserve `:` for operations and explicit navigation.
-- **Header Toggle System:** Header row is always row 0. Toggle header mode with `:ht` to freeze/style row 0. When ON, `gg` goes to row 1 (first data row). Use `gh` to navigate to header row, `gd` to navigate to first data row.
+- **Row Numbering:** All rows are numbered starting from 1 (displayed). Internally uses 0-based indexing. Row 1 typically contains column headers for SQL queries, but receives no special UI treatment.
 - **Command Ranges:** Standardized ranges: `:5,10d` for rows, `:B,Dd` for columns. Don't overcomplicate.
 - **Triple Clipboard:** Three independent buffers: row buffer (yy/p), column buffer (,yy/,p), region buffer (visual y/p). No cross-pasting.
 - **Ephemeral Edits:** No changes saved to file until explicit `:w`. All edits update in-memory representation first.
@@ -279,14 +279,11 @@ LazyCSV uses vim-style modal editing with these modes:
 | `:c1` / `:c27` | Jump to column by number (1=A, 27=AA) |
 | `5g` | Jump to row 5 |
 | `gg` / `G` | First/last row |
-| `gh` | Go to header row (row 0) |
-| `gd` | Go to first data row (row 1) |
 
 ### Data Commands
 
 | Command | Action |
 |---------|--------|
-| `:ht` | Toggle header mode for current file |
 | `:delim ;` | Set delimiter to semicolon (session-only) |
 | `:new A,B,C` | Create new CSV with headers |
 | `:sort A,B` | Sort by columns A, B ascending |

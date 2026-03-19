@@ -269,7 +269,7 @@ fn test_large_schema_completion() {
     let filtered = completion.filtered_items();
     // Should match field_99, field_990..field_999 at minimum
     assert!(
-        filtered.len() >= 1,
+        !filtered.is_empty(),
         "Should find completions for 'field_99' prefix"
     );
     assert!(
@@ -773,7 +773,7 @@ fn test_integration_completion_with_real_columns() {
         return;
     }
 
-    let schema = build_schema(&[path.clone()]);
+    let schema = build_schema(std::slice::from_ref(&path));
     let headers = schema.get(&path).unwrap();
 
     let mut items: Vec<CompletionItem> = headers

@@ -64,7 +64,7 @@ fn execute_percent_range(app: &mut App, operation: &str) -> Result<InputResult> 
     match operation {
         "d" => {
             // Delete all data rows (excluding header)
-            let row_count = app.document.data_row_count();
+            let row_count = app.document.row_count();
             if row_count == 0 {
                 app.status_message = Some(StatusMessage::from("No data rows to delete"));
                 return Ok(InputResult::Continue);
@@ -80,7 +80,7 @@ fn execute_percent_range(app: &mut App, operation: &str) -> Result<InputResult> 
             )));
 
             // Move cursor to row 1 (or row 0 if no data rows left)
-            if app.document.data_row_count() > 0 {
+            if app.document.row_count() > 0 {
                 app.view_state.table_state.select(Some(1));
             } else {
                 app.view_state.table_state.select(Some(0));
@@ -90,7 +90,7 @@ fn execute_percent_range(app: &mut App, operation: &str) -> Result<InputResult> 
         }
         "y" => {
             // Yank all data rows
-            let row_count = app.document.data_row_count();
+            let row_count = app.document.row_count();
             if row_count == 0 {
                 app.status_message = Some(StatusMessage::from("No data rows to yank"));
                 return Ok(InputResult::Continue);
@@ -128,7 +128,7 @@ fn execute_current_row(app: &mut App, operation: &str) -> Result<InputResult> {
                     app.status_message = Some(StatusMessage::from("Deleted 1 row"));
 
                     // Adjust cursor position
-                    let new_row_count = app.document.data_row_count();
+                    let new_row_count = app.document.row_count();
                     let current_pos = row_idx.get();
 
                     if new_row_count == 0 {
@@ -177,7 +177,7 @@ fn execute_last_row(app: &mut App, operation: &str) -> Result<InputResult> {
     match operation {
         "d" => {
             // Delete last row
-            let row_count = app.document.data_row_count();
+            let row_count = app.document.row_count();
             if row_count == 0 {
                 app.status_message = Some(StatusMessage::from("No data rows to delete"));
                 return Ok(InputResult::Continue);
@@ -188,10 +188,10 @@ fn execute_last_row(app: &mut App, operation: &str) -> Result<InputResult> {
 
                 // Move cursor to new last row if cursor was on deleted row
                 if let Some(current_row) = app.selected_row() {
-                    if current_row.get() > app.document.data_row_count() {
+                    if current_row.get() > app.document.row_count() {
                         app.view_state
                             .table_state
-                            .select(Some(app.document.data_row_count()));
+                            .select(Some(app.document.row_count()));
                     }
                 }
             } else {
@@ -201,7 +201,7 @@ fn execute_last_row(app: &mut App, operation: &str) -> Result<InputResult> {
         }
         "y" => {
             // Yank last row
-            let row_count = app.document.data_row_count();
+            let row_count = app.document.row_count();
             if row_count == 0 {
                 app.status_message = Some(StatusMessage::from("No data rows to yank"));
                 return Ok(InputResult::Continue);
@@ -306,7 +306,7 @@ fn delete_row_range(app: &mut App, start_num: usize, end_num: usize) -> Result<I
 
         // Adjust cursor position
         if let Some(current_row) = app.selected_row() {
-            let new_row_count = app.document.data_row_count();
+            let new_row_count = app.document.row_count();
             if new_row_count == 0 {
                 app.view_state.table_state.select(Some(0));
             } else if current_row.get() > new_row_count {

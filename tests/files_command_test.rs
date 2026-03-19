@@ -15,20 +15,6 @@ fn create_test_csv(dir: &TempDir, name: &str, content: &str) -> PathBuf {
     path
 }
 
-/// Helper to send command string to app
-fn send_command(app: &mut App, cmd: &str) {
-    // Enter command mode
-    let _ = app.handle_key(key_event(KeyCode::Char(':')));
-
-    // Type command
-    for c in cmd.chars() {
-        let _ = app.handle_key(key_event(KeyCode::Char(c)));
-    }
-
-    // Press Enter
-    let _ = app.handle_key(key_event(KeyCode::Enter));
-}
-
 /// Helper to open files menu using Space+f
 fn open_files_menu(app: &mut App) {
     let _ = app.handle_key(key_event(KeyCode::Char(' ')));

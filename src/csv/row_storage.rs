@@ -38,13 +38,13 @@ pub struct LazyStorage {
     /// Memory-mapped file bytes.
     mmap: memmap2::Mmap,
     /// Byte offset of the start of each CSV record (monotonically increasing).
-    /// Index 0 = header row, index 1 = first data row, etc.
+    /// Index 0 = first row, index 1 = second row, etc.
     /// These stay in original file order so get_row_bytes can use offsets[i+1] as end boundary.
     row_offsets: Vec<u64>,
     /// Optional sort indirection: logical row index → physical row_offsets index.
     /// When None, logical == physical. When Some, row access goes through this mapping.
     sort_order: Option<Vec<usize>>,
-    /// Parsed header row (always materialized).
+    /// Parsed first row (always materialized, typically contains column names).
     header: Vec<String>,
     /// Number of columns (from header).
     col_count: usize,
@@ -75,7 +75,7 @@ impl RowStorage {
             .context(format!("Failed to open file: {}", path.display()))?;
         let mmap = unsafe { memmap2::MmapOptions::new().map(&file)? };
 
-        // Parse header row
+        // Parse first row
         let header = if row_offsets.is_empty() {
             vec![]
         } else {
@@ -201,7 +201,7 @@ impl RowStorage {
         }
     }
 
-    /// Get the header row (row 0).
+    /// Get the first row (row 0).
     pub fn header_row(&self) -> &[String] {
         match self {
             RowStorage::InMemory { rows } => rows.first().map(|r| r.as_slice()).unwrap_or(&[]),
@@ -506,7 +506,7 @@ impl LazyStorage {
         self.delimiter
     }
 
-    /// Header row.
+    /// First row (typically contains column names).
     pub fn header(&self) -> &[String] {
         &self.header
     }
@@ -668,7 +668,7 @@ pub fn count_rows_fast(path: &Path, no_headers: bool) -> Result<usize> {
         row_count -= 1;
     }
 
-    // Subtract header row if headers are present
+    // Subtract row 0 if headers are present
     if !no_headers && row_count > 0 {
         row_count -= 1;
     }

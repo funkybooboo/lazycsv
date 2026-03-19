@@ -112,7 +112,6 @@ pub fn execute(app: &mut App) -> Result<InputResult> {
         "w" | "write" => execute_write(app),
         "wq" | "x" => execute_write_quit(app),
         "h" | "help" => execute_help(app),
-        "ht" => execute_header_toggle(app),
         "delim" => execute_delimiter_change(app, _arg),
         "new" => execute_new_document(app, _arg),
         "c" => execute_column_jump(app, _arg),
@@ -190,29 +189,6 @@ fn execute_help(app: &mut App) -> Result<InputResult> {
     Ok(InputResult::Continue)
 }
 
-/// Execute :ht (header toggle) command
-fn execute_header_toggle(app: &mut App) -> Result<InputResult> {
-    // Toggle header mode
-    app.document.toggle_header_mode();
-    app.session.set_header_mode(app.document.header_mode);
-
-    // Adjust cursor position if needed
-    if let Some(row_idx) = app.selected_row() {
-        if app.document.header_mode && row_idx.get() == 0 {
-            // Header mode turned ON and cursor is on row 0 - move to row 1
-            app.view_state.table_state.select(Some(1));
-        }
-    }
-
-    let mode_str = if app.document.header_mode {
-        "ON"
-    } else {
-        "OFF"
-    };
-    app.status_message = Some(StatusMessage::from(format!("Header mode: {}", mode_str)));
-    Ok(InputResult::Continue)
-}
-
 /// Execute :delim command to change CSV delimiter
 fn execute_delimiter_change(app: &mut App, arg: Option<&str>) -> Result<InputResult> {
     // Change CSV delimiter for current file and reload
@@ -270,21 +246,14 @@ fn execute_new_document(app: &mut App, arg: Option<&str>) -> Result<InputResult>
     app.document = Document::new(headers.clone(), vec![], filename);
     app.document.delimiter = delimiter; // Preserve current delimiter
     app.document.is_dirty = true;
-    app.document.header_mode = true;
 
     // Mark current file as dirty in session
     let current_file = app.current_file().clone();
     app.session.mark_dirty(&current_file);
 
-    // Reset view state and position cursor
+    // Reset view state and position cursor at row 0
     app.view_state = crate::ui::ViewState::default();
-    // Position at row 1 (first data row position) if header_mode is ON
-    // Since we have 0 data rows, this will be out of bounds but selection will still work
-    if app.document.header_mode {
-        app.view_state.table_state.select(Some(1));
-    } else {
-        app.view_state.table_state.select(Some(0));
-    }
+    app.view_state.table_state.select(Some(0));
 
     app.status_message = Some(StatusMessage::from(format!(
         "New CSV created with {} column(s)",

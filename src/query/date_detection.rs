@@ -32,9 +32,9 @@ const SAMPLE_SIZE: usize = 100;
 /// Fraction of non-empty sampled values that must match a date pattern.
 const DATE_THRESHOLD: f64 = 0.9;
 
-/// Detect column types by sampling document data rows (header excluded).
+/// Detect column types by sampling document data rows (row 0 excluded).
 ///
-/// `data_rows` should NOT include the header row.
+/// `data_rows` should NOT include row 0 (which typically contains column names).
 /// Returns a `ColumnType` for each column.
 pub fn detect_column_types(data_rows: &[Vec<String>], col_count: usize) -> Vec<ColumnType> {
     if data_rows.is_empty() || col_count == 0 {
