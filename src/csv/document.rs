@@ -31,6 +31,10 @@ pub struct Document {
     /// Monotonically increasing counter bumped on every mutation.
     /// Used by SQLite cache to detect when a table needs reloading.
     pub generation: u64,
+
+    /// Imported xlsx formulas: (row, col) -> formula text (e.g., "=SUM(B2:B5)").
+    /// Consumed by App to populate the FormulaStore after loading.
+    pub xlsx_formulas: Vec<((usize, usize), String)>,
 }
 
 impl Document {
@@ -49,16 +53,54 @@ impl Document {
             header_mode: true,
             delimiter: delimiter.map(|d| d as char).unwrap_or(','),
             generation: 0,
+            xlsx_formulas: vec![],
         })
     }
 
-    /// Load CSV from file path with optional delimiter, header, and encoding settings.
+    /// Load CSV or XLSX from file path with optional delimiter, header, and encoding settings.
+    /// For xlsx files, `sheet_name` selects which sheet to load.
     pub fn from_file(
         path: &Path,
         delimiter: Option<u8>,
         no_headers: bool,
         encoding_label: Option<String>,
     ) -> Result<Self> {
+        Self::from_file_with_sheet(path, delimiter, no_headers, encoding_label, None)
+    }
+
+    /// Load CSV or XLSX with optional sheet selection for spreadsheet files.
+    pub fn from_file_with_sheet(
+        path: &Path,
+        delimiter: Option<u8>,
+        no_headers: bool,
+        encoding_label: Option<String>,
+        sheet_name: Option<&str>,
+    ) -> Result<Self> {
+        // XLSX/XLS path: convert spreadsheet to in-memory rows
+        if crate::csv::xlsx::is_spreadsheet(path) {
+            let sheet = match sheet_name {
+                Some(name) => name.to_string(),
+                None => {
+                    let sheets = crate::csv::xlsx::get_sheet_names(path)?;
+                    if sheets.is_empty() {
+                        anyhow::bail!("Spreadsheet has no sheets");
+                    }
+                    sheets[0].clone()
+                }
+            };
+            let data = crate::csv::xlsx::load_sheet_with_formulas(path, &sheet)?;
+            let filename = format!("{}.csv", data.sheet_name);
+            return Ok(Document {
+                storage: RowStorage::in_memory(data.rows),
+                filename,
+                is_dirty: true,
+                header_mode: true,
+                delimiter: ',',
+                generation: 0,
+                xlsx_formulas: data.formulas,
+            });
+        }
+
         let filename = path
             .file_name()
             .and_then(|n| n.to_str())
@@ -75,6 +117,7 @@ impl Document {
                 header_mode: true,
                 delimiter: delimiter.map(|d| d as char).unwrap_or(','),
                 generation: 0,
+                xlsx_formulas: vec![],
             });
         }
 
@@ -92,6 +135,7 @@ impl Document {
                 header_mode: true,
                 delimiter: delimiter.map(|d| d as char).unwrap_or(','),
                 generation: 0,
+                xlsx_formulas: vec![],
             });
         }
 
@@ -113,6 +157,7 @@ impl Document {
             header_mode: true,
             delimiter: delimiter.map(|d| d as char).unwrap_or(','),
             generation: 0,
+            xlsx_formulas: vec![],
         })
     }
 
@@ -237,7 +282,7 @@ impl Document {
         Ok((final_headers, rows))
     }
 
-    /// Load CSV from file path with cancellation support.
+    /// Load CSV or XLSX from file path with cancellation support.
     /// Same as `from_file` but checks `cancelled` flag periodically during parsing.
     pub fn from_file_cancellable(
         path: &Path,
@@ -246,6 +291,50 @@ impl Document {
         encoding_label: Option<String>,
         cancelled: &AtomicBool,
     ) -> Result<Self> {
+        Self::from_file_cancellable_with_sheet(
+            path,
+            delimiter,
+            no_headers,
+            encoding_label,
+            cancelled,
+            None,
+        )
+    }
+
+    /// Load CSV or XLSX with cancellation and optional sheet selection.
+    pub fn from_file_cancellable_with_sheet(
+        path: &Path,
+        delimiter: Option<u8>,
+        no_headers: bool,
+        encoding_label: Option<String>,
+        cancelled: &AtomicBool,
+        sheet_name: Option<&str>,
+    ) -> Result<Self> {
+        // XLSX/XLS path: convert spreadsheet to in-memory rows
+        if crate::csv::xlsx::is_spreadsheet(path) {
+            let sheet = match sheet_name {
+                Some(name) => name.to_string(),
+                None => {
+                    let sheets = crate::csv::xlsx::get_sheet_names(path)?;
+                    if sheets.is_empty() {
+                        anyhow::bail!("Spreadsheet has no sheets");
+                    }
+                    sheets[0].clone()
+                }
+            };
+            let data = crate::csv::xlsx::load_sheet_with_formulas(path, &sheet)?;
+            let filename = format!("{}.csv", data.sheet_name);
+            return Ok(Document {
+                storage: RowStorage::in_memory(data.rows),
+                filename,
+                is_dirty: true,
+                header_mode: true,
+                delimiter: ',',
+                generation: 0,
+                xlsx_formulas: data.formulas,
+            });
+        }
+
         let filename = path
             .file_name()
             .and_then(|n| n.to_str())
@@ -263,6 +352,7 @@ impl Document {
                 header_mode: true,
                 delimiter: delimiter.map(|d| d as char).unwrap_or(','),
                 generation: 0,
+                xlsx_formulas: vec![],
             });
         }
 
@@ -282,6 +372,7 @@ impl Document {
                 header_mode: true,
                 delimiter: delimiter.map(|d| d as char).unwrap_or(','),
                 generation: 0,
+                xlsx_formulas: vec![],
             });
         }
 
@@ -307,6 +398,7 @@ impl Document {
             header_mode: true,
             delimiter: delimiter.map(|d| d as char).unwrap_or(','),
             generation: 0,
+            xlsx_formulas: vec![],
         })
     }
 
@@ -843,6 +935,7 @@ impl Document {
             header_mode: true,
             delimiter: ',',
             generation: 0,
+            xlsx_formulas: vec![],
         }
     }
 
@@ -857,6 +950,7 @@ impl Document {
             header_mode: true,
             delimiter: ',',
             generation: 0,
+            xlsx_formulas: vec![],
         }
     }
 
@@ -869,6 +963,7 @@ impl Document {
             header_mode: true,
             delimiter,
             generation: 0,
+            xlsx_formulas: vec![],
         }
     }
 }

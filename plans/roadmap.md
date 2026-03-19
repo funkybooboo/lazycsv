@@ -53,6 +53,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.23.0 | Final Architecture Review | [ ] | TBD |
 | v0.23.1 | Final Architecture Polish | [ ] | TBD |
 | v0.24.0 | Performance, CLI Pipeline & SQL Type Intelligence | [x] | TBD |
+| v0.25.0 | Excel (XLSX/XLS) Support | [x] | TBD |
 | v1.0.0 | Stable Release & Polish | [ ] | - |
 
 **Total Tests Passing:** 1,403 tests (all integration and unit tests across vim_editor, SQL, magnifier, UI, keybindings, and core modules)
@@ -121,7 +122,10 @@ Refactored vim_editor with command pattern, removed code duplication, reorganize
 Yazi-inspired 3-column file explorer (30%:40%:30%) with parent directory preview, current directory navigation, and file/CSV preview. Bug fixes for navigation scroll, ASCII-only rendering (no emojis), and consistent error messages. All 524 tests passing.
 
 **[v0.24.0](versions/v0.24.0.md) - Performance, CLI Pipeline & SQL Type Intelligence**
-Lazy loading with memory-mapped files for large CSVs, CLI sort mode, piped stdin support for all non-interactive modes, and automatic column type detection for correct numeric/date ordering in SQL queries.
+Lazy loading with memory-mapped files for large CSVs, CLI sort mode, piped stdin support for all non-interactive modes, and automatic column type detection for correct numeric/date ordering in SQL queries. Buffered I/O indexing (7x faster on macOS), parallel sort with rayon, fast memchr row counting, and raw-byte CSV write for sorted lazy files.
+
+**[v0.25.0](versions/v0.25.0.md) - Excel (XLSX/XLS) Support**
+Native Excel file support via calamine. Open xlsx/xls files in TUI (default to first sheet, select by name or index). Formula preservation in formula bar with computed values in cells. CLI extraction (`-x` flag) to convert all or specific sheets to CSV. SQL queries directly against xlsx files.
 
 ###  Planned Versions
 
@@ -222,8 +226,8 @@ Production-ready release with comprehensive documentation and polish.
 - **Triple Clipboard:** Three independent buffers: row buffer (yy/p), column buffer (,yy/,p), region buffer (visual y/p). No cross-pasting.
 - **Ephemeral Edits:** No changes saved to file until explicit `:w`. All edits update in-memory representation first.
 - **Minimal UI Chrome:** No heavy borders. Use subtle separators. Maximum content, minimum decoration. Status line shows mode + row + column only.
-- **In-Memory Only:** All CSV files loaded entirely into RAM for maximum performance.
-- **CSV Only:** No Excel (.xlsx) support - CSV files only for simplicity.
+- **In-Memory Only:** Small CSV files loaded entirely into RAM; large files use lazy mmap-backed storage.
+- **CSV-Centric:** CSV is the primary format. Excel files (.xlsx/.xls) are supported for reading and converted to CSV on save.
 - **Zero Configuration:** Works great out of the box. Optional `~/.config/lazycsv/config.toml` for power users with full customization.
 - **Robust Error Handling:** Handle errors gracefully with clear, user-friendly feedback.
 

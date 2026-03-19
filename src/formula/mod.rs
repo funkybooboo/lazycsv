@@ -136,9 +136,19 @@ pub enum FormulaFunc {
     HLookup,
     // Logic
     If,
+    // Placeholder for xlsx formulas our parser doesn't support
+    Unsupported,
 }
 
 impl Formula {
+    /// Create a placeholder formula for unsupported xlsx formulas.
+    pub fn unsupported() -> Self {
+        Formula {
+            func: FormulaFunc::Unsupported,
+            args: vec![],
+        }
+    }
+
     /// Get all cell references this formula depends on.
     pub fn references(&self) -> Vec<CellRef> {
         self.args.iter().flat_map(|a| a.cell_refs()).collect()
@@ -186,6 +196,7 @@ impl Formula {
             FormulaFunc::VLookup => self.eval_vlookup(get_cell),
             FormulaFunc::HLookup => self.eval_hlookup(get_cell),
             FormulaFunc::If => self.eval_if(get_cell),
+            FormulaFunc::Unsupported => "#UNSUPPORTED".to_string(),
         }
     }
 

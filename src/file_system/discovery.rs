@@ -21,10 +21,11 @@ pub fn scan_directory(dir: &Path) -> Result<Vec<PathBuf>> {
             continue;
         }
 
-        // Check if it's a CSV file
+        // Check if it's a supported data file (CSV, XLSX, XLS)
         if path.is_file() {
-            if let Some(ext) = path.extension() {
-                if ext.to_str() == Some("csv") {
+            if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                let lower = ext.to_ascii_lowercase();
+                if lower == "csv" || lower == "xlsx" || lower == "xls" {
                     csv_files.push(path);
                 }
             }
@@ -554,10 +555,8 @@ mod tests {
         assert!(result.is_ok());
 
         let csv_files = result.unwrap();
-        // scan_directory is case-sensitive, only matches lowercase "csv"
-        // So it should only find file1.csv
-        assert_eq!(csv_files.len(), 1, "Found {} files", csv_files.len());
-        assert!(csv_files[0].ends_with("file1.csv"));
+        // scan_directory now uses case-insensitive matching
+        assert_eq!(csv_files.len(), 3, "Found {} files", csv_files.len());
     }
 
     #[test]

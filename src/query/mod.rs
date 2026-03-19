@@ -1163,6 +1163,7 @@ mod tests {
             header_mode: true,
             delimiter: ',',
             generation: 0,
+            xlsx_formulas: vec![],
         };
 
         load_csv_into_sqlite(&conn, &doc, "people").unwrap();
@@ -1206,6 +1207,7 @@ mod tests {
             header_mode: true,
             delimiter: ',',
             generation: 0,
+            xlsx_formulas: vec![],
         };
 
         let result = load_csv_into_sqlite(&conn, &doc, "empty");
@@ -1222,6 +1224,7 @@ mod tests {
             header_mode: true,
             delimiter: ',',
             generation: 0,
+            xlsx_formulas: vec![],
         };
 
         load_csv_into_sqlite(&conn, &doc, "headers_only").unwrap();
@@ -1245,6 +1248,7 @@ mod tests {
             header_mode: true,
             delimiter: ',',
             generation: 0,
+            xlsx_formulas: vec![],
         };
 
         // Should not fail even with SQL reserved words as column names
@@ -1269,6 +1273,7 @@ mod tests {
             header_mode: true,
             delimiter: ',',
             generation: 0,
+            xlsx_formulas: vec![],
         };
 
         load_csv_into_sqlite(&conn, &doc, "sparse").unwrap();
@@ -1294,6 +1299,7 @@ mod tests {
             header_mode: true,
             delimiter: ',',
             generation: 0,
+            xlsx_formulas: vec![],
         };
         load_csv_into_sqlite(&conn, &doc, "customers").unwrap();
 
@@ -1377,6 +1383,7 @@ mod tests {
             header_mode: true,
             delimiter: ',',
             generation: 0,
+            xlsx_formulas: vec![],
         };
         load_csv_into_sqlite(&conn, &doc, "people").unwrap();
 
@@ -1406,6 +1413,7 @@ mod tests {
             header_mode: true,
             delimiter: ',',
             generation: 0,
+            xlsx_formulas: vec![],
         };
         load_csv_into_sqlite(&conn, &doc, "products").unwrap();
 
@@ -1446,6 +1454,7 @@ mod tests {
             header_mode: true,
             delimiter: ',',
             generation: 0,
+            xlsx_formulas: vec![],
         };
         load_csv_into_sqlite(&conn, &doc, "data").unwrap();
 
@@ -1477,6 +1486,7 @@ mod tests {
             header_mode: true,
             delimiter: ',',
             generation: 0,
+            xlsx_formulas: vec![],
         };
         let doc2 = Document {
             storage: RowStorage::in_memory(vec![
@@ -1488,6 +1498,7 @@ mod tests {
             header_mode: true,
             delimiter: ',',
             generation: 0,
+            xlsx_formulas: vec![],
         };
 
         load_csv_into_sqlite(&conn, &doc1, "users").unwrap();

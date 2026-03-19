@@ -4,10 +4,11 @@ use std::path::PathBuf;
 #[derive(Parser, Debug)]
 #[command(author, version, about = "LazyCSV: A blazing-fast CSV TUI viewer", long_about = None)]
 pub struct CliArgs {
-    /// Path to the CSV file or directory containing CSV files.
-    /// If a directory is provided, the first CSV file found will be opened.
-    /// If no path is provided, the current directory will be scanned.
-    pub path: Option<PathBuf>,
+    /// Path to a CSV/XLSX file or directory, optionally followed by a sheet name or
+    /// 1-based sheet index for spreadsheet files.
+    /// Examples: lazycsv data.csv | lazycsv file.xlsx | lazycsv file.xlsx 2 | lazycsv file.xlsx "Sheet Name"
+    #[arg(num_args = 0..=2)]
+    pub path: Vec<String>,
 
     /// Specify a custom delimiter character for the CSV file.
     #[arg(short, long, value_parser = parse_delimiter, help = "Custom delimiter character (e.g., ',' or ';')")]
@@ -59,6 +60,33 @@ pub struct CliArgs {
         help = "Sort by columns on load (e.g., -s Name, -s 1,2, -s '!Age' for descending)"
     )]
     pub sort: Option<String>,
+
+    /// Extract Excel sheets to CSV files (non-interactive mode).
+    /// Uses the file path and optional sheet from positional args.
+    /// Examples: lazycsv file.xlsx -x | lazycsv file.xlsx 2 -x
+    #[arg(short = 'x', long = "xlsx", help = "Extract Excel sheets to CSV")]
+    pub xlsx: bool,
+
+    /// Output directory for xlsx conversion (used with --xlsx).
+    /// Defaults to a directory named after the Excel file (without extension).
+    #[arg(
+        short = 'o',
+        long = "output",
+        help = "Output directory (default: <excel_filename> directory)"
+    )]
+    pub output: Option<PathBuf>,
+}
+
+impl CliArgs {
+    /// Get the file path from positional args.
+    pub fn file_path(&self) -> Option<PathBuf> {
+        self.path.first().map(PathBuf::from)
+    }
+
+    /// Get the sheet specifier from positional args (second positional arg).
+    pub fn sheet_from_path(&self) -> Option<&str> {
+        self.path.get(1).map(|s| s.as_str())
+    }
 }
 
 fn parse_delimiter(s: &str) -> Result<u8, String> {
@@ -92,7 +120,7 @@ mod tests {
         let args = CliArgs::try_parse_from(["lazycsv"]);
         assert!(args.is_ok());
         let args = args.unwrap();
-        assert_eq!(args.path, None);
+        assert!(args.file_path().is_none());
         assert_eq!(args.delimiter, None);
         assert!(!args.no_headers);
         assert_eq!(args.encoding, None);
@@ -107,7 +135,7 @@ mod tests {
         let args = CliArgs::try_parse_from(["lazycsv", file_path.to_str().unwrap()]);
         assert!(args.is_ok());
         let args = args.unwrap();
-        assert_eq!(args.path, Some(file_path));
+        assert_eq!(args.file_path(), Some(file_path));
     }
 
     #[test]
@@ -157,7 +185,7 @@ mod tests {
         ]);
         assert!(args.is_ok());
         let args = args.unwrap();
-        assert_eq!(args.path, Some(file_path));
+        assert_eq!(args.file_path(), Some(file_path));
         assert_eq!(args.delimiter, Some(b','));
         assert!(args.no_headers);
         assert_eq!(args.encoding, Some("utf-8".to_string()));
@@ -168,7 +196,10 @@ mod tests {
         let args = CliArgs::try_parse_from(["lazycsv", "/non/existent/path.csv"]);
         assert!(args.is_ok());
         let args = args.unwrap();
-        assert_eq!(args.path, Some(PathBuf::from("/non/existent/path.csv")));
+        assert_eq!(
+            args.file_path(),
+            Some(PathBuf::from("/non/existent/path.csv"))
+        );
     }
 
     #[test]
@@ -245,7 +276,7 @@ mod tests {
             CliArgs::try_parse_from(["lazycsv", "data.csv", "-d", ";", "-q", "SELECT * FROM data"]);
         assert!(args.is_ok());
         let args = args.unwrap();
-        assert_eq!(args.path, Some(PathBuf::from("data.csv")));
+        assert_eq!(args.file_path(), Some(PathBuf::from("data.csv")));
         assert_eq!(args.delimiter, Some(b';'));
         assert_eq!(args.query, Some("SELECT * FROM data".to_string()));
     }

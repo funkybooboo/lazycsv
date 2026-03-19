@@ -14,6 +14,14 @@ type Term = ratatui::Terminal<ratatui::backend::CrosstermBackend<std::io::Stdout
 fn main() -> Result<()> {
     let cli_args = cli::parse_args();
 
+    // Non-interactive xlsx-to-csv extraction mode
+    if cli_args.xlsx {
+        let path = cli_args
+            .file_path()
+            .context("Usage: lazycsv <file.xlsx> -x")?;
+        return execute_xlsx_convert(&path, &cli_args);
+    }
+
     // Non-interactive query mode: execute SQL and exit
     if let Some(ref query) = cli_args.query {
         return execute_query_mode(query, &cli_args);
@@ -30,7 +38,7 @@ fn main() -> Result<()> {
     }
 
     // Piped stdin requires a non-interactive flag (-q, --sort, --rows, --columns)
-    if cli_args.path.is_none() && stdin_is_piped() {
+    if cli_args.file_path().is_none() && stdin_is_piped() {
         anyhow::bail!(
             "Piped stdin is not supported in interactive TUI mode.\n\
              Use a non-interactive flag: -q <query>, --sort <col>, --rows, or --columns.\n\
@@ -59,6 +67,26 @@ fn main() -> Result<()> {
         .ok();
     }
 
+    // For xlsx files, resolve sheet from CLI arg or prompt user
+    let sheet_name = if lazycsv::csv::xlsx::is_spreadsheet(&file_path) {
+        let cli_sheet = cli_args.sheet_from_path();
+        match lazycsv::csv::xlsx::get_sheet_names(&file_path) {
+            Ok(sheets) => {
+                if let Some(spec) = cli_sheet {
+                    Some(resolve_sheet_spec(spec, &sheets)?)
+                } else {
+                    sheets.into_iter().next()
+                }
+            }
+            Err(e) => {
+                restore_terminal(supports_enhancement);
+                return Err(e);
+            }
+        }
+    } else {
+        None
+    };
+
     // Show loading message while file loads (with Esc hint)
     let filename = file_path
         .file_name()
@@ -71,8 +99,15 @@ fn main() -> Result<()> {
     // Load file with cancellation support — background thread watches for Esc
     let cancelled = Arc::new(AtomicBool::new(false));
     let watcher = lazycsv::cancel::EscWatcher::spawn(&cancelled);
-    let app_result =
-        App::load_file_cancellable(&file_path, csv_files, index, config, &cli_args, &cancelled);
+    let app_result = App::load_file_cancellable(
+        &file_path,
+        csv_files,
+        index,
+        config,
+        &cli_args,
+        &cancelled,
+        sheet_name.as_deref(),
+    );
     watcher.stop();
 
     let app = match app_result {
@@ -104,11 +139,38 @@ fn main() -> Result<()> {
     }
 }
 
+/// Resolve a sheet specifier (name or 1-based index) against available sheet names.
+fn resolve_sheet_spec(spec: &str, sheets: &[String]) -> Result<String> {
+    // Try as 1-based index first
+    if let Ok(idx) = spec.parse::<usize>() {
+        if idx == 0 || idx > sheets.len() {
+            anyhow::bail!(
+                "Sheet index {} out of range (1-{}). Available sheets: {}",
+                idx,
+                sheets.len(),
+                sheets.join(", ")
+            );
+        }
+        return Ok(sheets[idx - 1].clone());
+    }
+    // Treat as sheet name
+    if !sheets.iter().any(|s| s == spec) {
+        anyhow::bail!(
+            "Sheet '{}' not found. Available sheets: {}",
+            spec,
+            sheets.join(", ")
+        );
+    }
+    Ok(spec.to_string())
+}
+
 fn restore_terminal(supports_enhancement: bool) {
     if supports_enhancement {
         crossterm::execute!(std::io::stdout(), PopKeyboardEnhancementFlags).ok();
     }
     ratatui::restore();
+    // Ensure cursor is visible after leaving the TUI
+    crossterm::execute!(std::io::stdout(), crossterm::cursor::Show).ok();
 }
 
 fn run(terminal: &mut Term, mut app: App) -> Result<()> {
@@ -367,6 +429,144 @@ fn stdin_is_piped() -> bool {
     !std::io::stdin().is_terminal()
 }
 
+/// Non-interactive xlsx-to-csv conversion.
+/// Extracts all sheets by default, or specific sheets if specified.
+fn execute_xlsx_convert(xlsx_path: &std::path::Path, cli_args: &cli::CliArgs) -> Result<()> {
+    use lazycsv::csv::xlsx;
+    use std::io::Write;
+
+    if !xlsx_path.is_file() {
+        anyhow::bail!("File not found: {}", xlsx_path.display());
+    }
+    if !xlsx::is_spreadsheet(xlsx_path) {
+        anyhow::bail!(
+            "Not a spreadsheet file: {} (expected .xlsx or .xls)",
+            xlsx_path.display()
+        );
+    }
+
+    let all_sheets = xlsx::get_sheet_names(xlsx_path)?;
+    if all_sheets.is_empty() {
+        anyhow::bail!("Spreadsheet has no sheets");
+    }
+
+    // Determine which sheets to extract
+    let sheets_to_extract: Vec<String> = match cli_args.sheet_from_path() {
+        Some(spec) => vec![resolve_sheet_spec(spec, &all_sheets)?],
+        None => all_sheets,
+    };
+
+    // Determine output directory
+    let out_dir = match &cli_args.output {
+        Some(p) => p.clone(),
+        None => {
+            // Use the xlsx filename without extension as the directory name
+            let stem = xlsx_path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("output");
+            PathBuf::from(stem)
+        }
+    };
+
+    // Create output directory
+    std::fs::create_dir_all(&out_dir)
+        .context(format!("Failed to create directory: {}", out_dir.display()))?;
+
+    // Extract each sheet
+    for sheet_name in &sheets_to_extract {
+        let (rows, sheet) = xlsx::load_sheet(xlsx_path, sheet_name)?;
+        let output_path = out_dir.join(format!("{}.csv", sheet));
+
+        let file = std::fs::File::create(&output_path)
+            .context(format!("Failed to create: {}", output_path.display()))?;
+        let mut writer = std::io::BufWriter::with_capacity(1024 * 1024, file);
+
+        for row in &rows {
+            for (i, cell) in row.iter().enumerate() {
+                if i > 0 {
+                    write!(writer, ",")?;
+                }
+                if cell.contains(',') || cell.contains('"') || cell.contains('\n') {
+                    write!(writer, "\"{}\"", cell.replace('"', "\"\""))?;
+                } else {
+                    write!(writer, "{}", cell)?;
+                }
+            }
+            writeln!(writer)?;
+        }
+
+        eprintln!(
+            "  {} ({} rows) -> {}",
+            sheet,
+            rows.len().saturating_sub(1),
+            output_path.display()
+        );
+    }
+
+    eprintln!(
+        "Extracted {} sheet(s) to {}/",
+        sheets_to_extract.len(),
+        out_dir.display()
+    );
+    Ok(())
+}
+
+/// Execute a SQL query against xlsx sheet(s) by extracting to temp CSVs first.
+fn execute_query_on_xlsx(
+    xlsx_path: &std::path::Path,
+    query: &str,
+    config: &FileConfig,
+    cli_args: &cli::CliArgs,
+) -> Result<()> {
+    use lazycsv::csv::xlsx;
+    use std::io::Write;
+
+    let all_sheets = xlsx::get_sheet_names(xlsx_path)?;
+    if all_sheets.is_empty() {
+        anyhow::bail!("Spreadsheet has no sheets");
+    }
+
+    // If a specific sheet is given, extract only that one; otherwise extract all
+    let sheets_to_extract: Vec<String> = match cli_args.sheet_from_path() {
+        Some(spec) => vec![resolve_sheet_spec(spec, &all_sheets)?],
+        None => all_sheets,
+    };
+
+    // Extract to a temp directory
+    let temp_dir = std::env::temp_dir().join(format!("lazycsv_xlsx_{}", std::process::id()));
+    std::fs::create_dir_all(&temp_dir)
+        .context(format!("Failed to create temp dir: {}", temp_dir.display()))?;
+
+    for sheet_name in &sheets_to_extract {
+        let (rows, sheet) = xlsx::load_sheet(xlsx_path, sheet_name)?;
+        let csv_path = temp_dir.join(format!("{}.csv", sheet));
+        let file = std::fs::File::create(&csv_path)?;
+        let mut writer = std::io::BufWriter::new(file);
+        for row in &rows {
+            for (i, cell) in row.iter().enumerate() {
+                if i > 0 {
+                    write!(writer, ",")?;
+                }
+                if cell.contains(',') || cell.contains('"') || cell.contains('\n') {
+                    write!(writer, "\"{}\"", cell.replace('"', "\"\""))?;
+                } else {
+                    write!(writer, "{}", cell)?;
+                }
+            }
+            writeln!(writer)?;
+        }
+    }
+
+    // Run the query against the temp directory of CSVs
+    let result = lazycsv::query::execute_query(&temp_dir, query, config);
+
+    // Cleanup temp files
+    let _ = std::fs::remove_dir_all(&temp_dir);
+
+    result
+}
+
 /// Save piped stdin to a temporary file and return its path.
 /// The caller is responsible for cleanup (or let it be cleaned up on process exit).
 fn save_stdin_to_tempfile() -> Result<PathBuf> {
@@ -387,8 +587,12 @@ fn execute_query_mode(query: &str, cli_args: &cli::CliArgs) -> Result<()> {
         cli_args.encoding.clone(),
     );
 
-    if let Some(ref path) = cli_args.path {
-        return lazycsv::query::execute_query(path, query, &config);
+    if let Some(path) = cli_args.file_path() {
+        // For xlsx files, extract sheet(s) to a temp dir and query those CSVs
+        if lazycsv::csv::xlsx::is_spreadsheet(&path) {
+            return execute_query_on_xlsx(&path, query, &config, cli_args);
+        }
+        return lazycsv::query::execute_query(&path, query, &config);
     }
 
     if stdin_is_piped() {
@@ -409,7 +613,7 @@ fn execute_count_mode(cli_args: &cli::CliArgs) -> Result<()> {
         '\0'
     };
 
-    if cli_args.path.is_none() && stdin_is_piped() {
+    if cli_args.file_path().is_none() && stdin_is_piped() {
         // Read from stdin
         let doc = {
             let stdin = std::io::stdin();
@@ -440,7 +644,7 @@ fn execute_count_mode(cli_args: &cli::CliArgs) -> Result<()> {
         return Ok(());
     }
 
-    let path = cli_args.path.clone().unwrap_or_else(|| PathBuf::from("."));
+    let path = cli_args.file_path().unwrap_or_else(|| PathBuf::from("."));
     let files = if path.is_file() {
         vec![path]
     } else if path.is_dir() {
@@ -488,11 +692,11 @@ fn execute_count_mode(cli_args: &cli::CliArgs) -> Result<()> {
 /// Non-interactive sort: load CSV, sort by columns, write sorted CSV to stdout.
 fn execute_sort_and_output(sort_spec: &str, cli_args: &cli::CliArgs) -> Result<()> {
     // Load document from file path or stdin
-    let mut doc = if let Some(ref path) = cli_args.path {
+    let mut doc = if let Some(path) = cli_args.file_path() {
         let file_path = if path.is_file() {
             path.clone()
         } else if path.is_dir() {
-            let csv_files = lazycsv::file_system::scan_directory(path)?;
+            let csv_files = lazycsv::file_system::scan_directory(&path)?;
             csv_files
                 .into_iter()
                 .next()

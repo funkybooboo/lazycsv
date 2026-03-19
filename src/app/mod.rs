@@ -635,7 +635,7 @@ impl App {
     pub fn resolve_files(
         cli_args: &crate::cli::CliArgs,
     ) -> Result<(PathBuf, Vec<PathBuf>, usize, crate::session::FileConfig)> {
-        let path = cli_args.path.clone().unwrap_or_else(|| PathBuf::from("."));
+        let path = cli_args.file_path().unwrap_or_else(|| PathBuf::from("."));
 
         // Determine the CSV file to load and scan directory for others
         let (file_path, csv_files, current_file_index) = if path.is_file() {
@@ -721,7 +721,7 @@ impl App {
         // Create input state
         let input_state = InputState::new();
 
-        Self {
+        let mut app = Self {
             document: csv_data,
             view_state,
             input_state,
@@ -754,7 +754,19 @@ impl App {
             file_operation_buffer: String::new(),
             formula_store: crate::formula::FormulaStore::new(),
             formula_completion: None,
+        };
+        let xlsx_formulas = std::mem::take(&mut app.document.xlsx_formulas);
+        for ((row, col), raw) in xlsx_formulas {
+            if let Some(formula) = crate::formula::parse_formula(&raw) {
+                app.formula_store.set(row, col, raw, formula);
+            } else {
+                // Store unsupported formulas with a dummy formula for display in the formula bar
+                app.formula_store
+                    .set(row, col, raw, crate::formula::Formula::unsupported());
+            }
         }
+
+        app
     }
 
     /// Handle keyboard input events
@@ -1054,7 +1066,7 @@ impl App {
         }
     }
 
-    /// Load a CSV file with cancellation support.
+    /// Load a CSV or XLSX file with cancellation support.
     /// Same as `load_file` but uses `Document::from_file_cancellable`.
     pub fn load_file_cancellable(
         file_path: &Path,
@@ -1063,13 +1075,15 @@ impl App {
         file_config: crate::session::FileConfig,
         cli_args: &crate::cli::CliArgs,
         cancelled: &AtomicBool,
+        sheet_name: Option<&str>,
     ) -> Result<Self> {
-        let csv_data = crate::csv::Document::from_file_cancellable(
+        let csv_data = crate::csv::Document::from_file_cancellable_with_sheet(
             file_path,
             cli_args.delimiter,
             cli_args.no_headers,
             cli_args.encoding.clone(),
             cancelled,
+            sheet_name,
         )
         .context(messages::failed_to_load_csv(file_path))?;
 

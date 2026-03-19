@@ -333,7 +333,7 @@ fn test_default_directory_scans_current() {
     let args = CliArgs::try_parse_from(["lazycsv", temp_dir.path().to_str().unwrap()]).unwrap();
 
     // Should successfully parse with directory path
-    assert!(args.path.is_some());
+    assert!(args.file_path().is_some());
 }
 
 #[test]

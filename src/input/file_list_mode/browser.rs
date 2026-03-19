@@ -48,7 +48,10 @@ pub fn scan_directory(dir: &Path) -> Result<Vec<BrowserEntry>, std::io::Error> {
         } else if metadata.is_file() {
             // Add CSV files only
             if let Some(ext) = path.extension() {
-                if ext.eq_ignore_ascii_case("csv") {
+                if ext.eq_ignore_ascii_case("csv")
+                    || ext.eq_ignore_ascii_case("xlsx")
+                    || ext.eq_ignore_ascii_case("xls")
+                {
                     entries.push(BrowserEntry::CsvFile(path));
                 }
             }
