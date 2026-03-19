@@ -67,14 +67,19 @@ pub struct CliArgs {
     #[arg(short = 'x', long = "xlsx", help = "Extract Excel sheets to CSV")]
     pub xlsx: bool,
 
-    /// Output directory for xlsx conversion (used with --xlsx).
-    /// Defaults to a directory named after the Excel file (without extension).
+    /// Output for xlsx conversion (used with --xlsx).
+    /// -o alone: output to stdout (for piping/redirect)
+    /// -o path/: output to directory
+    /// -o file.csv: output to specific file (single sheet only)
+    /// omitted: output to <excel_filename>/ directory
     #[arg(
         short = 'o',
         long = "output",
-        help = "Output directory (default: <excel_filename> directory)"
+        num_args = 0..=1,
+        default_missing_value = "-",
+        help = "Output target: -o (stdout), -o dir/ (directory), -o file.csv (file)"
     )]
-    pub output: Option<PathBuf>,
+    pub output: Option<String>,
 }
 
 impl CliArgs {

@@ -426,10 +426,13 @@ fn stdin_is_piped() -> bool {
 }
 
 /// Non-interactive xlsx-to-csv conversion.
-/// Extracts all sheets by default, or specific sheets if specified.
+/// Output modes:
+///   (no -o): write to <excel_name>/ directory
+///   -o (bare): write to stdout
+///   -o dir/: write to specified directory
+///   -o file.csv: write to specific file (single sheet only)
 fn execute_xlsx_convert(xlsx_path: &std::path::Path, cli_args: &cli::CliArgs) -> Result<()> {
     use lazycsv::csv::xlsx;
-    use std::io::Write;
 
     if !xlsx_path.is_file() {
         anyhow::bail!("File not found: {}", xlsx_path.display());
@@ -447,64 +450,127 @@ fn execute_xlsx_convert(xlsx_path: &std::path::Path, cli_args: &cli::CliArgs) ->
     }
 
     // Determine which sheets to extract
+    let single_sheet = cli_args.sheet_from_path().is_some();
     let sheets_to_extract: Vec<String> = match cli_args.sheet_from_path() {
         Some(spec) => vec![resolve_sheet_spec(spec, &all_sheets)?],
         None => all_sheets,
     };
 
-    // Determine output directory
-    let out_dir = match &cli_args.output {
-        Some(p) => p.clone(),
+    // Determine output mode
+    enum OutputMode {
+        Stdout,
+        File(PathBuf),
+        Directory(PathBuf),
+    }
+
+    let output_mode = match &cli_args.output {
+        Some(val) if val == "-" => {
+            // -o with no value (default_missing_value = "-") → stdout
+            OutputMode::Stdout
+        }
+        Some(val) => {
+            let p = PathBuf::from(val);
+            // If it's an existing directory, or ends with separator, or has no extension → directory
+            if p.is_dir()
+                || val.ends_with('/')
+                || val.ends_with(std::path::MAIN_SEPARATOR)
+                || p.extension().is_none()
+            {
+                OutputMode::Directory(p)
+            } else {
+                // Looks like a file path
+                if !single_sheet && sheets_to_extract.len() > 1 {
+                    anyhow::bail!(
+                        "Cannot output multiple sheets to a single file.\n\
+                         Specify a sheet: lazycsv {} <sheet> -x -o {}\n\
+                         Or use a directory: lazycsv {} -x -o {}/",
+                        xlsx_path.display(),
+                        val,
+                        xlsx_path.display(),
+                        val,
+                    );
+                }
+                OutputMode::File(p)
+            }
+        }
         None => {
-            // Use the xlsx filename without extension as the directory name
+            // No -o flag → default directory named after the xlsx file
             let stem = xlsx_path
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("output");
-            PathBuf::from(stem)
+            OutputMode::Directory(PathBuf::from(stem))
         }
     };
 
-    // Create output directory
-    std::fs::create_dir_all(&out_dir)
-        .context(format!("Failed to create directory: {}", out_dir.display()))?;
-
-    // Extract each sheet
-    for sheet_name in &sheets_to_extract {
-        let (rows, sheet) = xlsx::load_sheet(xlsx_path, sheet_name)?;
-        let output_path = out_dir.join(format!("{}.csv", sheet));
-
-        let file = std::fs::File::create(&output_path)
-            .context(format!("Failed to create: {}", output_path.display()))?;
-        let mut writer = std::io::BufWriter::with_capacity(1024 * 1024, file);
-
-        for row in &rows {
-            for (i, cell) in row.iter().enumerate() {
-                if i > 0 {
-                    write!(writer, ",")?;
-                }
-                if cell.contains(',') || cell.contains('"') || cell.contains('\n') {
-                    write!(writer, "\"{}\"", cell.replace('"', "\"\""))?;
-                } else {
-                    write!(writer, "{}", cell)?;
-                }
+    match output_mode {
+        OutputMode::Stdout => {
+            let stdout = std::io::stdout();
+            let mut writer = std::io::BufWriter::with_capacity(1024 * 1024, stdout.lock());
+            for sheet_name in &sheets_to_extract {
+                let (rows, _) = xlsx::load_sheet(xlsx_path, sheet_name)?;
+                write_csv_rows(&mut writer, &rows)?;
             }
-            writeln!(writer)?;
         }
-
-        eprintln!(
-            "  {} ({} rows) -> {}",
-            sheet,
-            rows.len().saturating_sub(1),
-            output_path.display()
-        );
+        OutputMode::File(path) => {
+            let (rows, sheet) = xlsx::load_sheet(xlsx_path, &sheets_to_extract[0])?;
+            if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+                std::fs::create_dir_all(parent)?;
+            }
+            let file = std::fs::File::create(&path)
+                .context(format!("Failed to create: {}", path.display()))?;
+            let mut writer = std::io::BufWriter::with_capacity(1024 * 1024, file);
+            write_csv_rows(&mut writer, &rows)?;
+            eprintln!(
+                "  {} ({} rows) -> {}",
+                sheet,
+                rows.len().saturating_sub(1),
+                path.display()
+            );
+        }
+        OutputMode::Directory(dir) => {
+            std::fs::create_dir_all(&dir)
+                .context(format!("Failed to create directory: {}", dir.display()))?;
+            for sheet_name in &sheets_to_extract {
+                let (rows, sheet) = xlsx::load_sheet(xlsx_path, sheet_name)?;
+                let output_path = dir.join(format!("{}.csv", sheet));
+                let file = std::fs::File::create(&output_path)
+                    .context(format!("Failed to create: {}", output_path.display()))?;
+                let mut writer = std::io::BufWriter::with_capacity(1024 * 1024, file);
+                write_csv_rows(&mut writer, &rows)?;
+                eprintln!(
+                    "  {} ({} rows) -> {}",
+                    sheet,
+                    rows.len().saturating_sub(1),
+                    output_path.display()
+                );
+            }
+            eprintln!(
+                "Extracted {} sheet(s) to {}/",
+                sheets_to_extract.len(),
+                dir.display()
+            );
+        }
     }
 
-    eprintln!(
-        "Extracted {} sheet(s) to {}/",
-        sheets_to_extract.len(),
-        out_dir.display()
-    );
+    Ok(())
+}
+
+/// Write rows as CSV to any writer.
+fn write_csv_rows<W: std::io::Write>(writer: &mut W, rows: &[Vec<String>]) -> Result<()> {
+    for row in rows {
+        for (i, cell) in row.iter().enumerate() {
+            if i > 0 {
+                write!(writer, ",")?;
+            }
+            if cell.contains(',') || cell.contains('"') || cell.contains('\n') {
+                write!(writer, "\"{}\"", cell.replace('"', "\"\""))?;
+            } else {
+                write!(writer, "{}", cell)?;
+            }
+        }
+        writeln!(writer)?;
+    }
     Ok(())
 }
 
