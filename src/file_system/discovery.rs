@@ -21,11 +21,11 @@ pub fn scan_directory(dir: &Path) -> Result<Vec<PathBuf>> {
             continue;
         }
 
-        // Check if it's a supported data file (CSV, XLSX, XLS)
+        // Check if it's a supported data file (CSV, XLSX, XLS, ODS)
         if path.is_file() {
             if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                 let lower = ext.to_ascii_lowercase();
-                if lower == "csv" || lower == "xlsx" || lower == "xls" {
+                if lower == "csv" || lower == "xlsx" || lower == "xls" || lower == "ods" {
                     csv_files.push(path);
                 }
             }

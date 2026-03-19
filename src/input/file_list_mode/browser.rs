@@ -51,6 +51,7 @@ pub fn scan_directory(dir: &Path) -> Result<Vec<BrowserEntry>, std::io::Error> {
                 if ext.eq_ignore_ascii_case("csv")
                     || ext.eq_ignore_ascii_case("xlsx")
                     || ext.eq_ignore_ascii_case("xls")
+                    || ext.eq_ignore_ascii_case("ods")
                 {
                     entries.push(BrowserEntry::CsvFile(path));
                 }

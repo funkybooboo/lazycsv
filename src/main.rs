@@ -11,7 +11,25 @@ use std::time::{Duration, Instant};
 
 type Term = ratatui::Terminal<ratatui::backend::CrosstermBackend<std::io::Stdout>>;
 
-fn main() -> Result<()> {
+fn main() {
+    match run_main() {
+        Ok(()) => {}
+        Err(e) => {
+            // Ensure terminal is in a sane state before printing errors
+            let _ = crossterm::terminal::disable_raw_mode();
+            // Silently exit on broken pipe (e.g., `lazycsv -q ... | head`)
+            if let Some(io_err) = e.downcast_ref::<std::io::Error>() {
+                if io_err.kind() == std::io::ErrorKind::BrokenPipe {
+                    std::process::exit(0);
+                }
+            }
+            eprintln!("Error: {}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn run_main() -> Result<()> {
     let cli_args = cli::parse_args();
 
     // Non-interactive xlsx-to-csv extraction mode
@@ -37,16 +55,17 @@ fn main() -> Result<()> {
         return execute_count_mode(&cli_args);
     }
 
-    // Piped stdin requires a non-interactive flag (-q, --sort, --rows, --columns)
+    // Piped stdin can't be used with the interactive TUI (stdin is needed for keyboard input)
     if cli_args.file_path().is_none() && stdin_is_piped() {
-        anyhow::bail!(
-            "Piped stdin is not supported in interactive TUI mode.\n\
-             Use a non-interactive flag: -q <query>, --sort <col>, --rows, or --columns.\n\
-             Examples:\n  \
-               cat data.csv | lazycsv -q \"SELECT * FROM stdin\"\n  \
-               cat data.csv | lazycsv --sort Salary\n  \
-               cat data.csv | lazycsv --rows"
-        );
+        let _ = crossterm::terminal::disable_raw_mode();
+        eprintln!("Piped stdin is not supported in interactive TUI mode.");
+        eprintln!("Use a non-interactive flag: -q <query>, --sort <col>, --rows, or --columns.");
+        eprintln!();
+        eprintln!("Examples:");
+        eprintln!("  cat data.csv | lazycsv -q \"SELECT * FROM stdin\"");
+        eprintln!("  cat data.csv | lazycsv --sort Salary");
+        eprintln!("  cat data.csv | lazycsv --rows");
+        std::process::exit(1);
     }
 
     // Interactive TUI mode: resolve files first, then show loading screen

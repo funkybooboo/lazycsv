@@ -7,13 +7,13 @@ use anyhow::{Context, Result};
 use calamine::{open_workbook_auto, Data, DataType as CalamineDataType, Reader};
 use std::path::Path;
 
-/// Check if a path is a spreadsheet file (.xlsx or .xls).
+/// Check if a path is a spreadsheet file (.xlsx, .xls, or .ods).
 pub fn is_spreadsheet(path: &Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
         .map(|e| {
             let lower = e.to_ascii_lowercase();
-            lower == "xlsx" || lower == "xls"
+            lower == "xlsx" || lower == "xls" || lower == "ods"
         })
         .unwrap_or(false)
 }
@@ -145,6 +145,8 @@ mod tests {
         assert!(is_spreadsheet(Path::new("file.XLSX")));
         assert!(is_spreadsheet(Path::new("file.xls")));
         assert!(is_spreadsheet(Path::new("file.XLS")));
+        assert!(is_spreadsheet(Path::new("file.ods")));
+        assert!(is_spreadsheet(Path::new("file.ODS")));
         assert!(!is_spreadsheet(Path::new("file.csv")));
         assert!(!is_spreadsheet(Path::new("file.txt")));
         assert!(!is_spreadsheet(Path::new("file")));
