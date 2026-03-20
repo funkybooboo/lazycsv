@@ -513,6 +513,11 @@ impl SqliteCache {
         self.loaded_generations.remove(path);
     }
 
+    /// Force a table to be reloaded on next use by removing its generation entry.
+    pub(crate) fn force_reload_generation(&mut self, path: &Path) {
+        self.loaded_generations.remove(path);
+    }
+
     /// Get a reference to the underlying connection.
     pub(crate) fn conn(&self) -> &rusqlite::Connection {
         &self.conn
@@ -1232,6 +1237,116 @@ impl App {
         self.sql_error = None;
         self.mode = Mode::Normal;
         (result_doc, false)
+    }
+
+    /// Execute a SQL DML statement (INSERT, UPDATE, DELETE, ALTER) against the current document.
+    /// Loads the current document into SQLite, executes the DML, then SELECT * to get updated data.
+    /// Replaces the current document in-place and marks it dirty.
+    /// Returns (success, was_cancelled).
+    pub fn execute_sql_dml_cancellable(
+        &mut self,
+        query: &str,
+        cancelled: &AtomicBool,
+        on_progress: &mut dyn FnMut(&str),
+    ) -> (bool, bool) {
+        let query = crate::query::strip_csv_extensions(query);
+        let query = query.as_str();
+
+        let mut cache = self.sqlite_cache.take().unwrap_or_else(SqliteCache::new);
+
+        // Derive table name from the document's filename (not the session file path,
+        // which may point to a different file after switching).
+        let doc_table_name = self
+            .document
+            .filename
+            .strip_suffix(".csv")
+            .or_else(|| self.document.filename.strip_suffix(".tsv"))
+            .or_else(|| self.document.filename.strip_suffix(".txt"))
+            .unwrap_or(&self.document.filename)
+            .to_string();
+        let file_path = self.current_file().clone();
+
+        // Force reload current document into SQLite using the document's own table name
+        on_progress("Syncing data to database...");
+        cache.force_reload_generation(&file_path);
+        if self.document.row_count() > 0 && self.document.column_count() > 0 {
+            // Drop any existing table with this name and recreate from current data
+            let _ = cache.conn().execute(
+                &format!(
+                    "DROP TABLE IF EXISTS \"{}\"",
+                    doc_table_name.replace('"', "\"\"")
+                ),
+                [],
+            );
+            match crate::query::load_csv_into_sqlite_cancellable(
+                cache.conn(),
+                &self.document,
+                &doc_table_name,
+                cancelled,
+            ) {
+                Ok(()) => {}
+                Err(e) => {
+                    if e.downcast_ref::<cancel::CancelledError>().is_some() {
+                        self.sqlite_cache = Some(cache);
+                        return (false, true);
+                    }
+                    self.sql_error = Some(format!("Failed to load data: {}", e));
+                    self.sqlite_cache = Some(cache);
+                    return (false, false);
+                }
+            }
+        }
+
+        // Execute the DML statement
+        on_progress("Executing DML...");
+        match cache.conn().execute(query, []) {
+            Ok(_) => {}
+            Err(e) => {
+                self.sql_error = Some(format!("SQL error: {}", e));
+                self.sqlite_cache = Some(cache);
+                return (false, false);
+            }
+        }
+
+        // SELECT * from the table to get updated data
+        on_progress("Reading updated data...");
+        let select_query = format!("SELECT * FROM \"{}\"", doc_table_name.replace('"', "\"\""));
+        let (result_doc, select_cancelled, error_msg) = sql_execution::execute_and_convert_query(
+            &mut cache,
+            &select_query,
+            &self.document.filename,
+            cancelled,
+        );
+
+        self.sqlite_cache = Some(cache);
+
+        if let Some(err) = error_msg {
+            self.sql_error = Some(err);
+            return (false, false);
+        }
+        if select_cancelled {
+            return (false, true);
+        }
+
+        if let Some(doc) = result_doc {
+            // Replace current document data in-place
+            self.document.storage = doc.storage;
+            self.document.is_dirty = true;
+            self.document.generation += 1;
+            self.document.xlsx_formulas = vec![];
+
+            // Reset view state
+            self.view_state.table_state.select(Some(1));
+            self.view_state.column_scroll_offset = 0;
+            self.view_state.selected_column = crate::domain::position::ColIndex::new(0);
+
+            self.sql_error = None;
+            self.mode = Mode::Normal;
+            (true, false)
+        } else {
+            self.sql_error = Some("DML succeeded but failed to read back results".to_string());
+            (false, false)
+        }
     }
 
     /// Generate a unique output filename for SQL query results

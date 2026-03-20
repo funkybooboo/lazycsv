@@ -412,7 +412,60 @@ fn handle_sort_document(
 }
 
 /// Handle SQL query execution with cancellation support
+/// Handle a DML statement by modifying the current document in-place.
+fn handle_execute_dml(terminal: &mut Term, app: &mut App, query: String) -> Result<()> {
+    app.mode = lazycsv::app::Mode::Normal;
+    terminal
+        .draw(|frame| ui::render_loading(frame, "Executing DML... (Esc to cancel)"))
+        .context("Failed to render UI")?;
+
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let watcher = lazycsv::cancel::EscWatcher::spawn(&cancelled);
+    let mut on_progress = |msg: &str| {
+        let full_msg = format!("{} (Esc to cancel)", msg);
+        let _ = terminal.draw(|frame| ui::render_loading(frame, &full_msg));
+    };
+    let (success, was_cancelled) =
+        app.execute_sql_dml_cancellable(&query, &cancelled, &mut on_progress);
+    watcher.stop();
+
+    if was_cancelled {
+        app.mode = lazycsv::app::Mode::SqlEditor;
+        app.status_message = Some(lazycsv::input::StatusMessage::from(
+            "DML cancelled".to_string(),
+        ));
+    } else if success {
+        app.status_message = Some(lazycsv::input::StatusMessage::from(
+            "DML executed successfully".to_string(),
+        ));
+    } else {
+        // Error is already in app.sql_error
+        app.mode = lazycsv::app::Mode::SqlEditor;
+    }
+    Ok(())
+}
+
+/// Check if a SQL query is a DML statement (INSERT, UPDATE, DELETE, ALTER).
+fn is_dml_query(query: &str) -> bool {
+    let trimmed = query.trim();
+    // Skip leading comments and whitespace
+    let first_word = trimmed
+        .split_whitespace()
+        .find(|w| !w.starts_with("--"))
+        .unwrap_or("")
+        .to_ascii_uppercase();
+    matches!(
+        first_word.as_str(),
+        "INSERT" | "UPDATE" | "DELETE" | "ALTER" | "DROP" | "CREATE"
+    )
+}
+
 fn handle_execute_query(terminal: &mut Term, app: &mut App, query: String) -> Result<()> {
+    // DML statements modify the current document in-place
+    if is_dml_query(&query) {
+        return handle_execute_dml(terminal, app, query);
+    }
+
     let output_name = app
         .session
         .find_query_output_file()
@@ -1445,5 +1498,48 @@ mod tests {
 
         // Output goes to same dir as input
         assert!(temp_dir.path().join("0.csv").exists());
+    }
+
+    // ── is_dml_query ───────────────────────────────────────────
+
+    #[test]
+    fn test_is_dml_query_insert() {
+        assert!(is_dml_query("INSERT INTO t VALUES (1, 'a')"));
+        assert!(is_dml_query("  insert into t values (1)"));
+    }
+
+    #[test]
+    fn test_is_dml_query_update() {
+        assert!(is_dml_query("UPDATE t SET a = 1"));
+        assert!(is_dml_query("  UPDATE t SET a = 1 WHERE b = 2"));
+    }
+
+    #[test]
+    fn test_is_dml_query_delete() {
+        assert!(is_dml_query("DELETE FROM t WHERE a = 1"));
+        assert!(is_dml_query("delete from t"));
+    }
+
+    #[test]
+    fn test_is_dml_query_alter() {
+        assert!(is_dml_query("ALTER TABLE t ADD COLUMN c TEXT"));
+    }
+
+    #[test]
+    fn test_is_dml_query_create_drop() {
+        assert!(is_dml_query("CREATE TABLE t (a TEXT)"));
+        assert!(is_dml_query("DROP TABLE t"));
+    }
+
+    #[test]
+    fn test_is_dml_query_select_is_not_dml() {
+        assert!(!is_dml_query("SELECT * FROM t"));
+        assert!(!is_dml_query("  select count(*) from t"));
+    }
+
+    #[test]
+    fn test_is_dml_query_empty() {
+        assert!(!is_dml_query(""));
+        assert!(!is_dml_query("   "));
     }
 }

@@ -87,7 +87,7 @@ const SQL_FUNCTIONS: &[&str] = &[
 enum CompletionContext {
     /// After SELECT → columns, *, functions
     Select,
-    /// After FROM/JOIN → table names
+    /// After FROM/JOIN/UPDATE/INSERT INTO/DELETE FROM → table names
     From,
     /// After WHERE/HAVING → columns, functions
     Where,
@@ -95,6 +95,8 @@ enum CompletionContext {
     GroupBy,
     /// After ORDER BY → columns, ASC/DESC
     OrderBy,
+    /// After SET → column names (for UPDATE SET)
+    Set,
     /// After "alias." → columns from that table
     AliasPrefix(String),
     /// Fallback → keywords
@@ -262,16 +264,48 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         let files = app.session.files().to_vec();
         let context = detect_completion_context(&text_before_cursor);
 
+        let is_dml = {
+            let first_word = sql_text
+                .split_whitespace()
+                .next()
+                .unwrap_or("")
+                .to_ascii_uppercase();
+            matches!(
+                first_word.as_str(),
+                "UPDATE" | "INSERT" | "DELETE" | "ALTER" | "DROP" | "CREATE"
+            )
+        };
+
         let items: Vec<CompletionItem> = match context {
-            CompletionContext::From => files
-                .iter()
-                .map(|p| CompletionItem {
-                    text: crate::query::table_name_from_path(p),
-                    kind: CompletionKind::Table,
-                    template: None,
-                    template_steps: vec![],
-                })
-                .collect(),
+            CompletionContext::From => {
+                if is_dml {
+                    // DML: only show the current document's table name
+                    let table_name = app
+                        .document
+                        .filename
+                        .strip_suffix(".csv")
+                        .or_else(|| app.document.filename.strip_suffix(".tsv"))
+                        .or_else(|| app.document.filename.strip_suffix(".txt"))
+                        .unwrap_or(&app.document.filename)
+                        .to_string();
+                    vec![CompletionItem {
+                        text: table_name,
+                        kind: CompletionKind::Table,
+                        template: None,
+                        template_steps: vec![],
+                    }]
+                } else {
+                    files
+                        .iter()
+                        .map(|p| CompletionItem {
+                            text: crate::query::table_name_from_path(p),
+                            kind: CompletionKind::Table,
+                            template: None,
+                            template_steps: vec![],
+                        })
+                        .collect()
+                }
+            }
             CompletionContext::AliasPrefix(alias) => {
                 let aliases = parse_table_aliases(&sql_text, &files);
                 let headers = if let Some(path) = resolve_alias(&alias, &aliases, &files) {
@@ -328,6 +362,9 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                 let mut items = column_items_from_query(&sql_text, &files, &mut app.schema_cache);
                 items.extend(keyword_items(&["ASC", "DESC"]));
                 items
+            }
+            CompletionContext::Set => {
+                column_items_from_query(&sql_text, &files, &mut app.schema_cache)
             }
             CompletionContext::General => {
                 let mut items: Vec<CompletionItem> = SQL_KEYWORDS
@@ -620,6 +657,7 @@ fn detect_completion_context(text_before_cursor: &str) -> CompletionContext {
     // Find the last occurrence of each clause keyword
     type ClauseList<'a> = &'a [(&'a str, fn() -> CompletionContext)];
     let clauses: ClauseList = &[
+        // SELECT clauses
         ("SELECT", || CompletionContext::Select),
         ("FROM", || CompletionContext::From),
         ("JOIN", || CompletionContext::From),
@@ -631,6 +669,11 @@ fn detect_completion_context(text_before_cursor: &str) -> CompletionContext {
         ("HAVING", || CompletionContext::Where),
         ("GROUP BY", || CompletionContext::GroupBy),
         ("ORDER BY", || CompletionContext::OrderBy),
+        // DML clauses
+        ("UPDATE", || CompletionContext::From),
+        ("INSERT INTO", || CompletionContext::From),
+        ("DELETE FROM", || CompletionContext::From),
+        ("SET", || CompletionContext::Set),
     ];
 
     let mut best_pos: Option<usize> = None;
@@ -968,4 +1011,127 @@ fn build_template_items() -> Vec<CompletionItem> {
             ],
         },
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── detect_completion_context ──────────────────────────────
+
+    #[test]
+    fn test_context_after_select() {
+        assert!(matches!(
+            detect_completion_context("SELECT "),
+            CompletionContext::Select
+        ));
+    }
+
+    #[test]
+    fn test_context_after_from() {
+        assert!(matches!(
+            detect_completion_context("SELECT * FROM "),
+            CompletionContext::From
+        ));
+    }
+
+    #[test]
+    fn test_context_after_where() {
+        assert!(matches!(
+            detect_completion_context("SELECT * FROM t WHERE "),
+            CompletionContext::Where
+        ));
+    }
+
+    #[test]
+    fn test_context_after_group_by() {
+        assert!(matches!(
+            detect_completion_context("SELECT * FROM t GROUP BY "),
+            CompletionContext::GroupBy
+        ));
+    }
+
+    #[test]
+    fn test_context_after_order_by() {
+        assert!(matches!(
+            detect_completion_context("SELECT * FROM t ORDER BY "),
+            CompletionContext::OrderBy
+        ));
+    }
+
+    #[test]
+    fn test_context_after_update() {
+        assert!(matches!(
+            detect_completion_context("UPDATE "),
+            CompletionContext::From
+        ));
+    }
+
+    #[test]
+    fn test_context_after_insert_into() {
+        assert!(matches!(
+            detect_completion_context("INSERT INTO "),
+            CompletionContext::From
+        ));
+    }
+
+    #[test]
+    fn test_context_after_delete_from() {
+        assert!(matches!(
+            detect_completion_context("DELETE FROM "),
+            CompletionContext::From
+        ));
+    }
+
+    #[test]
+    fn test_context_after_set() {
+        assert!(matches!(
+            detect_completion_context("UPDATE numbers SET "),
+            CompletionContext::Set
+        ));
+    }
+
+    #[test]
+    fn test_context_after_update_where() {
+        // WHERE after SET should give Where context (WHERE is later in the text)
+        assert!(matches!(
+            detect_completion_context("UPDATE numbers SET x = 1 WHERE "),
+            CompletionContext::Where
+        ));
+    }
+
+    #[test]
+    fn test_context_general_fallback() {
+        assert!(matches!(
+            detect_completion_context(""),
+            CompletionContext::General
+        ));
+        assert!(matches!(
+            detect_completion_context("PRAGMA "),
+            CompletionContext::General
+        ));
+    }
+
+    // ── word_before_cursor ─────────────────────────────────────
+
+    #[test]
+    fn test_word_before_cursor_empty() {
+        assert_eq!(word_before_cursor(""), "");
+    }
+
+    #[test]
+    fn test_word_before_cursor_partial() {
+        assert_eq!(word_before_cursor("SELECT na"), "na");
+        assert_eq!(word_before_cursor("UPDATE num"), "num");
+    }
+
+    #[test]
+    fn test_word_before_cursor_after_space() {
+        assert_eq!(word_before_cursor("SELECT "), "");
+    }
+
+    #[test]
+    fn test_word_before_cursor_after_dot() {
+        assert_eq!(word_before_cursor("t.col"), "col");
+    }
 }
