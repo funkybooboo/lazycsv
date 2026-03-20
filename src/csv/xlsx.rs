@@ -151,4 +151,58 @@ mod tests {
         assert!(!is_spreadsheet(Path::new("file.txt")));
         assert!(!is_spreadsheet(Path::new("file")));
     }
+
+    #[test]
+    fn test_is_spreadsheet_with_path_components() {
+        assert!(is_spreadsheet(Path::new("/tmp/data/report.xlsx")));
+        assert!(is_spreadsheet(Path::new("../files/budget.ods")));
+        assert!(!is_spreadsheet(Path::new("/tmp/data/report.csv")));
+    }
+
+    #[test]
+    fn test_get_sheet_names_nonexistent_file() {
+        let result = get_sheet_names(Path::new("/nonexistent/file.xlsx"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_load_sheet_nonexistent_file() {
+        let result = load_sheet(Path::new("/nonexistent/file.xlsx"), "Sheet1");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_load_sheet_with_formulas_nonexistent_file() {
+        let result = load_sheet_with_formulas(Path::new("/nonexistent/file.xlsx"), "Sheet1");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_cell_to_string_empty() {
+        assert_eq!(cell_to_string(&Data::Empty), "");
+    }
+
+    #[test]
+    fn test_cell_to_string_string() {
+        assert_eq!(cell_to_string(&Data::String("hello".to_string())), "hello");
+    }
+
+    #[test]
+    fn test_cell_to_string_int_float() {
+        // Integer-valued floats should display without decimals
+        assert_eq!(cell_to_string(&Data::Float(42.0)), "42");
+        // Non-integer floats keep decimals
+        assert_eq!(cell_to_string(&Data::Float(3.14)), "3.14");
+    }
+
+    #[test]
+    fn test_cell_to_string_int() {
+        assert_eq!(cell_to_string(&Data::Int(99)), "99");
+    }
+
+    #[test]
+    fn test_cell_to_string_bool() {
+        assert_eq!(cell_to_string(&Data::Bool(true)), "true");
+        assert_eq!(cell_to_string(&Data::Bool(false)), "false");
+    }
 }

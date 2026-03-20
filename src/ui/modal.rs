@@ -131,6 +131,11 @@ pub fn row_number_style() -> Style {
     Style::default().add_modifier(Modifier::BOLD)
 }
 
+/// Zebra stripe background for alternating rows (subtle dark tint)
+pub fn zebra_stripe_style() -> Style {
+    Style::default().bg(Color::Rgb(30, 30, 30))
+}
+
 /// Success message style (green, bold)
 pub fn success_style() -> Style {
     Style::default()
@@ -480,5 +485,13 @@ mod tests {
         let unselected = completion_unselected_style();
         assert_eq!(unselected.bg, Some(COLOR_POPUP_BG));
         assert_eq!(unselected.fg, Some(Color::White));
+    }
+
+    #[test]
+    fn test_zebra_stripe_style() {
+        let style = zebra_stripe_style();
+        assert_eq!(style.bg, Some(Color::Rgb(30, 30, 30)));
+        // No foreground override — inherits default
+        assert_eq!(style.fg, None);
     }
 }

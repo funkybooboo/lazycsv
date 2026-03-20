@@ -61,8 +61,11 @@ fn calculate_cell_style(
     } else if search_state.map(|s| s.is_match(row, col)).unwrap_or(false) {
         // Other search matches: visual selection style (dark gray bg, yellow fg)
         super::modal::visual_selection_style()
+    } else if row.get().is_multiple_of(2) {
+        // Even rows: subtle background for zebra striping
+        super::modal::zebra_stripe_style()
     } else {
-        // Default: no special styling
+        // Odd rows: no background
         Style::default()
     }
 }
@@ -255,6 +258,8 @@ fn build_data_rows(
             let row_num_display = format!("{:>4}", row_idx);
             let row_num_style = if is_selected_row {
                 super::modal::row_number_style()
+            } else if row_idx.is_multiple_of(2) {
+                super::modal::zebra_stripe_style()
             } else {
                 Style::default()
             };

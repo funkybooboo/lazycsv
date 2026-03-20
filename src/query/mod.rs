@@ -1110,6 +1110,36 @@ pub fn execute_query(path: &Path, query: &str, config: &FileConfig) -> Result<()
     Ok(())
 }
 
+/// Execute a query and return the result as a Document (for clipboard/capture use).
+pub fn execute_query_to_doc_from_path(
+    path: &Path,
+    query: &str,
+    config: &FileConfig,
+) -> Result<Document> {
+    let query = strip_csv_extensions(query);
+    let query = query.as_str();
+
+    let csv_files = resolve_csv_files(path)?;
+
+    let conn = Connection::open_in_memory().context("Failed to open in-memory SQLite database")?;
+    conn.execute_batch(
+        "PRAGMA journal_mode=OFF;
+         PRAGMA synchronous=OFF;
+         PRAGMA temp_store=MEMORY;
+         PRAGMA cache_size=-64000;",
+    )?;
+
+    let referenced = files_referenced_by_query(query, &csv_files);
+    for file_path in referenced {
+        let table_name = table_name_from_path(file_path);
+        if load_csv_file_into_sqlite(&conn, file_path, &table_name, config).is_err() {
+            continue;
+        }
+    }
+
+    execute_query_to_document(&conn, query, "query_result".to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1558,5 +1588,48 @@ mod tests {
     fn test_strip_csv_no_extension_passthrough() {
         let q = "SELECT * FROM myfile WHERE a = 1";
         assert_eq!(strip_csv_extensions(q), q);
+    }
+
+    #[test]
+    fn test_execute_query_to_doc_from_path() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("data.csv");
+        std::fs::write(&file_path, "Name,Age\nAlice,30\nBob,25\n").unwrap();
+
+        let config = FileConfig::default();
+        let doc =
+            execute_query_to_doc_from_path(&file_path, "SELECT * FROM data", &config).unwrap();
+
+        assert_eq!(doc.row_count(), 3); // header + 2 data rows
+        assert_eq!(doc.column_count(), 2);
+    }
+
+    #[test]
+    fn test_execute_query_to_doc_from_path_with_filter() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("nums.csv");
+        std::fs::write(&file_path, "Val\n10\n20\n30\n").unwrap();
+
+        let config = FileConfig::default();
+        let doc = execute_query_to_doc_from_path(
+            &file_path,
+            "SELECT * FROM nums WHERE Val > 15",
+            &config,
+        )
+        .unwrap();
+
+        assert_eq!(doc.row_count(), 3); // header + 2 matching rows
+    }
+
+    #[test]
+    fn test_execute_query_to_doc_from_path_invalid_query() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("data.csv");
+        std::fs::write(&file_path, "A\n1\n").unwrap();
+
+        let config = FileConfig::default();
+        let result = execute_query_to_doc_from_path(&file_path, "INVALID SQL GARBAGE", &config);
+
+        assert!(result.is_err());
     }
 }

@@ -80,6 +80,33 @@ pub struct CliArgs {
         help = "Output target: -o (stdout), -o dir/ (directory), -o file.csv (file)"
     )]
     pub output: Option<String>,
+
+    /// Copy CSV output to system clipboard (non-interactive mode).
+    /// Works with CSV, XLSX, XLS, ODS files and -q query results.
+    #[arg(
+        short = 'C',
+        long = "cb-copy",
+        help = "Copy CSV output to system clipboard"
+    )]
+    pub clipboard: bool,
+
+    /// Paste CSV data from system clipboard and open in the TUI.
+    #[arg(
+        short = 'P',
+        long = "cb-paste",
+        help = "Open CSV data from system clipboard in the TUI"
+    )]
+    pub paste: bool,
+
+    /// Split a CSV/XLSX/ODS file into multiple CSV files with the specified number of rows each.
+    /// Files are numbered sequentially (1.csv, 2.csv, ...).
+    /// Output to -o directory if provided, otherwise to the input file's directory.
+    #[arg(
+        short = 'S',
+        long = "split",
+        help = "Split file into CSVs of N rows each (e.g., -S 1000)"
+    )]
+    pub split: Option<usize>,
 }
 
 impl CliArgs {
