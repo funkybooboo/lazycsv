@@ -110,8 +110,8 @@ pub fn execute(app: &mut App) -> Result<InputResult> {
     match cmd_name_lower.as_str() {
         "q" | "quit" => execute_quit(app),
         "q!" => execute_force_quit(app),
-        "w" | "write" => execute_write(app),
-        "wq" | "x" => execute_write_quit(app),
+        "w" | "w!" | "write" => execute_write(app),
+        "wq" | "wq!" | "x" => execute_write_quit(app),
         "h" | "help" => execute_help(app),
         "delim" => execute_delimiter_change(app, _arg),
         "new" => execute_new_document(app, _arg),
@@ -126,6 +126,7 @@ pub fn execute(app: &mut App) -> Result<InputResult> {
         "distinct" => super::stats::execute_distinct(app, _arg),
         "width" | "resize" => execute_width(app, _arg),
         "copy" => execute_copy_to_clipboard(app),
+        "paste" => execute_paste_from_clipboard(app),
         _ => {
             // Unknown command
             app.status_message = Some(StatusMessage::from(format!("Unknown command: :{}", cmd)));
@@ -366,6 +367,105 @@ fn execute_copy_to_clipboard(app: &mut App) -> Result<InputResult> {
         }
         Err(e) => {
             app.status_message = Some(StatusMessage::from(format!("Clipboard error: {}", e)));
+        }
+    }
+
+    Ok(InputResult::Continue)
+}
+
+/// Execute :paste command — read CSV/TSV from system clipboard and replace current document.
+fn execute_paste_from_clipboard(app: &mut App) -> Result<InputResult> {
+    use std::process::{Command, Stdio};
+
+    // Read from clipboard
+    #[cfg(target_os = "macos")]
+    let output_result = Command::new("pbpaste").stdout(Stdio::piped()).output();
+
+    #[cfg(target_os = "linux")]
+    let output_result = Command::new("xclip")
+        .args(["-selection", "clipboard", "-o"])
+        .stdout(Stdio::piped())
+        .output()
+        .or_else(|_| {
+            Command::new("xsel")
+                .args(["--clipboard", "--output"])
+                .stdout(Stdio::piped())
+                .output()
+        })
+        .or_else(|_| Command::new("wl-paste").stdout(Stdio::piped()).output());
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    let output_result: Result<std::process::Output, std::io::Error> = Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "Clipboard not supported",
+    ));
+
+    let output = match output_result {
+        Ok(o) if o.status.success() => o,
+        Ok(_) => {
+            app.status_message = Some(StatusMessage::from("Clipboard read failed"));
+            return Ok(InputResult::Continue);
+        }
+        Err(e) => {
+            app.status_message = Some(StatusMessage::from(format!("Clipboard error: {}", e)));
+            return Ok(InputResult::Continue);
+        }
+    };
+
+    let text = match String::from_utf8(output.stdout) {
+        Ok(s) => s,
+        Err(_) => {
+            app.status_message = Some(StatusMessage::from("Clipboard contains invalid UTF-8"));
+            return Ok(InputResult::Continue);
+        }
+    };
+
+    if text.trim().is_empty() {
+        app.status_message = Some(StatusMessage::from("Clipboard is empty"));
+        return Ok(InputResult::Continue);
+    }
+
+    // Auto-detect delimiter
+    let delimiter = crate::csv::detect_delimiter(&text);
+
+    // Parse the clipboard content as CSV with detected delimiter
+    let reader = std::io::Cursor::new(text.as_bytes());
+    match crate::csv::Document::from_reader(
+        reader,
+        Some(delimiter),
+        false,
+        "clipboard.csv".to_string(),
+    ) {
+        Ok(doc) => {
+            let rows = doc.row_count().saturating_sub(1);
+            let delim_name = match delimiter {
+                b'\t' => "tab",
+                b'|' => "pipe",
+                b';' => "semicolon",
+                b',' => "comma",
+                _ => "auto",
+            };
+            // Replace current document
+            app.document.storage = doc.storage;
+            app.document.filename = "clipboard.csv".to_string();
+            app.document.delimiter = ',';
+            app.document.is_dirty = true;
+            app.document.generation += 1;
+            app.document.xlsx_formulas = vec![];
+            // Reset view
+            app.view_state.table_state.select(Some(1));
+            app.view_state.column_scroll_offset = 0;
+            app.view_state.selected_column = crate::domain::position::ColIndex::new(0);
+            app.status_message = Some(StatusMessage::from(format!(
+                "Pasted {} rows from clipboard ({}-delimited)",
+                rows, delim_name
+            )));
+        }
+        Err(e) => {
+            app.status_message = Some(StatusMessage::from(format!(
+                "Failed to parse clipboard: {}",
+                e
+            )));
         }
     }
 

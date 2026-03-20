@@ -125,7 +125,7 @@ Yazi-inspired 3-column file explorer (30%:40%:30%) with parent directory preview
 Lazy loading with memory-mapped files for large CSVs, CLI sort mode, piped stdin support for all non-interactive modes, and automatic column type detection for correct numeric/date ordering in SQL queries. Buffered I/O indexing (7x faster on macOS), parallel sort with rayon, fast memchr row counting, and raw-byte CSV write for sorted lazy files.
 
 **[v0.25.0](versions/v0.25.0.md) - Spreadsheet Support, CLI Tools & SQL DML**
-Native spreadsheet file support (xlsx/xls/ods) via calamine. Formula preservation in formula bar. CLI extraction (`-x`), clipboard copy (`-C`), clipboard paste (`-P`), file splitting (`-S`), and SQL queries (`-q`) all work across CSV and spreadsheet formats. SQL DML support (INSERT, UPDATE, DELETE, ALTER) in the TUI SQL editor with in-place document modification and DML-aware IntelliSense. Streaming I/O for large file clipboard copy and split. Zebra striping for row readability. Terminal robustness fixes.
+Native spreadsheet file support (xlsx/xls/ods) via calamine. Formula preservation in formula bar. CLI extraction (`-x`), clipboard copy (`-C`), clipboard paste (`-P` with auto delimiter detection), file splitting (`-S`), and SQL queries (`-q`) all work across CSV and spreadsheet formats. SQL DML (INSERT/UPDATE/DELETE/ALTER) with DML-aware IntelliSense and templates. TUI `:copy`/`:paste` commands with auto delimiter detection. SQL formatting via Ctrl+F. Streaming I/O for large files. Zebra striping. Terminal robustness fixes.
 
 ###  Planned Versions
 

@@ -178,3 +178,109 @@ fn test_copy_command_not_confused_with_column_jump() {
         msg
     );
 }
+
+// ── :paste command ──────────────────────────────────────────
+
+#[test]
+fn test_paste_command_sets_status_message() {
+    let (mut app, _dir) = create_app("A,B\n1,2\n");
+
+    send_command(&mut app, "paste");
+
+    // Should have a status message (either success or clipboard error)
+    let msg = app
+        .status_message
+        .as_ref()
+        .map(|m| m.as_str().to_string())
+        .unwrap_or_default();
+    assert!(
+        msg.contains("Pasted")
+            || msg.contains("Clipboard")
+            || msg.contains("clipboard")
+            || msg.contains("empty"),
+        "Expected paste status message, got: '{}'",
+        msg
+    );
+}
+
+// ── detect_delimiter ────────────────────────────────────────
+
+#[test]
+fn test_detect_delimiter_tab_from_excel() {
+    // Excel-style tab-delimited paste
+    let excel_data = "Name\tSalary\tCost\nDoug\t$10.00\t22\nHenry\t$14.00\t33\n";
+    assert_eq!(lazycsv::csv::detect_delimiter(excel_data), b'\t');
+}
+
+#[test]
+fn test_detect_delimiter_comma() {
+    assert_eq!(lazycsv::csv::detect_delimiter("a,b,c\n1,2,3\n"), b',');
+}
+
+#[test]
+fn test_detect_delimiter_pipe() {
+    assert_eq!(lazycsv::csv::detect_delimiter("a|b|c\n1|2|3\n"), b'|');
+}
+
+#[test]
+fn test_detect_delimiter_converts_tab_to_csv() {
+    // Simulate what -P does: detect tab delimiter, parse, write as CSV
+    let tab_data = "Name\tAge\nAlice\t30\nBob\t25\n";
+    let detected = lazycsv::csv::detect_delimiter(tab_data);
+    assert_eq!(detected, b'\t');
+
+    // Parse with detected delimiter
+    let reader = std::io::Cursor::new(tab_data.as_bytes());
+    let doc =
+        lazycsv::csv::Document::from_reader(reader, Some(detected), false, "test.csv".to_string())
+            .unwrap();
+
+    assert_eq!(doc.row_count(), 3); // header + 2 rows
+    assert_eq!(doc.column_count(), 2);
+
+    // Write as CSV
+    let mut buf = Vec::new();
+    lazycsv::csv::write_csv_content(&mut buf, &doc, ',').unwrap();
+    let csv_output = String::from_utf8(buf).unwrap();
+    assert!(csv_output.contains("Name,Age"));
+    assert!(csv_output.contains("Alice,30"));
+}
+
+// ── :w! and :wq! commands ───────────────────────────────────
+
+#[test]
+fn test_w_bang_does_not_error() {
+    let (mut app, _dir) = create_app("A,B\n1,2\n");
+
+    send_command(&mut app, "w!");
+
+    let msg = app
+        .status_message
+        .as_ref()
+        .map(|m| m.as_str().to_string())
+        .unwrap_or_default();
+    assert!(
+        !msg.contains("Unknown command"),
+        "':w!' should not be unknown, got: '{}'",
+        msg
+    );
+}
+
+#[test]
+fn test_wq_bang_does_not_error() {
+    let (mut app, _dir) = create_app("A,B\n1,2\n");
+
+    send_command(&mut app, "wq!");
+
+    // wq! triggers quit, so should_quit should be true (or at minimum no unknown command error)
+    let msg = app
+        .status_message
+        .as_ref()
+        .map(|m| m.as_str().to_string())
+        .unwrap_or_default();
+    assert!(
+        !msg.contains("Unknown command"),
+        "':wq!' should not be unknown, got: '{}'",
+        msg
+    );
+}

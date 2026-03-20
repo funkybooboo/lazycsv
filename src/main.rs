@@ -66,9 +66,37 @@ fn run_main() -> Result<()> {
         if let Some(parent) = out_path.parent().filter(|p| !p.as_os_str().is_empty()) {
             std::fs::create_dir_all(parent)?;
         }
-        std::fs::write(&out_path, &content)?;
-        let lines = content.lines().count().saturating_sub(1);
-        eprintln!("Pasted {} rows to {}", lines, out_path.display());
+        // Auto-detect delimiter and convert to CSV if needed
+        let detected = lazycsv::csv::detect_delimiter(&content);
+        let output = if detected != b',' {
+            // Parse with detected delimiter and re-write as CSV
+            let reader = std::io::Cursor::new(content.as_bytes());
+            let doc = lazycsv::csv::Document::from_reader(
+                reader,
+                Some(detected),
+                false,
+                "clipboard.csv".to_string(),
+            )?;
+            let mut buf = Vec::new();
+            lazycsv::csv::write_csv_content(&mut buf, &doc, ',')?;
+            String::from_utf8(buf)?
+        } else {
+            content.clone()
+        };
+        std::fs::write(&out_path, &output)?;
+        let lines = output.lines().count().saturating_sub(1);
+        let delim_name = match detected {
+            b'\t' => "tab",
+            b'|' => "pipe",
+            b';' => "semicolon",
+            _ => "comma",
+        };
+        eprintln!(
+            "Pasted {} rows to {} ({}-delimited input → CSV)",
+            lines,
+            out_path.display(),
+            delim_name
+        );
         return Ok(());
     }
 
