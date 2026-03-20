@@ -129,3 +129,52 @@ fn test_dml_preserves_column_structure() {
     let header = app.document.get_rows_range(0, 1);
     assert_eq!(header[0], vec!["A", "B", "C"]);
 }
+
+// ── :copy command ──────────────────────────────────────────
+
+fn send_command(app: &mut App, cmd: &str) {
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    let _ = app.handle_key(KeyEvent::new(KeyCode::Char(':'), KeyModifiers::NONE));
+    for c in cmd.chars() {
+        let _ = app.handle_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE));
+    }
+    let _ = app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+}
+
+#[test]
+fn test_copy_command_sets_status_message() {
+    let (mut app, _dir) = create_app("A,B\n1,2\n3,4\n");
+
+    send_command(&mut app, "copy");
+
+    // Should have a status message (either success or clipboard error)
+    let msg = app
+        .status_message
+        .as_ref()
+        .map(|m| m.as_str().to_string())
+        .unwrap_or_default();
+    assert!(
+        msg.contains("Copied") || msg.contains("Clipboard") || msg.contains("clipboard"),
+        "Expected clipboard status message, got: '{}'",
+        msg
+    );
+}
+
+#[test]
+fn test_copy_command_not_confused_with_column_jump() {
+    let (mut app, _dir) = create_app("A,B\n1,2\n");
+
+    send_command(&mut app, "copy");
+
+    // Should NOT be interpreted as :c opy (column jump)
+    let msg = app
+        .status_message
+        .as_ref()
+        .map(|m| m.as_str().to_string())
+        .unwrap_or_default();
+    assert!(
+        !msg.contains("Column") && !msg.contains("does not exist"),
+        "':copy' should not be treated as column jump, got: '{}'",
+        msg
+    );
+}

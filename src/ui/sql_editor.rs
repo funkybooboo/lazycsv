@@ -186,7 +186,7 @@ fn build_status_line<'a>(
     sql_error: Option<&str>,
     width: usize,
 ) -> Line<'a> {
-    let help_text = "Ctrl+Enter: execute | :w/:q | Esc: exit";
+    let help_text = "Ctrl+Enter: execute | Ctrl+F: format | :w/:q | Esc: exit";
 
     // Left side: Mode or command buffer or error
     let left = if let Some(err) = sql_error {

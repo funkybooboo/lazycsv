@@ -398,6 +398,17 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         return Ok(InputResult::Continue);
     }
 
+    // --- Ctrl+F: format SQL statement ---
+    if key.code == KeyCode::Char('f') && key.modifiers.contains(KeyModifiers::CONTROL) {
+        let sql_text = editor.content();
+        if !sql_text.trim().is_empty() {
+            let formatted = format_sql(&sql_text);
+            editor.set_content(&formatted);
+            app.status_message = Some(StatusMessage::new_owned("SQL formatted".to_string()));
+        }
+        return Ok(InputResult::Continue);
+    }
+
     // Ctrl+Enter executes the query from any vim mode.
     if key.code == KeyCode::Enter && key.modifiers.contains(KeyModifiers::CONTROL) {
         if vim_mode != VimMode::Normal {
@@ -1082,6 +1093,17 @@ fn build_template_items() -> Vec<CompletionItem> {
     ]
 }
 
+/// Format a SQL statement using the sqlformat crate.
+fn format_sql(sql: &str) -> String {
+    let options = sqlformat::FormatOptions {
+        indent: sqlformat::Indent::Spaces(2),
+        uppercase: Some(true),
+        lines_between_queries: 1,
+        ..Default::default()
+    };
+    sqlformat::format(sql, &sqlformat::QueryParams::None, &options)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1289,6 +1311,38 @@ mod tests {
     fn test_is_dml_sql_empty() {
         assert!(!is_dml_sql(""));
         assert!(!is_dml_sql("   "));
+    }
+
+    // ── format_sql ──────────────────────────────────────────────
+
+    #[test]
+    fn test_format_sql_select() {
+        let result = format_sql("select * from table where id = 1");
+        assert!(result.contains("SELECT"));
+        assert!(result.contains("FROM"));
+        assert!(result.contains("WHERE"));
+        // Should be multi-line
+        assert!(result.contains('\n'));
+    }
+
+    #[test]
+    fn test_format_sql_update() {
+        let result = format_sql("update numbers set value = 99 where id = 1");
+        assert!(result.contains("UPDATE"));
+        assert!(result.contains("SET"));
+        assert!(result.contains("WHERE"));
+    }
+
+    #[test]
+    fn test_format_sql_empty() {
+        let result = format_sql("");
+        assert!(result.trim().is_empty());
+    }
+
+    #[test]
+    fn test_format_sql_preserves_strings() {
+        let result = format_sql("select * from t where name = 'hello world'");
+        assert!(result.contains("'hello world'"));
     }
 
     #[test]

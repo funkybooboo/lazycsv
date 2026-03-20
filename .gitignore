@@ -38,7 +38,6 @@ out/
 .*.swo
 
 # Emacs
-*~
 \#*\#
 /.emacs.desktop
 /.emacs.desktop.lock
@@ -58,7 +57,6 @@ tramp
 .LSOverride
 
 # Linux
-*~
 
 # Windows
 Thumbs.db
@@ -99,3 +97,4 @@ tarpaulin-report.html
 cobertura.xml
 lcov.info
 *.lcov
+test_data/result.csv

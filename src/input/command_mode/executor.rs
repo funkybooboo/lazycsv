@@ -26,7 +26,8 @@ pub fn execute(app: &mut App) -> Result<InputResult> {
     // Support both `:cA` (no space) and `:c A` (with space)
     // Exclude known commands that start with 'c' (count)
     let cmd_lower_full = cmd.to_lowercase();
-    let is_known_c_command = cmd_lower_full.starts_with("count");
+    let is_known_c_command =
+        cmd_lower_full.starts_with("count") || cmd_lower_full.starts_with("copy");
     if !is_known_c_command && (cmd.starts_with('c') || cmd.starts_with('C')) {
         let rest = &cmd[1..]; // Get everything after 'c'
 
@@ -124,6 +125,7 @@ pub fn execute(app: &mut App) -> Result<InputResult> {
         "count" => super::stats::execute_count(app, _arg),
         "distinct" => super::stats::execute_distinct(app, _arg),
         "width" | "resize" => execute_width(app, _arg),
+        "copy" => execute_copy_to_clipboard(app),
         _ => {
             // Unknown command
             app.status_message = Some(StatusMessage::from(format!("Unknown command: :{}", cmd)));
@@ -314,6 +316,59 @@ fn execute_filename(app: &mut App, arg: Option<&str>) -> Result<InputResult> {
 fn execute_clear_search(app: &mut App) -> Result<InputResult> {
     app.search_state = None;
     app.status_message = Some(StatusMessage::from("Search cleared"));
+    Ok(InputResult::Continue)
+}
+
+/// Execute :copy/:clipboard command — copy current document as CSV to system clipboard.
+fn execute_copy_to_clipboard(app: &mut App) -> Result<InputResult> {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
+    // Build CSV content from current document
+    let mut buf = Vec::new();
+    crate::csv::write_csv_content(&mut buf, &app.document, app.document.delimiter)
+        .map_err(|e| anyhow::anyhow!("Failed to build CSV: {}", e))?;
+
+    // Spawn clipboard command
+    #[cfg(target_os = "macos")]
+    let child_result = Command::new("pbcopy").stdin(Stdio::piped()).spawn();
+
+    #[cfg(target_os = "linux")]
+    let child_result = Command::new("xclip")
+        .args(["-selection", "clipboard"])
+        .stdin(Stdio::piped())
+        .spawn()
+        .or_else(|_| {
+            Command::new("xsel")
+                .args(["--clipboard", "--input"])
+                .stdin(Stdio::piped())
+                .spawn()
+        })
+        .or_else(|_| Command::new("wl-copy").stdin(Stdio::piped()).spawn());
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    let child_result: Result<std::process::Child, std::io::Error> = Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "Clipboard not supported",
+    ));
+
+    match child_result {
+        Ok(mut child) => {
+            if let Some(ref mut stdin) = child.stdin {
+                let _ = stdin.write_all(&buf);
+            }
+            let _ = child.wait();
+            let rows = app.document.row_count().saturating_sub(1);
+            app.status_message = Some(StatusMessage::from(format!(
+                "Copied {} rows to clipboard",
+                rows
+            )));
+        }
+        Err(e) => {
+            app.status_message = Some(StatusMessage::from(format!("Clipboard error: {}", e)));
+        }
+    }
+
     Ok(InputResult::Continue)
 }
 

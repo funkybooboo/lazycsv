@@ -146,6 +146,17 @@ impl VimEditor {
         self.lines.join("\n")
     }
 
+    /// Replace editor content, preserving undo history.
+    pub fn set_content(&mut self, text: &str) {
+        self.push_undo();
+        self.lines = text.lines().map(|l| l.to_string()).collect();
+        if self.lines.is_empty() {
+            self.lines.push(String::new());
+        }
+        self.cursor = (0, 0);
+        self.mode = VimMode::Normal;
+    }
+
     /// Get the current vim mode
     pub fn mode(&self) -> VimMode {
         self.mode
