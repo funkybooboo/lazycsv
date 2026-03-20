@@ -264,17 +264,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         let files = app.session.files().to_vec();
         let context = detect_completion_context(&text_before_cursor);
 
-        let is_dml = {
-            let first_word = sql_text
-                .split_whitespace()
-                .next()
-                .unwrap_or("")
-                .to_ascii_uppercase();
-            matches!(
-                first_word.as_str(),
-                "UPDATE" | "INSERT" | "DELETE" | "ALTER" | "DROP" | "CREATE"
-            )
-        };
+        let is_dml = is_dml_sql(&sql_text);
 
         let items: Vec<CompletionItem> = match context {
             CompletionContext::From => {
@@ -504,16 +494,39 @@ fn execute_template_steps(app: &mut App) {
             }
             TemplateStep::PickTable => {
                 app.sql_template_steps.remove(0);
-                let files = app.session.files().to_vec();
-                let items: Vec<CompletionItem> = files
-                    .iter()
-                    .map(|p| CompletionItem {
-                        text: crate::query::table_name_from_path(p),
+                // For DML templates, only show the current document's table name
+                let is_dml = app
+                    .sql_vim_editor
+                    .as_ref()
+                    .map(|ed| is_dml_sql(&ed.content()))
+                    .unwrap_or(false);
+                let items: Vec<CompletionItem> = if is_dml {
+                    let table_name = app
+                        .document
+                        .filename
+                        .strip_suffix(".csv")
+                        .or_else(|| app.document.filename.strip_suffix(".tsv"))
+                        .or_else(|| app.document.filename.strip_suffix(".txt"))
+                        .unwrap_or(&app.document.filename)
+                        .to_string();
+                    vec![CompletionItem {
+                        text: table_name,
                         kind: CompletionKind::Table,
                         template: None,
                         template_steps: vec![],
-                    })
-                    .collect();
+                    }]
+                } else {
+                    let files = app.session.files().to_vec();
+                    files
+                        .iter()
+                        .map(|p| CompletionItem {
+                            text: crate::query::table_name_from_path(p),
+                            kind: CompletionKind::Table,
+                            template: None,
+                            template_steps: vec![],
+                        })
+                        .collect()
+                };
                 if !items.is_empty() {
                     app.sql_completion = Some(SqlCompletion::new(items, ""));
                 }
@@ -612,6 +625,19 @@ fn quote_if_needed(identifier: &str) -> String {
     } else {
         identifier.to_string()
     }
+}
+
+/// Check if SQL text starts with a DML keyword (UPDATE, INSERT, DELETE, ALTER, DROP, CREATE).
+fn is_dml_sql(sql: &str) -> bool {
+    let first_word = sql
+        .split_whitespace()
+        .next()
+        .unwrap_or("")
+        .to_ascii_uppercase();
+    matches!(
+        first_word.as_str(),
+        "UPDATE" | "INSERT" | "DELETE" | "ALTER" | "DROP" | "CREATE"
+    )
 }
 
 /// Get the SQL text up to the cursor position as a single string.
@@ -1010,6 +1036,49 @@ fn build_template_items() -> Vec<CompletionItem> {
                 TemplateStep::Text("\nLIMIT 10".to_string()),
             ],
         },
+        // DML templates
+        CompletionItem {
+            text: "Update Rows".to_string(),
+            kind: CompletionKind::Keyword,
+            template: Some("UPDATE ".to_string()),
+            template_steps: vec![
+                TemplateStep::PickTable,
+                TemplateStep::Text("\nSET ".to_string()),
+                TemplateStep::PickColumn("*".to_string()),
+                TemplateStep::Text(" = ''\nWHERE ".to_string()),
+                TemplateStep::PickColumn("*".to_string()),
+                TemplateStep::Text(" = ''".to_string()),
+            ],
+        },
+        CompletionItem {
+            text: "Insert Row".to_string(),
+            kind: CompletionKind::Keyword,
+            template: Some("INSERT INTO ".to_string()),
+            template_steps: vec![
+                TemplateStep::PickTable,
+                TemplateStep::Assemble("INSERT INTO {table}\nVALUES ()".to_string()),
+            ],
+        },
+        CompletionItem {
+            text: "Delete Rows".to_string(),
+            kind: CompletionKind::Keyword,
+            template: Some("DELETE FROM ".to_string()),
+            template_steps: vec![
+                TemplateStep::PickTable,
+                TemplateStep::Text("\nWHERE ".to_string()),
+                TemplateStep::PickColumn("*".to_string()),
+                TemplateStep::Text(" = ''".to_string()),
+            ],
+        },
+        CompletionItem {
+            text: "Add Column".to_string(),
+            kind: CompletionKind::Keyword,
+            template: Some("ALTER TABLE ".to_string()),
+            template_steps: vec![
+                TemplateStep::PickTable,
+                TemplateStep::Text(" ADD COLUMN new_column TEXT".to_string()),
+            ],
+        },
     ]
 }
 
@@ -1133,5 +1202,118 @@ mod tests {
     #[test]
     fn test_word_before_cursor_after_dot() {
         assert_eq!(word_before_cursor("t.col"), "col");
+    }
+
+    // ── build_template_items ───────────────────────────────────
+
+    #[test]
+    fn test_templates_include_select_all() {
+        let items = build_template_items();
+        assert!(items.iter().any(|i| i.text == "Select All"));
+    }
+
+    #[test]
+    fn test_templates_include_dml() {
+        let items = build_template_items();
+        assert!(items.iter().any(|i| i.text == "Update Rows"));
+        assert!(items.iter().any(|i| i.text == "Insert Row"));
+        assert!(items.iter().any(|i| i.text == "Delete Rows"));
+        assert!(items.iter().any(|i| i.text == "Add Column"));
+    }
+
+    #[test]
+    fn test_templates_all_have_template_text() {
+        let items = build_template_items();
+        for item in &items {
+            assert!(
+                item.template.is_some(),
+                "Template '{}' should have template text",
+                item.text
+            );
+        }
+    }
+
+    #[test]
+    fn test_templates_dml_start_with_correct_keyword() {
+        let items = build_template_items();
+        for item in &items {
+            let tmpl = item.template.as_deref().unwrap_or("");
+            match item.text.as_str() {
+                "Update Rows" => assert!(tmpl.starts_with("UPDATE ")),
+                "Insert Row" => assert!(tmpl.starts_with("INSERT INTO ")),
+                "Delete Rows" => assert!(tmpl.starts_with("DELETE FROM ")),
+                "Add Column" => assert!(tmpl.starts_with("ALTER TABLE ")),
+                _ => {} // SELECT templates checked elsewhere
+            }
+        }
+    }
+
+    #[test]
+    fn test_template_count() {
+        let items = build_template_items();
+        assert_eq!(items.len(), 8, "Should have 4 SELECT + 4 DML templates");
+    }
+
+    // ── is_dml_sql ────────────────────────────────────────────
+
+    #[test]
+    fn test_is_dml_sql_update() {
+        assert!(is_dml_sql("UPDATE t SET a = 1"));
+        assert!(is_dml_sql("  update t set a = 1"));
+    }
+
+    #[test]
+    fn test_is_dml_sql_insert() {
+        assert!(is_dml_sql("INSERT INTO t VALUES (1)"));
+    }
+
+    #[test]
+    fn test_is_dml_sql_delete() {
+        assert!(is_dml_sql("DELETE FROM t"));
+    }
+
+    #[test]
+    fn test_is_dml_sql_alter_drop_create() {
+        assert!(is_dml_sql("ALTER TABLE t ADD COLUMN c TEXT"));
+        assert!(is_dml_sql("DROP TABLE t"));
+        assert!(is_dml_sql("CREATE TABLE t (a TEXT)"));
+    }
+
+    #[test]
+    fn test_is_dml_sql_select_is_not_dml() {
+        assert!(!is_dml_sql("SELECT * FROM t"));
+        assert!(!is_dml_sql("  select count(*) from t"));
+    }
+
+    #[test]
+    fn test_is_dml_sql_empty() {
+        assert!(!is_dml_sql(""));
+        assert!(!is_dml_sql("   "));
+    }
+
+    #[test]
+    fn test_dml_templates_are_classified_as_dml() {
+        let items = build_template_items();
+        for item in &items {
+            let tmpl = item.template.as_deref().unwrap_or("");
+            let is_dml = is_dml_sql(tmpl);
+            match item.text.as_str() {
+                "Update Rows" | "Insert Row" | "Delete Rows" | "Add Column" => {
+                    assert!(
+                        is_dml,
+                        "'{}' template should be classified as DML",
+                        item.text
+                    );
+                }
+                "Select All" | "Join Two Tables" | "Group & Count" | "Order & Limit" => {
+                    assert!(
+                        !is_dml,
+                        "'{}' template should NOT be classified as DML",
+                        item.text
+                    );
+                }
+                _ => panic!("Unknown template: {}", item.text),
+            }
+        }
     }
 }

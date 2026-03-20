@@ -392,19 +392,34 @@ impl VimEditor {
                 true
             }
 
-            // Enter: Execute command
+            // Enter: Execute command or search
             (KeyCode::Enter, _) => {
-                let cmd = self.parse_command();
-                match cmd {
-                    commands::ExCommand::NoHighlight => {
-                        self.clear_search();
+                if self.command_buffer.starts_with('/') {
+                    // Search forward
+                    let pattern = self.command_buffer[1..].to_string();
+                    self.mode = VimMode::Normal;
+                    self.command_buffer.clear();
+                    if !pattern.is_empty() {
+                        self.search_forward(pattern);
                     }
-                    _ => {
-                        // Store for embedding context to handle via check_ex_command()
-                        self.last_ex_command = Some(cmd);
+                } else if self.command_buffer.starts_with('%') {
+                    // Substitution: %s/old/new/g
+                    let cmd_str = self.command_buffer.clone();
+                    self.mode = VimMode::Normal;
+                    self.command_buffer.clear();
+                    self.execute_substitution(&cmd_str);
+                } else {
+                    let cmd = self.parse_command();
+                    match cmd {
+                        commands::ExCommand::NoHighlight => {
+                            self.clear_search();
+                        }
+                        _ => {
+                            self.last_ex_command = Some(cmd);
+                        }
                     }
+                    self.exit_command_mode();
                 }
-                self.exit_command_mode();
                 true
             }
 
@@ -421,6 +436,48 @@ impl VimEditor {
             }
 
             _ => false,
+        }
+    }
+
+    /// Execute a substitution command (:%s/old/new/g or %s/old/new/g)
+    pub fn execute_substitution(&mut self, cmd: &str) {
+        // Parse %s/old/new/g or %s/old/new/
+        let cmd = cmd.strip_prefix('%').unwrap_or(cmd);
+        let cmd = cmd.strip_prefix('s').unwrap_or(cmd);
+
+        if cmd.is_empty() {
+            return;
+        }
+
+        let delim = cmd.chars().next().unwrap();
+        let parts: Vec<&str> = cmd[delim.len_utf8()..].split(delim).collect();
+        if parts.len() < 2 {
+            return;
+        }
+
+        let pattern = parts[0];
+        let replacement = parts[1];
+        let global = parts.get(2).map(|s| s.contains('g')).unwrap_or(false);
+
+        if pattern.is_empty() {
+            return;
+        }
+
+        self.push_undo();
+
+        for line in &mut self.lines {
+            if global {
+                *line = line.replace(pattern, replacement);
+            } else {
+                // Replace first occurrence only
+                if let Some(pos) = line.find(pattern) {
+                    let mut new_line = String::with_capacity(line.len());
+                    new_line.push_str(&line[..pos]);
+                    new_line.push_str(replacement);
+                    new_line.push_str(&line[pos + pattern.len()..]);
+                    *line = new_line;
+                }
+            }
         }
     }
 }

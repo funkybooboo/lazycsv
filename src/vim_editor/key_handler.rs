@@ -49,6 +49,12 @@ pub fn handle_key(editor: &mut VimEditor, key: KeyEvent) -> KeyResult {
         return KeyResult::Handled;
     }
 
+    // Operator + motion (d{motion}, y{motion}, c{motion}) must be checked
+    // before plain navigation so motions are applied to the operator range.
+    if handle_operator_motion(editor, key).was_handled() {
+        return KeyResult::Handled;
+    }
+
     if handle_navigation(editor, key).was_handled() {
         return KeyResult::Handled;
     }
@@ -144,6 +150,169 @@ fn handle_mode_switch(editor: &mut VimEditor, key: KeyEvent) -> KeyResult {
 }
 
 /// Handle navigation commands (hjkl, w/b/e, 0/$, gg/G, etc.)
+/// Handle operator + motion combinations (d{motion}, y{motion}, c{motion}).
+/// Records cursor position, executes the motion, then applies the operator
+/// over the range between the old and new cursor positions.
+fn handle_operator_motion(editor: &mut VimEditor, key: KeyEvent) -> KeyResult {
+    use super::{PendingCommand, VimMode};
+
+    let pending = match editor.pending_command {
+        Some(PendingCommand::D) | Some(PendingCommand::Y) | Some(PendingCommand::C) => {
+            editor.pending_command.take().unwrap()
+        }
+        _ => return KeyResult::Unhandled,
+    };
+
+    // Check if this key is a valid motion
+    let is_motion = matches!(
+        (key.code, key.modifiers),
+        (KeyCode::Char('w'), KeyModifiers::NONE)
+            | (KeyCode::Char('b'), KeyModifiers::NONE)
+            | (KeyCode::Char('e'), KeyModifiers::NONE)
+            | (KeyCode::Char('$'), KeyModifiers::NONE)
+            | (KeyCode::Char('0'), KeyModifiers::NONE)
+            | (KeyCode::Char('^'), KeyModifiers::NONE)
+            | (KeyCode::Char('h'), KeyModifiers::NONE)
+            | (KeyCode::Char('l'), KeyModifiers::NONE)
+            | (KeyCode::Char('j'), KeyModifiers::NONE)
+            | (KeyCode::Char('k'), KeyModifiers::NONE)
+            | (KeyCode::Left, _)
+            | (KeyCode::Right, _)
+            | (KeyCode::Up, _)
+            | (KeyCode::Down, _)
+            | (KeyCode::Char('G'), KeyModifiers::NONE | KeyModifiers::SHIFT)
+    );
+
+    if !is_motion {
+        // Not a motion — restore pending command and let other handlers deal with it
+        editor.pending_command = Some(pending);
+        return KeyResult::Unhandled;
+    }
+
+    // Record start position
+    let start_line = editor.cursor.0;
+    let start_col = editor.cursor.1;
+
+    // Execute the motion — set the count back so the motion method can consume it.
+    // Motion methods like move_next_word() call take_count() internally.
+    // Temporarily switch to Insert mode so clamp_cursor allows cursor at end of line
+    // (Normal mode clamps to line_len-1, which would cut off the last character).
+    let saved_mode = editor.mode;
+    editor.mode = VimMode::Insert;
+    let count = editor.take_count().max(1);
+    editor.count_prefix = Some(count);
+    match key.code {
+        KeyCode::Char('w') => editor.move_next_word(),
+        KeyCode::Char('b') => editor.move_prev_word(),
+        KeyCode::Char('e') => {
+            editor.move_end_word();
+            // 'e' is inclusive — move one past the end for delete range
+            editor.cursor.1 += 1;
+        }
+        KeyCode::Char('$') => {
+            editor.move_to_line_end();
+            // '$' is inclusive
+            editor.cursor.1 += 1;
+        }
+        KeyCode::Char('0') | KeyCode::Char('^') => editor.move_to_line_start(),
+        KeyCode::Char('h') | KeyCode::Left => {
+            for _ in 0..count {
+                editor.move_left();
+            }
+        }
+        KeyCode::Char('l') | KeyCode::Right => {
+            for _ in 0..count {
+                editor.move_right();
+            }
+        }
+        KeyCode::Char('j') | KeyCode::Down => {
+            for _ in 0..count {
+                editor.move_down();
+            }
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            for _ in 0..count {
+                editor.move_up();
+            }
+        }
+        KeyCode::Char('G') => editor.move_to_last_line(),
+        _ => {}
+    }
+    // Restore mode and ensure count is cleared
+    editor.mode = saved_mode;
+    editor.count_prefix = None;
+
+    let end_line = editor.cursor.0;
+    let end_col = editor.cursor.1;
+
+    // Determine range (handle backwards motions)
+    let (from_line, from_col, to_line, to_col) = if (start_line, start_col) <= (end_line, end_col) {
+        (start_line, start_col, end_line, end_col)
+    } else {
+        (end_line, end_col, start_line, start_col)
+    };
+
+    editor.push_undo();
+
+    if from_line == to_line {
+        // Same line: delete/yank the character range
+        let line = &editor.lines[from_line];
+        let chars: Vec<char> = line.chars().collect();
+        let safe_from = from_col.min(chars.len());
+        let safe_to = to_col.min(chars.len());
+        let deleted: String = chars[safe_from..safe_to].iter().collect();
+
+        match pending {
+            PendingCommand::D | PendingCommand::C => {
+                let new_line = format!(
+                    "{}{}",
+                    chars[..safe_from].iter().collect::<String>(),
+                    chars[safe_to..].iter().collect::<String>()
+                );
+                editor.lines[from_line] = new_line;
+                editor.cursor = (from_line, safe_from);
+                editor.clipboard = vec![deleted];
+            }
+            PendingCommand::Y => {
+                editor.clipboard = vec![deleted];
+                editor.cursor = (start_line, start_col); // Restore cursor for yank
+            }
+            _ => {}
+        }
+    } else {
+        // Multi-line: delete/yank full lines in range
+        let deleted_lines: Vec<String> = editor.lines[from_line..=to_line].to_vec();
+
+        match pending {
+            PendingCommand::D | PendingCommand::C => {
+                for _ in from_line..=to_line {
+                    if from_line < editor.lines.len() {
+                        editor.lines.remove(from_line);
+                    }
+                }
+                if editor.lines.is_empty() {
+                    editor.lines.push(String::new());
+                }
+                editor.cursor = (from_line.min(editor.lines.len() - 1), 0);
+                editor.clipboard = deleted_lines;
+            }
+            PendingCommand::Y => {
+                editor.clipboard = deleted_lines;
+                editor.cursor = (start_line, start_col);
+            }
+            _ => {}
+        }
+    }
+
+    // 'c' enters insert mode after deleting
+    if pending == PendingCommand::C {
+        editor.mode = VimMode::Insert;
+    }
+
+    editor.count_prefix = None;
+    KeyResult::Handled
+}
+
 fn handle_navigation(editor: &mut VimEditor, key: KeyEvent) -> KeyResult {
     let handled = match (key.code, key.modifiers) {
         // Basic movement - motions handle count internally via take_count()
@@ -325,6 +494,15 @@ fn handle_edit_operations(editor: &mut VimEditor, key: KeyEvent) -> KeyResult {
             true
         }
 
+        // Join lines
+        (KeyCode::Char('J'), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
+            editor.push_undo();
+            for _ in 0..count {
+                editor.join_lines();
+            }
+            true
+        }
+
         // Undo/Redo
         (KeyCode::Char('u'), KeyModifiers::NONE) => {
             for _ in 0..count {
@@ -452,6 +630,10 @@ mod tests {
         KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE)
     }
 
+    fn key_shift(c: char) -> KeyEvent {
+        KeyEvent::new(KeyCode::Char(c), KeyModifiers::SHIFT)
+    }
+
     #[test]
     fn test_count_prefix_movement() {
         let mut editor = VimEditor::new("SELECT * FROM table".to_string());
@@ -467,5 +649,150 @@ mod tests {
         assert_eq!(result, KeyResult::Handled);
         assert_eq!(editor.count_prefix, None); // Count should be cleared
         assert_eq!(editor.cursor(), (0, 5)); // Should have moved 5 positions
+    }
+
+    // ── Operator + motion (d/y/c + w/e/$) ─────────────────────
+
+    #[test]
+    fn test_dw_delete_word() {
+        let mut editor = VimEditor::new("hello world".to_string());
+        // dw should delete "hello "
+        handle_key(&mut editor, key_char('d'));
+        handle_key(&mut editor, key_char('w'));
+        assert_eq!(editor.content(), "world");
+    }
+
+    #[test]
+    fn test_dw_delete_last_word_on_line() {
+        let mut editor = VimEditor::new("select * from numbers".to_string());
+        // Move cursor to 'n' in 'numbers' (position 14)
+        for _ in 0..14 {
+            handle_key(&mut editor, key_char('l'));
+        }
+        assert_eq!(editor.cursor(), (0, 14));
+        // dw should delete "numbers"
+        handle_key(&mut editor, key_char('d'));
+        handle_key(&mut editor, key_char('w'));
+        assert_eq!(editor.content(), "select * from ");
+    }
+
+    #[test]
+    fn test_de_delete_to_end_of_word() {
+        let mut editor = VimEditor::new("hello world".to_string());
+        // de should delete "hello" (inclusive)
+        handle_key(&mut editor, key_char('d'));
+        handle_key(&mut editor, key_char('e'));
+        assert_eq!(editor.content(), " world");
+    }
+
+    #[test]
+    fn test_d_dollar_delete_to_end_of_line() {
+        let mut editor = VimEditor::new("hello world".to_string());
+        // Move to 'w'
+        for _ in 0..6 {
+            handle_key(&mut editor, key_char('l'));
+        }
+        // d$ should delete from 'w' to end
+        handle_key(&mut editor, key_char('d'));
+        handle_key(&mut editor, key_char('$'));
+        assert_eq!(editor.content(), "hello ");
+    }
+
+    #[test]
+    fn test_db_delete_back_word() {
+        let mut editor = VimEditor::new("hello world".to_string());
+        // Move to 'w'
+        handle_key(&mut editor, key_char('w'));
+        // db should delete backwards
+        handle_key(&mut editor, key_char('d'));
+        handle_key(&mut editor, key_char('b'));
+        assert_eq!(editor.content(), "world");
+    }
+
+    #[test]
+    fn test_yw_yank_word() {
+        let mut editor = VimEditor::new("hello world".to_string());
+        handle_key(&mut editor, key_char('y'));
+        handle_key(&mut editor, key_char('w'));
+        // Content shouldn't change
+        assert_eq!(editor.content(), "hello world");
+        // Clipboard should have the yanked text
+        assert_eq!(editor.clipboard, vec!["hello "]);
+    }
+
+    #[test]
+    fn test_cw_change_word() {
+        let mut editor = VimEditor::new("hello world".to_string());
+        handle_key(&mut editor, key_char('c'));
+        handle_key(&mut editor, key_char('w'));
+        // "hello " deleted, now in insert mode
+        assert_eq!(editor.content(), "world");
+        assert_eq!(editor.mode(), crate::vim_editor::VimMode::Insert);
+    }
+
+    // ── J (join lines) ────────────────────────────────────────
+
+    #[test]
+    fn test_join_lines_key() {
+        let mut editor = VimEditor::new("line one\nline two".to_string());
+        handle_key(&mut editor, key_shift('J'));
+        assert_eq!(editor.content(), "line one line two");
+    }
+
+    #[test]
+    fn test_join_lines_last_line_noop() {
+        let mut editor = VimEditor::new("only line".to_string());
+        handle_key(&mut editor, key_shift('J'));
+        assert_eq!(editor.content(), "only line");
+    }
+
+    // ── / search via command mode ─────────────────────────────
+
+    #[test]
+    fn test_slash_search() {
+        let mut editor = VimEditor::new("hello world hello".to_string());
+        // Enter search mode
+        editor.handle_key(key_char('/'));
+        assert_eq!(editor.mode(), crate::vim_editor::VimMode::Command);
+
+        // Type pattern
+        editor.handle_key(key_char('w'));
+        editor.handle_key(key_char('o'));
+        editor.handle_key(key_char('r'));
+
+        // Execute search
+        editor.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+        assert_eq!(editor.mode(), crate::vim_editor::VimMode::Normal);
+        assert_eq!(editor.search_pattern(), Some("wor"));
+    }
+
+    // ── :%s substitution ──────────────────────────────────────
+
+    #[test]
+    fn test_substitution_global() {
+        let mut editor = VimEditor::new("foo bar foo".to_string());
+        editor.execute_substitution("%s/foo/baz/g");
+        assert_eq!(editor.content(), "baz bar baz");
+    }
+
+    #[test]
+    fn test_substitution_first_only() {
+        let mut editor = VimEditor::new("foo bar foo".to_string());
+        editor.execute_substitution("%s/foo/baz/");
+        assert_eq!(editor.content(), "baz bar foo");
+    }
+
+    #[test]
+    fn test_substitution_multiline() {
+        let mut editor = VimEditor::new("aaa\nbbb\naaa".to_string());
+        editor.execute_substitution("%s/aaa/ccc/g");
+        assert_eq!(editor.content(), "ccc\nbbb\nccc");
+    }
+
+    #[test]
+    fn test_substitution_empty_pattern_noop() {
+        let mut editor = VimEditor::new("hello".to_string());
+        editor.execute_substitution("%s//world/g");
+        assert_eq!(editor.content(), "hello");
     }
 }
