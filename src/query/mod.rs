@@ -502,10 +502,15 @@ fn load_csv_file_into_sqlite(
     table_name: &str,
     config: &FileConfig,
 ) -> Result<()> {
-    let file_bytes = std::fs::read(file_path)
-        .context(format!("Failed to read file: {}", file_path.display()))?;
+    // Stream from file — never load entire file into memory.
+    // For custom encodings, we still need to read the full file (rare path).
+    if config.encoding.is_some() {
+        return load_csv_file_into_sqlite_encoded(conn, file_path, table_name, config);
+    }
 
-    let decoded = crate::csv::Document::decode_file_bytes(&file_bytes, config.encoding.clone())?;
+    let file = std::fs::File::open(file_path)
+        .context(format!("Failed to open file: {}", file_path.display()))?;
+    let buf_reader = std::io::BufReader::with_capacity(1024 * 1024, file);
 
     let mut builder = csv::ReaderBuilder::new();
     builder.has_headers(!config.no_headers);
@@ -513,7 +518,7 @@ fn load_csv_file_into_sqlite(
         builder.delimiter(d);
     }
 
-    let mut reader = builder.from_reader(decoded.as_bytes());
+    let mut reader = builder.from_reader(buf_reader);
 
     // Get headers
     let headers: Vec<String> = if config.no_headers {
@@ -530,26 +535,26 @@ fn load_csv_file_into_sqlite(
 
     let col_count = headers.len();
 
-    // Sample first 100 records for column type detection
+    // Sample first 100 records for column type detection (stream, don't buffer all)
     let mut sample_rows: Vec<Vec<String>> = Vec::new();
-    let mut buffered_records: Vec<csv::StringRecord> = Vec::new();
-    for result in reader.records() {
-        let record = result.context("Failed to read CSV record")?;
-        if sample_rows.len() < 100 {
-            let row: Vec<String> = (0..col_count)
-                .map(|i| record.get(i).unwrap_or("").to_string())
-                .collect();
-            sample_rows.push(row);
-        }
-        buffered_records.push(record);
+    let mut record = csv::ByteRecord::new();
+    let mut sample_count = 0;
+    while sample_count < 1000 && reader.read_byte_record(&mut record).unwrap_or(false) {
+        let row: Vec<String> = (0..col_count)
+            .map(|i| {
+                record
+                    .get(i)
+                    .map(|b| String::from_utf8_lossy(b).into_owned())
+                    .unwrap_or_default()
+            })
+            .collect();
+        sample_rows.push(row);
+        sample_count += 1;
     }
 
     let col_types = date_detection::detect_column_types(&sample_rows, col_count);
-    let has_date_cols = col_types
-        .iter()
-        .any(|ct| matches!(ct, date_detection::ColumnType::Date(_)));
 
-    // CREATE TABLE with detected affinities
+    // CREATE TABLE
     let col_defs: Vec<String> = headers
         .iter()
         .enumerate()
@@ -569,11 +574,10 @@ fn load_csv_file_into_sqlite(
     )
     .context(format!("Failed to create table '{}'", table_name))?;
 
-    let placeholders: Vec<&str> = vec!["?"; col_count];
     let insert_sql = format!(
         "INSERT INTO \"{}\" VALUES ({})",
         escaped_table,
-        placeholders.join(", ")
+        vec!["?"; col_count].join(",")
     );
 
     conn.execute("BEGIN", [])
@@ -581,35 +585,106 @@ fn load_csv_file_into_sqlite(
 
     let mut stmt = conn.prepare_cached(&insert_sql)?;
 
-    // Insert all buffered records
-    for record in &buffered_records {
-        if has_date_cols {
-            let params: Vec<String> = (0..col_count)
-                .map(|j| {
-                    let val = record.get(j).unwrap_or("");
-                    match &col_types[j] {
-                        date_detection::ColumnType::Date(fmt) => {
-                            date_detection::normalize_to_iso(val, *fmt)
-                        }
-                        date_detection::ColumnType::Numeric => val.to_string(),
-                    }
-                })
-                .collect();
-            stmt.execute(rusqlite::params_from_iter(
-                params.iter().map(|s: &String| s.as_str()),
-            ))?;
-        } else {
-            let params: Vec<&str> = (0..col_count)
-                .map(|j| record.get(j).unwrap_or(""))
-                .collect();
-            stmt.execute(rusqlite::params_from_iter(params))?;
-        }
+    // Insert sampled rows
+    for row in &sample_rows {
+        let params: Vec<&str> = row.iter().map(|s| s.as_str()).collect();
+        stmt.execute(rusqlite::params_from_iter(params))?;
+    }
+
+    // Stream remaining rows — bind directly from ByteRecord
+    while reader.read_byte_record(&mut record).unwrap_or(false) {
+        let params: Vec<std::borrow::Cow<str>> = (0..col_count)
+            .map(|j| {
+                record
+                    .get(j)
+                    .map(|b| String::from_utf8_lossy(b))
+                    .unwrap_or(std::borrow::Cow::Borrowed(""))
+            })
+            .collect();
+        stmt.execute(rusqlite::params_from_iter(
+            params.iter().map(|c| c.as_ref()),
+        ))?;
     }
 
     drop(stmt);
+
     conn.execute("COMMIT", [])
         .context("Failed to commit transaction")?;
 
+    Ok(())
+}
+
+/// Fallback for custom-encoded CSV files (must decode full file first).
+fn load_csv_file_into_sqlite_encoded(
+    conn: &Connection,
+    file_path: &Path,
+    table_name: &str,
+    config: &FileConfig,
+) -> Result<()> {
+    let file_bytes = std::fs::read(file_path)
+        .context(format!("Failed to read file: {}", file_path.display()))?;
+    let decoded = crate::csv::Document::decode_file_bytes(&file_bytes, config.encoding.clone())?;
+
+    let mut builder = csv::ReaderBuilder::new();
+    builder.has_headers(!config.no_headers);
+    if let Some(d) = config.delimiter {
+        builder.delimiter(d);
+    }
+    let mut reader = builder.from_reader(decoded.as_bytes());
+
+    let headers: Vec<String> = if config.no_headers {
+        let first = reader.headers().context("CSV file has no records")?;
+        (1..=first.len()).map(|i| format!("Column {}", i)).collect()
+    } else {
+        let h = reader.headers().context("CSV file has no headers")?;
+        h.iter().map(String::from).collect()
+    };
+
+    if headers.is_empty() {
+        bail!("CSV file has no columns");
+    }
+
+    let col_count = headers.len();
+    let escaped_table = table_name.replace('"', "\"\"");
+
+    let col_defs: Vec<String> = headers
+        .iter()
+        .map(|h| format!("\"{}\" TEXT", h.replace('"', "\"\"")))
+        .collect();
+    conn.execute(
+        &format!(
+            "CREATE TABLE \"{}\" ({})",
+            escaped_table,
+            col_defs.join(", ")
+        ),
+        [],
+    )?;
+
+    let placeholders: Vec<&str> = vec!["?"; col_count];
+    let insert_sql = format!(
+        "INSERT INTO \"{}\" VALUES ({})",
+        escaped_table,
+        placeholders.join(", ")
+    );
+
+    conn.execute("BEGIN", [])?;
+    let mut stmt = conn.prepare_cached(&insert_sql)?;
+    let mut record = csv::ByteRecord::new();
+    while reader.read_byte_record(&mut record).unwrap_or(false) {
+        let params: Vec<String> = (0..col_count)
+            .map(|j| {
+                record
+                    .get(j)
+                    .map(|b| String::from_utf8_lossy(b).into_owned())
+                    .unwrap_or_default()
+            })
+            .collect();
+        stmt.execute(rusqlite::params_from_iter(
+            params.iter().map(|s| s.as_str()),
+        ))?;
+    }
+    drop(stmt);
+    conn.execute("COMMIT", [])?;
     Ok(())
 }
 
@@ -773,11 +848,11 @@ pub fn load_csv_into_sqlite_cancellable(
     conn.execute(&create_sql, [])
         .context(format!("Failed to create table '{}'", table_name))?;
 
-    let placeholders: Vec<&str> = vec!["?"; col_count];
+    let escaped_table = table_name.replace('"', "\"\"");
     let insert_sql = format!(
         "INSERT INTO \"{}\" VALUES ({})",
-        table_name.replace('"', "\"\""),
-        placeholders.join(", ")
+        escaped_table,
+        vec!["?"; col_count].join(",")
     );
 
     conn.execute("BEGIN", [])
@@ -793,29 +868,27 @@ pub fn load_csv_into_sqlite_cancellable(
         }
         let row = doc.storage.get_row(row_idx);
         if has_date_cols {
-            let params: Vec<String> = (0..col_count)
-                .map(|j| {
-                    let val = row.get(j).map(|s| s.as_str()).unwrap_or("");
-                    match &col_types[j] {
-                        date_detection::ColumnType::Date(fmt) => {
-                            date_detection::normalize_to_iso(val, *fmt)
-                        }
-                        date_detection::ColumnType::Numeric => val.to_string(),
+            let params: Vec<String> = row
+                .iter()
+                .zip(col_types.iter())
+                .map(|(val, ct)| match ct {
+                    date_detection::ColumnType::Date(fmt) => {
+                        date_detection::normalize_to_iso(val, *fmt)
                     }
+                    date_detection::ColumnType::Numeric => val.to_string(),
                 })
                 .collect();
             stmt.execute(rusqlite::params_from_iter(
-                params.iter().map(|s: &String| s.as_str()),
+                params.iter().map(|s| s.as_str()),
             ))?;
         } else {
-            let params: Vec<&str> = (0..col_count)
-                .map(|j| row.get(j).map(|s| s.as_str()).unwrap_or(""))
-                .collect();
+            let params: Vec<&str> = row.iter().map(|s| s.as_str()).collect();
             stmt.execute(rusqlite::params_from_iter(params))?;
         }
     }
 
     drop(stmt);
+
     conn.execute("COMMIT", [])
         .context("Failed to commit transaction")?;
 
@@ -888,11 +961,10 @@ fn load_lazy_into_sqlite_cancellable(
     )
     .context(format!("Failed to create table '{}'", table_name))?;
 
-    let placeholders: Vec<&str> = vec!["?"; col_count];
     let insert_sql = format!(
         "INSERT INTO \"{}\" VALUES ({})",
         escaped_table,
-        placeholders.join(", ")
+        vec!["?"; col_count].join(",")
     );
 
     conn.execute("BEGIN", [])
@@ -901,7 +973,6 @@ fn load_lazy_into_sqlite_cancellable(
     let mut stmt = conn.prepare_cached(&insert_sql)?;
 
     // Re-create reader from the start to stream all data rows.
-    // The mmap is still available so this is free.
     let mut reader = csv::ReaderBuilder::new()
         .has_headers(true)
         .delimiter(delim)
@@ -919,12 +990,13 @@ fn load_lazy_into_sqlite_cancellable(
 
         if has_date_cols {
             let params: Vec<String> = (0..col_count)
-                .map(|i| {
+                .zip(col_types.iter())
+                .map(|(j, ct)| {
                     let val = record
-                        .get(i)
+                        .get(j)
                         .map(|b| String::from_utf8_lossy(b).into_owned())
                         .unwrap_or_default();
-                    match &col_types[i] {
+                    match ct {
                         date_detection::ColumnType::Date(fmt) => {
                             date_detection::normalize_to_iso(&val, *fmt)
                         }
@@ -933,21 +1005,20 @@ fn load_lazy_into_sqlite_cancellable(
                 })
                 .collect();
             stmt.execute(rusqlite::params_from_iter(
-                params.iter().map(|s: &String| s.as_str()),
+                params.iter().map(|s| s.as_str()),
             ))?;
         } else {
-            // Fast path: bind byte fields directly as &str without String allocation
-            // (safe because mmap bytes remain valid for the duration)
             let params: Vec<std::borrow::Cow<'_, str>> = (0..col_count)
-                .map(|i| {
+                .map(|j| {
                     record
-                        .get(i)
+                        .get(j)
                         .map(|b| String::from_utf8_lossy(b))
                         .unwrap_or(std::borrow::Cow::Borrowed(""))
                 })
                 .collect();
-            let param_refs: Vec<&str> = params.iter().map(|c| c.as_ref()).collect();
-            stmt.execute(rusqlite::params_from_iter(param_refs))?;
+            stmt.execute(rusqlite::params_from_iter(
+                params.iter().map(|c| c.as_ref()),
+            ))?;
         }
         row_count += 1;
     }
@@ -1045,20 +1116,41 @@ pub fn execute_query(path: &Path, query: &str, config: &FileConfig) -> Result<()
 
     let csv_files = resolve_csv_files(path)?;
 
-    let conn = Connection::open_in_memory().context("Failed to open in-memory SQLite database")?;
+    // Estimate total rows to decide in-memory vs disk-backed SQLite
+    let referenced = files_referenced_by_query(query, &csv_files);
+    let total_rows: usize = referenced
+        .iter()
+        .filter_map(|p| p.metadata().ok())
+        .map(|m| (m.len() as usize) / 50) // rough estimate: ~50 bytes per row
+        .sum();
 
-    // Optimize SQLite for bulk loading (safe for in-memory databases)
+    let conn = if total_rows > 10_000_000 {
+        let temp_path =
+            std::env::temp_dir().join(format!("lazycsv_query_{}.db", std::process::id()));
+        Connection::open(&temp_path).context("Failed to open disk-backed SQLite")?
+    } else {
+        Connection::open_in_memory().context("Failed to open in-memory SQLite database")?
+    };
+
     conn.execute_batch(
         "PRAGMA journal_mode=OFF;
          PRAGMA synchronous=OFF;
-         PRAGMA temp_store=MEMORY;
-         PRAGMA cache_size=-64000;",
+         PRAGMA cache_size=-256000;
+         PRAGMA page_size=8192;
+         PRAGMA mmap_size=1073741824;",
     )
     .context("Failed to set SQLite pragmas")?;
 
-    // Only load CSV files referenced by the query
-    let referenced = files_referenced_by_query(query, &csv_files);
-    for file_path in referenced {
+    // Use temp_store=FILE for large datasets, MEMORY for small
+    if total_rows > 10_000_000 {
+        conn.execute_batch("PRAGMA temp_store=FILE;")
+            .context("Failed to set temp_store")?;
+    } else {
+        conn.execute_batch("PRAGMA temp_store=MEMORY;")
+            .context("Failed to set temp_store")?;
+    }
+
+    for file_path in &referenced {
         let table_name = table_name_from_path(file_path);
         if load_csv_file_into_sqlite(&conn, file_path, &table_name, config).is_err() {
             continue;
@@ -1120,17 +1212,30 @@ pub fn execute_query_to_doc_from_path(
     let query = query.as_str();
 
     let csv_files = resolve_csv_files(path)?;
+    let referenced = files_referenced_by_query(query, &csv_files);
 
-    let conn = Connection::open_in_memory().context("Failed to open in-memory SQLite database")?;
+    let total_rows: usize = referenced
+        .iter()
+        .filter_map(|p| p.metadata().ok())
+        .map(|m| (m.len() as usize) / 50)
+        .sum();
+
+    let conn = if total_rows > 10_000_000 {
+        let temp_path =
+            std::env::temp_dir().join(format!("lazycsv_query_doc_{}.db", std::process::id(),));
+        Connection::open(&temp_path).context("Failed to open disk-backed SQLite")?
+    } else {
+        Connection::open_in_memory().context("Failed to open in-memory SQLite database")?
+    };
     conn.execute_batch(
         "PRAGMA journal_mode=OFF;
          PRAGMA synchronous=OFF;
-         PRAGMA temp_store=MEMORY;
-         PRAGMA cache_size=-64000;",
+         PRAGMA cache_size=-256000;
+         PRAGMA page_size=8192;
+         PRAGMA mmap_size=1073741824;",
     )?;
 
-    let referenced = files_referenced_by_query(query, &csv_files);
-    for file_path in referenced {
+    for file_path in &referenced {
         let table_name = table_name_from_path(file_path);
         if load_csv_file_into_sqlite(&conn, file_path, &table_name, config).is_err() {
             continue;

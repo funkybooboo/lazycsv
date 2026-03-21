@@ -446,9 +446,13 @@ impl std::fmt::Debug for SqliteCache {
     }
 }
 
+/// Threshold in rows above which SQLite uses a temp file on disk instead of in-memory.
+/// This prevents excessive RAM usage for large datasets.
+const SQLITE_DISK_THRESHOLD: usize = 10_000_000;
+
 impl SqliteCache {
-    /// Create a new in-memory SQLite connection with performance pragmas.
-    fn new() -> Self {
+    /// Create an in-memory SQLite connection (fast, but uses RAM for all data).
+    fn new_in_memory() -> Self {
         let conn = rusqlite::Connection::open_in_memory().expect("Failed to open in-memory SQLite");
         conn.execute_batch(
             "PRAGMA journal_mode=OFF;
@@ -460,6 +464,37 @@ impl SqliteCache {
         SqliteCache {
             conn,
             loaded_generations: HashMap::new(),
+        }
+    }
+
+    /// Create a disk-backed SQLite connection in a temp file.
+    /// Uses much less RAM for large datasets at the cost of some I/O.
+    fn new_on_disk() -> Self {
+        let temp_path =
+            std::env::temp_dir().join(format!("lazycsv_sqlite_{}.db", std::process::id()));
+        let conn =
+            rusqlite::Connection::open(&temp_path).expect("Failed to open disk-backed SQLite");
+        conn.execute_batch(
+            "PRAGMA journal_mode=OFF;
+             PRAGMA synchronous=OFF;
+             PRAGMA temp_store=FILE;
+             PRAGMA cache_size=-256000;
+             PRAGMA page_size=8192;
+             PRAGMA mmap_size=1073741824;",
+        )
+        .expect("Failed to set SQLite pragmas");
+        SqliteCache {
+            conn,
+            loaded_generations: HashMap::new(),
+        }
+    }
+
+    /// Create a connection appropriate for the dataset size.
+    fn for_row_count(row_count: usize) -> Self {
+        if row_count > SQLITE_DISK_THRESHOLD {
+            Self::new_on_disk()
+        } else {
+            Self::new_in_memory()
         }
     }
 
@@ -1168,7 +1203,10 @@ impl App {
         let query = query.as_str();
 
         // Take the cache out of self for independent borrowing
-        let mut cache = self.sqlite_cache.take().unwrap_or_else(SqliteCache::new);
+        let mut cache = self
+            .sqlite_cache
+            .take()
+            .unwrap_or_else(|| SqliteCache::for_row_count(self.document.row_count()));
 
         // Clean up stale tables
         on_progress("Preparing database...");
@@ -1252,7 +1290,10 @@ impl App {
         let query = crate::query::strip_csv_extensions(query);
         let query = query.as_str();
 
-        let mut cache = self.sqlite_cache.take().unwrap_or_else(SqliteCache::new);
+        let mut cache = self
+            .sqlite_cache
+            .take()
+            .unwrap_or_else(|| SqliteCache::for_row_count(self.document.row_count()));
 
         // Derive table name from the document's filename (not the session file path,
         // which may point to a different file after switching).
