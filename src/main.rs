@@ -362,8 +362,13 @@ fn handle_switch_document(
     if app.document.is_dirty {
         let current_path = app.current_file().clone();
         app.session.mark_dirty(&current_path);
-        app.session
-            .cache_document(current_path, app.document.clone());
+        // Only cache small dirty documents (edited files).
+        // Large query results live in temp CSV files and don't need cloning,
+        // which would materialize millions of mmap'd rows into RAM.
+        if !app.document.is_lazy() {
+            app.session
+                .cache_document(current_path, app.document.clone());
+        }
     }
 
     let doc_filename = doc.filename.clone();
@@ -555,10 +560,9 @@ fn handle_execute_query(terminal: &mut Term, app: &mut App, query: String) -> Re
 
 /// Spawn a clipboard command and return the child process.
 fn spawn_clipboard_command() -> Result<std::process::Child> {
-    use std::process::{Command, Stdio};
-
     #[cfg(target_os = "macos")]
     {
+        use std::process::{Command, Stdio};
         Command::new("pbcopy")
             .stdin(Stdio::piped())
             .spawn()
@@ -567,6 +571,7 @@ fn spawn_clipboard_command() -> Result<std::process::Child> {
 
     #[cfg(target_os = "linux")]
     {
+        use std::process::{Command, Stdio};
         Command::new("xclip")
             .args(["-selection", "clipboard"])
             .stdin(Stdio::piped())
@@ -587,36 +592,42 @@ fn spawn_clipboard_command() -> Result<std::process::Child> {
 
 /// Read text from the system clipboard.
 fn read_from_clipboard() -> Result<String> {
-    use std::process::{Command, Stdio};
-
     #[cfg(target_os = "macos")]
-    let output = Command::new("pbpaste")
-        .stdout(Stdio::piped())
-        .output()
-        .context("Failed to run pbpaste. Is it available?")?;
+    let output = {
+        use std::process::{Command, Stdio};
+        Command::new("pbpaste")
+            .stdout(Stdio::piped())
+            .output()
+            .context("Failed to run pbpaste. Is it available?")?
+    };
 
     #[cfg(target_os = "linux")]
-    let output = Command::new("xclip")
-        .args(["-selection", "clipboard", "-o"])
-        .stdout(Stdio::piped())
-        .output()
-        .or_else(|_| {
-            Command::new("xsel")
-                .args(["--clipboard", "--output"])
-                .stdout(Stdio::piped())
-                .output()
-        })
-        .or_else(|_| Command::new("wl-paste").stdout(Stdio::piped()).output())
-        .context("No clipboard tool found. Install xclip, xsel, or wl-paste.")?;
+    let output = {
+        use std::process::{Command, Stdio};
+        Command::new("xclip")
+            .args(["-selection", "clipboard", "-o"])
+            .stdout(Stdio::piped())
+            .output()
+            .or_else(|_| {
+                Command::new("xsel")
+                    .args(["--clipboard", "--output"])
+                    .stdout(Stdio::piped())
+                    .output()
+            })
+            .or_else(|_| Command::new("wl-paste").stdout(Stdio::piped()).output())
+            .context("No clipboard tool found. Install xclip, xsel, or wl-paste.")?
+    };
 
     #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     anyhow::bail!("Clipboard not supported on this platform");
 
-    if !output.status.success() {
-        anyhow::bail!("Clipboard read failed");
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    {
+        if !output.status.success() {
+            anyhow::bail!("Clipboard read failed");
+        }
+        String::from_utf8(output.stdout).context("Clipboard contains invalid UTF-8")
     }
-
-    String::from_utf8(output.stdout).context("Clipboard contains invalid UTF-8")
 }
 
 /// Copy text to the system clipboard.

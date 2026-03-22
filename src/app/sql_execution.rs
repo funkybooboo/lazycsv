@@ -169,7 +169,13 @@ pub fn load_file_from_disk(
     }
 }
 
-/// Execute SQL query and convert result to Document.
+/// Execute SQL query and return result as a Document.
+///
+/// Strategy:
+/// 1. Use DuckDB's COPY to write results directly to /tmp/<result>.csv
+/// 2. Load that file as a lazy mmap-backed Document (minimal RAM)
+/// 3. Drop all DuckDB tables to free memory
+/// 4. Fallback: materialize in-memory for DML readback (small results)
 ///
 /// Returns (result, was_cancelled, error_message).
 pub fn execute_and_convert_query(
@@ -177,7 +183,54 @@ pub fn execute_and_convert_query(
     query: &str,
     output_name: &str,
     cancelled: &AtomicBool,
+    on_progress: &mut dyn FnMut(&str),
 ) -> (Option<Document>, bool, Option<String>) {
+    let query_upper = query.trim().to_ascii_uppercase();
+    let is_select = query_upper.starts_with("SELECT");
+
+    // Skip COPY path for DML readback (bare SELECT * FROM table after INSERT/UPDATE/DELETE).
+    // These are always small and the table name matches the output name.
+    let result_table_upper = output_name
+        .strip_suffix(".csv")
+        .unwrap_or(output_name)
+        .to_ascii_uppercase();
+    let is_bare_select_from_same_table = is_select
+        && (query_upper.trim() == format!("SELECT * FROM \"{}\"", result_table_upper)
+            || query_upper.trim() == format!("SELECT * FROM {}", result_table_upper));
+
+    // For SELECT queries: COPY results to /tmp file, load as lazy mmap document
+    if is_select && !is_bare_select_from_same_table {
+        let result_stem = output_name.strip_suffix(".csv").unwrap_or(output_name);
+        let temp_path = std::env::temp_dir().join(format!(
+            "lazycsv_{}_{}.csv",
+            result_stem,
+            std::process::id()
+        ));
+        let temp_str = temp_path.display().to_string().replace('\'', "''");
+        let copy_sql = format!("COPY ({}) TO '{}' (HEADER, DELIMITER ',')", query, temp_str);
+
+        on_progress("Exporting results...");
+        if cache.conn().execute_batch(&copy_sql).is_ok() {
+            let mb = std::fs::metadata(&temp_path)
+                .map(|m| m.len() as f64 / (1024.0 * 1024.0))
+                .unwrap_or(0.0);
+            on_progress(&format!("Loading results ({:.0} MB)...", mb));
+            match crate::csv::row_storage::RowStorage::lazy_from_file(&temp_path, None, false) {
+                Ok(storage) => {
+                    let doc =
+                        crate::csv::Document::from_storage(storage, output_name.to_string(), ',');
+                    on_progress("Cleaning up...");
+                    cache.drop_all_tables();
+                    return (Some(doc), false, None);
+                }
+                Err(_) => {
+                    let _ = std::fs::remove_file(&temp_path);
+                }
+            }
+        }
+    }
+
+    // Fallback: materialize in-memory (DML readback or COPY failure)
     match crate::query::execute_query_to_document_cancellable(
         cache.conn(),
         query,

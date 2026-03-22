@@ -191,7 +191,7 @@ fn test_query_no_headers() {
         .arg(file.to_str().unwrap())
         .arg("--no-headers")
         .arg("-q")
-        .arg("SELECT \"Column 1\", \"Column 2\" FROM data ORDER BY \"Column 1\"")
+        .arg("SELECT * FROM data ORDER BY column0")
         .output()
         .unwrap();
 

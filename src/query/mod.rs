@@ -69,9 +69,29 @@ use crate::csv::Document;
 use crate::file_system;
 use crate::session::FileConfig;
 use anyhow::{bail, Context, Result};
+use duckdb::Connection;
 use error_enhancer::enhance_sql_error;
-use rusqlite::Connection;
 use std::path::{Path, PathBuf};
+
+/// Extract a cell value as String from a DuckDB row, handling all types.
+fn duckdb_get_string(row: &duckdb::Row, idx: usize) -> String {
+    // Try String first (VARCHAR columns)
+    if let Ok(s) = row.get::<_, String>(idx) {
+        return s;
+    }
+    // Try numeric types
+    if let Ok(n) = row.get::<_, i64>(idx) {
+        return n.to_string();
+    }
+    if let Ok(f) = row.get::<_, f64>(idx) {
+        return f.to_string();
+    }
+    if let Ok(b) = row.get::<_, bool>(idx) {
+        return b.to_string();
+    }
+    // NULL or unsupported
+    String::new()
+}
 use std::sync::atomic::AtomicBool;
 
 /// Derive a SQLite table name from a file path.
@@ -391,7 +411,7 @@ pub fn resolve_csv_files(path: &Path) -> Result<Vec<PathBuf>> {
 /// # Examples
 ///
 /// ```no_run
-/// use rusqlite::Connection;
+/// use duckdb::Connection;
 /// use lazycsv::csv::Document;
 /// use lazycsv::query::load_csv_into_sqlite;
 ///
@@ -459,7 +479,7 @@ pub fn load_csv_into_sqlite(conn: &Connection, doc: &Document, table_name: &str)
     conn.execute("BEGIN", [])
         .context("Failed to begin transaction")?;
 
-    let mut stmt = conn.prepare_cached(&insert_sql)?;
+    let mut stmt = conn.prepare(&insert_sql)?;
 
     // Stream rows one at a time from storage (avoids materializing all rows for lazy docs)
     for row_idx in 1..row_count {
@@ -476,14 +496,14 @@ pub fn load_csv_into_sqlite(conn: &Connection, doc: &Document, table_name: &str)
                     }
                 })
                 .collect();
-            stmt.execute(rusqlite::params_from_iter(
+            stmt.execute(duckdb::params_from_iter(
                 params.iter().map(|s: &String| s.as_str()),
             ))?;
         } else {
             let params: Vec<&str> = (0..col_count)
                 .map(|j| row.get(j).map(|s| s.as_str()).unwrap_or(""))
                 .collect();
-            stmt.execute(rusqlite::params_from_iter(params))?;
+            stmt.execute(duckdb::params_from_iter(params))?;
         }
     }
 
@@ -502,114 +522,35 @@ fn load_csv_file_into_sqlite(
     table_name: &str,
     config: &FileConfig,
 ) -> Result<()> {
-    // Stream from file — never load entire file into memory.
-    // For custom encodings, we still need to read the full file (rare path).
+    // For custom encodings, fall back to manual loading
     if config.encoding.is_some() {
         return load_csv_file_into_sqlite_encoded(conn, file_path, table_name, config);
     }
 
-    let file = std::fs::File::open(file_path)
-        .context(format!("Failed to open file: {}", file_path.display()))?;
-    let buf_reader = std::io::BufReader::with_capacity(1024 * 1024, file);
+    let escaped_table = table_name.replace('"', "\"\"");
+    let path_str = file_path.display().to_string().replace('\'', "''");
 
-    let mut builder = csv::ReaderBuilder::new();
-    builder.has_headers(!config.no_headers);
-    if let Some(d) = config.delimiter {
-        builder.delimiter(d);
-    }
-
-    let mut reader = builder.from_reader(buf_reader);
-
-    // Get headers
-    let headers: Vec<String> = if config.no_headers {
-        let first = reader.headers().context("CSV file has no records")?;
-        (1..=first.len()).map(|i| format!("Column {}", i)).collect()
+    // Build read_csv options
+    let delim = config
+        .delimiter
+        .map(|d| format!(", delim = '{}'", d as char))
+        .unwrap_or_default();
+    let header = if config.no_headers {
+        ", header = false"
     } else {
-        let h = reader.headers().context("CSV file has no headers")?;
-        h.iter().map(String::from).collect()
+        ", header = true"
     };
 
-    if headers.is_empty() {
-        bail!("CSV file has no columns");
-    }
-
-    let col_count = headers.len();
-
-    // Sample first 100 records for column type detection (stream, don't buffer all)
-    let mut sample_rows: Vec<Vec<String>> = Vec::new();
-    let mut record = csv::ByteRecord::new();
-    let mut sample_count = 0;
-    while sample_count < 1000 && reader.read_byte_record(&mut record).unwrap_or(false) {
-        let row: Vec<String> = (0..col_count)
-            .map(|i| {
-                record
-                    .get(i)
-                    .map(|b| String::from_utf8_lossy(b).into_owned())
-                    .unwrap_or_default()
-            })
-            .collect();
-        sample_rows.push(row);
-        sample_count += 1;
-    }
-
-    let col_types = date_detection::detect_column_types(&sample_rows, col_count);
-
-    // CREATE TABLE
-    let col_defs: Vec<String> = headers
-        .iter()
-        .enumerate()
-        .map(|(i, h)| {
-            let affinity = date_detection::sqlite_affinity(&col_types[i]);
-            format!("\"{}\" {}", h.replace('"', "\"\""), affinity)
-        })
-        .collect();
-    let escaped_table = table_name.replace('"', "\"\"");
-    conn.execute(
-        &format!(
-            "CREATE TABLE \"{}\" ({})",
-            escaped_table,
-            col_defs.join(", ")
-        ),
-        [],
-    )
-    .context(format!("Failed to create table '{}'", table_name))?;
-
-    let insert_sql = format!(
-        "INSERT INTO \"{}\" VALUES ({})",
-        escaped_table,
-        vec!["?"; col_count].join(",")
+    // Use DuckDB's native read_csv — no manual INSERT loop needed
+    let sql = format!(
+        "CREATE TABLE \"{}\" AS SELECT * FROM read_csv('{}'{}{})",
+        escaped_table, path_str, header, delim
     );
 
-    conn.execute("BEGIN", [])
-        .context("Failed to begin transaction")?;
-
-    let mut stmt = conn.prepare_cached(&insert_sql)?;
-
-    // Insert sampled rows
-    for row in &sample_rows {
-        let params: Vec<&str> = row.iter().map(|s| s.as_str()).collect();
-        stmt.execute(rusqlite::params_from_iter(params))?;
-    }
-
-    // Stream remaining rows — bind directly from ByteRecord
-    while reader.read_byte_record(&mut record).unwrap_or(false) {
-        let params: Vec<std::borrow::Cow<str>> = (0..col_count)
-            .map(|j| {
-                record
-                    .get(j)
-                    .map(|b| String::from_utf8_lossy(b))
-                    .unwrap_or(std::borrow::Cow::Borrowed(""))
-            })
-            .collect();
-        stmt.execute(rusqlite::params_from_iter(
-            params.iter().map(|c| c.as_ref()),
-        ))?;
-    }
-
-    drop(stmt);
-
-    conn.execute("COMMIT", [])
-        .context("Failed to commit transaction")?;
+    conn.execute_batch(&sql).context(format!(
+        "Failed to load '{}' via read_csv",
+        file_path.display()
+    ))?;
 
     Ok(())
 }
@@ -668,7 +609,7 @@ fn load_csv_file_into_sqlite_encoded(
     );
 
     conn.execute("BEGIN", [])?;
-    let mut stmt = conn.prepare_cached(&insert_sql)?;
+    let mut stmt = conn.prepare(&insert_sql)?;
     let mut record = csv::ByteRecord::new();
     while reader.read_byte_record(&mut record).unwrap_or(false) {
         let params: Vec<String> = (0..col_count)
@@ -679,9 +620,7 @@ fn load_csv_file_into_sqlite_encoded(
                     .unwrap_or_default()
             })
             .collect();
-        stmt.execute(rusqlite::params_from_iter(
-            params.iter().map(|s| s.as_str()),
-        ))?;
+        stmt.execute(duckdb::params_from_iter(params.iter().map(|s| s.as_str())))?;
     }
     drop(stmt);
     conn.execute("COMMIT", [])?;
@@ -709,7 +648,7 @@ fn load_csv_file_into_sqlite_encoded(
 /// # Examples
 ///
 /// ```no_run
-/// use rusqlite::Connection;
+/// use duckdb::Connection;
 /// use lazycsv::query::{load_csv_into_sqlite, execute_query_to_document};
 /// use lazycsv::csv::Document;
 ///
@@ -740,26 +679,19 @@ pub fn execute_query_to_document(
     query: &str,
     output_filename: String,
 ) -> Result<Document> {
+    // DuckDB requires execution before column info is available.
+    // Use a two-step approach: execute to get column names, then re-execute to get data.
     let mut stmt = conn.prepare(query).map_err(|e| anyhow::anyhow!("{}", e))?;
+    // Execute once to make column info available
+    let _ = stmt.execute([]).ok();
     let col_count = stmt.column_count();
-    let col_names: Vec<String> = (0..col_count)
-        .map(|i| stmt.column_name(i).unwrap_or("?").to_string())
-        .collect();
+    let col_names = stmt.column_names();
 
+    // Re-prepare and query for data
+    let mut stmt = conn.prepare(query).map_err(|e| anyhow::anyhow!("{}", e))?;
     let rows = stmt
         .query_map([], |row| {
-            let values: Vec<String> = (0..col_count)
-                .map(|i| {
-                    use rusqlite::types::ValueRef;
-                    match row.get_ref(i).unwrap_or(ValueRef::Null) {
-                        ValueRef::Null => String::new(),
-                        ValueRef::Integer(n) => n.to_string(),
-                        ValueRef::Real(f) => f.to_string(),
-                        ValueRef::Text(s) => String::from_utf8_lossy(s).into_owned(),
-                        ValueRef::Blob(b) => String::from_utf8_lossy(b).into_owned(),
-                    }
-                })
-                .collect();
+            let values: Vec<String> = (0..col_count).map(|i| duckdb_get_string(row, i)).collect();
             Ok(values)
         })
         .map_err(|e| anyhow::anyhow!("{}", e))?;
@@ -858,7 +790,7 @@ pub fn load_csv_into_sqlite_cancellable(
     conn.execute("BEGIN", [])
         .context("Failed to begin transaction")?;
 
-    let mut stmt = conn.prepare_cached(&insert_sql)?;
+    let mut stmt = conn.prepare(&insert_sql)?;
 
     for row_idx in 1..row_count {
         if (row_idx - 1) % cancel::CHECK_INTERVAL == 0 && cancel::check_esc(cancelled) {
@@ -878,12 +810,10 @@ pub fn load_csv_into_sqlite_cancellable(
                     date_detection::ColumnType::Numeric => val.to_string(),
                 })
                 .collect();
-            stmt.execute(rusqlite::params_from_iter(
-                params.iter().map(|s| s.as_str()),
-            ))?;
+            stmt.execute(duckdb::params_from_iter(params.iter().map(|s| s.as_str())))?;
         } else {
             let params: Vec<&str> = row.iter().map(|s| s.as_str()).collect();
-            stmt.execute(rusqlite::params_from_iter(params))?;
+            stmt.execute(duckdb::params_from_iter(params))?;
         }
     }
 
@@ -970,7 +900,7 @@ fn load_lazy_into_sqlite_cancellable(
     conn.execute("BEGIN", [])
         .context("Failed to begin transaction")?;
 
-    let mut stmt = conn.prepare_cached(&insert_sql)?;
+    let mut stmt = conn.prepare(&insert_sql)?;
 
     // Re-create reader from the start to stream all data rows.
     let mut reader = csv::ReaderBuilder::new()
@@ -1004,9 +934,7 @@ fn load_lazy_into_sqlite_cancellable(
                     }
                 })
                 .collect();
-            stmt.execute(rusqlite::params_from_iter(
-                params.iter().map(|s| s.as_str()),
-            ))?;
+            stmt.execute(duckdb::params_from_iter(params.iter().map(|s| s.as_str())))?;
         } else {
             let params: Vec<std::borrow::Cow<'_, str>> = (0..col_count)
                 .map(|j| {
@@ -1016,9 +944,7 @@ fn load_lazy_into_sqlite_cancellable(
                         .unwrap_or(std::borrow::Cow::Borrowed(""))
                 })
                 .collect();
-            stmt.execute(rusqlite::params_from_iter(
-                params.iter().map(|c| c.as_ref()),
-            ))?;
+            stmt.execute(duckdb::params_from_iter(params.iter().map(|c| c.as_ref())))?;
         }
         row_count += 1;
     }
@@ -1075,25 +1001,17 @@ pub fn execute_query_to_document_cancellable(
     let mut stmt = conn
         .prepare(query)
         .map_err(|e| enhance_sql_error(e, conn, query))?;
+    // DuckDB requires execution before column info is available
+    let _ = stmt.execute([]).ok();
     let col_count = stmt.column_count();
-    let col_names: Vec<String> = (0..col_count)
-        .map(|i| stmt.column_name(i).unwrap_or("?").to_string())
-        .collect();
+    let col_names = stmt.column_names();
+    let mut stmt = conn
+        .prepare(query)
+        .map_err(|e| enhance_sql_error(e, conn, query))?;
 
     let rows = stmt
         .query_map([], |row| {
-            let values: Vec<String> = (0..col_count)
-                .map(|i| {
-                    use rusqlite::types::ValueRef;
-                    match row.get_ref(i).unwrap_or(ValueRef::Null) {
-                        ValueRef::Null => String::new(),
-                        ValueRef::Integer(n) => n.to_string(),
-                        ValueRef::Real(f) => f.to_string(),
-                        ValueRef::Text(s) => String::from_utf8_lossy(s).into_owned(),
-                        ValueRef::Blob(b) => String::from_utf8_lossy(b).into_owned(),
-                    }
-                })
-                .collect();
+            let values: Vec<String> = (0..col_count).map(|i| duckdb_get_string(row, i)).collect();
             Ok(values)
         })
         .map_err(|e| anyhow::anyhow!("{}", e))?;
@@ -1115,40 +1033,9 @@ pub fn execute_query(path: &Path, query: &str, config: &FileConfig) -> Result<()
     let query = query.as_str();
 
     let csv_files = resolve_csv_files(path)?;
-
-    // Estimate total rows to decide in-memory vs disk-backed SQLite
     let referenced = files_referenced_by_query(query, &csv_files);
-    let total_rows: usize = referenced
-        .iter()
-        .filter_map(|p| p.metadata().ok())
-        .map(|m| (m.len() as usize) / 50) // rough estimate: ~50 bytes per row
-        .sum();
 
-    let conn = if total_rows > 10_000_000 {
-        let temp_path =
-            std::env::temp_dir().join(format!("lazycsv_query_{}.db", std::process::id()));
-        Connection::open(&temp_path).context("Failed to open disk-backed SQLite")?
-    } else {
-        Connection::open_in_memory().context("Failed to open in-memory SQLite database")?
-    };
-
-    conn.execute_batch(
-        "PRAGMA journal_mode=OFF;
-         PRAGMA synchronous=OFF;
-         PRAGMA cache_size=-256000;
-         PRAGMA page_size=8192;
-         PRAGMA mmap_size=1073741824;",
-    )
-    .context("Failed to set SQLite pragmas")?;
-
-    // Use temp_store=FILE for large datasets, MEMORY for small
-    if total_rows > 10_000_000 {
-        conn.execute_batch("PRAGMA temp_store=FILE;")
-            .context("Failed to set temp_store")?;
-    } else {
-        conn.execute_batch("PRAGMA temp_store=MEMORY;")
-            .context("Failed to set temp_store")?;
-    }
+    let conn = Connection::open_in_memory().context("Failed to open DuckDB")?;
 
     for file_path in &referenced {
         let table_name = table_name_from_path(file_path);
@@ -1161,25 +1048,16 @@ pub fn execute_query(path: &Path, query: &str, config: &FileConfig) -> Result<()
     let mut stmt = conn
         .prepare(query)
         .map_err(|e| enhance_sql_error(e, &conn, query))?;
+    let _ = stmt.execute([]).ok();
     let col_count = stmt.column_count();
-    let col_names: Vec<String> = (0..col_count)
-        .map(|i| stmt.column_name(i).unwrap_or("?").to_string())
-        .collect();
+    let col_names = stmt.column_names();
+    let mut stmt = conn
+        .prepare(query)
+        .map_err(|e| enhance_sql_error(e, &conn, query))?;
 
     let rows = stmt
         .query_map([], |row| {
-            let values: Vec<String> = (0..col_count)
-                .map(|i| {
-                    use rusqlite::types::ValueRef;
-                    match row.get_ref(i).unwrap_or(ValueRef::Null) {
-                        ValueRef::Null => String::new(),
-                        ValueRef::Integer(n) => n.to_string(),
-                        ValueRef::Real(f) => f.to_string(),
-                        ValueRef::Text(s) => String::from_utf8_lossy(s).into_owned(),
-                        ValueRef::Blob(b) => String::from_utf8_lossy(b).into_owned(),
-                    }
-                })
-                .collect();
+            let values: Vec<String> = (0..col_count).map(|i| duckdb_get_string(row, i)).collect();
             Ok(values)
         })
         .map_err(|e| anyhow::anyhow!("{}", e))?;
@@ -1214,26 +1092,7 @@ pub fn execute_query_to_doc_from_path(
     let csv_files = resolve_csv_files(path)?;
     let referenced = files_referenced_by_query(query, &csv_files);
 
-    let total_rows: usize = referenced
-        .iter()
-        .filter_map(|p| p.metadata().ok())
-        .map(|m| (m.len() as usize) / 50)
-        .sum();
-
-    let conn = if total_rows > 10_000_000 {
-        let temp_path =
-            std::env::temp_dir().join(format!("lazycsv_query_doc_{}.db", std::process::id(),));
-        Connection::open(&temp_path).context("Failed to open disk-backed SQLite")?
-    } else {
-        Connection::open_in_memory().context("Failed to open in-memory SQLite database")?
-    };
-    conn.execute_batch(
-        "PRAGMA journal_mode=OFF;
-         PRAGMA synchronous=OFF;
-         PRAGMA cache_size=-256000;
-         PRAGMA page_size=8192;
-         PRAGMA mmap_size=1073741824;",
-    )?;
+    let conn = Connection::open_in_memory().context("Failed to open DuckDB")?;
 
     for file_path in &referenced {
         let table_name = table_name_from_path(file_path);
@@ -1307,19 +1166,8 @@ mod tests {
             .unwrap();
         let rows: Vec<(String, String)> = stmt
             .query_map([], |row| {
-                use rusqlite::types::ValueRef;
-                let col0 = match row.get_ref(0).unwrap_or(ValueRef::Null) {
-                    ValueRef::Text(s) => String::from_utf8_lossy(s).into_owned(),
-                    ValueRef::Integer(n) => n.to_string(),
-                    ValueRef::Real(f) => f.to_string(),
-                    _ => String::new(),
-                };
-                let col1 = match row.get_ref(1).unwrap_or(ValueRef::Null) {
-                    ValueRef::Text(s) => String::from_utf8_lossy(s).into_owned(),
-                    ValueRef::Integer(n) => n.to_string(),
-                    ValueRef::Real(f) => f.to_string(),
-                    _ => String::new(),
-                };
+                let col0: String = row.get(0)?;
+                let col1: String = row.get(1)?;
                 Ok((col0, col1))
             })
             .unwrap()
@@ -1439,7 +1287,7 @@ mod tests {
         );
         let err_msg = result.unwrap_err().to_string();
         assert!(
-            err_msg.contains("no such column: Contect"),
+            err_msg.contains("Contect"),
             "Error should mention the bad column name, got: {}",
             err_msg
         );
@@ -1565,7 +1413,14 @@ mod tests {
 
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("no such table") || err_msg.contains("Failed to execute query"));
+        assert!(
+            err_msg.contains("no such table")
+                || err_msg.contains("Table")
+                || err_msg.contains("does not exist")
+                || err_msg.contains("Catalog Error"),
+            "Unexpected error: {}",
+            err_msg
+        );
     }
 
     #[test]

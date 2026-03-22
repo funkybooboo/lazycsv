@@ -29,6 +29,18 @@ pub fn handle_key(editor: &mut VimEditor, key: KeyEvent) -> KeyResult {
         return KeyResult::Handled;
     }
 
+    // Handle pending replace: r + next char (must come before count prefix
+    // so that digits can be used as replacement characters)
+    if editor.pending_command == Some(super::PendingCommand::Replace) {
+        editor.pending_command = None;
+        if let KeyCode::Char(c) = key.code {
+            editor.push_undo();
+            editor.replace_char(c);
+        }
+        editor.count_prefix = None;
+        return KeyResult::Handled;
+    }
+
     // Handle count prefix (0-9) - must come before other handlers
     if let KeyCode::Char(c) = key.code {
         if c.is_ascii_digit()
@@ -501,6 +513,12 @@ fn handle_edit_operations(editor: &mut VimEditor, key: KeyEvent) -> KeyResult {
                 editor.join_lines();
             }
             true
+        }
+
+        // Replace single character
+        (KeyCode::Char('r'), KeyModifiers::NONE) => {
+            editor.pending_command = Some(super::PendingCommand::Replace);
+            return KeyResult::Handled; // Don't clear count
         }
 
         // Undo/Redo

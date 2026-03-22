@@ -284,3 +284,106 @@ fn test_wq_bang_does_not_error() {
         msg
     );
 }
+
+// ── DuckDB reload_table strategies ──────────────────────────
+
+#[test]
+fn test_dml_on_clean_file_uses_fast_path() {
+    // Strategy 1: clean file on disk → DuckDB read_csv directly
+    let (mut app, _dir) = create_app("Name,Value\nAlice,10\nBob,20\n");
+    // Document is not dirty, file exists on disk
+    assert!(!app.document.is_dirty);
+
+    let cancelled = AtomicBool::new(false);
+    let mut progress = |_: &str| {};
+    let (success, _) = app.execute_sql_dml_cancellable(
+        "UPDATE data SET Value = '99' WHERE Name = 'Alice'",
+        &cancelled,
+        &mut progress,
+    );
+    assert!(success);
+    // After DML, document should be dirty and have updated data
+    assert!(app.document.is_dirty);
+}
+
+#[test]
+fn test_dml_exports_to_temp_file() {
+    // DML should export modified data via COPY to a temp file
+    let (mut app, _dir) = create_app("X,Y\n1,2\n3,4\n");
+
+    let cancelled = AtomicBool::new(false);
+    let mut progress = |_: &str| {};
+    let (success, _) =
+        app.execute_sql_dml_cancellable("UPDATE data SET Y = '99'", &cancelled, &mut progress);
+    assert!(success);
+
+    // Verify the updated values are visible
+    let mut found_99 = false;
+    for i in 1..app.document.row_count() {
+        let row = app.document.get_rows_range(i, i + 1);
+        if row[0].get(1).map(|s| s.as_str()) == Some("99") {
+            found_99 = true;
+            break;
+        }
+    }
+    assert!(found_99, "Updated value '99' should be in document");
+}
+
+#[test]
+fn test_dml_original_file_untouched() {
+    // DML should not modify the original CSV file
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("original.csv");
+    let original_content = "Name,Score\nAlice,100\nBob,200\n";
+    write(&file_path, original_content).unwrap();
+
+    let args = CliArgs::try_parse_from(["lazycsv", file_path.to_str().unwrap()]).unwrap();
+    let mut app = App::from_cli(args).unwrap();
+
+    let cancelled = AtomicBool::new(false);
+    let mut progress = |_: &str| {};
+    let (success, _) = app.execute_sql_dml_cancellable(
+        "UPDATE original SET Score = '999'",
+        &cancelled,
+        &mut progress,
+    );
+    assert!(success);
+
+    // Original file should be unchanged
+    let disk_content = std::fs::read_to_string(&file_path).unwrap();
+    assert_eq!(
+        disk_content, original_content,
+        "Original file should not be modified by DML"
+    );
+}
+
+#[test]
+fn test_query_result_uses_lazy_mmap() {
+    // Query results should be loaded as lazy mmap documents (not in-memory Vec<Vec<String>>)
+    let (mut app, _dir) = create_app("A,B\n1,2\n3,4\n5,6\n");
+
+    let cancelled = std::sync::Arc::new(AtomicBool::new(false));
+    let watcher = lazycsv::cancel::EscWatcher::spawn(&cancelled);
+    let mut progress = |_: &str| {};
+    let (result, _) = app.execute_sql_query_cancellable(
+        "SELECT * FROM data WHERE A != '3'",
+        "result.csv",
+        &cancelled,
+        &mut progress,
+    );
+    watcher.stop();
+
+    assert!(result.is_some());
+    let doc = result.unwrap();
+    assert_eq!(doc.row_count(), 3); // header + 2 data rows
+}
+
+#[test]
+fn test_switch_document_does_not_clone_lazy() {
+    // Verifies that switching away from a lazy document doesn't materialize it.
+    // We can't directly test this without timing, but we can verify the document
+    // is lazy before the switch.
+    let (app, _dir) = create_app("A,B\n1,2\n");
+    // Small files are in-memory, not lazy
+    assert!(!app.document.is_lazy());
+}

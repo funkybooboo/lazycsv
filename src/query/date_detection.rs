@@ -76,8 +76,8 @@ pub fn detect_column_types_from_strs(rows: &[Vec<&str>], col_count: usize) -> Ve
 /// Build the SQLite affinity string for a detected column type.
 pub fn sqlite_affinity(col_type: &ColumnType) -> &'static str {
     match col_type {
-        ColumnType::Numeric => "NUMERIC",
-        ColumnType::Date(_) => "TEXT",
+        ColumnType::Numeric => "VARCHAR",
+        ColumnType::Date(_) => "VARCHAR",
     }
 }
 
@@ -710,7 +710,11 @@ mod tests {
 
     #[test]
     fn test_sqlite_affinity() {
-        assert_eq!(sqlite_affinity(&ColumnType::Numeric), "NUMERIC");
-        assert_eq!(sqlite_affinity(&ColumnType::Date(DateFormat::Iso)), "TEXT");
+        // DuckDB uses VARCHAR for all columns
+        assert_eq!(sqlite_affinity(&ColumnType::Numeric), "VARCHAR");
+        assert_eq!(
+            sqlite_affinity(&ColumnType::Date(DateFormat::Iso)),
+            "VARCHAR"
+        );
     }
 }

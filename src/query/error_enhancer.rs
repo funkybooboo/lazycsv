@@ -3,10 +3,10 @@
 //! Parses SQLite errors and provides user-friendly messages with helpful suggestions.
 
 use anyhow::anyhow;
-use rusqlite::Connection;
+use duckdb::Connection;
 
 /// Enhance a SQL error with context-aware help
-pub fn enhance_sql_error(error: rusqlite::Error, conn: &Connection, query: &str) -> anyhow::Error {
+pub fn enhance_sql_error(error: duckdb::Error, conn: &Connection, query: &str) -> anyhow::Error {
     let err_str = error.to_string();
 
     // Handle "no such column" errors with suggestions

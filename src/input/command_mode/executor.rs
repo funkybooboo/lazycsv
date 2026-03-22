@@ -323,7 +323,6 @@ fn execute_clear_search(app: &mut App) -> Result<InputResult> {
 /// Execute :copy/:clipboard command — copy current document as CSV to system clipboard.
 fn execute_copy_to_clipboard(app: &mut App) -> Result<InputResult> {
     use std::io::Write;
-    use std::process::{Command, Stdio};
 
     // Build CSV content from current document
     let mut buf = Vec::new();
@@ -332,20 +331,26 @@ fn execute_copy_to_clipboard(app: &mut App) -> Result<InputResult> {
 
     // Spawn clipboard command
     #[cfg(target_os = "macos")]
-    let child_result = Command::new("pbcopy").stdin(Stdio::piped()).spawn();
+    let child_result = {
+        use std::process::{Command, Stdio};
+        Command::new("pbcopy").stdin(Stdio::piped()).spawn()
+    };
 
     #[cfg(target_os = "linux")]
-    let child_result = Command::new("xclip")
-        .args(["-selection", "clipboard"])
-        .stdin(Stdio::piped())
-        .spawn()
-        .or_else(|_| {
-            Command::new("xsel")
-                .args(["--clipboard", "--input"])
-                .stdin(Stdio::piped())
-                .spawn()
-        })
-        .or_else(|_| Command::new("wl-copy").stdin(Stdio::piped()).spawn());
+    let child_result = {
+        use std::process::{Command, Stdio};
+        Command::new("xclip")
+            .args(["-selection", "clipboard"])
+            .stdin(Stdio::piped())
+            .spawn()
+            .or_else(|_| {
+                Command::new("xsel")
+                    .args(["--clipboard", "--input"])
+                    .stdin(Stdio::piped())
+                    .spawn()
+            })
+            .or_else(|_| Command::new("wl-copy").stdin(Stdio::piped()).spawn())
+    };
 
     #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     let child_result: Result<std::process::Child, std::io::Error> = Err(std::io::Error::new(
@@ -375,24 +380,28 @@ fn execute_copy_to_clipboard(app: &mut App) -> Result<InputResult> {
 
 /// Execute :paste command — read CSV/TSV from system clipboard and replace current document.
 fn execute_paste_from_clipboard(app: &mut App) -> Result<InputResult> {
-    use std::process::{Command, Stdio};
-
     // Read from clipboard
     #[cfg(target_os = "macos")]
-    let output_result = Command::new("pbpaste").stdout(Stdio::piped()).output();
+    let output_result = {
+        use std::process::{Command, Stdio};
+        Command::new("pbpaste").stdout(Stdio::piped()).output()
+    };
 
     #[cfg(target_os = "linux")]
-    let output_result = Command::new("xclip")
-        .args(["-selection", "clipboard", "-o"])
-        .stdout(Stdio::piped())
-        .output()
-        .or_else(|_| {
-            Command::new("xsel")
-                .args(["--clipboard", "--output"])
-                .stdout(Stdio::piped())
-                .output()
-        })
-        .or_else(|_| Command::new("wl-paste").stdout(Stdio::piped()).output());
+    let output_result = {
+        use std::process::{Command, Stdio};
+        Command::new("xclip")
+            .args(["-selection", "clipboard", "-o"])
+            .stdout(Stdio::piped())
+            .output()
+            .or_else(|_| {
+                Command::new("xsel")
+                    .args(["--clipboard", "--output"])
+                    .stdout(Stdio::piped())
+                    .output()
+            })
+            .or_else(|_| Command::new("wl-paste").stdout(Stdio::piped()).output())
+    };
 
     #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     let output_result: Result<std::process::Output, std::io::Error> = Err(std::io::Error::new(
