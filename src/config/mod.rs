@@ -145,6 +145,12 @@ pub struct ConfigWatcher {
     local_mtime: Option<SystemTime>,
 }
 
+impl Default for ConfigWatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ConfigWatcher {
     /// Create a new watcher, recording the current mtimes of config files.
     pub fn new() -> Self {

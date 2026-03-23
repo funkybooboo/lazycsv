@@ -157,9 +157,18 @@ pub fn paste_columns_after(app: &mut App) {
     if let Some(columns) = app.clipboard.as_columns() {
         let col_idx = app.view_state.selected_column;
         let pasted_count = columns.len();
+        let mut commands = Vec::new();
         for (i, col_data) in columns.into_iter().enumerate() {
             let insert_at = ColIndex::new(col_idx.get() + 1 + i);
-            app.document.insert_column(insert_at, col_data);
+            app.document.insert_column(insert_at, col_data.clone());
+            commands.push(crate::history::EditCommand::InsertColumn {
+                at: insert_at,
+                data: col_data,
+            });
+        }
+        if !commands.is_empty() {
+            app.history
+                .push(crate::history::EditCommand::Compound(commands));
         }
         // Move selection to first pasted column
         app.view_state.selected_column = ColIndex::new(col_idx.get() + 1);
@@ -178,9 +187,18 @@ pub fn paste_columns_before(app: &mut App) {
     if let Some(columns) = app.clipboard.as_columns() {
         let col_idx = app.view_state.selected_column;
         let pasted_count = columns.len();
+        let mut commands = Vec::new();
         for (i, col_data) in columns.into_iter().enumerate() {
             let insert_at = ColIndex::new(col_idx.get() + i);
-            app.document.insert_column(insert_at, col_data);
+            app.document.insert_column(insert_at, col_data.clone());
+            commands.push(crate::history::EditCommand::InsertColumn {
+                at: insert_at,
+                data: col_data,
+            });
+        }
+        if !commands.is_empty() {
+            app.history
+                .push(crate::history::EditCommand::Compound(commands));
         }
         // Selection stays at current index (first pasted column)
         app.status_message = Some(StatusMessage::new_owned(format!(

@@ -25,7 +25,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.9.0 | Configuration System | [x] | 12 |
 | v0.9.1 | Configuration Testing & Polish | [x] | 50 |
 | v0.10.0 | Undo/Redo & Command History | [x] | 29 |
-| v0.10.1 | Undo System Testing & Reliability | [ ] | TBD |
+| v0.10.1 | Undo System Testing & Reliability | [x] | 38 |
 | v0.11.0 | SQL Editor Vim Editing | [x] | 700+ |
 | v0.11.1 | SQL Editor Refactoring & Quality | [x] | 1,251 |
 | v0.12.0 | UI Consistency & Standardization | [x] | 1,403 |
@@ -136,10 +136,10 @@ Validation with user-facing warnings for invalid config values. Proper TOML pars
 **[v0.10.0](versions/v0.10.0.md) - Undo/Redo & Command History**
 Command-based undo/redo engine storing deltas (not snapshots). `u`/`Ctrl+r`/`.` keybindings. Wired into all mutation points: cell edits, row/column insert/delete, visual mode, range commands. Per-file history preserved across file switches. 29 tests.
 
-###  Planned Versions
+**[v0.10.1](versions/v0.10.1.md) - Undo System Testing & Reliability**
+Paste operations wired to undo history. 23 integration tests covering edge cases: mode transitions, interleaved operations, partial undo/redo, dot repeat for deletes. Zero clippy warnings. 38 total tests.
 
-**[v0.10.1](versions/v0.10.1.md) - Undo System Testing & Reliability**  
-Undo system refinement with edge case handling and comprehensive test coverage.  
+###  Planned Versions
 
 **[v0.12.1](versions/v0.12.1.md) - UI System Testing**  
 UI system testing with visual regression tests and accessibility improvements.  

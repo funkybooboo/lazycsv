@@ -374,3 +374,253 @@ fn test_5dd_single_undo_step() {
         "Charlie"
     );
 }
+
+// ============================================================================
+// Undo paste rows (p)
+// ============================================================================
+
+#[test]
+fn test_undo_paste_rows_below() {
+    let mut app = create_test_app();
+    let orig_count = app.document.row_count();
+    app.view_state.table_state.select(Some(1));
+
+    // yy then p: yank row then paste below
+    app.handle_key(key(KeyCode::Char('y'))).unwrap();
+    app.handle_key(key(KeyCode::Char('y'))).unwrap();
+    app.handle_key(key(KeyCode::Char('p'))).unwrap();
+    assert_eq!(app.document.row_count(), orig_count + 1);
+
+    // Undo should remove pasted row
+    app.handle_key(key(KeyCode::Char('u'))).unwrap();
+    assert_eq!(app.document.row_count(), orig_count);
+}
+
+#[test]
+fn test_undo_paste_rows_above() {
+    let mut app = create_test_app();
+    let orig_count = app.document.row_count();
+    app.view_state.table_state.select(Some(2));
+
+    // yy then P: yank row then paste above
+    app.handle_key(key(KeyCode::Char('y'))).unwrap();
+    app.handle_key(key(KeyCode::Char('y'))).unwrap();
+    app.handle_key(key(KeyCode::Char('P'))).unwrap();
+    assert_eq!(app.document.row_count(), orig_count + 1);
+
+    // Undo should remove pasted row
+    app.handle_key(key(KeyCode::Char('u'))).unwrap();
+    assert_eq!(app.document.row_count(), orig_count);
+}
+
+// ============================================================================
+// Interleaved edits and deletes
+// ============================================================================
+
+#[test]
+fn test_interleaved_cell_edit_and_row_delete_undo() {
+    let mut app = create_test_app();
+    let orig_count = app.document.row_count();
+    app.view_state.table_state.select(Some(1));
+    app.view_state.selected_column = ColIndex::new(0);
+
+    // Edit cell
+    app.commit_cell_value(RowIndex::new(1), ColIndex::new(0), "Edited".into());
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "Edited"
+    );
+
+    // Delete row 2
+    app.view_state.table_state.select(Some(2));
+    app.handle_key(key(KeyCode::Char('d'))).unwrap();
+    app.handle_key(key(KeyCode::Char('d'))).unwrap();
+    assert_eq!(app.document.row_count(), orig_count - 1);
+
+    // Undo delete
+    app.handle_key(key(KeyCode::Char('u'))).unwrap();
+    assert_eq!(app.document.row_count(), orig_count);
+
+    // Undo cell edit
+    app.handle_key(key(KeyCode::Char('u'))).unwrap();
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "Alice"
+    );
+}
+
+// ============================================================================
+// Undo all the way back to original state
+// ============================================================================
+
+#[test]
+fn test_undo_all_restores_original() {
+    let mut app = create_test_app();
+    app.view_state.table_state.select(Some(1));
+    app.view_state.selected_column = ColIndex::new(0);
+
+    let orig = app.document.cell(RowIndex::new(1), ColIndex::new(0));
+
+    // Make 5 edits
+    for i in 0..5 {
+        app.commit_cell_value(RowIndex::new(1), ColIndex::new(0), format!("v{}", i));
+    }
+
+    // Undo all 5
+    for _ in 0..5 {
+        app.handle_key(key(KeyCode::Char('u'))).unwrap();
+    }
+
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        orig
+    );
+
+    // Further undo does nothing
+    app.handle_key(key(KeyCode::Char('u'))).unwrap();
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        orig
+    );
+}
+
+// ============================================================================
+// Redo after partial undo, then new edit clears redo
+// ============================================================================
+
+#[test]
+fn test_partial_undo_then_new_edit() {
+    let mut app = create_test_app();
+    app.view_state.table_state.select(Some(1));
+    app.view_state.selected_column = ColIndex::new(0);
+
+    app.commit_cell_value(RowIndex::new(1), ColIndex::new(0), "A".into());
+    app.commit_cell_value(RowIndex::new(1), ColIndex::new(0), "B".into());
+    app.commit_cell_value(RowIndex::new(1), ColIndex::new(0), "C".into());
+
+    // Undo twice (back to "A")
+    app.handle_key(key(KeyCode::Char('u'))).unwrap();
+    app.handle_key(key(KeyCode::Char('u'))).unwrap();
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "A"
+    );
+
+    // New edit — should clear redo stack
+    app.commit_cell_value(RowIndex::new(1), ColIndex::new(0), "D".into());
+    assert!(!app.history.can_redo());
+
+    // Can't redo to B or C anymore
+    app.handle_key(ctrl_key(KeyCode::Char('r'))).unwrap();
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "D"
+    );
+}
+
+// ============================================================================
+// Undo across different columns
+// ============================================================================
+
+#[test]
+fn test_undo_edits_across_columns() {
+    let mut app = create_test_app();
+    app.view_state.table_state.select(Some(1));
+
+    // Edit col 0
+    app.commit_cell_value(RowIndex::new(1), ColIndex::new(0), "X".into());
+    // Edit col 1
+    app.commit_cell_value(RowIndex::new(1), ColIndex::new(1), "Y".into());
+
+    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "X");
+    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(1)), "Y");
+
+    // Undo col 1 edit
+    app.handle_key(key(KeyCode::Char('u'))).unwrap();
+    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "X");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(1)),
+        "100"
+    );
+
+    // Undo col 0 edit
+    app.handle_key(key(KeyCode::Char('u'))).unwrap();
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "Alice"
+    );
+}
+
+// ============================================================================
+// Undo column insert (,o)
+// ============================================================================
+
+#[test]
+fn test_undo_column_insert() {
+    let mut app = create_test_app();
+    let orig_cols = app.document.column_count();
+    app.view_state.selected_column = ColIndex::new(0);
+
+    // ,o: insert column after
+    app.handle_key(key(KeyCode::Char(','))).unwrap();
+    app.handle_key(key(KeyCode::Char('o'))).unwrap();
+    assert_eq!(app.document.column_count(), orig_cols + 1);
+
+    // Undo
+    app.handle_key(key(KeyCode::Char('u'))).unwrap();
+    assert_eq!(app.document.column_count(), orig_cols);
+}
+
+// ============================================================================
+// Dot repeat row delete
+// ============================================================================
+
+#[test]
+fn test_dot_repeats_row_delete() {
+    let mut app = create_test_app();
+    let orig_count = app.document.row_count();
+    app.view_state.table_state.select(Some(1));
+
+    // dd to delete a row
+    app.handle_key(key(KeyCode::Char('d'))).unwrap();
+    app.handle_key(key(KeyCode::Char('d'))).unwrap();
+    assert_eq!(app.document.row_count(), orig_count - 1);
+
+    // . to repeat (delete another row)
+    app.handle_key(key(KeyCode::Char('.'))).unwrap();
+    assert_eq!(app.document.row_count(), orig_count - 2);
+}
+
+// ============================================================================
+// Insert mode edit then undo
+// ============================================================================
+
+#[test]
+fn test_insert_mode_edit_then_undo() {
+    let mut app = create_test_app();
+    app.view_state.table_state.select(Some(1));
+    app.view_state.selected_column = ColIndex::new(1);
+
+    // Enter insert mode with 's' (substitute — clears cell first)
+    app.handle_key(key(KeyCode::Char('s'))).unwrap();
+
+    // Type some text
+    app.handle_key(key(KeyCode::Char('9'))).unwrap();
+    app.handle_key(key(KeyCode::Char('9'))).unwrap();
+    app.handle_key(key(KeyCode::Char('9'))).unwrap();
+
+    // Commit with Enter
+    app.handle_key(key(KeyCode::Enter)).unwrap();
+
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(1)),
+        "999"
+    );
+
+    // Undo in normal mode
+    app.handle_key(key(KeyCode::Char('u'))).unwrap();
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(1)),
+        "100"
+    );
+}
