@@ -34,7 +34,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.13.1 | Module Organization & Cleanup | [ ] | TBD |
 | v0.14.0 | Cell Transforms & Data Cleanup | [x] | 40 |
 | v0.14.1 | Performance Optimization & Profiling | [x] | - |
-| v0.15.0 | System Clipboard & External Integration | [ ] | TBD |
+| v0.15.0 | System Clipboard & External Integration | [x] | - |
 | v0.15.1 | Testing & Reliability Improvements | [ ] | TBD |
 | v0.16.0 | Bulk Operations & Find/Replace | [ ] | TBD |
 | v0.16.1 | Error Handling & Robustness | [ ] | TBD |
@@ -145,6 +145,9 @@ Case transforms (`~` toggle, `g~` title), boolean toggle (`g.`), row swap (`gj`/
 **[v0.14.1](versions/v0.14.1.md) - Performance Optimization & Profiling**
 Already addressed in prior versions: mmap lazy loading, DuckDB migration, buffered I/O, parallel sort, COPY+mmap pattern.
 
+**[v0.15.0](versions/v0.15.0.md) - System Clipboard & External Integration**
+Already implemented in v0.25.0: `:copy`/`:paste` commands, `-C`/`-P` CLI flags, auto delimiter detection.
+
 ###  Planned Versions
 
 **[v0.12.1](versions/v0.12.1.md) - UI System Testing**
@@ -155,9 +158,6 @@ Reorganize codebase with clear module boundaries and comprehensive documentation
 
 **[v0.13.1](versions/v0.13.1.md) - Module Organization & Cleanup**
 Module system cleanup with clear dependencies and improved maintainability.
-
-**[v0.15.0](versions/v0.15.0.md) - System Clipboard & External Integration**  
-System clipboard integration with TSV/CSV paste support and external tool integration.  
 
 **[v0.15.1](versions/v0.15.1.md) - Testing & Reliability Improvements**  
 Testing infrastructure improvements with flaky test fixes and CI enhancements.  
