@@ -20,8 +20,16 @@ const TABLE_HEADER_HEIGHT: u16 = 3;
 /// Height reserved for status bar (1)
 const STATUS_BAR_HEIGHT: u16 = 1;
 
-/// Width allocated for the row number column
-const ROW_NUMBER_COLUMN_WIDTH: u16 = 5;
+/// Compute the width needed for the row number gutter based on total row count.
+/// Adds 1 for a space separator after the number.
+fn row_number_col_width(row_count: usize) -> u16 {
+    let digits = if row_count == 0 {
+        1
+    } else {
+        row_count.ilog10() as usize + 1
+    };
+    (digits + 1) as u16
+}
 
 /// Offset added to selected position to account for column letters row
 const HEADER_ROW_OFFSET: usize = 1;
@@ -95,8 +103,9 @@ fn calculate_visible_columns(
     start_col: usize,
     total_cols: usize,
     available_width: u16,
+    row_num_width: u16,
 ) -> (usize, usize) {
-    let usable_width = available_width.saturating_sub(ROW_NUMBER_COLUMN_WIDTH);
+    let usable_width = available_width.saturating_sub(row_num_width);
     let mut used_width: u16 = 0;
     let mut end_col = start_col;
 
@@ -151,13 +160,14 @@ fn build_column_letters_row<'a>(
     end_col: usize,
     selected_column: ColIndex,
     theme: &crate::config::Theme,
+    row_num_width: usize,
 ) -> Row<'a> {
     let base_style = if let Some(bg) = theme.header_bg {
         Style::default().bg(bg)
     } else {
         Style::default()
     };
-    let mut col_letter_cells = vec![Cell::from("    ").style(base_style)]; // Align with row numbers column
+    let mut col_letter_cells = vec![Cell::from(" ".repeat(row_num_width)).style(base_style)]; // Align with row numbers column
 
     for i in start_col..end_col {
         let letter = column_to_excel_letter(i);
@@ -233,6 +243,7 @@ fn build_data_rows(
     start_col: usize,
     end_col: usize,
     column_widths: &[u16],
+    row_num_width: usize,
 ) -> Vec<Row<'static>> {
     let selected_column = app.view_state.selected_column;
     let selected_row_idx = app.selected_row().map(|r| r.get());
@@ -255,8 +266,9 @@ fn build_data_rows(
             let row_idx = scroll_offset + idx_in_window;
             let is_selected_row = selected_row_idx == Some(row_idx);
 
-            // Row number: display row index as-is (already 1-based)
-            let row_num_display = format!("{:>4}", row_idx);
+            // Row number: right-align within the gutter width (minus 1 for the trailing space)
+            let num_digits = row_num_width.saturating_sub(1);
+            let row_num_display = format!("{:>width$}", row_idx, width = num_digits);
             let row_num_style = if is_selected_row {
                 super::modal::row_number_style()
             } else if app.config.defaults.zebra_striping && row_idx.is_multiple_of(2) {
@@ -335,12 +347,13 @@ fn calculate_column_widths(
     area: &Rect,
     start_col: usize,
     end_col: usize,
+    row_num_width: u16,
 ) -> (Vec<Constraint>, Vec<u16>) {
-    let mut constraints = vec![Constraint::Length(ROW_NUMBER_COLUMN_WIDTH)];
-    let mut raw_widths = vec![ROW_NUMBER_COLUMN_WIDTH];
+    let mut constraints = vec![Constraint::Length(row_num_width)];
+    let mut raw_widths = vec![row_num_width];
 
     // Calculate available width for data columns
-    let available_width = area.width.saturating_sub(ROW_NUMBER_COLUMN_WIDTH);
+    let available_width = area.width.saturating_sub(row_num_width);
     let visible_col_count = end_col - start_col;
 
     if visible_col_count == 0 {
@@ -418,10 +431,18 @@ fn calculate_column_widths(
 pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     let csv = &app.document;
 
+    // Compute row number gutter width based on actual row count
+    let row_num_width = row_number_col_width(csv.row_count());
+
     // Calculate visible columns dynamically based on terminal width
     let start_col = app.view_state.column_scroll_offset;
-    let (start_col, end_col) =
-        calculate_visible_columns(app, start_col, csv.column_count(), area.width);
+    let (start_col, end_col) = calculate_visible_columns(
+        app,
+        start_col,
+        csv.column_count(),
+        area.width,
+        row_num_width,
+    );
     let visible_col_count = end_col - start_col;
 
     // Store for navigation code to use
@@ -440,6 +461,7 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
         end_col,
         app.view_state.selected_column,
         &app.config.theme,
+        row_num_width as usize,
     );
 
     // Calculate visible viewport for virtual scrolling
@@ -469,7 +491,8 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     let visible_rows = visible_rows_vec.as_slice();
 
     // Calculate column widths first (needed for cell padding)
-    let (widths, raw_widths) = calculate_column_widths(app, &area, start_col, end_col);
+    let (widths, raw_widths) =
+        calculate_column_widths(app, &area, start_col, end_col, row_num_width);
 
     // Build data rows with column widths for proper cell padding
     let rows = build_data_rows(
@@ -479,6 +502,7 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
         start_col,
         end_col,
         &raw_widths,
+        row_num_width as usize,
     );
 
     // Combine column letters row + data rows
@@ -729,7 +753,8 @@ mod tests {
     fn test_calculate_visible_columns_fits_based_on_width() {
         // With a wide terminal, more columns should fit
         let app = create_test_app_with_cols(5);
-        let (start, end) = calculate_visible_columns(&app, 0, 5, 200);
+        let rnw = row_number_col_width(app.document.row_count());
+        let (start, end) = calculate_visible_columns(&app, 0, 5, 200, rnw);
         assert_eq!(start, 0);
         assert_eq!(end, 5); // All 5 columns fit in 200 chars
     }
@@ -738,7 +763,8 @@ mod tests {
     fn test_calculate_visible_columns_narrow_terminal() {
         let app = create_test_app_with_cols(5);
         // Very narrow — only a couple columns should fit
-        let (start, end) = calculate_visible_columns(&app, 0, 5, 25);
+        let rnw = row_number_col_width(app.document.row_count());
+        let (start, end) = calculate_visible_columns(&app, 0, 5, 25, rnw);
         assert_eq!(start, 0);
         assert!(end >= 1); // At least one column always shown
         assert!(end <= 5);
@@ -747,7 +773,8 @@ mod tests {
     #[test]
     fn test_calculate_visible_columns_scrolled() {
         let app = create_test_app_with_cols(5);
-        let (start, end) = calculate_visible_columns(&app, 2, 5, 200);
+        let rnw = row_number_col_width(app.document.row_count());
+        let (start, end) = calculate_visible_columns(&app, 2, 5, 200, rnw);
         assert_eq!(start, 2);
         assert_eq!(end, 5); // Remaining 3 columns fit
     }
@@ -756,8 +783,28 @@ mod tests {
     fn test_calculate_visible_columns_many_cols_wide_terminal() {
         // With 20 columns and a wide terminal, should show more than old limit of 10
         let app = create_test_app_with_cols(20);
-        let (start, end) = calculate_visible_columns(&app, 0, 20, 250);
+        let rnw = row_number_col_width(app.document.row_count());
+        let (start, end) = calculate_visible_columns(&app, 0, 20, 250, rnw);
         assert_eq!(start, 0);
         assert!(end > 10); // Should exceed old MAX_VISIBLE_COLS of 10
+    }
+
+    #[test]
+    fn test_row_number_col_width() {
+        // 0 rows → 1 digit placeholder + 1 = 2
+        assert_eq!(row_number_col_width(0), 2);
+        // 1–9 rows → 1 digit + 1 = 2
+        assert_eq!(row_number_col_width(1), 2);
+        assert_eq!(row_number_col_width(9), 2);
+        // 10–99 rows → 2 digits + 1 = 3
+        assert_eq!(row_number_col_width(10), 3);
+        assert_eq!(row_number_col_width(99), 3);
+        // 100–999 rows → 3 digits + 1 = 4
+        assert_eq!(row_number_col_width(100), 4);
+        assert_eq!(row_number_col_width(999), 4);
+        // 9999 rows → 4 digits + 1 = 5 (old hardcoded constant value)
+        assert_eq!(row_number_col_width(9999), 5);
+        // 1,048,576 rows (Excel max) → 7 digits + 1 = 8
+        assert_eq!(row_number_col_width(1_048_576), 8);
     }
 }

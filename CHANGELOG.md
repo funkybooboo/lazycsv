@@ -29,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Row number gutter now scales to the actual row count instead of truncating at 4 digits.
+  Files with more than 9,999 rows (e.g. 1,048,576 rows) now display full row numbers correctly.
+
 ## [0.12.0] - 2026-03-14
 
 ### Added - Modal Standardization & Code Consolidation
