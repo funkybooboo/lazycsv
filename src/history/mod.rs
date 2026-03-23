@@ -26,15 +26,10 @@ pub enum EditCommand {
     },
 
     /// Row inserted at index
-    InsertRow {
-        at: RowIndex,
-    },
+    InsertRow { at: RowIndex },
 
     /// Row deleted: (index, deleted_data)
-    DeleteRow {
-        at: RowIndex,
-        data: Vec<String>,
-    },
+    DeleteRow { at: RowIndex, data: Vec<String> },
 
     /// Multiple rows deleted: (start, deleted_data)
     DeleteRows {
@@ -43,16 +38,10 @@ pub enum EditCommand {
     },
 
     /// Column inserted at index with data
-    InsertColumn {
-        at: ColIndex,
-        data: Vec<String>,
-    },
+    InsertColumn { at: ColIndex, data: Vec<String> },
 
     /// Column deleted: (index, header, column_data)
-    DeleteColumn {
-        at: ColIndex,
-        data: Vec<String>,
-    },
+    DeleteColumn { at: ColIndex, data: Vec<String> },
 
     /// Multiple columns deleted: (start, headers+data per column)
     DeleteColumns {
@@ -61,10 +50,7 @@ pub enum EditCommand {
     },
 
     /// Two rows swapped
-    SwapRows {
-        a: RowIndex,
-        b: RowIndex,
-    },
+    SwapRows { a: RowIndex, b: RowIndex },
 
     /// Compound operation (multiple commands as a single undo step)
     Compound(Vec<EditCommand>),
@@ -418,11 +404,7 @@ mod tests {
 
         for i in 0..5 {
             let old = doc
-                .set_cell(
-                    RowIndex::new(1),
-                    ColIndex::new(0),
-                    format!("v{}", i),
-                )
+                .set_cell(RowIndex::new(1), ColIndex::new(0), format!("v{}", i))
                 .unwrap();
             history.push(EditCommand::SetCell {
                 row: RowIndex::new(1),

@@ -107,10 +107,7 @@ fn test_u_undoes_row_delete() {
     // Undo
     app.handle_key(key(KeyCode::Char('u'))).unwrap();
     assert_eq!(app.document.row_count(), orig_count);
-    assert_eq!(
-        app.document.cell(RowIndex::new(2), ColIndex::new(0)),
-        "Bob"
-    );
+    assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(0)), "Bob");
 }
 
 // ============================================================================
@@ -174,10 +171,7 @@ fn test_u_undoes_cell_clear() {
 
     // Press Delete to clear cell
     app.handle_key(key(KeyCode::Delete)).unwrap();
-    assert_eq!(
-        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
-        ""
-    );
+    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "");
 
     // Undo
     app.handle_key(key(KeyCode::Char('u'))).unwrap();
@@ -471,17 +465,11 @@ fn test_undo_all_restores_original() {
         app.handle_key(key(KeyCode::Char('u'))).unwrap();
     }
 
-    assert_eq!(
-        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
-        orig
-    );
+    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), orig);
 
     // Further undo does nothing
     app.handle_key(key(KeyCode::Char('u'))).unwrap();
-    assert_eq!(
-        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
-        orig
-    );
+    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), orig);
 }
 
 // ============================================================================
@@ -501,10 +489,7 @@ fn test_partial_undo_then_new_edit() {
     // Undo twice (back to "A")
     app.handle_key(key(KeyCode::Char('u'))).unwrap();
     app.handle_key(key(KeyCode::Char('u'))).unwrap();
-    assert_eq!(
-        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
-        "A"
-    );
+    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "A");
 
     // New edit — should clear redo stack
     app.commit_cell_value(RowIndex::new(1), ColIndex::new(0), "D".into());
@@ -512,10 +497,7 @@ fn test_partial_undo_then_new_edit() {
 
     // Can't redo to B or C anymore
     app.handle_key(ctrl_key(KeyCode::Char('r'))).unwrap();
-    assert_eq!(
-        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
-        "D"
-    );
+    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "D");
 }
 
 // ============================================================================
@@ -538,10 +520,7 @@ fn test_undo_edits_across_columns() {
     // Undo col 1 edit
     app.handle_key(key(KeyCode::Char('u'))).unwrap();
     assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "X");
-    assert_eq!(
-        app.document.cell(RowIndex::new(1), ColIndex::new(1)),
-        "100"
-    );
+    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(1)), "100");
 
     // Undo col 0 edit
     app.handle_key(key(KeyCode::Char('u'))).unwrap();
@@ -612,15 +591,9 @@ fn test_insert_mode_edit_then_undo() {
     // Commit with Enter
     app.handle_key(key(KeyCode::Enter)).unwrap();
 
-    assert_eq!(
-        app.document.cell(RowIndex::new(1), ColIndex::new(1)),
-        "999"
-    );
+    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(1)), "999");
 
     // Undo in normal mode
     app.handle_key(key(KeyCode::Char('u'))).unwrap();
-    assert_eq!(
-        app.document.cell(RowIndex::new(1), ColIndex::new(1)),
-        "100"
-    );
+    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(1)), "100");
 }

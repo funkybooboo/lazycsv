@@ -42,7 +42,10 @@ pub fn handle(app: &mut App, first: PendingCommand, second: KeyCode) -> Result<I
                 if new_value != old {
                     app.document.set_cell(row, col, new_value.clone());
                     app.history.push(crate::history::EditCommand::SetCell {
-                        row, col, old_value: old, new_value,
+                        row,
+                        col,
+                        old_value: old,
+                        new_value,
                     });
                 }
             }
@@ -57,7 +60,10 @@ pub fn handle(app: &mut App, first: PendingCommand, second: KeyCode) -> Result<I
                 if let Some(new_value) = crate::transforms::toggle_boolean(&old) {
                     app.document.set_cell(row, col, new_value.clone());
                     app.history.push(crate::history::EditCommand::SetCell {
-                        row, col, old_value: old, new_value,
+                        row,
+                        col,
+                        old_value: old,
+                        new_value,
                     });
                 } else {
                     app.status_message = Some(StatusMessage::from(
@@ -74,7 +80,8 @@ pub fn handle(app: &mut App, first: PendingCommand, second: KeyCode) -> Result<I
                 let next = crate::domain::position::RowIndex::new(row.get() + 1);
                 if next.get() < app.document.row_count() {
                     app.document.swap_rows(row, next);
-                    app.history.push(crate::history::EditCommand::SwapRows { a: row, b: next });
+                    app.history
+                        .push(crate::history::EditCommand::SwapRows { a: row, b: next });
                     app.view_state.table_state.select(Some(next.get()));
                 }
             }
@@ -84,10 +91,12 @@ pub fn handle(app: &mut App, first: PendingCommand, second: KeyCode) -> Result<I
         (PendingCommand::G, KeyCode::Char('k')) => {
             app.input_state.clear_pending_command();
             if let Some(row) = app.selected_row() {
-                if row.get() > 1 { // Don't swap with header (row 0)
+                if row.get() > 1 {
+                    // Don't swap with header (row 0)
                     let prev = crate::domain::position::RowIndex::new(row.get() - 1);
                     app.document.swap_rows(row, prev);
-                    app.history.push(crate::history::EditCommand::SwapRows { a: row, b: prev });
+                    app.history
+                        .push(crate::history::EditCommand::SwapRows { a: row, b: prev });
                     app.view_state.table_state.select(Some(prev.get()));
                 }
             }

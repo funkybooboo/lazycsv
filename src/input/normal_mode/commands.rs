@@ -226,8 +226,10 @@ pub fn insert_column_after(app: &mut App) {
         app.document.row_count().saturating_sub(1),
     ))
     .collect();
-    app.history
-        .push(crate::history::EditCommand::InsertColumn { at: insert_at, data });
+    app.history.push(crate::history::EditCommand::InsertColumn {
+        at: insert_at,
+        data,
+    });
     app.view_state.selected_column = insert_at;
     app.status_message = Some(StatusMessage::from("Inserted empty column"));
 }

@@ -38,10 +38,16 @@ fn test_tilde_toggles_lower_to_upper() {
     let mut app = create_test_app();
     app.view_state.table_state.select(Some(1));
     app.view_state.selected_column = ColIndex::new(0);
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "alice"
+    );
 
     app.handle_key(key(KeyCode::Char('~'))).unwrap();
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "ALICE");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "ALICE"
+    );
 }
 
 #[test]
@@ -62,10 +68,16 @@ fn test_tilde_undo() {
     app.view_state.selected_column = ColIndex::new(0);
 
     app.handle_key(key(KeyCode::Char('~'))).unwrap();
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "ALICE");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "ALICE"
+    );
 
     app.handle_key(key(KeyCode::Char('u'))).unwrap();
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "alice"
+    );
 }
 
 // ============================================================================
@@ -81,7 +93,10 @@ fn test_g_tilde_title_case() {
     // g then ~
     app.handle_key(key(KeyCode::Char('g'))).unwrap();
     app.handle_key(key(KeyCode::Char('~'))).unwrap();
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "Alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "Alice"
+    );
 }
 
 #[test]
@@ -107,7 +122,10 @@ fn test_g_dot_toggles_true_to_false() {
 
     app.handle_key(key(KeyCode::Char('g'))).unwrap();
     app.handle_key(key(KeyCode::Char('.'))).unwrap();
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(2)), "false");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(2)),
+        "false"
+    );
 }
 
 #[test]
@@ -118,7 +136,10 @@ fn test_g_dot_toggles_false_to_true() {
 
     app.handle_key(key(KeyCode::Char('g'))).unwrap();
     app.handle_key(key(KeyCode::Char('.'))).unwrap();
-    assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(2)), "true");
+    assert_eq!(
+        app.document.cell(RowIndex::new(2), ColIndex::new(2)),
+        "true"
+    );
 }
 
 #[test]
@@ -142,7 +163,10 @@ fn test_g_dot_non_boolean_shows_message() {
     app.handle_key(key(KeyCode::Char('.'))).unwrap();
 
     // Cell unchanged
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "alice"
+    );
     // Status message shown
     assert!(app.status_message.is_some());
 }
@@ -155,10 +179,16 @@ fn test_g_dot_undo() {
 
     app.handle_key(key(KeyCode::Char('g'))).unwrap();
     app.handle_key(key(KeyCode::Char('.'))).unwrap();
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(2)), "false");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(2)),
+        "false"
+    );
 
     app.handle_key(key(KeyCode::Char('u'))).unwrap();
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(2)), "true");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(2)),
+        "true"
+    );
 }
 
 // ============================================================================
@@ -175,7 +205,10 @@ fn test_gj_swaps_row_down() {
 
     // alice and BOB should be swapped
     assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "BOB");
-    assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(0)), "alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(2), ColIndex::new(0)),
+        "alice"
+    );
     // Cursor follows the moved row
     assert_eq!(app.view_state.table_state.selected(), Some(2));
 }
@@ -190,7 +223,10 @@ fn test_gk_swaps_row_up() {
 
     // BOB and alice should be swapped
     assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "BOB");
-    assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(0)), "alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(2), ColIndex::new(0)),
+        "alice"
+    );
     // Cursor follows the moved row
     assert_eq!(app.view_state.table_state.selected(), Some(1));
 }
@@ -205,7 +241,10 @@ fn test_gj_undo() {
     assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "BOB");
 
     app.handle_key(key(KeyCode::Char('u'))).unwrap();
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "alice"
+    );
 }
 
 #[test]
@@ -244,7 +283,10 @@ fn test_upper_command() {
     app.view_state.selected_column = ColIndex::new(0);
 
     type_command(&mut app, "upper");
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "ALICE");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "ALICE"
+    );
 }
 
 #[test]
@@ -264,7 +306,10 @@ fn test_title_command() {
     app.view_state.selected_column = ColIndex::new(0);
 
     type_command(&mut app, "title");
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "Alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "Alice"
+    );
 }
 
 #[test]
@@ -275,10 +320,16 @@ fn test_trim_command() {
 
     // First set a value with whitespace
     app.commit_cell_value(RowIndex::new(1), ColIndex::new(0), "  alice  ".into());
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "  alice  ");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "  alice  "
+    );
 
     type_command(&mut app, "trim");
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "alice"
+    );
 }
 
 #[test]
@@ -288,8 +339,14 @@ fn test_upper_command_undo() {
     app.view_state.selected_column = ColIndex::new(0);
 
     type_command(&mut app, "upper");
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "ALICE");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "ALICE"
+    );
 
     app.handle_key(key(KeyCode::Char('u'))).unwrap();
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "alice"
+    );
 }

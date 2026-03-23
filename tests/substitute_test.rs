@@ -42,7 +42,10 @@ fn test_percent_s_replaces_all_cells() {
     let mut app = create_test_app();
 
     type_command(&mut app, "%s/Alice/Zara/");
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "Zara");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "Zara"
+    );
     // Other cells unchanged
     assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(0)), "Bob");
 }
@@ -73,10 +76,16 @@ fn test_percent_s_undo() {
     let mut app = create_test_app();
 
     type_command(&mut app, "%s/Alice/Zara/");
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "Zara");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "Zara"
+    );
 
     app.handle_key(key(KeyCode::Char('u'))).unwrap();
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "Alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "Alice"
+    );
 }
 
 // ============================================================================
@@ -90,7 +99,10 @@ fn test_s_replaces_current_cell() {
     app.view_state.selected_column = ColIndex::new(0);
 
     type_command(&mut app, "s/Alice/Zara/");
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "Zara");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "Zara"
+    );
     // Other rows unchanged
     assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(0)), "Bob");
 }
@@ -131,7 +143,10 @@ fn test_column_range_substitute() {
 
     // Replace "B" in columns A-B (name and value columns)
     type_command(&mut app, "A,Bs/Bob/Robert/");
-    assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(0)), "Robert");
+    assert_eq!(
+        app.document.cell(RowIndex::new(2), ColIndex::new(0)),
+        "Robert"
+    );
     // Column C unchanged
     assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(2)), "B");
 }
@@ -158,7 +173,10 @@ fn test_regex_word_boundary() {
     // Only replace whole word "A" in category column, not in "Alice"
     type_command(&mut app, "%s/^A$/Z/");
     // "Alice" should NOT be changed (not an exact match)
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "Alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "Alice"
+    );
     // Category "A" should be changed
     assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(2)), "Z");
 }
@@ -184,7 +202,10 @@ fn test_case_sensitive_by_default() {
 
     type_command(&mut app, "%s/alice/REPLACED/");
     // "Alice" has capital A, should NOT match without /i
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "Alice");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "Alice"
+    );
 }
 
 // ============================================================================
@@ -235,7 +256,10 @@ fn test_alternate_delimiter() {
     let mut app = create_test_app();
 
     type_command(&mut app, "%s|Alice|Zara|");
-    assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "Zara");
+    assert_eq!(
+        app.document.cell(RowIndex::new(1), ColIndex::new(0)),
+        "Zara"
+    );
 }
 
 // ============================================================================

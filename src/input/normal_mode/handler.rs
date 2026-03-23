@@ -267,7 +267,10 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                 if new_value != old {
                     app.document.set_cell(row, col, new_value.clone());
                     app.history.push(crate::history::EditCommand::SetCell {
-                        row, col, old_value: old, new_value,
+                        row,
+                        col,
+                        old_value: old,
+                        new_value,
                     });
                 }
             }
@@ -316,8 +319,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                     }
                 }
             } else {
-                app.status_message =
-                    Some(StatusMessage::from("No previous edit".to_string()));
+                app.status_message = Some(StatusMessage::from("No previous edit".to_string()));
             }
         }
 

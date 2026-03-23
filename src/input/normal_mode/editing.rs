@@ -112,13 +112,12 @@ pub fn clear_cell(app: &mut App) {
         let col_idx = app.view_state.selected_column;
         let old_value = app.document.cell(row_idx, col_idx);
         app.document.set_cell(row_idx, col_idx, String::new());
-        app.history
-            .push(crate::history::EditCommand::SetCell {
-                row: row_idx,
-                col: col_idx,
-                old_value,
-                new_value: String::new(),
-            });
+        app.history.push(crate::history::EditCommand::SetCell {
+            row: row_idx,
+            col: col_idx,
+            old_value,
+            new_value: String::new(),
+        });
         app.status_message = Some(StatusMessage::from("Cell cleared"));
     }
 }

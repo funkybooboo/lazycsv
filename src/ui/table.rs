@@ -435,8 +435,12 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 
     // Build column letters row
-    let col_letters_row =
-        build_column_letters_row(start_col, end_col, app.view_state.selected_column, &app.config.theme);
+    let col_letters_row = build_column_letters_row(
+        start_col,
+        end_col,
+        app.view_state.selected_column,
+        &app.config.theme,
+    );
 
     // Calculate visible viewport for virtual scrolling
     let table_height = area

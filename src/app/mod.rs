@@ -778,16 +778,17 @@ impl App {
     ) -> Result<Self> {
         // Apply config defaults for the initial file load
         let config = crate::config::load_config();
-        let delimiter = cli_args.delimiter.or(config.defaults.delimiter.map(|d| d as u8));
-        let encoding = cli_args.encoding.clone().or(config.defaults.encoding.clone());
+        let delimiter = cli_args
+            .delimiter
+            .or(config.defaults.delimiter.map(|d| d as u8));
+        let encoding = cli_args
+            .encoding
+            .clone()
+            .or(config.defaults.encoding.clone());
 
-        let csv_data = crate::csv::Document::from_file(
-            file_path,
-            delimiter,
-            cli_args.no_headers,
-            encoding,
-        )
-        .context(messages::failed_to_load_csv(file_path))?;
+        let csv_data =
+            crate::csv::Document::from_file(file_path, delimiter, cli_args.no_headers, encoding)
+                .context(messages::failed_to_load_csv(file_path))?;
 
         let mut app = Self::new(csv_data, csv_files, current_file_index, file_config);
         app.session.record_file_mtime(file_path);
@@ -894,11 +895,10 @@ impl App {
 
         // Show config warnings in status bar
         if !config_warnings.is_empty() {
-            app.status_message = Some(
-                crate::input::StatusMessage::from(
-                    format!("Config: {}", config_warnings.join("; "))
-                )
-            );
+            app.status_message = Some(crate::input::StatusMessage::from(format!(
+                "Config: {}",
+                config_warnings.join("; ")
+            )));
         }
 
         app
@@ -1233,8 +1233,7 @@ impl App {
             let result = crate::config::load_config_with_warnings();
             self.config = result.config;
             if result.warnings.is_empty() {
-                self.status_message =
-                    Some(StatusMessage::from("Config reloaded".to_string()));
+                self.status_message = Some(StatusMessage::from("Config reloaded".to_string()));
             } else {
                 self.status_message = Some(StatusMessage::from(format!(
                     "Config reloaded: {}",

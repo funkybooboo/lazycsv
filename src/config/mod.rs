@@ -327,10 +327,7 @@ fn apply_toml(config: &mut Config, toml: &TomlConfig, path: &Path, warnings: &mu
                 if let Some(color) = parse_color(c) {
                     $field = color;
                 } else {
-                    warnings.push(format!(
-                        "{}: invalid color for {}: {:?}",
-                        file, $name, c
-                    ));
+                    warnings.push(format!("{}: invalid color for {}: {:?}", file, $name, c));
                 }
             }
         };
@@ -372,10 +369,7 @@ fn apply_toml(config: &mut Config, toml: &TomlConfig, path: &Path, warnings: &mu
         if let Some(color) = parse_color(c) {
             config.theme.header_bg = Some(color);
         } else {
-            warnings.push(format!(
-                "{}: invalid color for header_bg: {:?}",
-                file, c
-            ));
+            warnings.push(format!("{}: invalid color for header_bg: {:?}", file, c));
         }
     }
 
@@ -1123,7 +1117,9 @@ mod tests {
         let mut watcher = ConfigWatcher {
             global_path: Some(path.clone()),
             local_path: PathBuf::from("/nonexistent/.lazycsv.toml"),
-            global_mtime: std::fs::metadata(&path).ok().and_then(|m| m.modified().ok()),
+            global_mtime: std::fs::metadata(&path)
+                .ok()
+                .and_then(|m| m.modified().ok()),
             local_mtime: None,
         };
 
@@ -1146,7 +1142,9 @@ mod tests {
         let mut watcher = ConfigWatcher {
             global_path: Some(path.clone()),
             local_path: PathBuf::from("/nonexistent/.lazycsv.toml"),
-            global_mtime: std::fs::metadata(&path).ok().and_then(|m| m.modified().ok()),
+            global_mtime: std::fs::metadata(&path)
+                .ok()
+                .and_then(|m| m.modified().ok()),
             local_mtime: None,
         };
 

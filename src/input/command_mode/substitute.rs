@@ -89,8 +89,7 @@ fn parse_range(cmd: &str) -> Option<(SubRange, &str)> {
         {
             let start_col =
                 crate::ui::utils::excel_letter_to_column(&start_str.to_uppercase()).ok()?;
-            let end_col =
-                crate::ui::utils::excel_letter_to_column(&end_str.to_uppercase()).ok()?;
+            let end_col = crate::ui::utils::excel_letter_to_column(&end_str.to_uppercase()).ok()?;
             return Some((SubRange::ColRange(start_col, end_col), rest));
         }
     }
@@ -157,11 +156,7 @@ fn split_by_delimiter(s: &str, delim: char) -> Vec<&str> {
 }
 
 /// Execute the substitute across the specified range.
-fn execute_substitute(
-    app: &mut App,
-    range: SubRange,
-    sub: SubCommand,
-) -> Result<InputResult> {
+fn execute_substitute(app: &mut App, range: SubRange, sub: SubCommand) -> Result<InputResult> {
     // Build regex
     let regex = if sub.case_insensitive {
         Regex::new(&format!("(?i){}", &sub.pattern))
@@ -186,7 +181,12 @@ fn execute_substitute(
         SubRange::AllCells => {
             let row_count = app.document.row_count();
             let col_count = app.document.column_count();
-            (1, row_count.saturating_sub(1), 0, col_count.saturating_sub(1))
+            (
+                1,
+                row_count.saturating_sub(1),
+                0,
+                col_count.saturating_sub(1),
+            )
         }
         SubRange::RowRange(start, end) => {
             let col_count = app.document.column_count();
@@ -216,9 +216,13 @@ fn execute_substitute(
             let old_value = app.document.cell(r, c);
 
             let new_value = if sub.global {
-                regex.replace_all(&old_value, sub.replacement.as_str()).to_string()
+                regex
+                    .replace_all(&old_value, sub.replacement.as_str())
+                    .to_string()
             } else {
-                regex.replace(&old_value, sub.replacement.as_str()).to_string()
+                regex
+                    .replace(&old_value, sub.replacement.as_str())
+                    .to_string()
             };
 
             if new_value != old_value {
@@ -359,11 +363,11 @@ mod tests {
 
     #[test]
     fn test_split_by_delimiter() {
-        assert_eq!(split_by_delimiter("foo/bar/g", '/'), vec!["foo", "bar", "g"]);
-        assert_eq!(split_by_delimiter("foo/bar", '/'), vec!["foo", "bar"]);
         assert_eq!(
-            split_by_delimiter("a\\/b/c/", '/'),
-            vec!["a\\/b", "c", ""]
+            split_by_delimiter("foo/bar/g", '/'),
+            vec!["foo", "bar", "g"]
         );
+        assert_eq!(split_by_delimiter("foo/bar", '/'), vec!["foo", "bar"]);
+        assert_eq!(split_by_delimiter("a\\/b/c/", '/'), vec!["a\\/b", "c", ""]);
     }
 }
