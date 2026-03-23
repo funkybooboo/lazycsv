@@ -32,6 +32,67 @@ pub fn handle(app: &mut App, first: PendingCommand, second: KeyCode) -> Result<I
             commands::reselect_visual(app);
         }
 
+        // g~ - Title case current cell
+        (PendingCommand::G, KeyCode::Char('~')) => {
+            app.input_state.clear_pending_command();
+            if let Some(row) = app.selected_row() {
+                let col = app.view_state.selected_column;
+                let old = app.document.cell(row, col);
+                let new_value = crate::transforms::to_title(&old);
+                if new_value != old {
+                    app.document.set_cell(row, col, new_value.clone());
+                    app.history.push(crate::history::EditCommand::SetCell {
+                        row, col, old_value: old, new_value,
+                    });
+                }
+            }
+        }
+
+        // g. - Toggle boolean value
+        (PendingCommand::G, KeyCode::Char('.')) => {
+            app.input_state.clear_pending_command();
+            if let Some(row) = app.selected_row() {
+                let col = app.view_state.selected_column;
+                let old = app.document.cell(row, col);
+                if let Some(new_value) = crate::transforms::toggle_boolean(&old) {
+                    app.document.set_cell(row, col, new_value.clone());
+                    app.history.push(crate::history::EditCommand::SetCell {
+                        row, col, old_value: old, new_value,
+                    });
+                } else {
+                    app.status_message = Some(StatusMessage::from(
+                        "Not a boolean value (true/false, yes/no, 1/0, on/off)".to_string(),
+                    ));
+                }
+            }
+        }
+
+        // gj - Swap current row with row below
+        (PendingCommand::G, KeyCode::Char('j')) => {
+            app.input_state.clear_pending_command();
+            if let Some(row) = app.selected_row() {
+                let next = crate::domain::position::RowIndex::new(row.get() + 1);
+                if next.get() < app.document.row_count() {
+                    app.document.swap_rows(row, next);
+                    app.history.push(crate::history::EditCommand::SwapRows { a: row, b: next });
+                    app.view_state.table_state.select(Some(next.get()));
+                }
+            }
+        }
+
+        // gk - Swap current row with row above
+        (PendingCommand::G, KeyCode::Char('k')) => {
+            app.input_state.clear_pending_command();
+            if let Some(row) = app.selected_row() {
+                if row.get() > 1 { // Don't swap with header (row 0)
+                    let prev = crate::domain::position::RowIndex::new(row.get() - 1);
+                    app.document.swap_rows(row, prev);
+                    app.history.push(crate::history::EditCommand::SwapRows { a: row, b: prev });
+                    app.view_state.table_state.select(Some(prev.get()));
+                }
+            }
+        }
+
         // g + letter - Start column jump (e.g., gA, gB)
         (PendingCommand::G, KeyCode::Char(c)) if c.is_ascii_alphabetic() => {
             let new_pending = first.append_letter(c);

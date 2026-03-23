@@ -258,6 +258,21 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             editing::paste_rows_below(app);
         }
 
+        // ~ - Toggle case of current cell
+        KeyCode::Char('~') if help::is_navigation_allowed(app) => {
+            if let Some(row) = app.selected_row() {
+                let col = app.view_state.selected_column;
+                let old = app.document.cell(row, col);
+                let new_value = crate::transforms::toggle_case(&old);
+                if new_value != old {
+                    app.document.set_cell(row, col, new_value.clone());
+                    app.history.push(crate::history::EditCommand::SetCell {
+                        row, col, old_value: old, new_value,
+                    });
+                }
+            }
+        }
+
         // Delete key - clear current cell
         KeyCode::Delete if help::is_navigation_allowed(app) => {
             editing::clear_cell(app);

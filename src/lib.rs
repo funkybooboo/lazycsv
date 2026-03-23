@@ -14,6 +14,7 @@ pub mod navigation;
 pub mod query;
 pub mod search;
 pub mod session;
+pub mod transforms;
 pub mod ui;
 pub mod vim_editor;
 

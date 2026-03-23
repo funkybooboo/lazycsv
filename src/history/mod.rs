@@ -60,6 +60,12 @@ pub enum EditCommand {
         data: Vec<Vec<String>>,
     },
 
+    /// Two rows swapped
+    SwapRows {
+        a: RowIndex,
+        b: RowIndex,
+    },
+
     /// Compound operation (multiple commands as a single undo step)
     Compound(Vec<EditCommand>),
 }
@@ -112,6 +118,9 @@ impl EditCommand {
                     doc.insert_column(col_idx, col_data.clone());
                 }
             }
+            EditCommand::SwapRows { a, b } => {
+                doc.swap_rows(*a, *b); // swap is its own inverse
+            }
             EditCommand::Compound(commands) => {
                 // Undo in reverse order
                 for cmd in commands.iter().rev() {
@@ -157,6 +166,9 @@ impl EditCommand {
             EditCommand::DeleteColumns { start, data } => {
                 let end = ColIndex::new(start.get() + data.len() - 1);
                 doc.delete_columns(*start, end);
+            }
+            EditCommand::SwapRows { a, b } => {
+                doc.swap_rows(*a, *b);
             }
             EditCommand::Compound(commands) => {
                 // Redo in forward order

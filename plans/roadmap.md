@@ -32,7 +32,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.12.1 | UI System Testing | [ ] | TBD |
 | v0.13.0 | Repository Organization & Structure | [ ] | TBD |
 | v0.13.1 | Module Organization & Cleanup | [ ] | TBD |
-| v0.14.0 | Cell Transforms & Data Cleanup | [ ] | TBD |
+| v0.14.0 | Cell Transforms & Data Cleanup | [x] | 40 |
 | v0.14.1 | Performance Optimization & Profiling | [ ] | TBD |
 | v0.15.0 | System Clipboard & External Integration | [ ] | TBD |
 | v0.15.1 | Testing & Reliability Improvements | [ ] | TBD |
@@ -139,19 +139,19 @@ Command-based undo/redo engine storing deltas (not snapshots). `u`/`Ctrl+r`/`.` 
 **[v0.10.1](versions/v0.10.1.md) - Undo System Testing & Reliability**
 Paste operations wired to undo history. 23 integration tests covering edge cases: mode transitions, interleaved operations, partial undo/redo, dot repeat for deletes. Zero clippy warnings. 38 total tests.
 
+**[v0.14.0](versions/v0.14.0.md) - Cell Transforms & Data Cleanup**
+Case transforms (`~` toggle, `g~` title), boolean toggle (`g.`), row swap (`gj`/`gk`), command-mode transforms (`:upper`, `:lower`, `:title`, `:trim`). All undoable. 40 tests.
+
 ###  Planned Versions
 
-**[v0.12.1](versions/v0.12.1.md) - UI System Testing**  
-UI system testing with visual regression tests and accessibility improvements.  
+**[v0.12.1](versions/v0.12.1.md) - UI System Testing**
+UI system testing with visual regression tests and accessibility improvements.
 
-**[v0.13.0](versions/v0.13.0.md) - Repository Organization & Structure**  
-Reorganize codebase with clear module boundaries and comprehensive documentation.  
+**[v0.13.0](versions/v0.13.0.md) - Repository Organization & Structure**
+Reorganize codebase with clear module boundaries and comprehensive documentation.
 
-**[v0.13.1](versions/v0.13.1.md) - Module Organization & Cleanup**  
-Module system cleanup with clear dependencies and improved maintainability.  
-
-**[v0.14.0](versions/v0.14.0.md) - Cell Transforms & Data Cleanup**  
-Cell transformation commands (trim, uppercase, lowercase, normalize) with preview.  
+**[v0.13.1](versions/v0.13.1.md) - Module Organization & Cleanup**
+Module system cleanup with clear dependencies and improved maintainability.
 
 **[v0.14.1](versions/v0.14.1.md) - Performance Optimization & Profiling**  
 Performance profiling and optimization with benchmarking suite.  

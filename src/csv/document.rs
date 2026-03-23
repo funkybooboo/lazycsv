@@ -870,6 +870,18 @@ impl Document {
         self.insert_column(at, column_data);
     }
 
+    /// Swap two rows by index.
+    pub fn swap_rows(&mut self, a: RowIndex, b: RowIndex) {
+        let rows = self.rows_mut();
+        let ai = a.get();
+        let bi = b.get();
+        if ai < rows.len() && bi < rows.len() && ai != bi {
+            rows.swap(ai, bi);
+            self.is_dirty = true;
+            self.generation += 1;
+        }
+    }
+
     /// Sort data rows by the given column indices.
     /// Uses parallel sort and avoids materializing lazy storage.
     /// Returns `true` if sort completed, `false` if cancelled.

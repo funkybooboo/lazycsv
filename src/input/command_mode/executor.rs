@@ -127,6 +127,10 @@ pub fn execute(app: &mut App) -> Result<InputResult> {
         "width" | "resize" => execute_width(app, _arg),
         "copy" => execute_copy_to_clipboard(app),
         "paste" => execute_paste_from_clipboard(app),
+        "upper" | "uppercase" => execute_cell_transform(app, crate::transforms::to_upper),
+        "lower" | "lowercase" => execute_cell_transform(app, crate::transforms::to_lower),
+        "title" | "titlecase" => execute_cell_transform(app, crate::transforms::to_title),
+        "trim" => execute_cell_transform(app, crate::transforms::trim),
         _ => {
             // Unknown command
             app.status_message = Some(StatusMessage::from(format!("Unknown command: :{}", cmd)));
@@ -486,6 +490,25 @@ fn execute_paste_from_clipboard(app: &mut App) -> Result<InputResult> {
 /// Usage:
 ///   :width A 20   - Set column A width to 20 characters
 ///   :width B auto - Auto-size column B (clear manual width)
+/// Apply a transform function to the current cell.
+fn execute_cell_transform(app: &mut App, transform: fn(&str) -> String) -> Result<InputResult> {
+    if let Some(row) = app.selected_row() {
+        let col = app.view_state.selected_column;
+        let old = app.document.cell(row, col);
+        let new_value = transform(&old);
+        if new_value != old {
+            app.document.set_cell(row, col, new_value.clone());
+            app.history.push(crate::history::EditCommand::SetCell {
+                row,
+                col,
+                old_value: old,
+                new_value,
+            });
+        }
+    }
+    Ok(InputResult::Continue)
+}
+
 ///   :width * auto - Auto-size all columns (clear all manual widths)
 ///   :width * 15   - Set all columns to 15 characters
 fn execute_width(app: &mut App, arg: Option<&str>) -> Result<InputResult> {
