@@ -22,8 +22,8 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.7.1 | Search System Optimization | [x] | 27 |
 | v0.8.0 | SQL Query Mode & Data Operations | [x] | 30 |
 | v0.8.1 | SQL & Data Operations Polish | [x] | 555 |
-| v0.9.0 | Configuration System | [ ] | TBD |
-| v0.9.1 | Configuration Testing & Polish | [ ] | TBD |
+| v0.9.0 | Configuration System | [x] | 12 |
+| v0.9.1 | Configuration Testing & Polish | [x] | 50 |
 | v0.10.0 | Undo/Redo & Command History | [ ] | TBD |
 | v0.10.1 | Undo System Testing & Reliability | [ ] | TBD |
 | v0.11.0 | SQL Editor Vim Editing | [x] | 700+ |
@@ -127,13 +127,13 @@ Lazy loading with memory-mapped files for large CSVs, CLI sort mode, piped stdin
 **[v0.25.0](versions/v0.25.0.md) - Spreadsheet Support, CLI Tools & SQL DML**
 Native spreadsheet file support (xlsx/xls/ods) via calamine. Formula preservation in formula bar. CLI extraction (`-x`), clipboard copy (`-C`), clipboard paste (`-P` with auto delimiter detection), file splitting (`-S`), and SQL queries (`-q`) all work across CSV and spreadsheet formats. SQL DML (INSERT/UPDATE/DELETE/ALTER) with DML-aware IntelliSense and templates. TUI `:copy`/`:paste` commands with auto delimiter detection. SQL formatting via Ctrl+F. Streaming I/O for large files. Zebra striping. Terminal robustness fixes.
 
+**[v0.9.0](versions/v0.9.0.md) - Configuration System**
+TOML-based config system with `~/.config/lazycsv/config.toml` (global) and `.lazycsv.toml` (per-directory). Theme customization (cursor, selection, search, zebra, header_bg, dirty_indicator colors). Default behaviors (delimiter, encoding, zebra_striping, max_column_width, undo_limit). SQL formatting config. 12 tests.
+
+**[v0.9.1](versions/v0.9.1.md) - Configuration Testing & Polish**
+Validation with user-facing warnings for invalid config values. Proper TOML parse error reporting. 46 unit tests covering edge cases, merge behavior, and file I/O. `docs/configuration.md` with full reference. Zero clippy warnings.
+
 ###  Planned Versions
-
-**[v0.9.0](versions/v0.9.0.md) - Configuration System**  
-Implement `~/.config/lazycsv/config.toml` with theme customization, keybinding remapping, and default behaviors.  
-
-**[v0.9.1](versions/v0.9.1.md) - Configuration Testing & Polish**  
-Configuration system cleanup with validation, error handling, and comprehensive test coverage.  
 
 **[v0.10.0](versions/v0.10.0.md) - Undo/Redo & Command History**  
 Undo/redo system with persistent command history and session restoration.  

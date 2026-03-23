@@ -325,9 +325,6 @@ fn build_data_rows(
 /// Minimum column width in characters
 const MIN_COLUMN_WIDTH: u16 = 8;
 
-/// Maximum column width in characters (generous to avoid truncation)
-const MAX_COLUMN_WIDTH: u16 = 100;
-
 /// Truncation threshold - only truncate truly massive content
 const TRUNCATE_THRESHOLD: usize = 100;
 

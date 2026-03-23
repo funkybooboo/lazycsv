@@ -620,6 +620,9 @@ pub struct App {
     /// User configuration (theme, defaults, etc.)
     pub config: crate::config::Config,
 
+    /// Watches config files for live reload
+    config_watcher: crate::config::ConfigWatcher,
+
     /// View/UI state (renamed from ui, moved to ui module)
     pub view_state: ViewState,
 
@@ -806,7 +809,9 @@ impl App {
         current_file_index: usize,
         file_config: crate::session::FileConfig,
     ) -> Self {
-        let config = crate::config::load_config();
+        let config_result = crate::config::load_config_with_warnings();
+        let config_warnings = config_result.warnings.clone();
+        let config = config_result.config;
 
         // Apply config defaults where CLI didn't specify values
         let mut file_config = file_config;
@@ -829,9 +834,12 @@ impl App {
         // Create input state
         let input_state = InputState::new();
 
+        let config_watcher = crate::config::ConfigWatcher::new();
+
         let mut app = Self {
             document: csv_data,
             config,
+            config_watcher,
             view_state,
             input_state,
             session,
@@ -873,6 +881,15 @@ impl App {
                 app.formula_store
                     .set(row, col, raw, crate::formula::Formula::unsupported());
             }
+        }
+
+        // Show config warnings in status bar
+        if !config_warnings.is_empty() {
+            app.status_message = Some(
+                crate::input::StatusMessage::from(
+                    format!("Config: {}", config_warnings.join("; "))
+                )
+            );
         }
 
         app
@@ -1169,6 +1186,27 @@ impl App {
                 "File modified externally. Press 'r' to reload, Esc to ignore"
             };
             self.status_message = Some(StatusMessage::new_persistent(msg.to_string()));
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Check if config files have changed and reload if so.
+    /// Returns true if config was reloaded (triggers redraw).
+    pub fn check_config_reload(&mut self) -> bool {
+        if self.config_watcher.has_changed() {
+            let result = crate::config::load_config_with_warnings();
+            self.config = result.config;
+            if result.warnings.is_empty() {
+                self.status_message =
+                    Some(StatusMessage::from("Config reloaded".to_string()));
+            } else {
+                self.status_message = Some(StatusMessage::from(format!(
+                    "Config reloaded: {}",
+                    result.warnings.join("; ")
+                )));
+            }
             true
         } else {
             false

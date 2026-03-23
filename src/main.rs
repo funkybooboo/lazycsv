@@ -282,6 +282,9 @@ fn run(terminal: &mut Term, app: &mut App) -> Result<()> {
             if app.check_current_file_modification() {
                 needs_redraw = true;
             }
+            if app.check_config_reload() {
+                needs_redraw = true;
+            }
         }
 
         if app.should_quit {
