@@ -40,6 +40,26 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             app.input_state.pop_command_char();
         }
 
+        KeyCode::Delete => {
+            app.input_state.delete_command_char();
+        }
+
+        KeyCode::Left => {
+            app.input_state.command_cursor_left();
+        }
+
+        KeyCode::Right => {
+            app.input_state.command_cursor_right();
+        }
+
+        KeyCode::Home => {
+            app.input_state.command_cursor_home();
+        }
+
+        KeyCode::End => {
+            app.input_state.command_cursor_end();
+        }
+
         KeyCode::Char(c) => {
             app.input_state.push_command_char(c);
         }

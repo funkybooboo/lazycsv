@@ -6,6 +6,22 @@
 use crate::App;
 use ratatui::{layout::Rect, style::Style, widgets::Paragraph, Frame};
 
+/// Insert a visible cursor indicator (block) at the given char position in a string.
+fn insert_cursor_indicator(text: &str, cursor: usize) -> String {
+    let mut result = String::new();
+    let char_count = text.chars().count();
+    for (i, ch) in text.chars().enumerate() {
+        if i == cursor {
+            result.push('\u{2588}'); // Full block cursor █
+        }
+        result.push(ch);
+    }
+    if cursor >= char_count {
+        result.push('\u{2588}');
+    }
+    result
+}
+
 /// Build a status line with left (mode), center (filename), and right (stats + help)
 fn build_three_part_status_line(left: &str, center: &str, right: &str, width: usize) -> String {
     let left_len = left.chars().count();
@@ -112,7 +128,9 @@ fn build_status_text(app: &App, right_side: &str, pending_indicator: &str, width
         crate::app::Mode::Command => {
             let dirty = if app.document.is_dirty { "*" } else { "" };
             let filename = &app.document.filename;
-            let left = format!(" :{}", app.input_state.command_buffer);
+            let buf = &app.input_state.command_buffer;
+            let cursor = app.input_state.command_cursor;
+            let left = format!(" :{}", insert_cursor_indicator(buf, cursor));
             let center = format!("{}{}", filename, dirty);
             let right = format!("{} | ? for help ", right_side);
             build_three_part_status_line(&left, &center, &right, width)
@@ -460,6 +478,7 @@ mod tests {
         let mut app = create_test_app();
         app.mode = Mode::Command;
         app.input_state.command_buffer = "sort".to_string();
+        app.input_state.command_cursor = 4;
 
         let status = build_status_text(&app, "right", "", 80);
         assert!(status.contains(":sort"));

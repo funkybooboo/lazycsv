@@ -23,6 +23,9 @@ pub struct InputState {
     /// Command buffer for command mode (stores text after ":")
     pub command_buffer: String,
 
+    /// Cursor position within command buffer (char index)
+    pub command_cursor: usize,
+
     /// File filter buffer for FileList mode (search/filter files)
     pub file_filter_buffer: String,
 
@@ -89,19 +92,75 @@ impl InputState {
         };
     }
 
-    /// Clear the command buffer
+    /// Clear the command buffer and reset cursor
     pub fn clear_command_buffer(&mut self) {
         self.command_buffer.clear();
+        self.command_cursor = 0;
     }
 
-    /// Push a character to the command buffer
+    /// Insert a character at the cursor position
     pub fn push_command_char(&mut self, c: char) {
-        self.command_buffer.push(c);
+        let byte_pos = self
+            .command_buffer
+            .char_indices()
+            .nth(self.command_cursor)
+            .map(|(i, _)| i)
+            .unwrap_or(self.command_buffer.len());
+        self.command_buffer.insert(byte_pos, c);
+        self.command_cursor += 1;
     }
 
-    /// Pop a character from the command buffer
+    /// Delete the character before the cursor
     pub fn pop_command_char(&mut self) {
-        self.command_buffer.pop();
+        if self.command_cursor > 0 {
+            self.command_cursor -= 1;
+            let byte_pos = self
+                .command_buffer
+                .char_indices()
+                .nth(self.command_cursor)
+                .map(|(i, _)| i)
+                .unwrap_or(self.command_buffer.len());
+            self.command_buffer.remove(byte_pos);
+        }
+    }
+
+    /// Delete the character at the cursor (Delete key)
+    pub fn delete_command_char(&mut self) {
+        let char_count = self.command_buffer.chars().count();
+        if self.command_cursor < char_count {
+            let byte_pos = self
+                .command_buffer
+                .char_indices()
+                .nth(self.command_cursor)
+                .map(|(i, _)| i)
+                .unwrap_or(self.command_buffer.len());
+            self.command_buffer.remove(byte_pos);
+        }
+    }
+
+    /// Move command cursor left
+    pub fn command_cursor_left(&mut self) {
+        if self.command_cursor > 0 {
+            self.command_cursor -= 1;
+        }
+    }
+
+    /// Move command cursor right
+    pub fn command_cursor_right(&mut self) {
+        let char_count = self.command_buffer.chars().count();
+        if self.command_cursor < char_count {
+            self.command_cursor += 1;
+        }
+    }
+
+    /// Move command cursor to start
+    pub fn command_cursor_home(&mut self) {
+        self.command_cursor = 0;
+    }
+
+    /// Move command cursor to end
+    pub fn command_cursor_end(&mut self) {
+        self.command_cursor = self.command_buffer.chars().count();
     }
 
     /// Clear the file filter buffer
@@ -252,5 +311,156 @@ mod tests {
         state.add_count_digit(3);
 
         assert_eq!(state.count_or_default(), 123);
+    }
+
+    // ── Command buffer editing tests ──────────────────────────────
+
+    #[test]
+    fn test_push_char_appends_at_end() {
+        let mut state = InputState::new();
+        state.push_command_char('s');
+        state.push_command_char('o');
+        state.push_command_char('r');
+        state.push_command_char('t');
+        assert_eq!(state.command_buffer, "sort");
+        assert_eq!(state.command_cursor, 4);
+    }
+
+    #[test]
+    fn test_push_char_inserts_at_cursor() {
+        let mut state = InputState::new();
+        state.push_command_char('a');
+        state.push_command_char('c');
+        // cursor is at 2 ("ac|"), move left
+        state.command_cursor_left();
+        // cursor is at 1 ("a|c"), insert 'b'
+        state.push_command_char('b');
+        assert_eq!(state.command_buffer, "abc");
+        assert_eq!(state.command_cursor, 2);
+    }
+
+    #[test]
+    fn test_backspace_at_end() {
+        let mut state = InputState::new();
+        state.push_command_char('a');
+        state.push_command_char('b');
+        state.push_command_char('c');
+        state.pop_command_char();
+        assert_eq!(state.command_buffer, "ab");
+        assert_eq!(state.command_cursor, 2);
+    }
+
+    #[test]
+    fn test_backspace_in_middle() {
+        let mut state = InputState::new();
+        state.push_command_char('a');
+        state.push_command_char('b');
+        state.push_command_char('c');
+        state.command_cursor_left(); // cursor at 2 ("ab|c")
+        state.pop_command_char(); // delete 'b'
+        assert_eq!(state.command_buffer, "ac");
+        assert_eq!(state.command_cursor, 1);
+    }
+
+    #[test]
+    fn test_backspace_at_start_does_nothing() {
+        let mut state = InputState::new();
+        state.push_command_char('a');
+        state.command_cursor_home();
+        state.pop_command_char();
+        assert_eq!(state.command_buffer, "a");
+        assert_eq!(state.command_cursor, 0);
+    }
+
+    #[test]
+    fn test_delete_at_cursor() {
+        let mut state = InputState::new();
+        state.push_command_char('a');
+        state.push_command_char('b');
+        state.push_command_char('c');
+        state.command_cursor_home(); // cursor at 0 ("|abc")
+        state.delete_command_char(); // delete 'a'
+        assert_eq!(state.command_buffer, "bc");
+        assert_eq!(state.command_cursor, 0);
+    }
+
+    #[test]
+    fn test_delete_at_end_does_nothing() {
+        let mut state = InputState::new();
+        state.push_command_char('a');
+        state.delete_command_char();
+        assert_eq!(state.command_buffer, "a");
+        assert_eq!(state.command_cursor, 1);
+    }
+
+    #[test]
+    fn test_cursor_left_right() {
+        let mut state = InputState::new();
+        state.push_command_char('a');
+        state.push_command_char('b');
+        state.push_command_char('c');
+        assert_eq!(state.command_cursor, 3);
+
+        state.command_cursor_left();
+        assert_eq!(state.command_cursor, 2);
+        state.command_cursor_left();
+        assert_eq!(state.command_cursor, 1);
+        state.command_cursor_right();
+        assert_eq!(state.command_cursor, 2);
+    }
+
+    #[test]
+    fn test_cursor_left_at_zero() {
+        let mut state = InputState::new();
+        state.command_cursor_left();
+        assert_eq!(state.command_cursor, 0);
+    }
+
+    #[test]
+    fn test_cursor_right_at_end() {
+        let mut state = InputState::new();
+        state.push_command_char('a');
+        state.command_cursor_right(); // already at end
+        assert_eq!(state.command_cursor, 1);
+    }
+
+    #[test]
+    fn test_home_end() {
+        let mut state = InputState::new();
+        state.push_command_char('a');
+        state.push_command_char('b');
+        state.push_command_char('c');
+
+        state.command_cursor_home();
+        assert_eq!(state.command_cursor, 0);
+
+        state.command_cursor_end();
+        assert_eq!(state.command_cursor, 3);
+    }
+
+    #[test]
+    fn test_clear_resets_cursor() {
+        let mut state = InputState::new();
+        state.push_command_char('a');
+        state.push_command_char('b');
+        state.clear_command_buffer();
+        assert_eq!(state.command_buffer, "");
+        assert_eq!(state.command_cursor, 0);
+    }
+
+    #[test]
+    fn test_insert_in_middle_of_word() {
+        let mut state = InputState::new();
+        // Type "srt"
+        state.push_command_char('s');
+        state.push_command_char('r');
+        state.push_command_char('t');
+        // Move left twice to position after 's'
+        state.command_cursor_left();
+        state.command_cursor_left();
+        // Insert 'o' to make "sort"
+        state.push_command_char('o');
+        assert_eq!(state.command_buffer, "sort");
+        assert_eq!(state.command_cursor, 2);
     }
 }

@@ -33,5 +33,6 @@ mod executor;
 mod handler;
 mod range_commands;
 pub mod stats;
+mod substitute;
 
 pub use handler::handle;

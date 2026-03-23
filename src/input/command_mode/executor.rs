@@ -57,6 +57,12 @@ pub fn execute(app: &mut App) -> Result<InputResult> {
         }
     }
 
+    // Substitute commands: s/old/new/, %s/old/new/g, 5,10s/old/new/g, B,Ds/old/new/g
+    // Must be checked before range commands to avoid %s being caught by %d/%y handler
+    if let Some(sub_result) = super::substitute::try_execute(app, &cmd) {
+        return sub_result;
+    }
+
     // Special handling for range operations: :5,10d, :%d, :.d, :$d, etc.
     if let Some(range_result) =
         crate::input::command_mode::range_commands::parse_and_execute(app, &cmd)
