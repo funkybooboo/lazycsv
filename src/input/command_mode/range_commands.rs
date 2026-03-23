@@ -74,6 +74,12 @@ fn execute_percent_range(app: &mut App, operation: &str) -> Result<InputResult> 
             let deleted = app
                 .document
                 .delete_rows(RowIndex::new(1), RowIndex::new(row_count));
+            if !deleted.is_empty() {
+                app.history.push(crate::history::EditCommand::DeleteRows {
+                    start: RowIndex::new(1),
+                    data: deleted.clone(),
+                });
+            }
             app.status_message = Some(StatusMessage::from(format!(
                 "Deleted {} row(s)",
                 deleted.len()
@@ -124,7 +130,11 @@ fn execute_current_row(app: &mut App, operation: &str) -> Result<InputResult> {
         "d" => {
             // Delete current row
             if let Some(row_idx) = app.selected_row() {
-                if let Some(_deleted) = app.document.delete_row(row_idx) {
+                if let Some(deleted_data) = app.document.delete_row(row_idx) {
+                    app.history.push(crate::history::EditCommand::DeleteRow {
+                        at: row_idx,
+                        data: deleted_data,
+                    });
                     app.status_message = Some(StatusMessage::from("Deleted 1 row"));
 
                     // Adjust cursor position
@@ -183,7 +193,11 @@ fn execute_last_row(app: &mut App, operation: &str) -> Result<InputResult> {
                 return Ok(InputResult::Continue);
             }
 
-            if let Some(_deleted) = app.document.delete_row(RowIndex::new(row_count)) {
+            if let Some(deleted_data) = app.document.delete_row(RowIndex::new(row_count)) {
+                app.history.push(crate::history::EditCommand::DeleteRow {
+                    at: RowIndex::new(row_count),
+                    data: deleted_data,
+                });
                 app.status_message = Some(StatusMessage::from("Deleted 1 row"));
 
                 // Move cursor to new last row if cursor was on deleted row
@@ -299,6 +313,10 @@ fn delete_row_range(app: &mut App, start_num: usize, end_num: usize) -> Result<I
     if deleted.is_empty() {
         app.status_message = Some(StatusMessage::from("No rows deleted (range out of bounds)"));
     } else {
+        app.history.push(crate::history::EditCommand::DeleteRows {
+            start: RowIndex::new(start_num),
+            data: deleted.clone(),
+        });
         app.status_message = Some(StatusMessage::from(format!(
             "Deleted {} row(s)",
             deleted.len()
@@ -520,6 +538,11 @@ fn delete_column_range(
             "No columns deleted (range out of bounds)",
         ));
     } else {
+        app.history
+            .push(crate::history::EditCommand::DeleteColumns {
+                start: ColIndex::new(start_col),
+                data: deleted.clone(),
+            });
         app.status_message = Some(StatusMessage::from(format!(
             "Deleted {} column(s)",
             deleted.len()

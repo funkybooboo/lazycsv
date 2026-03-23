@@ -56,15 +56,27 @@ fn delete_block(
     }
     app.clipboard.yank_region(region);
 
-    // Clear cells in rectangular region (preserve structure)
+    // Clear cells in rectangular region (preserve structure) and record for undo
+    let mut commands = Vec::new();
     for row_idx in start_row.get()..=end_row.get() {
         for col_idx in start_col.get()..=end_col.get() {
-            app.document.set_cell(
-                RowIndex::new(row_idx),
-                ColIndex::new(col_idx),
-                String::new(),
-            );
+            let r = RowIndex::new(row_idx);
+            let c = ColIndex::new(col_idx);
+            let old_value = app.document.cell(r, c);
+            app.document.set_cell(r, c, String::new());
+            if !old_value.is_empty() {
+                commands.push(crate::history::EditCommand::SetCell {
+                    row: r,
+                    col: c,
+                    old_value,
+                    new_value: String::new(),
+                });
+            }
         }
+    }
+    if !commands.is_empty() {
+        app.history
+            .push(crate::history::EditCommand::Compound(commands));
     }
 
     let row_count = end_row.get() - start_row.get() + 1;
@@ -93,6 +105,12 @@ fn delete_lines(app: &mut App, start_row: RowIndex, end_row: RowIndex) {
 
     // Delete entire rows
     let deleted = app.document.delete_rows(start_row, end_row);
+    if !deleted.is_empty() {
+        app.history.push(crate::history::EditCommand::DeleteRows {
+            start: start_row,
+            data: deleted.clone(),
+        });
+    }
     app.status_message = Some(StatusMessage::from(format!(
         "Deleted {} row(s)",
         deleted.len()
@@ -123,10 +141,15 @@ fn delete_columns(app: &mut App, start_col: ColIndex, end_col: ColIndex) {
     }
     app.clipboard.yank_columns(columns);
 
-    // Delete entire columns
-    let col_count = end_col.get() - start_col.get() + 1;
-    for _ in 0..col_count {
-        app.document.delete_column(start_col);
+    // Delete entire columns — use delete_columns for a single undo step
+    let deleted = app.document.delete_columns(start_col, end_col);
+    let col_count = deleted.len();
+    if col_count > 0 {
+        app.history
+            .push(crate::history::EditCommand::DeleteColumns {
+                start: start_col,
+                data: deleted,
+            });
     }
     app.status_message = Some(StatusMessage::from(format!(
         "Deleted {} column(s)",

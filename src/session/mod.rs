@@ -77,6 +77,9 @@ pub struct Session {
     /// Per-file manual column widths (sparse: only stores explicitly set widths).
     /// Key is column index, value is width in characters.
     column_widths: HashMap<PathBuf, HashMap<usize, u16>>,
+
+    /// Per-file undo/redo history (preserved across file switches)
+    history_cache: HashMap<PathBuf, crate::history::History>,
 }
 
 impl Session {
@@ -92,6 +95,7 @@ impl Session {
             query_output_files: HashSet::new(),
             file_mtimes: HashMap::new(),
             column_widths: HashMap::new(),
+            history_cache: HashMap::new(),
         }
     }
 
@@ -236,6 +240,16 @@ impl Session {
     /// Remove a document from cache (called after saving)
     pub fn remove_from_cache(&mut self, path: &PathBuf) {
         self.document_cache.remove(path);
+    }
+
+    /// Save undo/redo history for a file (called when switching away)
+    pub fn cache_history(&mut self, path: PathBuf, history: crate::history::History) {
+        self.history_cache.insert(path, history);
+    }
+
+    /// Restore undo/redo history for a file (called when switching to)
+    pub fn take_history(&mut self, path: &PathBuf) -> Option<crate::history::History> {
+        self.history_cache.remove(path)
     }
 
     /// Clear all cached documents

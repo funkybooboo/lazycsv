@@ -36,9 +36,16 @@ pub fn handle_file_switch(app: &mut App, next: bool) -> InputResult {
         return InputResult::Continue;
     }
 
+    // Save current file's history before switching
+    let current_path = app.current_file().clone();
+    let history = std::mem::replace(
+        &mut app.history,
+        crate::history::History::new(app.config.defaults.undo_limit),
+    );
+    app.session.cache_history(current_path.clone(), history);
+
     // Cache current document before switching if it's a query output or dirty
     // (query results don't exist on disk, so they must be cached to switch back)
-    let current_path = app.current_file().clone();
     if app.session.is_query_output(&current_path) || app.document.is_dirty {
         app.session
             .cache_document(current_path.clone(), app.document.clone());

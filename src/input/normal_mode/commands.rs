@@ -75,6 +75,13 @@ pub fn delete_rows(app: &mut App) {
         let deleted = app.document.delete_rows(row_idx, end_idx);
         let deleted_count = deleted.len();
         if deleted_count > 0 {
+            // Record for undo and dot-repeat
+            let cmd = crate::history::EditCommand::DeleteRows {
+                start: row_idx,
+                data: deleted.clone(),
+            };
+            app.last_edit = Some(cmd.clone());
+            app.history.push(cmd);
             app.clipboard.yank_rows(deleted);
             // Adjust selection if needed
             let row_count = app.document.row_count();
@@ -191,6 +198,18 @@ pub fn insert_column_after(app: &mut App) {
     let col_idx = app.view_state.selected_column;
     let insert_at = ColIndex::new(col_idx.get() + 1);
     app.document.insert_empty_column(insert_at);
+    // Record for undo (empty column data)
+    let data: Vec<String> = std::iter::once(format!(
+        "Column {}",
+        crate::ui::utils::column_to_excel_letter(insert_at.get())
+    ))
+    .chain(std::iter::repeat_n(
+        String::new(),
+        app.document.row_count().saturating_sub(1),
+    ))
+    .collect();
+    app.history
+        .push(crate::history::EditCommand::InsertColumn { at: insert_at, data });
     app.view_state.selected_column = insert_at;
     app.status_message = Some(StatusMessage::from("Inserted empty column"));
 }
@@ -200,6 +219,18 @@ pub fn insert_column_before(app: &mut App) {
     app.input_state.clear_pending_command();
     let col_idx = app.view_state.selected_column;
     app.document.insert_empty_column(col_idx);
+    // Record for undo
+    let data: Vec<String> = std::iter::once(format!(
+        "Column {}",
+        crate::ui::utils::column_to_excel_letter(col_idx.get())
+    ))
+    .chain(std::iter::repeat_n(
+        String::new(),
+        app.document.row_count().saturating_sub(1),
+    ))
+    .collect();
+    app.history
+        .push(crate::history::EditCommand::InsertColumn { at: col_idx, data });
     app.status_message = Some(StatusMessage::from("Inserted empty column"));
 }
 
@@ -217,6 +248,12 @@ pub fn delete_columns(app: &mut App) {
     let deleted = app.document.delete_columns(col_idx, end_idx);
     let deleted_count = deleted.len();
     if deleted_count > 0 {
+        // Record for undo
+        app.history
+            .push(crate::history::EditCommand::DeleteColumns {
+                start: col_idx,
+                data: deleted.clone(),
+            });
         app.clipboard.yank_columns(deleted);
         // Adjust selection if needed
         let col_count = app.document.column_count();

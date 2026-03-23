@@ -10,6 +10,8 @@ pub fn insert_row_below(app: &mut App) {
     if let Some(row_idx) = app.selected_row() {
         let new_row_idx = RowIndex::new(row_idx.get() + 1);
         app.document.insert_row(new_row_idx);
+        app.history
+            .push(crate::history::EditCommand::InsertRow { at: new_row_idx });
         app.view_state.table_state.select(Some(new_row_idx.get()));
         enter_insert_mode(app, CursorPosition::Start, InitialContent::Keep);
     }
@@ -19,6 +21,8 @@ pub fn insert_row_below(app: &mut App) {
 pub fn insert_row_above(app: &mut App) {
     if let Some(row_idx) = app.selected_row() {
         app.document.insert_row(row_idx);
+        app.history
+            .push(crate::history::EditCommand::InsertRow { at: row_idx });
         // Selection stays at current index which is now the new row
         enter_insert_mode(app, CursorPosition::Start, InitialContent::Keep);
     }
@@ -82,7 +86,15 @@ pub fn paste_rows_below(app: &mut App) {
 pub fn clear_cell(app: &mut App) {
     if let Some(row_idx) = app.selected_row() {
         let col_idx = app.view_state.selected_column;
+        let old_value = app.document.cell(row_idx, col_idx);
         app.document.set_cell(row_idx, col_idx, String::new());
+        app.history
+            .push(crate::history::EditCommand::SetCell {
+                row: row_idx,
+                col: col_idx,
+                old_value,
+                new_value: String::new(),
+            });
         app.status_message = Some(StatusMessage::from("Cell cleared"));
     }
 }

@@ -623,6 +623,12 @@ pub struct App {
     /// Watches config files for live reload
     config_watcher: crate::config::ConfigWatcher,
 
+    /// CSV-level undo/redo history
+    pub history: crate::history::History,
+
+    /// Last edit command for dot-repeat (.)
+    pub last_edit: Option<crate::history::EditCommand>,
+
     /// View/UI state (renamed from ui, moved to ui module)
     pub view_state: ViewState,
 
@@ -835,11 +841,14 @@ impl App {
         let input_state = InputState::new();
 
         let config_watcher = crate::config::ConfigWatcher::new();
+        let history = crate::history::History::new(config.defaults.undo_limit);
 
         let mut app = Self {
             document: csv_data,
             config,
             config_watcher,
+            history,
+            last_edit: None,
             view_state,
             input_state,
             session,
@@ -1026,17 +1035,42 @@ impl App {
         col: crate::domain::position::ColIndex,
         content: String,
     ) {
+        // Record old value for undo before mutation
+        let old_value = self.document.cell(row, col);
+
         if let Some(formula) = crate::formula::parse_formula(&content) {
             // Evaluate using document cell values
             let computed = formula.evaluate(&|r, c| self.document.storage.get_cell(r, c));
+            let new_value = computed.clone();
             self.formula_store
                 .set(row.get(), col.get(), content, formula);
             self.document.set_cell(row, col, computed);
+            self.history.push(crate::history::EditCommand::SetCell {
+                row,
+                col,
+                old_value,
+                new_value,
+            });
         } else {
             // Not a formula — remove any existing formula and store raw value
+            let new_value = content.clone();
             self.formula_store.remove(row.get(), col.get());
             self.document.set_cell(row, col, content);
+            self.history.push(crate::history::EditCommand::SetCell {
+                row,
+                col,
+                old_value,
+                new_value,
+            });
         }
+
+        // Store for dot-repeat (use row=0, col=0 as placeholder — dot applies at cursor)
+        self.last_edit = Some(crate::history::EditCommand::SetCell {
+            row,
+            col,
+            old_value: String::new(), // placeholder
+            new_value: self.document.cell(row, col),
+        });
 
         self.document.is_dirty = true;
         let file_path = self.current_file().clone();

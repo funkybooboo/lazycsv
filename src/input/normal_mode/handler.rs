@@ -276,6 +276,62 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             nav::page_down(app);
         }
 
+        // Dot repeat: . — repeat last cell edit at current cursor
+        KeyCode::Char('.') if help::is_navigation_allowed(app) => {
+            if let Some(ref last) = app.last_edit.clone() {
+                match last {
+                    crate::history::EditCommand::SetCell { new_value, .. } => {
+                        if let Some(row) = app.selected_row() {
+                            let col = app.view_state.selected_column;
+                            app.commit_cell_value(row, col, new_value.clone());
+                            app.status_message =
+                                Some(StatusMessage::from("Repeated last edit".to_string()));
+                        }
+                    }
+                    crate::history::EditCommand::InsertRow { .. } => {
+                        editing::insert_row_below(app);
+                    }
+                    crate::history::EditCommand::DeleteRow { .. }
+                    | crate::history::EditCommand::DeleteRows { .. } => {
+                        super::commands::delete_rows(app);
+                    }
+                    _ => {
+                        app.status_message =
+                            Some(StatusMessage::from("No repeatable edit".to_string()));
+                    }
+                }
+            } else {
+                app.status_message =
+                    Some(StatusMessage::from("No previous edit".to_string()));
+            }
+        }
+
+        // Undo: u
+        KeyCode::Char('u')
+            if help::is_navigation_allowed(app)
+                && !key.modifiers.contains(KeyModifiers::CONTROL) =>
+        {
+            if app.history.undo(&mut app.document) {
+                app.status_message = Some(StatusMessage::from("Undone".to_string()));
+            } else {
+                app.status_message =
+                    Some(StatusMessage::from("Already at oldest change".to_string()));
+            }
+        }
+
+        // Redo: Ctrl+r
+        KeyCode::Char('r')
+            if help::is_navigation_allowed(app)
+                && key.modifiers.contains(KeyModifiers::CONTROL) =>
+        {
+            if app.history.redo(&mut app.document) {
+                app.status_message = Some(StatusMessage::from("Redone".to_string()));
+            } else {
+                app.status_message =
+                    Some(StatusMessage::from("Already at newest change".to_string()));
+            }
+        }
+
         // Page navigation: Ctrl+u - page up
         KeyCode::Char('u')
             if help::is_navigation_allowed(app)

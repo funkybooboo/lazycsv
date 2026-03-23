@@ -341,6 +341,10 @@ fn handle_reload_file(terminal: &mut Term, app: &mut App) -> Result<()> {
         Ok(true) => {
             let current_path = app.current_file().clone();
             app.invalidate_sqlite_cache_for(&current_path);
+            // Restore per-file history
+            if let Some(history) = app.session.take_history(&current_path) {
+                app.history = history;
+            }
             app.status_message = None;
             terminal.clear().context("Failed to clear terminal")?;
         }
@@ -361,6 +365,16 @@ fn handle_switch_document(
     doc: lazycsv::csv::Document,
 ) -> Result<()> {
     terminal.clear().context("Failed to clear terminal")?;
+
+    // Save current file's history before switching
+    {
+        let current_path = app.current_file().clone();
+        let history = std::mem::replace(
+            &mut app.history,
+            lazycsv::history::History::new(app.config.defaults.undo_limit),
+        );
+        app.session.cache_history(current_path, history);
+    }
 
     if app.document.is_dirty {
         let current_path = app.current_file().clone();
@@ -401,6 +415,12 @@ fn handle_switch_document(
     app.document.is_dirty = true;
     let result_path = app.current_file().clone();
     app.session.mark_dirty(&result_path);
+
+    // Restore history for the new file (if any)
+    let new_path = app.current_file().clone();
+    if let Some(history) = app.session.take_history(&new_path) {
+        app.history = history;
+    }
 
     app.view_state = lazycsv::ui::ViewState::default();
     // Start at row 0 (displays as row 1)
