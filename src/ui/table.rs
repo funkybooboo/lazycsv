@@ -46,26 +46,21 @@ fn calculate_cell_style(
     col: ColIndex,
     is_selected: bool,
 ) -> Style {
+    let theme = &app.config.theme;
     if is_selected {
-        // Selected cell: use centralized cursor style
-        super::modal::cursor_style()
+        super::modal::cursor_style_from(theme)
     } else if is_in_visual_selection(app, row, col) {
-        // Cell in visual selection: use centralized visual selection style
-        super::modal::visual_selection_style().fg(Color::White)
+        super::modal::visual_selection_style_from(theme).fg(Color::White)
     } else if search_state
         .map(|s| s.is_current_match(row, col))
         .unwrap_or(false)
     {
-        // Current search match: use search match style with bold
-        super::modal::search_match_style().add_modifier(Modifier::BOLD)
+        super::modal::search_match_style_from(theme).add_modifier(Modifier::BOLD)
     } else if search_state.map(|s| s.is_match(row, col)).unwrap_or(false) {
-        // Other search matches: visual selection style (dark gray bg, yellow fg)
-        super::modal::visual_selection_style()
-    } else if row.get().is_multiple_of(2) {
-        // Even rows: subtle background for zebra striping
-        super::modal::zebra_stripe_style()
+        super::modal::visual_selection_style_from(theme)
+    } else if app.config.defaults.zebra_striping && row.get().is_multiple_of(2) {
+        super::modal::zebra_stripe_style_from(theme)
     } else {
-        // Odd rows: no background
         Style::default()
     }
 }
@@ -145,8 +140,9 @@ fn ideal_column_width(app: &crate::App, col_idx: usize) -> u16 {
         .max()
         .unwrap_or(0);
 
+    let max_width = app.config.defaults.max_column_width;
     let ideal = (header_len.max(max_data_len) + 2) as u16;
-    ideal.clamp(MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH)
+    ideal.clamp(MIN_COLUMN_WIDTH, max_width)
 }
 
 /// Build the column letters row (A, B, C...) with highlighting for selected column
@@ -154,17 +150,22 @@ fn build_column_letters_row<'a>(
     start_col: usize,
     end_col: usize,
     selected_column: ColIndex,
+    theme: &crate::config::Theme,
 ) -> Row<'a> {
-    let mut col_letter_cells = vec![Cell::from("    ")]; // Align with row numbers column
+    let base_style = if let Some(bg) = theme.header_bg {
+        Style::default().bg(bg)
+    } else {
+        Style::default()
+    };
+    let mut col_letter_cells = vec![Cell::from("    ").style(base_style)]; // Align with row numbers column
 
     for i in start_col..end_col {
         let letter = column_to_excel_letter(i);
         let col_idx = ColIndex::new(i);
         let style = if col_idx == selected_column {
-            // Highlight selected column with bold only
-            super::modal::bold_style()
+            super::modal::bold_style().patch(base_style)
         } else {
-            super::modal::dim_style()
+            super::modal::dim_style().patch(base_style)
         };
         col_letter_cells.push(Cell::from(letter).style(style));
     }
@@ -258,8 +259,8 @@ fn build_data_rows(
             let row_num_display = format!("{:>4}", row_idx);
             let row_num_style = if is_selected_row {
                 super::modal::row_number_style()
-            } else if row_idx.is_multiple_of(2) {
-                super::modal::zebra_stripe_style()
+            } else if app.config.defaults.zebra_striping && row_idx.is_multiple_of(2) {
+                super::modal::zebra_stripe_style_from(&app.config.theme)
             } else {
                 Style::default()
             };
@@ -377,8 +378,9 @@ fn calculate_column_widths(
             .unwrap_or(0);
 
         // Calculate ideal width with min/max constraints
+        let max_width = app.config.defaults.max_column_width;
         let ideal = (header_len.max(max_data_len) + 2) as u16; // +2 for padding
-        let constrained = ideal.clamp(MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH);
+        let constrained = ideal.clamp(MIN_COLUMN_WIDTH, max_width);
         ideal_widths.push(constrained);
     }
 
@@ -437,7 +439,7 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
 
     // Build column letters row
     let col_letters_row =
-        build_column_letters_row(start_col, end_col, app.view_state.selected_column);
+        build_column_letters_row(start_col, end_col, app.view_state.selected_column, &app.config.theme);
 
     // Calculate visible viewport for virtual scrolling
     let table_height = area

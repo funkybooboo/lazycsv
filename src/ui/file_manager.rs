@@ -240,7 +240,7 @@ fn render_current_column(
                         .and_then(|n| n.to_str())
                         .unwrap_or("unknown");
 
-                    let dirty = if app.session.is_dirty(path) { "*" } else { "" };
+                    let is_dirty = app.session.is_dirty(path);
 
                     let style = if is_selected {
                         Style::default().add_modifier(Modifier::BOLD)
@@ -248,7 +248,11 @@ fn render_current_column(
                         Style::default()
                     };
 
-                    spans.push(Span::styled(format!("{}{}", filename, dirty), style));
+                    spans.push(Span::styled(filename.to_string(), style));
+                    if is_dirty {
+                        let dirty_style = Style::default().fg(app.config.theme.dirty_indicator_fg);
+                        spans.push(Span::styled("*", dirty_style));
+                    }
                 }
             }
 

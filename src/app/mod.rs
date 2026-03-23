@@ -617,6 +617,9 @@ pub struct App {
     /// Loaded CSV document
     pub document: Document,
 
+    /// User configuration (theme, defaults, etc.)
+    pub config: crate::config::Config,
+
     /// View/UI state (renamed from ui, moved to ui module)
     pub view_state: ViewState,
 
@@ -764,11 +767,16 @@ impl App {
         file_config: crate::session::FileConfig,
         cli_args: &crate::cli::CliArgs,
     ) -> Result<Self> {
+        // Apply config defaults for the initial file load
+        let config = crate::config::load_config();
+        let delimiter = cli_args.delimiter.or(config.defaults.delimiter.map(|d| d as u8));
+        let encoding = cli_args.encoding.clone().or(config.defaults.encoding.clone());
+
         let csv_data = crate::csv::Document::from_file(
             file_path,
-            cli_args.delimiter,
+            delimiter,
             cli_args.no_headers,
-            cli_args.encoding.clone(),
+            encoding,
         )
         .context(messages::failed_to_load_csv(file_path))?;
 
@@ -798,6 +806,19 @@ impl App {
         current_file_index: usize,
         file_config: crate::session::FileConfig,
     ) -> Self {
+        let config = crate::config::load_config();
+
+        // Apply config defaults where CLI didn't specify values
+        let mut file_config = file_config;
+        if file_config.delimiter.is_none() {
+            if let Some(d) = config.defaults.delimiter {
+                file_config.delimiter = Some(d as u8);
+            }
+        }
+        if file_config.encoding.is_none() {
+            file_config.encoding = config.defaults.encoding.clone();
+        }
+
         // Create session
         let session = Session::new(csv_files, current_file_index, file_config);
 
@@ -810,6 +831,7 @@ impl App {
 
         let mut app = Self {
             document: csv_data,
+            config,
             view_state,
             input_state,
             session,

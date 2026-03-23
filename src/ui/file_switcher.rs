@@ -152,14 +152,14 @@ fn build_file_spans(
             .and_then(|n| n.to_str())
             .unwrap_or("unknown");
 
-        // Add dirty indicator if file is dirty
-        let dirty_indicator = if app.session.is_dirty(path) { "*" } else { "" };
-        let display_name = format!("{}{}", filename, dirty_indicator);
+        let is_dirty = app.session.is_dirty(path);
+        let dirty_indicator = if is_dirty { "*" } else { "" };
+        let display_len = filename.len() + dirty_indicator.len();
 
         let sep_start = current_pos;
         let sep_end = sep_start + separator.len();
         let file_start = sep_end;
-        let file_end = file_start + display_name.len();
+        let file_end = file_start + display_len;
 
         // Check if this segment is visible
         if file_end > scroll_offset && sep_start < scroll_offset + visible_width {
@@ -175,7 +175,11 @@ fn build_file_spans(
                 } else {
                     dim_style
                 };
-                spans.push(Span::styled(display_name, style));
+                spans.push(Span::styled(filename.to_string(), style));
+                if is_dirty {
+                    let dirty_style = Style::default().fg(app.config.theme.dirty_indicator_fg);
+                    spans.push(Span::styled("*", dirty_style));
+                }
             }
         }
 

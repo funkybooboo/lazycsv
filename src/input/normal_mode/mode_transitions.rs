@@ -8,6 +8,7 @@ pub fn enter_sql_editor(app: &mut App) {
     app.sql_cursor = app.sql_buffer.chars().count();
     app.mode = Mode::SqlEditor;
     let mut editor = crate::vim_editor::VimEditor::new(app.sql_buffer.clone());
+    editor.set_undo_limit(app.config.defaults.undo_limit);
     // Auto-enter INSERT mode when there's no existing query
     if app.sql_buffer.trim().is_empty() {
         editor.enter_insert_mode();

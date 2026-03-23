@@ -74,11 +74,14 @@ pub struct VimEditor {
     /// Visual mode anchor point (where selection started)
     visual_anchor: Option<(usize, usize)>,
 
-    /// Undo history stack (limited to 1000 entries)
+    /// Undo history stack
     undo_stack: VecDeque<undo::UndoSnapshot>,
 
     /// Redo history stack
     redo_stack: Vec<undo::UndoSnapshot>,
+
+    /// Maximum undo history depth (configurable)
+    undo_limit: usize,
 
     /// Search pattern
     search_pattern: Option<String>,
@@ -97,8 +100,8 @@ pub struct VimEditor {
 }
 
 impl VimEditor {
-    /// Maximum undo history depth
-    const MAX_UNDO_HISTORY: usize = 1000;
+    /// Default maximum undo history depth
+    const DEFAULT_UNDO_LIMIT: usize = 1000;
 
     /// Create a new vim editor with the given content
     ///
@@ -133,12 +136,18 @@ impl VimEditor {
             visual_anchor: None,
             undo_stack: VecDeque::new(),
             redo_stack: Vec::new(),
+            undo_limit: Self::DEFAULT_UNDO_LIMIT,
             search_pattern: None,
             search_matches: Vec::new(),
             current_match: None,
             last_find: None,
             last_ex_command: None,
         }
+    }
+
+    /// Set the maximum undo history depth
+    pub fn set_undo_limit(&mut self, limit: usize) {
+        self.undo_limit = limit;
     }
 
     /// Get the current content as a single string with newlines

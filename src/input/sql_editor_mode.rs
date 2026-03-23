@@ -402,7 +402,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     if key.code == KeyCode::Char('f') && key.modifiers.contains(KeyModifiers::CONTROL) {
         let sql_text = editor.content();
         if !sql_text.trim().is_empty() {
-            let formatted = format_sql(&sql_text);
+            let formatted = format_sql(&sql_text, app.config.sql.format_uppercase);
             editor.set_content(&formatted);
             app.status_message = Some(StatusMessage::new_owned("SQL formatted".to_string()));
         }
@@ -1094,10 +1094,10 @@ fn build_template_items() -> Vec<CompletionItem> {
 }
 
 /// Format a SQL statement using the sqlformat crate.
-fn format_sql(sql: &str) -> String {
+fn format_sql(sql: &str, uppercase: bool) -> String {
     let options = sqlformat::FormatOptions {
         indent: sqlformat::Indent::Spaces(2),
-        uppercase: Some(true),
+        uppercase: Some(uppercase),
         lines_between_queries: 1,
         ..Default::default()
     };
@@ -1317,7 +1317,7 @@ mod tests {
 
     #[test]
     fn test_format_sql_select() {
-        let result = format_sql("select * from table where id = 1");
+        let result = format_sql("select * from table where id = 1", true);
         assert!(result.contains("SELECT"));
         assert!(result.contains("FROM"));
         assert!(result.contains("WHERE"));
@@ -1327,7 +1327,7 @@ mod tests {
 
     #[test]
     fn test_format_sql_update() {
-        let result = format_sql("update numbers set value = 99 where id = 1");
+        let result = format_sql("update numbers set value = 99 where id = 1", true);
         assert!(result.contains("UPDATE"));
         assert!(result.contains("SET"));
         assert!(result.contains("WHERE"));
@@ -1335,13 +1335,13 @@ mod tests {
 
     #[test]
     fn test_format_sql_empty() {
-        let result = format_sql("");
+        let result = format_sql("", true);
         assert!(result.trim().is_empty());
     }
 
     #[test]
     fn test_format_sql_preserves_strings() {
-        let result = format_sql("select * from t where name = 'hello world'");
+        let result = format_sql("select * from t where name = 'hello world'", true);
         assert!(result.contains("'hello world'"));
     }
 

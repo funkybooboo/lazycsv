@@ -93,7 +93,15 @@ pub const MODAL_SMALL_HEIGHT: u16 = 20;
 // STYLE CONSTANTS
 // ============================================================================
 
-/// Cursor/selection style (white background, black text, bold)
+/// Cursor/selection style from config theme.
+pub fn cursor_style_from(theme: &crate::config::Theme) -> Style {
+    Style::default()
+        .bg(theme.cursor_bg)
+        .fg(theme.cursor_fg)
+        .add_modifier(Modifier::BOLD)
+}
+
+/// Cursor/selection style (default: white background, black text, bold)
 pub fn cursor_style() -> Style {
     Style::default()
         .bg(Color::White)
@@ -116,12 +124,26 @@ pub fn error_style() -> Style {
     Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
 }
 
-/// Search match style (yellow background, black text)
+/// Search match style from config theme.
+pub fn search_match_style_from(theme: &crate::config::Theme) -> Style {
+    Style::default()
+        .bg(theme.search_match_bg)
+        .fg(theme.search_match_fg)
+}
+
+/// Search match style (default: yellow background, black text)
 pub fn search_match_style() -> Style {
     Style::default().bg(Color::Yellow).fg(Color::Black)
 }
 
-/// Visual selection style (dark gray background, yellow text)
+/// Visual selection style from config theme.
+pub fn visual_selection_style_from(theme: &crate::config::Theme) -> Style {
+    Style::default()
+        .bg(theme.selection_bg)
+        .fg(theme.selection_fg)
+}
+
+/// Visual selection style (default: dark gray background, yellow text)
 pub fn visual_selection_style() -> Style {
     Style::default().bg(COLOR_VISUAL_BG).fg(COLOR_VISUAL_FG)
 }
@@ -131,7 +153,12 @@ pub fn row_number_style() -> Style {
     Style::default().add_modifier(Modifier::BOLD)
 }
 
-/// Zebra stripe background for alternating rows (subtle dark tint)
+/// Zebra stripe from config theme.
+pub fn zebra_stripe_style_from(theme: &crate::config::Theme) -> Style {
+    Style::default().bg(theme.zebra_bg)
+}
+
+/// Zebra stripe background for alternating rows (default: subtle dark tint)
 pub fn zebra_stripe_style() -> Style {
     Style::default().bg(Color::Rgb(30, 30, 30))
 }

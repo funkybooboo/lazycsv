@@ -2,6 +2,7 @@ pub mod app;
 pub mod cancel;
 pub mod cli;
 pub mod clipboard;
+pub mod config;
 pub mod csv;
 pub mod domain;
 pub mod file_system;

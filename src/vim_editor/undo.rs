@@ -35,7 +35,7 @@ impl VimEditor {
         };
 
         // Limit undo history depth
-        if self.undo_stack.len() >= Self::MAX_UNDO_HISTORY {
+        if self.undo_stack.len() >= self.undo_limit {
             self.undo_stack.pop_front();
         }
 
