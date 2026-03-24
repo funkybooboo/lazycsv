@@ -312,13 +312,16 @@ fn copy_to_system_clipboard(text: &str) -> Result<()> {
         })?;
 
     #[cfg(not(any(target_os = "macos", target_os = "linux")))]
-    return Ok(());
+    return Ok(()); // No clipboard support on this platform
 
-    child
-        .stdin
-        .as_mut()
-        .ok_or_else(|| anyhow::anyhow!("Failed to open clipboard stdin"))?
-        .write_all(text.as_bytes())?;
-    child.wait()?;
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    {
+        child
+            .stdin
+            .as_mut()
+            .ok_or_else(|| anyhow::anyhow!("Failed to open clipboard stdin"))?
+            .write_all(text.as_bytes())?;
+        child.wait()?;
+    }
     Ok(())
 }
