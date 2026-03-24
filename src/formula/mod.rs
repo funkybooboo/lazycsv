@@ -596,8 +596,8 @@ fn range_bounds(refs: &[CellRef]) -> (usize, usize, usize, usize) {
 // ============================================================================
 
 /// Parse a cell reference like "A1", "B10", "AA3" into a CellRef.
-/// Row numbers in formulas map directly to document row indices (matching the TUI gutter).
-/// Row 0 = first row, Row 1 = second row, etc.
+/// Uses 1-based row numbering (Excel convention): A1 = header row (internal row 0),
+/// A2 = first data row (internal row 1), etc.
 fn parse_cell_ref(s: &str) -> Option<CellRef> {
     let s = s.trim();
     if s.is_empty() {
@@ -619,6 +619,9 @@ fn parse_cell_ref(s: &str) -> Option<CellRef> {
 
     let col = excel_letter_to_column(col_str).ok()?;
     let row: usize = row_str.parse().ok()?;
+
+    // Convert 1-based Excel row to 0-based internal index
+    let row = row.checked_sub(1)?;
 
     Some(CellRef { row, col })
 }
@@ -980,10 +983,12 @@ mod tests {
 
     #[test]
     fn test_parse_cell_ref() {
-        assert_eq!(parse_cell_ref("A1"), Some(CellRef { row: 1, col: 0 }));
-        assert_eq!(parse_cell_ref("B3"), Some(CellRef { row: 3, col: 1 }));
-        assert_eq!(parse_cell_ref("AA1"), Some(CellRef { row: 1, col: 26 }));
-        assert_eq!(parse_cell_ref("A0"), Some(CellRef { row: 0, col: 0 })); // first row
+        // 1-based Excel rows → 0-based internal rows
+        assert_eq!(parse_cell_ref("A1"), Some(CellRef { row: 0, col: 0 })); // header row
+        assert_eq!(parse_cell_ref("A2"), Some(CellRef { row: 1, col: 0 })); // first data row
+        assert_eq!(parse_cell_ref("B3"), Some(CellRef { row: 2, col: 1 }));
+        assert_eq!(parse_cell_ref("AA1"), Some(CellRef { row: 0, col: 26 }));
+        assert_eq!(parse_cell_ref("A0"), None); // row 0 is invalid in Excel
         assert_eq!(parse_cell_ref("1A"), None);
         assert_eq!(parse_cell_ref("A"), None);
         assert_eq!(parse_cell_ref("1"), None);
@@ -1014,13 +1019,15 @@ mod tests {
 
     // ---- Aggregate ----
 
+    // Note: A1 = internal row 0, A2 = internal row 1, etc. (1-based Excel → 0-based internal)
+
     #[test]
     fn test_evaluate_sum() {
         let f = parse_formula("=SUM(A1:A3)").unwrap();
         let result = f.evaluate(&|row, _col| match row {
-            1 => "10".to_string(),
-            2 => "20".to_string(),
-            3 => "30".to_string(),
+            0 => "10".to_string(),
+            1 => "20".to_string(),
+            2 => "30".to_string(),
             _ => String::new(),
         });
         assert_eq!(result, "60");
@@ -1030,9 +1037,9 @@ mod tests {
     fn test_evaluate_sum_skips_non_numeric() {
         let f = parse_formula("=SUM(A1:A3)").unwrap();
         let result = f.evaluate(&|row, _col| match row {
-            1 => "10".to_string(),
-            2 => "hello".to_string(),
-            3 => "30".to_string(),
+            0 => "10".to_string(),
+            1 => "hello".to_string(),
+            2 => "30".to_string(),
             _ => String::new(),
         });
         assert_eq!(result, "40");
@@ -1042,9 +1049,9 @@ mod tests {
     fn test_evaluate_average() {
         let f = parse_formula("=AVERAGE(A1:A3)").unwrap();
         let result = f.evaluate(&|row, _col| match row {
-            1 => "10".to_string(),
-            2 => "20".to_string(),
-            3 => "30".to_string(),
+            0 => "10".to_string(),
+            1 => "20".to_string(),
+            2 => "30".to_string(),
             _ => String::new(),
         });
         assert_eq!(result, "20");
@@ -1055,9 +1062,9 @@ mod tests {
         let f_min = parse_formula("=MIN(A1:A3)").unwrap();
         let f_max = parse_formula("=MAX(A1:A3)").unwrap();
         let get = |row: usize, _col: usize| match row {
-            1 => "10".to_string(),
-            2 => "5".to_string(),
-            3 => "30".to_string(),
+            0 => "10".to_string(),
+            1 => "5".to_string(),
+            2 => "30".to_string(),
             _ => String::new(),
         };
         assert_eq!(f_min.evaluate(&get), "5");
@@ -1068,11 +1075,11 @@ mod tests {
     fn test_evaluate_count() {
         let f = parse_formula("=COUNT(A1:A5)").unwrap();
         let result = f.evaluate(&|row, _col| match row {
-            1 => "10".to_string(),
-            2 => "".to_string(),
-            3 => "hello".to_string(),
-            4 => "  ".to_string(),
-            5 => "5".to_string(),
+            0 => "10".to_string(),
+            1 => "".to_string(),
+            2 => "hello".to_string(),
+            3 => "  ".to_string(),
+            4 => "5".to_string(),
             _ => String::new(),
         });
         assert_eq!(result, "3");
@@ -1084,7 +1091,7 @@ mod tests {
     fn test_evaluate_power() {
         let f = parse_formula("=POWER(A1, 2)").unwrap();
         let result = f.evaluate(&|row, _col| {
-            if row == 1 {
+            if row == 0 {
                 "3".to_string()
             } else {
                 String::new()
@@ -1097,7 +1104,7 @@ mod tests {
     fn test_evaluate_ceiling() {
         let f = parse_formula("=CEILING(A1, 5)").unwrap();
         let result = f.evaluate(&|row, _col| {
-            if row == 1 {
+            if row == 0 {
                 "23".to_string()
             } else {
                 "5".to_string()
@@ -1110,7 +1117,7 @@ mod tests {
     fn test_evaluate_floor() {
         let f = parse_formula("=FLOOR(A1, 5)").unwrap();
         let result = f.evaluate(&|row, _col| {
-            if row == 1 {
+            if row == 0 {
                 "23".to_string()
             } else {
                 "5".to_string()
@@ -1125,9 +1132,9 @@ mod tests {
     fn test_evaluate_concat() {
         let f = parse_formula("=CONCAT(A1, \" \", B1)").unwrap();
         let result = f.evaluate(&|row, col| {
-            if row == 1 && col == 0 {
+            if row == 0 && col == 0 {
                 "Hello".to_string()
-            } else if row == 1 && col == 1 {
+            } else if row == 0 && col == 1 {
                 "World".to_string()
             } else {
                 String::new()
@@ -1140,7 +1147,7 @@ mod tests {
     fn test_evaluate_trim() {
         let f = parse_formula("=TRIM(A1)").unwrap();
         let result = f.evaluate(&|row, _| {
-            if row == 1 {
+            if row == 0 {
                 "  hello   world  ".to_string()
             } else {
                 String::new()
@@ -1155,7 +1162,7 @@ mod tests {
         let f_lower = parse_formula("=LOWER(A1)").unwrap();
         let f_proper = parse_formula("=PROPER(A1)").unwrap();
         let get = |row: usize, _: usize| {
-            if row == 1 {
+            if row == 0 {
                 "hello world".to_string()
             } else {
                 String::new()
@@ -1172,7 +1179,7 @@ mod tests {
         let f_right = parse_formula("=RIGHT(A1, 3)").unwrap();
         let f_mid = parse_formula("=MID(A1, 2, 3)").unwrap();
         let get = |row: usize, _: usize| {
-            if row == 1 {
+            if row == 0 {
                 "Hello".to_string()
             } else {
                 String::new()
@@ -1187,7 +1194,7 @@ mod tests {
     fn test_evaluate_substitute() {
         let f = parse_formula("=SUBSTITUTE(A1, \"Old\", \"New\")").unwrap();
         let result = f.evaluate(&|row, _| {
-            if row == 1 {
+            if row == 0 {
                 "Old text with Old parts".to_string()
             } else {
                 String::new()
@@ -1200,7 +1207,7 @@ mod tests {
     fn test_evaluate_replace() {
         let f = parse_formula("=REPLACE(A1, 2, 3, \"XYZ\")").unwrap();
         let result = f.evaluate(&|row, _| {
-            if row == 1 {
+            if row == 0 {
                 "Hello".to_string()
             } else {
                 String::new()
@@ -1223,9 +1230,9 @@ mod tests {
     fn test_evaluate_datedif_days() {
         let f = parse_formula("=DATEDIF(A1, B1, \"d\")").unwrap();
         let result = f.evaluate(&|row, col| {
-            if row == 1 && col == 0 {
+            if row == 0 && col == 0 {
                 "2024-01-01".to_string()
-            } else if row == 1 && col == 1 {
+            } else if row == 0 && col == 1 {
                 "2024-01-31".to_string()
             } else {
                 String::new()
@@ -1238,9 +1245,9 @@ mod tests {
     fn test_evaluate_datedif_months() {
         let f = parse_formula("=DATEDIF(A1, B1, \"m\")").unwrap();
         let result = f.evaluate(&|row, col| {
-            if row == 1 && col == 0 {
+            if row == 0 && col == 0 {
                 "2024-01-15".to_string()
-            } else if row == 1 && col == 1 {
+            } else if row == 0 && col == 1 {
                 "2024-06-15".to_string()
             } else {
                 String::new()
@@ -1253,18 +1260,18 @@ mod tests {
 
     #[test]
     fn test_evaluate_vlookup() {
-        // Table in A1:C3 (rows 1-3):
+        // Table in A1:C3 (Excel rows 1-3 = internal rows 0-2):
         let f = parse_formula("=VLOOKUP(\"Banana\", A1:C3, 3, FALSE)").unwrap();
         let result = f.evaluate(&|row, col| match (row, col) {
-            (1, 0) => "Apple".to_string(),
-            (1, 1) => "Red".to_string(),
-            (1, 2) => "1".to_string(),
-            (2, 0) => "Banana".to_string(),
-            (2, 1) => "Yellow".to_string(),
-            (2, 2) => "2".to_string(),
-            (3, 0) => "Cherry".to_string(),
-            (3, 1) => "Red".to_string(),
-            (3, 2) => "3".to_string(),
+            (0, 0) => "Apple".to_string(),
+            (0, 1) => "Red".to_string(),
+            (0, 2) => "1".to_string(),
+            (1, 0) => "Banana".to_string(),
+            (1, 1) => "Yellow".to_string(),
+            (1, 2) => "2".to_string(),
+            (2, 0) => "Cherry".to_string(),
+            (2, 1) => "Red".to_string(),
+            (2, 2) => "3".to_string(),
             _ => String::new(),
         });
         assert_eq!(result, "2");
@@ -1274,10 +1281,10 @@ mod tests {
     fn test_evaluate_vlookup_not_found() {
         let f = parse_formula("=VLOOKUP(\"Grape\", A1:B2, 2, FALSE)").unwrap();
         let result = f.evaluate(&|row, col| match (row, col) {
-            (1, 0) => "Apple".to_string(),
-            (1, 1) => "1".to_string(),
-            (2, 0) => "Banana".to_string(),
-            (2, 1) => "2".to_string(),
+            (0, 0) => "Apple".to_string(),
+            (0, 1) => "1".to_string(),
+            (1, 0) => "Banana".to_string(),
+            (1, 1) => "2".to_string(),
             _ => String::new(),
         });
         assert_eq!(result, "#N/A");
@@ -1289,7 +1296,7 @@ mod tests {
     fn test_evaluate_if_true() {
         let f = parse_formula("=IF(A1>10, \"High\", \"Low\")").unwrap();
         let result = f.evaluate(&|row, _| {
-            if row == 1 {
+            if row == 0 {
                 "15".to_string()
             } else {
                 String::new()
@@ -1302,7 +1309,7 @@ mod tests {
     fn test_evaluate_if_false() {
         let f = parse_formula("=IF(A1>10, \"High\", \"Low\")").unwrap();
         let result = f.evaluate(&|row, _| {
-            if row == 1 {
+            if row == 0 {
                 "5".to_string()
             } else {
                 String::new()
@@ -1323,8 +1330,8 @@ mod tests {
         assert!(store.get_formula(5, 0).is_some());
         assert!(store.get_raw(0, 0).is_none());
 
-        // A2 (row 2, col 0) is referenced by the formula
-        let deps = store.cells_referencing(2, 0);
+        // A2 (Excel row 2 = internal row 1, col 0) is referenced by the formula
+        let deps = store.cells_referencing(1, 0);
         assert_eq!(deps, vec![(5, 0)]);
 
         let deps = store.cells_referencing(5, 5);
@@ -1372,16 +1379,16 @@ mod tests {
     #[test]
     fn test_evaluate_hlookup() {
         // Table:
-        // A1=Name  B1=Age   C1=City
-        // A2=Alice B2=30    C2=NYC
+        // A1=Name  B1=Age   C1=City  (internal row 0)
+        // A2=Alice B2=30    C2=NYC   (internal row 1)
         let f = parse_formula("=HLOOKUP(\"Age\", A1:C2, 2, FALSE)").unwrap();
         let result = f.evaluate(&|row, col| match (row, col) {
-            (1, 0) => "Name".to_string(),
-            (1, 1) => "Age".to_string(),
-            (1, 2) => "City".to_string(),
-            (2, 0) => "Alice".to_string(),
-            (2, 1) => "30".to_string(),
-            (2, 2) => "NYC".to_string(),
+            (0, 0) => "Name".to_string(),
+            (0, 1) => "Age".to_string(),
+            (0, 2) => "City".to_string(),
+            (1, 0) => "Alice".to_string(),
+            (1, 1) => "30".to_string(),
+            (1, 2) => "NYC".to_string(),
             _ => String::new(),
         });
         assert_eq!(result, "30");

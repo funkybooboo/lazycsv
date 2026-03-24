@@ -41,6 +41,8 @@ pub struct DualClipboard {
     row_buffer: ClipboardBuffer,
     column_buffer: ClipboardBuffer,
     region_buffer: ClipboardBuffer,
+    /// True when the row buffer holds a single cell value (from `cw`)
+    is_cell_yank: bool,
 }
 
 impl DualClipboard {
@@ -53,17 +55,33 @@ impl DualClipboard {
 
     /// Store a single row in the row buffer
     pub fn yank_row(&mut self, row: Vec<String>) {
+        self.is_cell_yank = false;
         self.row_buffer.store(vec![row]);
     }
 
     /// Store multiple rows in the row buffer
     pub fn yank_rows(&mut self, rows: Vec<Vec<String>>) {
+        self.is_cell_yank = false;
         self.row_buffer.store(rows);
     }
 
-    /// Store a single cell in the row buffer (treated as a 1-cell row)
+    /// Store a single cell value (from `cw` — copy cell)
     pub fn yank_cell(&mut self, cell: String) {
+        self.is_cell_yank = true;
         self.row_buffer.store(vec![vec![cell]]);
+    }
+
+    /// Returns the cell value if the last yank was a single cell (`cw`).
+    pub fn cell(&self) -> Option<&str> {
+        if self.is_cell_yank {
+            self.row_buffer
+                .get()
+                .and_then(|d| d.first())
+                .and_then(|r| r.first())
+                .map(|s| s.as_str())
+        } else {
+            None
+        }
     }
 
     /// Get the first row from the row buffer

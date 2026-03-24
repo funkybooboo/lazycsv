@@ -7,13 +7,13 @@ fn key(code: KeyCode) -> KeyEvent {
 }
 
 /// Create test app: header + 5 data rows
-/// Row 0: Name, Value (header)
-/// Row 1: A, 10
-/// Row 2: B, 20
-/// Row 3: C, 30
-/// Row 4: D, 40
-/// Row 5: E, 50
-/// Row 6: (empty, for formulas)
+/// Internal row 0 / Excel row 1: Name, Value (header)
+/// Internal row 1 / Excel row 2: A, 10
+/// Internal row 2 / Excel row 3: B, 20
+/// Internal row 3 / Excel row 4: C, 30
+/// Internal row 4 / Excel row 5: D, 40
+/// Internal row 5 / Excel row 6: E, 50
+/// Internal row 6 / Excel row 7: (empty, for formulas)
 fn create_test_app() -> App {
     let doc = Document::new(
         vec!["Name".to_string(), "Value".to_string()],
@@ -39,7 +39,7 @@ fn test_formula_sum_computed_value() {
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=SUM(B1:B5)".to_string(),
+        "=SUM(B2:B6)".to_string(),
     );
 
     let computed = app
@@ -55,12 +55,12 @@ fn test_formula_bar_shows_formula() {
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=SUM(B1:B5)".to_string(),
+        "=SUM(B2:B6)".to_string(),
     );
 
     // cell_formula_or_value returns formula text, not the computed value
     let bar_text = app.cell_formula_or_value(RowIndex::new(6), ColIndex::new(1));
-    assert_eq!(bar_text, "=SUM(B1:B5)");
+    assert_eq!(bar_text, "=SUM(B2:B6)");
 }
 
 #[test]
@@ -69,7 +69,7 @@ fn test_formula_re_evaluates_on_change() {
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=SUM(B1:B5)".to_string(),
+        "=SUM(B2:B6)".to_string(),
     );
     assert_eq!(
         app.document
@@ -96,7 +96,7 @@ fn test_formula_overwrite_removes_formula() {
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=SUM(B1:B5)".to_string(),
+        "=SUM(B2:B6)".to_string(),
     );
 
     // Overwrite with plain value
@@ -121,7 +121,7 @@ fn test_formula_average() {
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=AVERAGE(B1:B5)".to_string(),
+        "=AVERAGE(B2:B6)".to_string(),
     );
     assert_eq!(
         app.document
@@ -137,7 +137,7 @@ fn test_formula_min() {
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=MIN(B1:B5)".to_string(),
+        "=MIN(B2:B6)".to_string(),
     );
     assert_eq!(
         app.document
@@ -153,7 +153,7 @@ fn test_formula_max() {
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=MAX(B1:B5)".to_string(),
+        "=MAX(B2:B6)".to_string(),
     );
     assert_eq!(
         app.document
@@ -169,7 +169,7 @@ fn test_formula_count() {
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=COUNT(B1:B5)".to_string(),
+        "=COUNT(B2:B6)".to_string(),
     );
     assert_eq!(
         app.document
@@ -185,7 +185,7 @@ fn test_formula_case_insensitive() {
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=sum(B1:B5)".to_string(),
+        "=sum(B2:B6)".to_string(),
     );
     assert_eq!(
         app.document
@@ -201,7 +201,7 @@ fn test_formula_comma_separated_cells() {
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=SUM(B1,B3,B5)".to_string(),
+        "=SUM(B2,B4,B6)".to_string(),
     );
     assert_eq!(
         app.document
@@ -217,7 +217,7 @@ fn test_formula_power() {
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=POWER(B1, 2)".to_string(),
+        "=POWER(B2, 2)".to_string(),
     );
     assert_eq!(
         app.document
@@ -230,11 +230,11 @@ fn test_formula_power() {
 #[test]
 fn test_formula_ceiling() {
     let mut app = create_test_app();
-    // B3 = 30, CEILING(30, 7) = 35
+    // B4 (internal row 3) = 30, CEILING(30, 7) = 35
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=CEILING(B3, 7)".to_string(),
+        "=CEILING(B4, 7)".to_string(),
     );
     assert_eq!(
         app.document
@@ -247,11 +247,11 @@ fn test_formula_ceiling() {
 #[test]
 fn test_formula_floor() {
     let mut app = create_test_app();
-    // B3 = 30, FLOOR(30, 7) = 28
+    // B4 (internal row 3) = 30, FLOOR(30, 7) = 28
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=FLOOR(B3, 7)".to_string(),
+        "=FLOOR(B4, 7)".to_string(),
     );
     assert_eq!(
         app.document
@@ -267,7 +267,7 @@ fn test_formula_concat() {
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=CONCAT(A1, B1)".to_string(),
+        "=CONCAT(A2, B2)".to_string(),
     );
     assert_eq!(
         app.document
@@ -283,7 +283,7 @@ fn test_formula_concat_with_literal() {
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=CONCAT(A1, \" = \", B1)".to_string(),
+        "=CONCAT(A2, \" = \", B2)".to_string(),
     );
     assert_eq!(
         app.document
@@ -302,7 +302,7 @@ fn test_formula_trim() {
         ColIndex::new(0),
         "  hello   world  ".to_string(),
     );
-    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=TRIM(A6)".to_string());
+    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=TRIM(A7)".to_string());
     assert_eq!(
         app.document
             .cell(RowIndex::new(6), ColIndex::new(1))
@@ -320,7 +320,7 @@ fn test_formula_upper_lower_proper() {
         "hello world".to_string(),
     );
 
-    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=UPPER(A6)".to_string());
+    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=UPPER(A7)".to_string());
     assert_eq!(
         app.document
             .cell(RowIndex::new(6), ColIndex::new(1))
@@ -328,7 +328,7 @@ fn test_formula_upper_lower_proper() {
         "HELLO WORLD"
     );
 
-    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=LOWER(A6)".to_string());
+    app.commit_cell_value(RowIndex::new(6), ColIndex::new(1), "=LOWER(A7)".to_string());
     assert_eq!(
         app.document
             .cell(RowIndex::new(6), ColIndex::new(1))
@@ -339,7 +339,7 @@ fn test_formula_upper_lower_proper() {
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=PROPER(A6)".to_string(),
+        "=PROPER(A7)".to_string(),
     );
     assert_eq!(
         app.document
@@ -358,7 +358,7 @@ fn test_formula_left_right_mid() {
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=LEFT(A6, 3)".to_string(),
+        "=LEFT(A7, 3)".to_string(),
     );
     assert_eq!(
         app.document
@@ -370,7 +370,7 @@ fn test_formula_left_right_mid() {
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=RIGHT(A6, 3)".to_string(),
+        "=RIGHT(A7, 3)".to_string(),
     );
     assert_eq!(
         app.document
@@ -382,7 +382,7 @@ fn test_formula_left_right_mid() {
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=MID(A6, 2, 3)".to_string(),
+        "=MID(A7, 2, 3)".to_string(),
     );
     assert_eq!(
         app.document
@@ -403,7 +403,7 @@ fn test_formula_substitute() {
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=SUBSTITUTE(A6, \"Old\", \"New\")".to_string(),
+        "=SUBSTITUTE(A7, \"Old\", \"New\")".to_string(),
     );
     assert_eq!(
         app.document
@@ -421,7 +421,7 @@ fn test_formula_replace() {
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=REPLACE(A6, 2, 3, \"XYZ\")".to_string(),
+        "=REPLACE(A7, 2, 3, \"XYZ\")".to_string(),
     );
     assert_eq!(
         app.document
@@ -451,11 +451,11 @@ fn test_formula_today() {
 #[test]
 fn test_formula_if_true() {
     let mut app = create_test_app();
-    // B1 = 10, so 10 > 5 is true
+    // B2 (internal row 1) = 10, so 10 > 5 is true
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=IF(B1>5, \"High\", \"Low\")".to_string(),
+        "=IF(B2>5, \"High\", \"Low\")".to_string(),
     );
     assert_eq!(
         app.document
@@ -468,11 +468,11 @@ fn test_formula_if_true() {
 #[test]
 fn test_formula_if_false() {
     let mut app = create_test_app();
-    // B1 = 10, so 10 > 100 is false
+    // B2 (internal row 1) = 10, so 10 > 100 is false
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=IF(B1>100, \"High\", \"Low\")".to_string(),
+        "=IF(B2>100, \"High\", \"Low\")".to_string(),
     );
     assert_eq!(
         app.document
@@ -489,7 +489,7 @@ fn test_formula_vlookup() {
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=VLOOKUP(\"C\", A1:B5, 2, FALSE)".to_string(),
+        "=VLOOKUP(\"C\", A2:B6, 2, FALSE)".to_string(),
     );
     assert_eq!(
         app.document
@@ -521,12 +521,12 @@ fn test_formula_via_keyboard() {
 
     // Enter substitute mode ('s' = clear + insert), type formula, commit with Enter
     let _ = app.handle_key(key(KeyCode::Char('s')));
-    for c in "=SUM(B2:B5)".chars() {
+    for c in "=SUM(B3:B6)".chars() {
         let _ = app.handle_key(key(KeyCode::Char(c)));
     }
     let _ = app.handle_key(key(KeyCode::Enter)); // commit and move down
 
-    // Check result: SUM(B2:B5) = 20+30+40+50 = 140
+    // Check result: SUM(B3:B6) = 20+30+40+50 = 140
     let computed = app
         .document
         .cell(RowIndex::new(1), ColIndex::new(1))
@@ -535,13 +535,13 @@ fn test_formula_via_keyboard() {
 
     // Check formula bar shows formula text
     let bar = app.cell_formula_or_value(RowIndex::new(1), ColIndex::new(1));
-    assert_eq!(bar, "=SUM(B2:B5)");
+    assert_eq!(bar, "=SUM(B3:B6)");
 
     // Navigate back to B1 and enter insert mode — should show formula
     let _ = app.handle_key(key(KeyCode::Char('k'))); // move back up to row 1
     let _ = app.handle_key(key(KeyCode::Char('i'))); // enter insert mode
     let edit_content = app.edit_buffer.as_ref().unwrap().content.clone();
-    assert_eq!(edit_content, "=SUM(B2:B5)");
+    assert_eq!(edit_content, "=SUM(B3:B6)");
 }
 
 // ===== Multiple formulas with dependencies =====
@@ -554,7 +554,7 @@ fn test_multiple_formulas_update() {
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=SUM(B1:B5)".to_string(),
+        "=SUM(B2:B6)".to_string(),
     );
     assert_eq!(
         app.document
@@ -567,7 +567,7 @@ fn test_multiple_formulas_update() {
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(0),
-        "=AVERAGE(B1:B5)".to_string(),
+        "=AVERAGE(B2:B6)".to_string(),
     );
     assert_eq!(
         app.document
@@ -726,7 +726,7 @@ fn test_formula_datedif() {
     app.commit_cell_value(
         RowIndex::new(6),
         ColIndex::new(1),
-        "=DATEDIF(A6, A1, \"d\")".to_string(),
+        "=DATEDIF(A7, A2, \"d\")".to_string(),
     );
     assert_eq!(
         app.document

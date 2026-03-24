@@ -116,7 +116,7 @@ impl CompletionKind {
 }
 
 /// SQL query history popup state
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct SqlHistoryPopup {
     /// Index of the currently highlighted entry (0 = most recent)
     pub selected: usize,
@@ -128,11 +128,7 @@ pub struct SqlHistoryPopup {
 
 impl SqlHistoryPopup {
     pub fn new() -> Self {
-        SqlHistoryPopup {
-            selected: 0,
-            scroll_offset: 0,
-            pending_d: false,
-        }
+        Self::default()
     }
 
     /// Clamp selected/scroll_offset after the history list shrinks.

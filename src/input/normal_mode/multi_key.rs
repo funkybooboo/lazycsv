@@ -155,6 +155,19 @@ pub fn handle(app: &mut App, first: PendingCommand, second: KeyCode) -> Result<I
             commands::change_row(app);
         }
 
+        // cw - Copy cell value ("copy word") to internal + system clipboard
+        (PendingCommand::C, KeyCode::Char('w')) => {
+            app.input_state.clear_pending_command();
+            if let Some(row_idx) = app.selected_row() {
+                let col_idx = app.view_state.selected_column;
+                let value = app.document.cell(row_idx, col_idx);
+                app.clipboard.yank_cell(value.clone());
+                // Also copy to system clipboard
+                let _ = copy_to_system_clipboard(&value);
+                app.status_message = Some(StatusMessage::from(format!("Copied: {}", value)));
+            }
+        }
+
         // ,d - transition to CommaD (for ,dd)
         (PendingCommand::Comma, KeyCode::Char('d')) => {
             app.input_state.set_pending_command(PendingCommand::CommaD);
@@ -276,4 +289,36 @@ fn format_pending_command(cmd: &PendingCommand) -> String {
         PendingCommand::CommaY => ",y".to_string(),
         PendingCommand::Space => "Space".to_string(),
     }
+}
+
+/// Copy text to the system clipboard (best-effort, ignores errors).
+fn copy_to_system_clipboard(text: &str) -> Result<()> {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
+    #[cfg(target_os = "macos")]
+    let mut child = Command::new("pbcopy").stdin(Stdio::piped()).spawn()?;
+
+    #[cfg(target_os = "linux")]
+    let mut child = Command::new("xclip")
+        .args(["-selection", "clipboard"])
+        .stdin(Stdio::piped())
+        .spawn()
+        .or_else(|_| {
+            Command::new("xsel")
+                .args(["--clipboard", "--input"])
+                .stdin(Stdio::piped())
+                .spawn()
+        })?;
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    return Ok(());
+
+    child
+        .stdin
+        .as_mut()
+        .ok_or_else(|| anyhow::anyhow!("Failed to open clipboard stdin"))?
+        .write_all(text.as_bytes())?;
+    child.wait()?;
+    Ok(())
 }

@@ -55,7 +55,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.24.0 | Performance, CLI Pipeline & SQL Type Intelligence | [x] | TBD |
 | v0.25.0 | Spreadsheet Support & CLI Tools | [x] | 13 |
 | v0.26.0 | SQL History, DuckDB VIEW Optimization & CLI Output Flag | [x] | - |
-| v0.27.0 | CLI Data Tools, Per-Command Help & File Save Fix | [x] | - |
+| v0.27.0 | CLI Data Tools, Per-Command Help, TUI Editing & File Save Fix | [x] | - |
 | v1.0.0 | Stable Release & Polish | [ ] | - |
 
 **Total Tests Passing:** 1,403 tests (all integration and unit tests across vim_editor, SQL, magnifier, UI, keybindings, and core modules)
@@ -132,8 +132,8 @@ Native spreadsheet file support (xlsx/xls/ods) via calamine. Formula preservatio
 **[v0.26.0](versions/v0.26.0.md) - SQL History, DuckDB VIEW Optimization & CLI Output Flag**
 SQL query history popup (`Ctrl+H` in SQL editor): vim-style navigation (↑↓/jk), Enter to recall, `dd` to delete; persisted to `~/.config/lazycsv/sql_history` with configurable `sql_history_limit` (default 15). `SqliteCache` renamed to `DuckDbCache`; SELECT queries now use zero-cost VIEWs (column/predicate pushdown at query time) instead of materializing TABLEs; per-process spill directory lets DuckDB overflow large tables to disk instead of OOMing; DML still uses TABLEs (required for write operations); drop/cleanup correctly handles both object types. New `-o <file>` CLI flag writes query results directly to a CSV via DuckDB COPY without buffering rows in Rust. `format_number()` utility adds thousands separators to row/col counts in the status bar and query result progress messages.
 
-**[v0.27.0](versions/v0.27.0.md) - CLI Data Tools, Per-Command Help & File Save Fix**
-New CLI commands: `-h` (print headers), `-t` (column statistics via DuckDB), `-D` (dedup with PK columns, `--keep-first`, `--allow-nulls`, `--ignore-case`, `--report-only`). Added `-o` output file support to `-t`, `-h`, `-r`/`-c`, `-s`. Per-command `--help` system (e.g., `-q --help`, `-D --help`) with command-specific examples; `-o` and dedup sub-flags hidden from main help. Changed help flag from `-h` to `--help` only (freeing `-h` for headers). Fixed file save targeting wrong file when opened with a relative path in a multi-file directory (canonicalize path comparison). Renamed `load_csv_*_into_sqlite` → `load_csv_*_into_duckdb`.
+**[v0.27.0](versions/v0.27.0.md) - CLI Data Tools, Per-Command Help, TUI Editing & File Save Fix**
+New CLI commands: `-h` (print headers), `-t` (column statistics via DuckDB), `-D` (dedup with PK columns, `--keep-first`, `--allow-nulls`, `--ignore-case`, `--report-only`). Added `-o` output file support to `-t`, `-h`, `-r`/`-c`, `-s`. Per-command `--help` system (e.g., `-q --help`, `-D --help`) with command-specific examples; `-o` and dedup sub-flags hidden from main help. Changed help flag from `-h` to `--help` only (freeing `-h` for headers). TUI editing: 1-based row numbering (Excel-compatible), `r` to replace cell, Tab/Enter/arrows stay in Insert mode for seamless data entry, edit buffer horizontal scroll, `cw` cell copy (internal + system clipboard) with smart `p` paste. Fixed file save targeting wrong file with relative paths. Formula engine updated for 1-based cell references. Renamed `load_csv_*_into_sqlite` → `load_csv_*_into_duckdb`.
 
 **[v0.9.0](versions/v0.9.0.md) - Configuration System**
 TOML-based config system with `~/.config/lazycsv/config.toml` (global) and `.lazycsv.toml` (per-directory). Theme customization (cursor, selection, search, zebra, header_bg, dirty_indicator colors). Default behaviors (delimiter, encoding, zebra_striping, max_column_width, undo_limit). SQL formatting config. 12 tests.

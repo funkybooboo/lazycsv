@@ -219,20 +219,39 @@ fn calculate_scroll_offset(
 }
 
 /// Format edit buffer content with visible cursor
-fn format_edit_buffer(content: &str, cursor: usize) -> String {
+/// Format edit buffer with cursor, scrolled to keep cursor visible within `max_width`.
+fn format_edit_buffer(content: &str, cursor: usize, max_width: usize) -> String {
     // Insert a visible cursor character at cursor position
-    let mut result = String::new();
+    let mut with_cursor = String::new();
     for (i, ch) in content.chars().enumerate() {
         if i == cursor {
-            result.push('│'); // Cursor indicator
+            with_cursor.push('│'); // Cursor indicator
         }
-        result.push(ch);
+        with_cursor.push(ch);
     }
-    // If cursor is at end of content
     if cursor >= content.chars().count() {
-        result.push('│');
+        with_cursor.push('│');
     }
-    result
+
+    let total_chars = with_cursor.chars().count();
+    if max_width == 0 || total_chars <= max_width {
+        return with_cursor;
+    }
+
+    // Find cursor position in the with_cursor string (the '│' character)
+    let cursor_pos = with_cursor.chars().position(|c| c == '│').unwrap_or(cursor);
+
+    // Calculate a window around the cursor that fits in max_width
+    let half = max_width / 2;
+    let start = if cursor_pos <= half {
+        0
+    } else if cursor_pos + half >= total_chars {
+        total_chars.saturating_sub(max_width)
+    } else {
+        cursor_pos - half
+    };
+
+    with_cursor.chars().skip(start).take(max_width).collect()
 }
 
 /// Build data rows with proper styling for the current selection
@@ -250,11 +269,11 @@ fn build_data_rows(
     let is_insert_mode = app.mode == Mode::Insert;
     let search_state = app.search_state.as_ref();
 
-    // Get edit buffer content if in Insert mode
-    let edit_content = if is_insert_mode {
+    // Get edit buffer info if in Insert mode (formatted per-cell with column width)
+    let edit_info = if is_insert_mode {
         app.edit_buffer
             .as_ref()
-            .map(|buf| format_edit_buffer(&buf.content, buf.cursor))
+            .map(|buf| (buf.content.clone(), buf.cursor))
     } else {
         None
     };
@@ -268,7 +287,7 @@ fn build_data_rows(
 
             // Row number: right-align within the gutter width (minus 1 for the trailing space)
             let num_digits = row_num_width.saturating_sub(1);
-            let row_num_display = format!("{:>width$}", row_idx, width = num_digits);
+            let row_num_display = format!("{:>width$}", row_idx + 1, width = num_digits);
             let row_num_style = if is_selected_row {
                 super::modal::row_number_style()
             } else if app.config.defaults.zebra_striping && row_idx.is_multiple_of(2) {
@@ -289,8 +308,8 @@ fn build_data_rows(
 
                 // Show edit buffer content when editing this cell
                 let raw_value = if is_selected && is_insert_mode {
-                    if let Some(ref content) = edit_content {
-                        content.clone()
+                    if let Some((ref content, cursor)) = edit_info {
+                        format_edit_buffer(content, cursor, col_width.saturating_sub(1))
                     } else {
                         row.get(col_idx).cloned().unwrap_or_default()
                     }

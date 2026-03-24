@@ -178,7 +178,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             return Ok(InputResult::Continue);
         }
 
-        // Start 'c' pending command (for cc - clear row)
+        // Start 'c' pending command (for cc - clear row, cw - copy cell)
         KeyCode::Char('c') if help::is_navigation_allowed(app) => {
             app.input_state.set_pending_command(PendingCommand::C);
             return Ok(InputResult::Continue);
@@ -204,8 +204,8 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             mode_transitions::append_at_line_end(app);
         }
 
-        // Insert mode: 's' - replace cell (clear + edit)
-        KeyCode::Char('s') if help::is_navigation_allowed(app) => {
+        // Insert mode: 's' or 'r' - replace cell (clear + edit)
+        KeyCode::Char('s') | KeyCode::Char('r') if help::is_navigation_allowed(app) => {
             mode_transitions::substitute_cell(app);
         }
 
@@ -253,9 +253,25 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             editing::paste_rows_above(app);
         }
 
-        // Row operations: 'p' - paste row(s) below
+        // Paste: 'p' - paste cell value (if cw was used) or row(s) below
         KeyCode::Char('p') if help::is_navigation_allowed(app) => {
-            editing::paste_rows_below(app);
+            if let Some(value) = app.clipboard.cell().map(|s| s.to_string()) {
+                // Cell paste
+                if let Some(row_idx) = app.selected_row() {
+                    let col_idx = app.view_state.selected_column;
+                    let old_value = app.document.cell(row_idx, col_idx);
+                    app.document.set_cell(row_idx, col_idx, value.clone());
+                    app.history.push(crate::history::EditCommand::SetCell {
+                        row: row_idx,
+                        col: col_idx,
+                        old_value,
+                        new_value: value.clone(),
+                    });
+                    app.status_message = Some(StatusMessage::from(format!("Pasted: {}", value)));
+                }
+            } else {
+                editing::paste_rows_below(app);
+            }
         }
 
         // ~ - Toggle case of current cell

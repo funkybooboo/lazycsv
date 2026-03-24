@@ -61,8 +61,17 @@ pub fn handle_insert_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             handle_vim_commands(app, key);
         }
 
-        // Commit/cancel operations
-        (KeyCode::Enter, _) | (KeyCode::Tab, _) | (KeyCode::BackTab, _) | (KeyCode::Esc, _) => {
+        // Commit/cancel/navigate operations
+        (KeyCode::Enter, _)
+        | (KeyCode::Tab, _)
+        | (KeyCode::BackTab, _)
+        | (KeyCode::Esc, _)
+        | (KeyCode::Up, KeyModifiers::NONE)
+        | (KeyCode::Down, KeyModifiers::NONE)
+        | (KeyCode::Up, KeyModifiers::SHIFT)
+        | (KeyCode::Down, KeyModifiers::SHIFT)
+        | (KeyCode::Left, KeyModifiers::SHIFT)
+        | (KeyCode::Right, KeyModifiers::SHIFT) => {
             handle_commit_cancel(app, key);
         }
 
