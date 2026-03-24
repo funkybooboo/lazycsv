@@ -54,6 +54,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.23.1 | Final Architecture Polish | [ ] | TBD |
 | v0.24.0 | Performance, CLI Pipeline & SQL Type Intelligence | [x] | TBD |
 | v0.25.0 | Spreadsheet Support & CLI Tools | [x] | 13 |
+| v0.26.0 | SQL History, DuckDB VIEW Optimization & CLI Output Flag | [x] | - |
 | v1.0.0 | Stable Release & Polish | [ ] | - |
 
 **Total Tests Passing:** 1,403 tests (all integration and unit tests across vim_editor, SQL, magnifier, UI, keybindings, and core modules)
@@ -126,6 +127,9 @@ Lazy loading with memory-mapped files for large CSVs, CLI sort mode, piped stdin
 
 **[v0.25.0](versions/v0.25.0.md) - Spreadsheet Support, CLI Tools & SQL DML**
 Native spreadsheet file support (xlsx/xls/ods) via calamine. Formula preservation in formula bar. CLI extraction (`-x`), clipboard copy (`-C`), clipboard paste (`-P` with auto delimiter detection), file splitting (`-S`), and SQL queries (`-q`) all work across CSV and spreadsheet formats. SQL DML (INSERT/UPDATE/DELETE/ALTER) with DML-aware IntelliSense and templates. TUI `:copy`/`:paste` commands with auto delimiter detection. SQL formatting via Ctrl+F. Streaming I/O for large files. Zebra striping. Terminal robustness fixes.
+
+**[v0.26.0](versions/v0.26.0.md) - SQL History, DuckDB VIEW Optimization & CLI Output Flag**
+SQL query history popup (`Ctrl+H` in SQL editor): vim-style navigation (↑↓/jk), Enter to recall, `dd` to delete; persisted to `~/.config/lazycsv/sql_history` with configurable `sql_history_limit` (default 15). `SqliteCache` renamed to `DuckDbCache`; SELECT queries now use zero-cost VIEWs (column/predicate pushdown at query time) instead of materializing TABLEs; per-process spill directory lets DuckDB overflow large tables to disk instead of OOMing; DML still uses TABLEs (required for write operations); drop/cleanup correctly handles both object types. New `-o <file>` CLI flag writes query results directly to a CSV via DuckDB COPY without buffering rows in Rust. `format_number()` utility adds thousands separators to row/col counts in the status bar and query result progress messages.
 
 **[v0.9.0](versions/v0.9.0.md) - Configuration System**
 TOML-based config system with `~/.config/lazycsv/config.toml` (global) and `.lazycsv.toml` (per-directory). Theme customization (cursor, selection, search, zebra, header_bg, dirty_indicator colors). Default behaviors (delimiter, encoding, zebra_striping, max_column_width, undo_limit). SQL formatting config. 12 tests.
