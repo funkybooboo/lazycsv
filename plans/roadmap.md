@@ -37,7 +37,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.15.0 | System Clipboard & External Integration | [x] | - |
 | v0.15.1 | Testing & Reliability Improvements | [x] | 861 |
 | v0.16.0 | Bulk Operations & Find/Replace | [x] | 32 |
-| v0.16.1 | Error Handling & Robustness | [ ] | TBD |
+| v0.16.1 | Error Handling & Robustness | [x] | 10 |
 | v0.17.0 | Advanced Filtering & Conditional Views | [ ] | TBD |
 | v0.17.1 | Module Organization & Cleanup | [ ] | TBD |
 | v0.18.0 | SQL IntelliSense & Auto-completion | [x] | TBD |
@@ -173,8 +173,8 @@ Module system cleanup with clear dependencies and improved maintainability.
 **[v0.15.1](versions/v0.15.1.md) - Testing & Reliability Improvements** ✅ COMPLETE
 861 tests passing (all green). Fixed 19 tests broken by insert-mode persistence changes. Established coverage baseline: 73% line / 80% branch. Installed cargo-llvm-cov tooling. Reverted accidentally modified test data.
 
-**[v0.16.1](versions/v0.16.1.md) - Error Handling & Robustness**  
-Comprehensive error handling with graceful degradation and user-friendly messages.  
+**[v0.16.1](versions/v0.16.1.md) - Error Handling & Robustness** ✅ COMPLETE
+Audit found only 14 production unwrap/expect calls (all safe). Fixed 2 slightly risky unwraps (row_storage HashMap lookup, substitute command char index). Updated error handling docs. 10 existing error handling tests cover malformed CSVs, permissions, file-not-found, binary files.  
 
 **[v0.17.0](versions/v0.17.0.md) - Advanced Filtering & Conditional Views**  
 Advanced filtering with multiple conditions and saved filter presets.  

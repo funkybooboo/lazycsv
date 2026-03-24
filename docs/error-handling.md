@@ -1,13 +1,13 @@
 # Error Handling Policy
 
-**Version:** v0.11.0  
-**Last Updated:** 2026-03-08
+**Version:** v0.16.1
+**Last Updated:** 2026-03-24
 
 ## Overview
 
 This document defines when `unwrap()` and `expect()` are acceptable in the LazyCSV codebase versus when proper error handling is required.
 
-**Current State:** 593 unwrap/expect calls in codebase (as of v0.6.0)  
+**Current State:** 14 unwrap/expect calls in production code, all safe (as of v0.16.1)
 **Goal:** Eliminate unwraps on critical paths while maintaining pragmatic approach for internal code
 
 ## Core Principle

@@ -271,7 +271,7 @@ impl RowStorage {
                     let parsed = s.parse_row(row_idx);
                     s.edits.insert(row_idx, parsed);
                 }
-                let row = s.edits.get_mut(&row_idx).unwrap();
+                let row = s.edits.get_mut(&row_idx)?;
                 if let Some(cell) = row.get_mut(col_idx) {
                     Some(std::mem::replace(cell, value))
                 } else {

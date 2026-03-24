@@ -59,7 +59,7 @@ fn parse_range(cmd: &str) -> Option<(SubRange, &str)> {
     }
 
     // Plain s/... — current cell
-    if cmd.starts_with('s') && cmd.len() > 1 && !cmd.chars().nth(1).unwrap().is_alphanumeric() {
+    if cmd.starts_with('s') && cmd.chars().nth(1).is_some_and(|c| !c.is_alphanumeric()) {
         return Some((SubRange::CurrentCell, cmd));
     }
 
