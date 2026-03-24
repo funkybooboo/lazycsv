@@ -8,13 +8,15 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 
-use super::SqliteCache;
+use super::DuckDbCache;
+
+use crate::ui::utils::format_number;
 
 /// Remove stale tables (files no longer in the session).
 ///
 /// Returns true if cancellation was detected.
 pub fn cleanup_stale_tables(
-    cache: &mut SqliteCache,
+    cache: &mut DuckDbCache,
     session_paths: &[PathBuf],
     cancelled: &AtomicBool,
 ) -> bool {
@@ -38,11 +40,11 @@ pub fn cleanup_stale_tables(
     false
 }
 
-/// Load the currently active document into SQLite if needed.
+/// Load the currently active document into DuckDB if needed.
 ///
 /// Returns (success, was_cancelled).
 pub fn load_current_document(
-    cache: &mut SqliteCache,
+    cache: &mut DuckDbCache,
     file_path: &Path,
     document: &Document,
     cancelled: &AtomicBool,
@@ -67,6 +69,7 @@ pub fn load_current_document(
         document,
         document.generation,
         cancelled,
+        false,
     ) {
         Ok(()) => (true, false),
         Err(e) => {
@@ -79,11 +82,11 @@ pub fn load_current_document(
     }
 }
 
-/// Load a cached document from the session into SQLite if needed.
+/// Load a cached document from the session into DuckDB if needed.
 ///
 /// Returns (success, was_cancelled).
 pub fn load_cached_document(
-    cache: &mut SqliteCache,
+    cache: &mut DuckDbCache,
     file_path: &Path,
     cached_doc: &Document,
     cancelled: &AtomicBool,
@@ -103,7 +106,7 @@ pub fn load_cached_document(
     }
 
     let gen = cached_doc.generation;
-    match cache.reload_table(file_path, &table_name, cached_doc, gen, cancelled) {
+    match cache.reload_table(file_path, &table_name, cached_doc, gen, cancelled, false) {
         Ok(()) => (true, false),
         Err(e) => {
             if e.downcast_ref::<cancel::CancelledError>().is_some() {
@@ -115,11 +118,11 @@ pub fn load_cached_document(
     }
 }
 
-/// Load a file from disk into SQLite if needed.
+/// Load a file from disk into DuckDB if needed.
 ///
 /// Returns (success, was_cancelled).
 pub fn load_file_from_disk(
-    cache: &mut SqliteCache,
+    cache: &mut DuckDbCache,
     file_path: &Path,
     delimiter: Option<u8>,
     no_headers: bool,
@@ -148,7 +151,7 @@ pub fn load_file_from_disk(
             if d.row_count() == 0 || d.column_count() == 0 {
                 return (true, false);
             }
-            match cache.reload_table(file_path, &table_name, &d, d.generation, cancelled) {
+            match cache.reload_table(file_path, &table_name, &d, d.generation, cancelled, false) {
                 Ok(()) => (true, false),
                 Err(e) => {
                     if e.downcast_ref::<cancel::CancelledError>().is_some() {
@@ -179,7 +182,7 @@ pub fn load_file_from_disk(
 ///
 /// Returns (result, was_cancelled, error_message).
 pub fn execute_and_convert_query(
-    cache: &mut SqliteCache,
+    cache: &mut DuckDbCache,
     query: &str,
     output_name: &str,
     cancelled: &AtomicBool,
@@ -210,11 +213,15 @@ pub fn execute_and_convert_query(
         let copy_sql = format!("COPY ({}) TO '{}' (HEADER, DELIMITER ',')", query, temp_str);
 
         on_progress("Exporting results...");
-        if cache.conn().execute_batch(&copy_sql).is_ok() {
+        if let Ok(row_count) = cache.conn().execute(&copy_sql, []) {
             let mb = std::fs::metadata(&temp_path)
                 .map(|m| m.len() as f64 / (1024.0 * 1024.0))
                 .unwrap_or(0.0);
-            on_progress(&format!("Loading results ({:.0} MB)...", mb));
+            on_progress(&format!(
+                "Loading {} rows ({:.0} MB)...",
+                format_number(row_count),
+                mb
+            ));
             match crate::csv::row_storage::RowStorage::lazy_from_file(&temp_path, None, false) {
                 Ok(storage) => {
                     let doc =
@@ -251,19 +258,19 @@ pub fn execute_and_convert_query(
     }
 }
 
-/// File configuration for loading CSVs into SQLite.
+/// File configuration for loading CSVs into DuckDB.
 pub struct FileLoadConfig {
     pub delimiter: Option<u8>,
     pub no_headers: bool,
     pub encoding: Option<String>,
 }
 
-/// Load a single file from the session into SQLite.
+/// Load a single file from the session into DuckDB.
 ///
 /// Handles current document, cached document, or loading from disk.
 /// Returns true if cancelled.
 pub fn load_session_file<'a>(
-    cache: &mut SqliteCache,
+    cache: &mut DuckDbCache,
     file_path: &Path,
     current_doc: &Document,
     session_get_cached: impl FnOnce() -> Option<&'a Document>,

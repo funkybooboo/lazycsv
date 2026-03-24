@@ -48,7 +48,7 @@ fn build_three_part_status_line(left: &str, center: &str, right: &str, width: us
 
 /// Build the right side of the status bar with enhanced position and cell info
 fn build_right_side(app: &App) -> String {
-    use crate::ui::utils::column_to_excel_letter;
+    use crate::ui::utils::{column_to_excel_letter, format_number};
 
     let selected_row = app.selected_row().map(|r| r.get()).unwrap_or(0);
     let col_letter = column_to_excel_letter(app.view_state.selected_column.get());
@@ -91,12 +91,12 @@ fn build_right_side(app: &App) -> String {
     format!(
         "{}{} | Row {}/{} ({}%) | Col {}/{}{}",
         col_letter,
-        selected_row,
-        selected_row + 1,
-        total_rows,
+        format_number(selected_row),
+        format_number(selected_row + 1),
+        format_number(total_rows),
         row_percent,
-        app.view_state.selected_column.get() + 1,
-        total_cols,
+        format_number(app.view_state.selected_column.get() + 1),
+        format_number(total_cols),
         cell_info
     )
 }

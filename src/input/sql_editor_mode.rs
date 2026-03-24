@@ -3,7 +3,9 @@
 //! This module handles keyboard input when the user is editing SQL queries
 //! (after pressing 'q' in Normal mode). Delegates to VimEditor for text editing.
 
-use crate::app::{App, CompletionItem, CompletionKind, Mode, SqlCompletion, TemplateStep};
+use crate::app::{
+    App, CompletionItem, CompletionKind, Mode, SqlCompletion, SqlHistoryPopup, TemplateStep,
+};
 use crate::input::{InputResult, StatusMessage};
 use crate::vim_editor::VimMode;
 use anyhow::Result;
@@ -115,6 +117,89 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     };
 
     let vim_mode = editor.mode();
+
+    // --- History popup active ---
+    if app.sql_history_popup.is_some() {
+        const HISTORY_VISIBLE: usize = 10;
+        let len = app.sql_history.len();
+        match key.code {
+            KeyCode::Up | KeyCode::Char('k') => {
+                if let Some(ref mut popup) = app.sql_history_popup {
+                    popup.move_up(len);
+                }
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                if let Some(ref mut popup) = app.sql_history_popup {
+                    popup.move_down(len, HISTORY_VISIBLE);
+                }
+            }
+            KeyCode::Enter => {
+                let selected = app
+                    .sql_history_popup
+                    .as_ref()
+                    .map(|p| p.selected)
+                    .unwrap_or(0);
+                app.sql_history_popup = None;
+                if let Some(query) = app.sql_history.get(selected).cloned() {
+                    let mut new_editor = crate::vim_editor::VimEditor::new(query);
+                    new_editor.enter_insert_mode();
+                    let line_count = new_editor.line_count();
+                    if line_count > 0 {
+                        let last_line = line_count - 1;
+                        let last_col = new_editor.lines()[last_line].chars().count();
+                        new_editor.set_cursor_for_test(last_line, last_col);
+                    }
+                    app.sql_vim_editor = Some(new_editor);
+                }
+            }
+            KeyCode::Char('d') => {
+                let pending = app
+                    .sql_history_popup
+                    .as_ref()
+                    .map(|p| p.pending_d)
+                    .unwrap_or(false);
+                if pending {
+                    // Second d: delete selected entry
+                    let selected = app
+                        .sql_history_popup
+                        .as_ref()
+                        .map(|p| p.selected)
+                        .unwrap_or(0);
+                    if selected < app.sql_history.len() {
+                        app.sql_history.remove(selected);
+                        crate::config::save_sql_history(
+                            &app.sql_history,
+                            app.config.sql.sql_history_limit,
+                        );
+                    }
+                    if app.sql_history.is_empty() {
+                        app.sql_history_popup = None;
+                    } else if let Some(ref mut popup) = app.sql_history_popup {
+                        popup.pending_d = false;
+                        popup.clamp(app.sql_history.len(), HISTORY_VISIBLE);
+                    }
+                } else if let Some(ref mut popup) = app.sql_history_popup {
+                    popup.pending_d = true;
+                }
+            }
+            KeyCode::Esc => {
+                if let Some(ref mut popup) = app.sql_history_popup {
+                    if popup.pending_d {
+                        popup.pending_d = false;
+                        return Ok(InputResult::Continue);
+                    }
+                }
+                app.sql_history_popup = None;
+            }
+            _ => {
+                // Any other key cancels a pending d
+                if let Some(ref mut popup) = app.sql_history_popup {
+                    popup.pending_d = false;
+                }
+            }
+        }
+        return Ok(InputResult::Continue);
+    }
 
     // --- Completion popup active ---
     if app.sql_completion.is_some() {
@@ -386,6 +471,16 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             if !comp.filtered_items().is_empty() {
                 app.sql_completion = Some(comp);
             }
+        }
+        return Ok(InputResult::Continue);
+    }
+
+    // --- Ctrl+H: open SQL history popup ---
+    if key.code == KeyCode::Char('h') && key.modifiers.contains(KeyModifiers::CONTROL) {
+        if !app.sql_history.is_empty() {
+            app.sql_history_popup = Some(SqlHistoryPopup::new());
+        } else {
+            app.status_message = Some(StatusMessage::new_owned("No SQL history yet".to_string()));
         }
         return Ok(InputResult::Continue);
     }

@@ -541,9 +541,10 @@ fn load_csv_file_into_sqlite(
         ", header = true"
     };
 
-    // Use DuckDB's native read_csv — no manual INSERT loop needed
+    // Use a VIEW so DuckDB scans the CSV at query time with column/predicate pushdown.
+    // No data is materialized into memory upfront.
     let sql = format!(
-        "CREATE TABLE \"{}\" AS SELECT * FROM read_csv('{}'{}{})",
+        "CREATE VIEW \"{}\" AS SELECT * FROM read_csv('{}'{}{})",
         escaped_table, path_str, header, delim
     );
 
@@ -1076,6 +1077,50 @@ pub fn execute_query(path: &Path, query: &str, config: &FileConfig) -> Result<()
     }
 
     wtr.flush()?;
+
+    Ok(())
+}
+
+/// Execute a query and write results directly to a file via DuckDB COPY.
+///
+/// Uses `COPY (query) TO 'output_path' (HEADER, DELIMITER ',')` — a single DuckDB
+/// operation that applies column/predicate pushdown through the VIEW and writes
+/// directly to disk without buffering rows in Rust.
+///
+pub fn execute_query_to_file(
+    path: &Path,
+    query: &str,
+    config: &FileConfig,
+    output_path: &Path,
+) -> Result<()> {
+    let query = strip_csv_extensions(query);
+    let query = query.as_str();
+
+    let csv_files = resolve_csv_files(path)?;
+    let referenced = files_referenced_by_query(query, &csv_files);
+
+    let conn = Connection::open_in_memory().context("Failed to open DuckDB")?;
+
+    for file_path in &referenced {
+        let table_name = table_name_from_path(file_path);
+        if load_csv_file_into_sqlite(&conn, file_path, &table_name, config).is_err() {
+            continue;
+        }
+    }
+
+    // Ensure output directory exists
+    if let Some(parent) = output_path.parent().filter(|p| !p.as_os_str().is_empty()) {
+        std::fs::create_dir_all(parent).context(format!(
+            "Failed to create output directory: {}",
+            parent.display()
+        ))?;
+    }
+
+    let out_str = output_path.display().to_string().replace('\'', "''");
+    let copy_sql = format!("COPY ({}) TO '{}' (HEADER, DELIMITER ',')", query, out_str);
+
+    conn.execute_batch(&copy_sql)
+        .map_err(|e| enhance_sql_error(e, &conn, query))?;
 
     Ok(())
 }

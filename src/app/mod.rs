@@ -51,7 +51,7 @@ use crate::ui::ViewState;
 use crate::Document;
 use anyhow::{Context, Result};
 use crossterm::event::KeyEvent;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 
@@ -111,6 +111,67 @@ impl CompletionKind {
             CompletionKind::Function => ratatui::style::Color::Yellow,
             CompletionKind::Column => ratatui::style::Color::Green,
             CompletionKind::Table => ratatui::style::Color::Magenta,
+        }
+    }
+}
+
+/// SQL query history popup state
+#[derive(Debug, Clone)]
+pub struct SqlHistoryPopup {
+    /// Index of the currently highlighted entry (0 = most recent)
+    pub selected: usize,
+    /// First visible entry index (for scrolling)
+    pub scroll_offset: usize,
+    /// True when the first `d` of a `dd` delete has been pressed
+    pub pending_d: bool,
+}
+
+impl SqlHistoryPopup {
+    pub fn new() -> Self {
+        SqlHistoryPopup {
+            selected: 0,
+            scroll_offset: 0,
+            pending_d: false,
+        }
+    }
+
+    /// Clamp selected/scroll_offset after the history list shrinks.
+    pub fn clamp(&mut self, len: usize, visible: usize) {
+        if len == 0 {
+            self.selected = 0;
+            self.scroll_offset = 0;
+            return;
+        }
+        if self.selected >= len {
+            self.selected = len - 1;
+        }
+        let max_scroll = len.saturating_sub(visible);
+        if self.scroll_offset > max_scroll {
+            self.scroll_offset = max_scroll;
+        }
+    }
+
+    pub fn move_up(&mut self, len: usize) {
+        if len == 0 {
+            return;
+        }
+        if self.selected > 0 {
+            self.selected -= 1;
+            if self.selected < self.scroll_offset {
+                self.scroll_offset = self.selected;
+            }
+        }
+    }
+
+    pub fn move_down(&mut self, len: usize, visible: usize) {
+        if len == 0 {
+            return;
+        }
+        if self.selected + 1 < len {
+            self.selected += 1;
+            if self.selected >= self.scroll_offset + visible {
+                self.scroll_offset = self.selected + 1 - visible;
+            }
         }
     }
 }
@@ -431,29 +492,53 @@ pub struct EditBuffer {
     pub original: String,
 }
 
-/// Cached in-memory SQLite connection with generation tracking.
+/// Cached in-memory DuckDB connection with generation tracking.
 /// Keeps loaded tables across query executions so unchanged data isn't reloaded.
-pub struct SqliteCache {
+pub struct DuckDbCache {
     conn: duckdb::Connection,
-    /// Map from file path -> Document generation loaded in that table.
+    /// Map from file path -> Document generation loaded in that table/view.
     loaded_generations: HashMap<PathBuf, u64>,
+    /// Paths loaded as VIEWs (vs TABLEs). Views are zero-cost to create;
+    /// DuckDB scans the CSV at query time with column/predicate pushdown.
+    view_paths: HashSet<PathBuf>,
 }
 
-impl std::fmt::Debug for SqliteCache {
+impl Drop for DuckDbCache {
+    fn drop(&mut self) {
+        // Clean up the spill directory created in DuckDbCache::new().
+        let spill_dir = std::env::temp_dir().join(format!("lazycsv_spill_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&spill_dir);
+    }
+}
+
+impl std::fmt::Debug for DuckDbCache {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SqliteCache")
+        f.debug_struct("DuckDbCache")
             .field("loaded_generations", &self.loaded_generations)
             .finish_non_exhaustive()
     }
 }
 
-impl SqliteCache {
+impl DuckDbCache {
     /// Create a new in-memory DuckDB connection.
+    ///
+    /// A per-process spill directory is configured so DuckDB can overflow to disk
+    /// instead of OOMing when large tables are materialized (e.g. for DML).
     fn new() -> Self {
         let conn = duckdb::Connection::open_in_memory().expect("Failed to open DuckDB");
-        SqliteCache {
+
+        // Set a spill directory so DuckDB can overflow large materialized tables
+        // to disk rather than crashing with out-of-memory.
+        let spill_dir = std::env::temp_dir().join(format!("lazycsv_spill_{}", std::process::id()));
+        if std::fs::create_dir_all(&spill_dir).is_ok() {
+            let dir_str = spill_dir.display().to_string().replace('\'', "''");
+            let _ = conn.execute_batch(&format!("SET temp_directory = '{}'", dir_str));
+        }
+
+        DuckDbCache {
             conn,
             loaded_generations: HashMap::new(),
+            view_paths: HashSet::new(),
         }
     }
 
@@ -498,6 +583,9 @@ impl SqliteCache {
         doc: &Document,
         generation: u64,
         cancelled: &AtomicBool,
+        // When true, always create a TABLE (required for DML — VIEWs are read-only).
+        // When false, create a VIEW for clean on-disk files (zero-cost load).
+        force_table: bool,
     ) -> std::result::Result<(), anyhow::Error> {
         let escaped = table_name.replace('"', "\"\"");
 
@@ -505,30 +593,56 @@ impl SqliteCache {
             return Ok(());
         }
 
-        let _ = self
-            .conn
-            .execute(&format!("DROP TABLE IF EXISTS \"{}\"", escaped), []);
+        // Drop any existing table or view for this name.
+        let is_view = self.view_paths.contains(path);
+        if is_view {
+            let _ = self
+                .conn
+                .execute(&format!("DROP VIEW IF EXISTS \"{}\"", escaped), []);
+        } else {
+            let _ = self
+                .conn
+                .execute(&format!("DROP TABLE IF EXISTS \"{}\"", escaped), []);
+        }
         self.loaded_generations.remove(path);
+        self.view_paths.remove(path);
 
-        // Strategy 1: Clean file on disk → DuckDB reads directly
-        if !doc.is_dirty
-            && path.is_file()
-            && self.load_via_read_csv(&escaped, &path.display().to_string())
-        {
-            self.loaded_generations
-                .insert(path.to_path_buf(), generation);
-            return Ok(());
+        // Strategy 1: Clean file on disk.
+        // SELECT queries → VIEW (zero-cost; DuckDB scans at query time with pushdown).
+        // DML queries → TABLE (DML cannot target a VIEW).
+        if !doc.is_dirty && path.is_file() {
+            let ok = if force_table {
+                self.load_via_table(&escaped, &path.display().to_string())
+            } else {
+                self.load_via_view(&escaped, &path.display().to_string())
+            };
+            if ok {
+                self.loaded_generations
+                    .insert(path.to_path_buf(), generation);
+                if !force_table {
+                    self.view_paths.insert(path.to_path_buf());
+                }
+                return Ok(());
+            }
         }
 
-        // Strategy 2: Existing temp file (from a previous query result)
+        // Strategy 2: Existing temp file (from a previous query result).
         let temp_result =
             std::env::temp_dir().join(format!("lazycsv_{}_{}.csv", table_name, std::process::id()));
-        if temp_result.is_file()
-            && self.load_via_read_csv(&escaped, &temp_result.display().to_string())
-        {
-            self.loaded_generations
-                .insert(path.to_path_buf(), generation);
-            return Ok(());
+        if temp_result.is_file() {
+            let ok = if force_table {
+                self.load_via_table(&escaped, &temp_result.display().to_string())
+            } else {
+                self.load_via_view(&escaped, &temp_result.display().to_string())
+            };
+            if ok {
+                self.loaded_generations
+                    .insert(path.to_path_buf(), generation);
+                if !force_table {
+                    self.view_paths.insert(path.to_path_buf());
+                }
+                return Ok(());
+            }
         }
 
         // Strategy 3: Write doc to temp file, then DuckDB reads it
@@ -538,7 +652,8 @@ impl SqliteCache {
             table_name
         ));
         if crate::csv::write_csv_atomic(doc, &temp_path, doc.delimiter).is_ok() {
-            let ok = self.load_via_read_csv(&escaped, &temp_path.display().to_string());
+            // Must use TABLE here: the temp file is deleted immediately after loading.
+            let ok = self.load_via_table(&escaped, &temp_path.display().to_string());
             let _ = std::fs::remove_file(&temp_path);
             if ok {
                 self.loaded_generations
@@ -555,8 +670,9 @@ impl SqliteCache {
         Ok(())
     }
 
-    /// Helper: load a CSV file into DuckDB via read_csv. Returns true on success.
-    fn load_via_read_csv(&self, escaped_table: &str, file_path: &str) -> bool {
+    /// Helper: load a CSV file into a DuckDB TABLE via read_csv. Returns true on success.
+    /// Materializes all data into memory — use for dirty docs whose temp file will be deleted.
+    fn load_via_table(&self, escaped_table: &str, file_path: &str) -> bool {
         let path_str = file_path.replace('\'', "''");
         let sql = format!(
             "CREATE TABLE \"{}\" AS SELECT * FROM read_csv('{}')",
@@ -565,44 +681,62 @@ impl SqliteCache {
         self.conn.execute_batch(&sql).is_ok()
     }
 
-    /// Remove a single table from the cache.
-    pub(crate) fn remove_table(&mut self, path: &Path, table_name: &str) {
-        let _ = self.conn.execute(
-            &format!(
-                "DROP TABLE IF EXISTS \"{}\"",
-                table_name.replace('"', "\"\"")
-            ),
-            [],
+    /// Helper: create a DuckDB VIEW over a CSV file. Returns true on success.
+    /// Zero-cost — no data is read upfront; DuckDB scans at query time with
+    /// column and predicate pushdown.
+    fn load_via_view(&self, escaped_table: &str, file_path: &str) -> bool {
+        let path_str = file_path.replace('\'', "''");
+        let sql = format!(
+            "CREATE VIEW \"{}\" AS SELECT * FROM read_csv('{}')",
+            escaped_table, path_str
         );
-        self.loaded_generations.remove(path);
+        self.conn.execute_batch(&sql).is_ok()
     }
 
-    /// Drop all tables from DuckDB to free memory.
-    /// All generation tracking is cleared so tables will be reloaded on next use.
+    /// Remove a single table or view from the cache.
+    pub(crate) fn remove_table(&mut self, path: &Path, table_name: &str) {
+        let escaped = table_name.replace('"', "\"\"");
+        if self.view_paths.contains(path) {
+            let _ = self
+                .conn
+                .execute(&format!("DROP VIEW IF EXISTS \"{}\"", escaped), []);
+        } else {
+            let _ = self
+                .conn
+                .execute(&format!("DROP TABLE IF EXISTS \"{}\"", escaped), []);
+        }
+        self.loaded_generations.remove(path);
+        self.view_paths.remove(path);
+    }
+
+    /// Drop all tables and views from DuckDB to free memory.
+    /// All generation tracking is cleared so objects will be recreated on next use.
     pub(crate) fn drop_all_tables(&mut self) {
-        // Get table names from DuckDB's information schema
-        if let Ok(mut stmt) = self
-            .conn
-            .prepare("SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'")
-        {
-            let tables: Vec<String> = stmt
-                .query_map([], |row| row.get::<_, String>(0))
+        if let Ok(mut stmt) = self.conn.prepare(
+            "SELECT table_name, table_type FROM information_schema.tables WHERE table_schema = 'main'"
+        ) {
+            let objects: Vec<(String, String)> = stmt
+                .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
                 .ok()
                 .map(|rows| rows.filter_map(|r| r.ok()).collect())
                 .unwrap_or_default();
-            for table in tables {
-                let _ = self.conn.execute(
-                    &format!("DROP TABLE IF EXISTS \"{}\"", table.replace('"', "\"\"")),
-                    [],
-                );
+            for (name, obj_type) in objects {
+                let escaped = name.replace('"', "\"\"");
+                if obj_type == "VIEW" {
+                    let _ = self.conn.execute(&format!("DROP VIEW IF EXISTS \"{}\"", escaped), []);
+                } else {
+                    let _ = self.conn.execute(&format!("DROP TABLE IF EXISTS \"{}\"", escaped), []);
+                }
             }
         }
         self.loaded_generations.clear();
+        self.view_paths.clear();
     }
 
-    /// Force a table to be reloaded on next use by removing its generation entry.
+    /// Force a table/view to be reloaded on next use by removing its generation entry.
     pub(crate) fn force_reload_generation(&mut self, path: &Path) {
         self.loaded_generations.remove(path);
+        self.view_paths.remove(path);
     }
 
     /// Get a reference to the underlying connection.
@@ -668,6 +802,12 @@ pub struct App {
     /// SQL table-name completion popup state (None when not showing)
     pub sql_completion: Option<SqlCompletion>,
 
+    /// SQL query history (most recent first)
+    pub sql_history: Vec<String>,
+
+    /// SQL history popup state (None when not showing)
+    pub sql_history_popup: Option<SqlHistoryPopup>,
+
     /// Pre-execution SQL diagnostics (inline error/warning markers)
     pub sql_diagnostics: Vec<SqlDiagnostic>,
 
@@ -686,8 +826,8 @@ pub struct App {
     /// Flag to quit application
     pub should_quit: bool,
 
-    /// Cached SQLite connection for repeated SQL queries
-    pub sqlite_cache: Option<SqliteCache>,
+    /// Cached DuckDB connection for repeated SQL queries
+    pub duckdb_cache: Option<DuckDbCache>,
 
     /// Cached CSV header schemas (avoids re-reading from disk on every keystroke)
     pub schema_cache: SchemaCache,
@@ -863,13 +1003,15 @@ impl App {
             sql_error: None,
             sql_vim_editor: None,
             sql_completion: None,
+            sql_history: Vec::new(),
+            sql_history_popup: None,
             sql_diagnostics: Vec::new(),
             sql_template_steps: Vec::new(),
             sql_template_last_column: None,
             sql_template_last_table: None,
             magnifier_state: None,
             should_quit: false,
-            sqlite_cache: None,
+            duckdb_cache: None,
             schema_cache: SchemaCache::default(),
             external_modification_pending: false,
             search_state: None,
@@ -1185,18 +1327,31 @@ impl App {
         self.magnifier_state.as_mut()
     }
 
-    /// Invalidate the SQLite cache entry for a specific file path.
+    /// Invalidate the DuckDB cache entry for a specific file path.
     /// Called after file reloads from disk to force re-import on next query.
-    pub fn invalidate_sqlite_cache_for(&mut self, path: &Path) {
-        if let Some(cache) = &mut self.sqlite_cache {
+    pub fn invalidate_duckdb_cache_for(&mut self, path: &Path) {
+        if let Some(cache) = &mut self.duckdb_cache {
             let table_name = crate::query::table_name_from_path(path);
             cache.remove_table(path, &table_name);
         }
     }
 
-    /// Drop the entire SQLite cache (e.g. when session structure changes drastically).
-    pub fn invalidate_sqlite_cache(&mut self) {
-        self.sqlite_cache = None;
+    /// Drop the entire DuckDB cache (e.g. when session structure changes drastically).
+    pub fn invalidate_duckdb_cache(&mut self) {
+        self.duckdb_cache = None;
+    }
+
+    /// Add a query to SQL history, deduplicating and capping to the configured limit.
+    /// Does nothing if `sql_history_limit` is 0.
+    pub fn push_sql_history(&mut self, query: String) {
+        let limit = self.config.sql.sql_history_limit;
+        if limit == 0 {
+            return;
+        }
+        // Remove duplicate if already present
+        self.sql_history.retain(|q| q != &query);
+        self.sql_history.insert(0, query);
+        self.sql_history.truncate(limit);
     }
 
     /// Check if the current file has been modified externally.
@@ -1309,7 +1464,7 @@ impl App {
                 std::thread::spawn(move || drop(old_storage));
                 self.document = doc;
                 // Invalidate SQLite cache for this file (generation reset to 0)
-                self.invalidate_sqlite_cache_for(&file_path);
+                self.invalidate_duckdb_cache_for(&file_path);
                 // Record new mtime so we don't re-prompt for this version
                 self.session.record_file_mtime(&file_path);
                 self.view_state = ViewState::default();
@@ -1331,7 +1486,7 @@ impl App {
     /// Returns (Some(doc), false) on success, (None, true) if cancelled,
     /// (None, false) on query error.
     ///
-    /// Uses a cached SQLite connection so that unchanged documents are not
+    /// Uses a cached DuckDB connection so that unchanged documents are not
     /// re-imported on subsequent queries.
     ///
     /// `output_name` is the filename to assign to the result document.
@@ -1348,12 +1503,12 @@ impl App {
         let query = query.as_str();
 
         // Take the cache out of self for independent borrowing
-        let mut cache = self.sqlite_cache.take().unwrap_or_else(SqliteCache::new);
+        let mut cache = self.duckdb_cache.take().unwrap_or_else(DuckDbCache::new);
 
         // Clean up stale tables
         on_progress("Preparing database...");
         if sql_execution::cleanup_stale_tables(&mut cache, self.session.files(), cancelled) {
-            self.sqlite_cache = Some(cache);
+            self.duckdb_cache = Some(cache);
             return (None, true);
         }
 
@@ -1384,7 +1539,6 @@ impl App {
                 no_headers: config.no_headers,
                 encoding: config.encoding.clone(),
             };
-            let load_start = std::time::Instant::now();
             let cancelled_flag = sql_execution::load_session_file(
                 &mut cache,
                 &file_path,
@@ -1393,13 +1547,8 @@ impl App {
                 file_config,
                 cancelled,
             );
-            eprintln!(
-                "  Load {}: {:.1}s",
-                file_label,
-                load_start.elapsed().as_secs_f64()
-            );
             if cancelled_flag {
-                self.sqlite_cache = Some(cache);
+                self.duckdb_cache = Some(cache);
                 return (None, true);
             }
         }
@@ -1414,7 +1563,7 @@ impl App {
             on_progress,
         );
 
-        self.sqlite_cache = Some(cache);
+        self.duckdb_cache = Some(cache);
 
         if let Some(err) = error_msg {
             self.sql_error = Some(err);
@@ -1443,7 +1592,7 @@ impl App {
         let query = crate::query::strip_csv_extensions(query);
         let query = query.as_str();
 
-        let mut cache = self.sqlite_cache.take().unwrap_or_else(SqliteCache::new);
+        let mut cache = self.duckdb_cache.take().unwrap_or_else(DuckDbCache::new);
 
         // Derive table name from the document's filename (not the session file path,
         // which may point to a different file after switching).
@@ -1467,15 +1616,16 @@ impl App {
                 &self.document,
                 self.document.generation,
                 cancelled,
+                true, // DML requires a TABLE, not a VIEW
             ) {
                 Ok(()) => {}
                 Err(e) => {
                     if e.downcast_ref::<cancel::CancelledError>().is_some() {
-                        self.sqlite_cache = Some(cache);
+                        self.duckdb_cache = Some(cache);
                         return (false, true);
                     }
                     self.sql_error = Some(format!("Failed to load data: {}", e));
-                    self.sqlite_cache = Some(cache);
+                    self.duckdb_cache = Some(cache);
                     return (false, false);
                 }
             }
@@ -1488,7 +1638,7 @@ impl App {
             Ok(_) => {}
             Err(e) => {
                 self.sql_error = Some(format!("SQL error: {}", e));
-                self.sqlite_cache = Some(cache);
+                self.duckdb_cache = Some(cache);
                 return (false, false);
             }
         }
@@ -1514,7 +1664,7 @@ impl App {
 
         if cache.conn().execute_batch(&copy_sql).is_err() {
             self.sql_error = Some("Failed to export modified data".to_string());
-            self.sqlite_cache = Some(cache);
+            self.duckdb_cache = Some(cache);
             return (false, false);
         }
 
@@ -1524,14 +1674,14 @@ impl App {
                 Ok(s) => s,
                 Err(e) => {
                     self.sql_error = Some(format!("Failed to load modified data: {}", e));
-                    self.sqlite_cache = Some(cache);
+                    self.duckdb_cache = Some(cache);
                     return (false, false);
                 }
             };
 
         // Drop DuckDB tables to free memory
         cache.drop_all_tables();
-        self.sqlite_cache = Some(cache);
+        self.duckdb_cache = Some(cache);
 
         // Replace current document with the modified data
         {

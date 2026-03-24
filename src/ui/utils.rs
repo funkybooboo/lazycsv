@@ -10,6 +10,19 @@ const SINGLE_LETTER_COLS: [&str; 26] = [
     "T", "U", "V", "W", "X", "Y", "Z",
 ];
 
+/// Format a number with thousands separators (e.g. 1234567 → "1,234,567").
+pub fn format_number(n: usize) -> String {
+    let s = n.to_string();
+    let mut out = String::with_capacity(s.len() + s.len() / 3);
+    for (i, c) in s.chars().rev().enumerate() {
+        if i > 0 && i % 3 == 0 {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    out.chars().rev().collect()
+}
+
 /// Convert 0-based column index to Excel-style letter(s)
 ///
 /// Uses the Excel column naming scheme: A, B, ..., Z, AA, AB, ..., ZZ, AAA, etc.

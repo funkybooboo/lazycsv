@@ -3,7 +3,9 @@
 //! Displays a centered modal popup for typing and executing SQL queries
 //! against loaded CSV tables with full vim editing capabilities.
 
-use crate::app::{DiagnosticSeverity, SqlCompletion, SqlDiagnostic, COMPLETION_MAX_VISIBLE};
+use crate::app::{
+    DiagnosticSeverity, SqlCompletion, SqlDiagnostic, SqlHistoryPopup, COMPLETION_MAX_VISIBLE,
+};
 use crate::vim_editor::{VimEditor, VimMode};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -26,6 +28,7 @@ pub fn render_sql_editor_vim(
     sql_error: Option<&str>,
     completion: Option<&SqlCompletion>,
     diagnostics: &[SqlDiagnostic],
+    history_popup: Option<(&SqlHistoryPopup, &[String])>,
 ) {
     let area = super::modal::large_modal_rect(frame.area());
 
@@ -59,6 +62,11 @@ pub fn render_sql_editor_vim(
     // Render completion popup if active
     if let Some(comp) = completion {
         render_completion_popup(frame, vim_editor, comp, query_area);
+    }
+
+    // Render history popup if active (overlays the editor)
+    if let Some((popup, history)) = history_popup {
+        render_history_popup(frame, popup, history, area);
     }
 }
 
@@ -180,13 +188,89 @@ fn render_completion_popup(
     frame.render_widget(paragraph, popup_inner);
 }
 
+const HISTORY_MAX_VISIBLE: usize = 10;
+
+/// Render the SQL history popup centered over the SQL editor area.
+fn render_history_popup(
+    frame: &mut Frame,
+    popup: &SqlHistoryPopup,
+    history: &[String],
+    editor_area: Rect,
+) {
+    if history.is_empty() {
+        return;
+    }
+
+    let visible = history.len().min(HISTORY_MAX_VISIBLE);
+    let popup_height = (visible as u16 + 2).min(editor_area.height);
+    let popup_width = (editor_area.width * 9 / 10).max(40).min(editor_area.width);
+    let popup_x = editor_area.x + (editor_area.width.saturating_sub(popup_width)) / 2;
+    let popup_y = editor_area.y + (editor_area.height.saturating_sub(popup_height)) / 2;
+    let popup_rect = Rect::new(popup_x, popup_y, popup_width, popup_height);
+
+    frame.render_widget(Clear, popup_rect);
+    let title = if popup.pending_d {
+        " SQL History  (dd: confirm delete · Esc cancel) ".to_string()
+    } else {
+        " SQL History  (↑↓/jk · Enter select · dd delete · Esc close) ".to_string()
+    };
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(title)
+        .style(Style::default().bg(super::modal::COLOR_POPUP_BG));
+    let inner = block.inner(popup_rect);
+    frame.render_widget(block, popup_rect);
+
+    let inner_width = inner.width as usize;
+
+    let lines: Vec<Line<'static>> = history
+        .iter()
+        .enumerate()
+        .skip(popup.scroll_offset)
+        .take(visible)
+        .map(|(idx, query)| {
+            let is_selected = idx == popup.selected;
+            let style = if is_selected && popup.pending_d {
+                Style::default().fg(Color::White).bg(Color::Red)
+            } else if is_selected {
+                super::modal::completion_selected_style()
+            } else {
+                super::modal::completion_unselected_style()
+            };
+            // Collapse multi-line queries to a single display line
+            let one_line: String = query
+                .lines()
+                .map(|l| l.trim())
+                .filter(|l| !l.is_empty())
+                .collect::<Vec<_>>()
+                .join(" ");
+            // Truncate to fit
+            let display = if one_line.chars().count() > inner_width {
+                format!(
+                    "{}…",
+                    one_line
+                        .chars()
+                        .take(inner_width.saturating_sub(1))
+                        .collect::<String>()
+                )
+            } else {
+                format!("{:<width$}", one_line, width = inner_width)
+            };
+            Line::from(Span::styled(display, style))
+        })
+        .collect();
+
+    let paragraph = Paragraph::new(lines);
+    frame.render_widget(paragraph, inner);
+}
+
 /// Build status line with mode/command/error and help tip
 fn build_status_line<'a>(
     vim_editor: &VimEditor,
     sql_error: Option<&str>,
     width: usize,
 ) -> Line<'a> {
-    let help_text = "Ctrl+Enter: execute | Ctrl+F: format | :w/:q | Esc: exit";
+    let help_text = "Ctrl+Enter: execute | Ctrl+F: format | Ctrl+H: history | :w/:q | Esc: exit";
 
     // Left side: Mode or command buffer or error
     let left = if let Some(err) = sql_error {

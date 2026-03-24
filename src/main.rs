@@ -193,7 +193,10 @@ fn run_main() -> Result<()> {
     watcher.stop();
 
     let mut app = match app_result {
-        Ok(app) => app,
+        Ok(mut app) => {
+            app.sql_history = lazycsv::config::load_sql_history();
+            app
+        }
         Err(e) => {
             // If cancelled, exit cleanly
             if e.downcast_ref::<lazycsv::cancel::CancelledError>()
@@ -340,7 +343,7 @@ fn handle_reload_file(terminal: &mut Term, app: &mut App) -> Result<()> {
     match reload_result {
         Ok(true) => {
             let current_path = app.current_file().clone();
-            app.invalidate_sqlite_cache_for(&current_path);
+            app.invalidate_duckdb_cache_for(&current_path);
             // Restore per-file history
             if let Some(history) = app.session.take_history(&current_path) {
                 app.history = history;
@@ -517,6 +520,9 @@ fn is_dml_query(query: &str) -> bool {
 }
 
 fn handle_execute_query(terminal: &mut Term, app: &mut App, query: String) -> Result<()> {
+    app.push_sql_history(query.clone());
+    lazycsv::config::save_sql_history(&app.sql_history, app.config.sql.sql_history_limit);
+
     // DML statements modify the current document in-place
     if is_dml_query(&query) {
         return handle_execute_dml(terminal, app, query);
@@ -1062,8 +1068,15 @@ fn execute_query_mode(query: &str, cli_args: &cli::CliArgs) -> Result<()> {
         (PathBuf::from("."), None)
     };
 
-    // Run the query — always print to stdout, optionally also copy to clipboard
-    let result = lazycsv::query::execute_query(&query_path, query, &config);
+    // Run the query — write to file if -o is given, otherwise stdout
+    let output_file = cli_args.output.as_deref().filter(|o| *o != "-");
+    let result = if let Some(out) = output_file {
+        let out_path = std::path::PathBuf::from(out);
+        lazycsv::query::execute_query_to_file(&query_path, query, &config, &out_path)
+            .inspect(|_| eprintln!("Query results written to {}", out_path.display()))
+    } else {
+        lazycsv::query::execute_query(&query_path, query, &config)
+    };
 
     // If clipboard requested, re-run the query to capture output (query is fast from SQLite cache)
     if cli_args.clipboard && result.is_ok() {
