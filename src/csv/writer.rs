@@ -373,4 +373,81 @@ mod tests {
         assert_eq!(lines[2], "2,Bob,95");
         assert_eq!(lines[3], "3,Charlie,90");
     }
+
+    #[test]
+    fn test_write_lazy_file_after_insert_row_atomic_roundtrip() {
+        use crate::domain::position::{ColIndex, RowIndex};
+
+        // Create a CSV file, load it, insert a row, save back to same file, verify on disk
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("roundtrip_insert.csv");
+        fs::write(&file_path, "Name,Age,City\nAlice,30,NYC\nBob,25,LA\n").unwrap();
+
+        // Load from file (InMemory since small)
+        let mut doc = Document::from_file(&file_path, None, false, None).unwrap();
+
+        // Insert row at end and set values
+        let new_row_idx = RowIndex::new(doc.row_count());
+        doc.insert_row(new_row_idx);
+        doc.set_cell(new_row_idx, ColIndex::new(0), "Charlie".to_string());
+        doc.set_cell(new_row_idx, ColIndex::new(1), "35".to_string());
+        doc.set_cell(new_row_idx, ColIndex::new(2), "Chicago".to_string());
+
+        // Save back to same file (like :wq does)
+        let delimiter = doc.delimiter;
+        write_csv_atomic(&doc, &file_path, delimiter).unwrap();
+
+        // Read back and verify
+        let content = fs::read_to_string(&file_path).unwrap();
+        let lines: Vec<&str> = content.trim().split('\n').collect();
+        assert_eq!(
+            lines.len(),
+            4,
+            "Should have header + 3 data rows, got: {:?}",
+            lines
+        );
+        assert_eq!(lines[0], "Name,Age,City");
+        assert_eq!(lines[1], "Alice,30,NYC");
+        assert_eq!(lines[2], "Bob,25,LA");
+        assert_eq!(lines[3], "Charlie,35,Chicago");
+    }
+
+    #[test]
+    fn test_write_lazy_file_after_insert_row() {
+        use crate::csv::row_storage::RowStorage;
+        use crate::domain::position::{ColIndex, RowIndex};
+
+        // Create a CSV file that will load as Lazy storage
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("insert_test.csv");
+        fs::write(&file_path, "Name,Age,City\nAlice,30,NYC\nBob,25,LA\n").unwrap();
+
+        let storage = RowStorage::lazy_from_file(&file_path, None, false).unwrap();
+        let mut doc = Document::from_storage(storage, "insert_test.csv".to_string(), ',');
+        assert!(doc.storage.is_lazy(), "Should start as lazy storage");
+
+        // Insert a new row at the end (row index 3 = after Bob)
+        let new_row_idx = RowIndex::new(doc.row_count());
+        doc.insert_row(new_row_idx);
+
+        // After insert_row, storage should be materialized to InMemory
+        assert!(!doc.storage.is_lazy(), "Should be InMemory after insert");
+
+        // Set cell values on the new row
+        doc.set_cell(new_row_idx, ColIndex::new(0), "Charlie".to_string());
+        doc.set_cell(new_row_idx, ColIndex::new(1), "35".to_string());
+        doc.set_cell(new_row_idx, ColIndex::new(2), "Chicago".to_string());
+
+        // Write to buffer and verify
+        let mut output = Vec::new();
+        write_csv_content(&mut output, &doc, ',').unwrap();
+        let result = String::from_utf8(output).unwrap();
+        let lines: Vec<&str> = result.trim().split('\n').collect();
+
+        assert_eq!(lines.len(), 4, "Should have header + 3 data rows");
+        assert_eq!(lines[0], "Name,Age,City");
+        assert_eq!(lines[1], "Alice,30,NYC");
+        assert_eq!(lines[2], "Bob,25,LA");
+        assert_eq!(lines[3], "Charlie,35,Chicago");
+    }
 }

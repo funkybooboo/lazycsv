@@ -74,7 +74,7 @@ use error_enhancer::enhance_sql_error;
 use std::path::{Path, PathBuf};
 
 /// Extract a cell value as String from a DuckDB row, handling all types.
-fn duckdb_get_string(row: &duckdb::Row, idx: usize) -> String {
+pub fn duckdb_get_string(row: &duckdb::Row, idx: usize) -> String {
     // Try String first (VARCHAR columns)
     if let Ok(s) = row.get::<_, String>(idx) {
         return s;
@@ -413,7 +413,7 @@ pub fn resolve_csv_files(path: &Path) -> Result<Vec<PathBuf>> {
 /// ```no_run
 /// use duckdb::Connection;
 /// use lazycsv::csv::Document;
-/// use lazycsv::query::load_csv_into_sqlite;
+/// use lazycsv::query::load_csv_into_duckdb;
 ///
 /// # fn main() -> anyhow::Result<()> {
 /// let conn = Connection::open_in_memory()?;
@@ -423,13 +423,13 @@ pub fn resolve_csv_files(path: &Path) -> Result<Vec<PathBuf>> {
 ///     "users.csv".to_string(),
 /// );
 ///
-/// load_csv_into_sqlite(&conn, &doc, "users")?;
+/// load_csv_into_duckdb(&conn, &doc, "users")?;
 ///
 /// // Now can query: SELECT * FROM users
 /// # Ok(())
 /// # }
 /// ```
-pub fn load_csv_into_sqlite(conn: &Connection, doc: &Document, table_name: &str) -> Result<()> {
+pub fn load_csv_into_duckdb(conn: &Connection, doc: &Document, table_name: &str) -> Result<()> {
     if doc.row_count() == 0 {
         bail!("Document has no rows (not even headers)");
     }
@@ -516,7 +516,7 @@ pub fn load_csv_into_sqlite(conn: &Connection, doc: &Document, table_name: &str)
 
 /// Stream a CSV file directly into a SQLite table, bypassing the Document intermediate.
 /// Used by the CLI `-q` path where we don't need the Document in memory.
-fn load_csv_file_into_sqlite(
+pub fn load_csv_file_into_duckdb(
     conn: &Connection,
     file_path: &Path,
     table_name: &str,
@@ -524,7 +524,7 @@ fn load_csv_file_into_sqlite(
 ) -> Result<()> {
     // For custom encodings, fall back to manual loading
     if config.encoding.is_some() {
-        return load_csv_file_into_sqlite_encoded(conn, file_path, table_name, config);
+        return load_csv_file_into_duckdb_encoded(conn, file_path, table_name, config);
     }
 
     let escaped_table = table_name.replace('"', "\"\"");
@@ -557,7 +557,7 @@ fn load_csv_file_into_sqlite(
 }
 
 /// Fallback for custom-encoded CSV files (must decode full file first).
-fn load_csv_file_into_sqlite_encoded(
+fn load_csv_file_into_duckdb_encoded(
     conn: &Connection,
     file_path: &Path,
     table_name: &str,
@@ -650,7 +650,7 @@ fn load_csv_file_into_sqlite_encoded(
 ///
 /// ```no_run
 /// use duckdb::Connection;
-/// use lazycsv::query::{load_csv_into_sqlite, execute_query_to_document};
+/// use lazycsv::query::{load_csv_into_duckdb, execute_query_to_document};
 /// use lazycsv::csv::Document;
 ///
 /// # fn main() -> anyhow::Result<()> {
@@ -662,7 +662,7 @@ fn load_csv_file_into_sqlite_encoded(
 ///     vec![vec!["1".to_string(), "100".to_string()]],
 ///     "products.csv".to_string(),
 /// );
-/// load_csv_into_sqlite(&conn, &doc, "products")?;
+/// load_csv_into_duckdb(&conn, &doc, "products")?;
 ///
 /// // Query
 /// let result = execute_query_to_document(
@@ -707,7 +707,7 @@ pub fn execute_query_to_document(
 
 /// Load a CSV Document into SQLite with cancellation support.
 ///
-/// Like [`load_csv_into_sqlite`], but checks for cancellation every 1000 rows.
+/// Like [`load_csv_into_duckdb`], but checks for cancellation every 1000 rows.
 /// If cancelled, rolls back the transaction and returns [`CancelledError`].
 ///
 /// # Arguments
@@ -731,7 +731,7 @@ pub fn execute_query_to_document(
 /// 3. Caller should propagate or handle gracefully
 ///
 /// [`CancelledError`]: crate::cancel::CancelledError
-pub fn load_csv_into_sqlite_cancellable(
+pub fn load_csv_into_duckdb_cancellable(
     conn: &Connection,
     doc: &Document,
     table_name: &str,
@@ -1040,7 +1040,7 @@ pub fn execute_query(path: &Path, query: &str, config: &FileConfig) -> Result<()
 
     for file_path in &referenced {
         let table_name = table_name_from_path(file_path);
-        if load_csv_file_into_sqlite(&conn, file_path, &table_name, config).is_err() {
+        if load_csv_file_into_duckdb(&conn, file_path, &table_name, config).is_err() {
             continue;
         }
     }
@@ -1103,7 +1103,7 @@ pub fn execute_query_to_file(
 
     for file_path in &referenced {
         let table_name = table_name_from_path(file_path);
-        if load_csv_file_into_sqlite(&conn, file_path, &table_name, config).is_err() {
+        if load_csv_file_into_duckdb(&conn, file_path, &table_name, config).is_err() {
             continue;
         }
     }
@@ -1141,7 +1141,7 @@ pub fn execute_query_to_doc_from_path(
 
     for file_path in &referenced {
         let table_name = table_name_from_path(file_path);
-        if load_csv_file_into_sqlite(&conn, file_path, &table_name, config).is_err() {
+        if load_csv_file_into_duckdb(&conn, file_path, &table_name, config).is_err() {
             continue;
         }
     }
@@ -1204,7 +1204,7 @@ mod tests {
             xlsx_formulas: vec![],
         };
 
-        load_csv_into_sqlite(&conn, &doc, "people").unwrap();
+        load_csv_into_duckdb(&conn, &doc, "people").unwrap();
 
         let mut stmt = conn
             .prepare("SELECT name, age FROM people ORDER BY name")
@@ -1236,7 +1236,7 @@ mod tests {
             xlsx_formulas: vec![],
         };
 
-        let result = load_csv_into_sqlite(&conn, &doc, "empty");
+        let result = load_csv_into_duckdb(&conn, &doc, "empty");
         assert!(result.is_err());
     }
 
@@ -1252,7 +1252,7 @@ mod tests {
             xlsx_formulas: vec![],
         };
 
-        load_csv_into_sqlite(&conn, &doc, "headers_only").unwrap();
+        load_csv_into_duckdb(&conn, &doc, "headers_only").unwrap();
 
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM headers_only", [], |r| r.get(0))
@@ -1276,7 +1276,7 @@ mod tests {
         };
 
         // Should not fail even with SQL reserved words as column names
-        load_csv_into_sqlite(&conn, &doc, "reserved").unwrap();
+        load_csv_into_duckdb(&conn, &doc, "reserved").unwrap();
 
         let val: String = conn
             .query_row("SELECT \"select\" FROM reserved", [], |r| r.get(0))
@@ -1299,7 +1299,7 @@ mod tests {
             xlsx_formulas: vec![],
         };
 
-        load_csv_into_sqlite(&conn, &doc, "sparse").unwrap();
+        load_csv_into_duckdb(&conn, &doc, "sparse").unwrap();
 
         let val: String = conn
             .query_row("SELECT b FROM sparse", [], |r| {
@@ -1323,7 +1323,7 @@ mod tests {
             generation: 0,
             xlsx_formulas: vec![],
         };
-        load_csv_into_sqlite(&conn, &doc, "customers").unwrap();
+        load_csv_into_duckdb(&conn, &doc, "customers").unwrap();
 
         let result = execute_query_to_document(
             &conn,
@@ -1406,7 +1406,7 @@ mod tests {
             generation: 0,
             xlsx_formulas: vec![],
         };
-        load_csv_into_sqlite(&conn, &doc, "people").unwrap();
+        load_csv_into_duckdb(&conn, &doc, "people").unwrap();
 
         let result_doc = execute_query_to_document(
             &conn,
@@ -1435,7 +1435,7 @@ mod tests {
             generation: 0,
             xlsx_formulas: vec![],
         };
-        load_csv_into_sqlite(&conn, &doc, "products").unwrap();
+        load_csv_into_duckdb(&conn, &doc, "products").unwrap();
 
         let result_doc = execute_query_to_document(
             &conn,
@@ -1482,7 +1482,7 @@ mod tests {
             generation: 0,
             xlsx_formulas: vec![],
         };
-        load_csv_into_sqlite(&conn, &doc, "data").unwrap();
+        load_csv_into_duckdb(&conn, &doc, "data").unwrap();
 
         let result_doc = execute_query_to_document(
             &conn,
@@ -1525,8 +1525,8 @@ mod tests {
             xlsx_formulas: vec![],
         };
 
-        load_csv_into_sqlite(&conn, &doc1, "users").unwrap();
-        load_csv_into_sqlite(&conn, &doc2, "emails").unwrap();
+        load_csv_into_duckdb(&conn, &doc1, "users").unwrap();
+        load_csv_into_duckdb(&conn, &doc2, "emails").unwrap();
 
         let result_doc = execute_query_to_document(
             &conn,

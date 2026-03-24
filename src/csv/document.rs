@@ -238,6 +238,48 @@ impl Document {
         Ok(reader.headers().map(|h| h.len()).unwrap_or(0))
     }
 
+    /// Read header names from a CSV file without loading the full document.
+    pub fn read_headers(
+        path: &Path,
+        delimiter: Option<u8>,
+        no_headers: bool,
+        encoding_label: Option<String>,
+    ) -> Result<Vec<String>> {
+        if no_headers {
+            anyhow::bail!("Cannot read headers when --no-headers is set");
+        }
+
+        if encoding_label.is_none() {
+            let file = std::fs::File::open(path)
+                .context(format!("Failed to open file: {}", path.display()))?;
+            let reader = std::io::BufReader::with_capacity(64 * 1024, file);
+
+            let mut builder = csv::ReaderBuilder::new();
+            builder.has_headers(true);
+            if let Some(d) = delimiter {
+                builder.delimiter(d);
+            }
+
+            let mut csv_reader = builder.from_reader(reader);
+            let headers = csv_reader.headers()?.iter().map(String::from).collect();
+            return Ok(headers);
+        }
+
+        let file_bytes =
+            fs::read(path).context(format!("Failed to read file: {}", path.display()))?;
+        let decoded_content = Self::decode_file_bytes(&file_bytes, encoding_label)?;
+
+        let mut builder = csv::ReaderBuilder::new();
+        builder.has_headers(true);
+        if let Some(d) = delimiter {
+            builder.delimiter(d);
+        }
+
+        let mut reader = builder.from_reader(decoded_content.as_bytes());
+        let headers = reader.headers()?.iter().map(String::from).collect();
+        Ok(headers)
+    }
+
     /// Parses CSV content from a string.
     fn parse_csv_content(
         content: &str,

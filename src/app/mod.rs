@@ -664,7 +664,7 @@ impl DuckDbCache {
 
         // Strategy 4: Fallback row-by-row INSERT (small datasets)
 
-        crate::query::load_csv_into_sqlite_cancellable(&self.conn, doc, table_name, cancelled)?;
+        crate::query::load_csv_into_duckdb_cancellable(&self.conn, doc, table_name, cancelled)?;
         self.loaded_generations
             .insert(path.to_path_buf(), generation);
         Ok(())
@@ -884,7 +884,11 @@ impl App {
         // Determine the CSV file to load and scan directory for others
         let (file_path, csv_files, current_file_index) = if path.is_file() {
             let csv_files = crate::file_system::scan_directory_for_csvs(&path)?;
-            let current_file_index = csv_files.iter().position(|p| p == &path).unwrap_or(0);
+            let canonical_path = path.canonicalize().unwrap_or_else(|_| path.clone());
+            let current_file_index = csv_files
+                .iter()
+                .position(|p| p.canonicalize().unwrap_or_else(|_| p.clone()) == canonical_path)
+                .unwrap_or(0);
             (path, csv_files, current_file_index)
         } else if path.is_dir() {
             let csv_files = crate::file_system::scan_directory(&path)?;

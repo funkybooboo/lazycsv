@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use clap::CommandFactory;
 use crossterm::event::{
     self, Event, KeyEventKind, KeyboardEnhancementFlags, PopKeyboardEnhancementFlags,
     PushKeyboardEnhancementFlags,
@@ -31,6 +32,31 @@ fn main() {
 
 fn run_main() -> Result<()> {
     let cli_args = cli::parse_args();
+
+    // Handle --help: show command-specific help if a command flag is present
+    if cli_args.help {
+        if cli_args.dedup.is_some() {
+            cli::print_command_help("D");
+        } else if cli_args.query.is_some() {
+            cli::print_command_help("q");
+        } else if cli_args.xlsx {
+            cli::print_command_help("x");
+        } else if cli_args.split.is_some() {
+            cli::print_command_help("S");
+        } else if cli_args.stats {
+            cli::print_command_help("t");
+        } else if cli_args.sort.is_some() {
+            cli::print_command_help("s");
+        } else if cli_args.headers {
+            cli::print_command_help("h");
+        } else if cli_args.rows || cli_args.columns {
+            cli::print_command_help("rc");
+        } else {
+            cli::CliArgs::command().print_help()?;
+            println!();
+        }
+        return Ok(());
+    }
 
     // Non-interactive xlsx-to-csv extraction mode
     if cli_args.xlsx {
@@ -108,13 +134,23 @@ fn run_main() -> Result<()> {
         return execute_split(&path, rows_per_file, &cli_args);
     }
 
+    // Non-interactive dedup mode: remove duplicate rows and output CSV to stdout
+    if let Some(ref dedup_spec) = cli_args.dedup {
+        return execute_dedup(dedup_spec, &cli_args);
+    }
+
     // Non-interactive sort mode: load, sort, output CSV to stdout, and exit
     if let Some(ref sort_spec) = cli_args.sort {
         return execute_sort_and_output(sort_spec, &cli_args);
     }
 
+    // Non-interactive stats mode: print column statistics and exit
+    if cli_args.stats {
+        return execute_stats_mode(&cli_args);
+    }
+
     // Non-interactive row/column count mode: print counts and exit
-    if cli_args.rows || cli_args.columns {
+    if cli_args.headers || cli_args.rows || cli_args.columns {
         return execute_count_mode(&cli_args);
     }
 
@@ -122,7 +158,7 @@ fn run_main() -> Result<()> {
     if cli_args.file_path().is_none() && stdin_is_piped() {
         let _ = crossterm::terminal::disable_raw_mode();
         eprintln!("Piped stdin is not supported in interactive TUI mode.");
-        eprintln!("Use a non-interactive flag: -q <query>, --sort <col>, --rows, or --columns.");
+        eprintln!("Use a non-interactive flag: -q <query>, --sort <col>, --headers, --rows, or --columns.");
         eprintln!();
         eprintln!("Examples:");
         eprintln!("  cat data.csv | lazycsv -q \"SELECT * FROM stdin\"");
@@ -1132,6 +1168,207 @@ fn extract_xlsx_to_temp(xlsx_path: &std::path::Path, cli_args: &cli::CliArgs) ->
     Ok(temp_dir)
 }
 
+/// Non-interactive stats mode: compute per-column statistics using DuckDB.
+fn execute_stats_mode(cli_args: &cli::CliArgs) -> Result<()> {
+    use duckdb::Connection;
+
+    let config = FileConfig::with_options(
+        cli_args.delimiter,
+        cli_args.no_headers,
+        cli_args.encoding.clone(),
+    );
+
+    // Resolve the file path (file, xlsx temp dir, stdin temp, or cwd)
+    let (query_path, _temp_cleanup) = if let Some(path) = cli_args.file_path() {
+        if lazycsv::csv::xlsx::is_spreadsheet(&path) {
+            let temp_dir = extract_xlsx_to_temp(&path, cli_args)?;
+            (temp_dir.clone(), Some(temp_dir))
+        } else {
+            (path, None)
+        }
+    } else if stdin_is_piped() {
+        let temp_path = save_stdin_to_tempfile()?;
+        (temp_path.clone(), Some(temp_path))
+    } else {
+        anyhow::bail!("Usage: lazycsv <file> --stats");
+    };
+
+    // Resolve to a single file or directory of files
+    let csv_files = if query_path.is_file() {
+        vec![query_path]
+    } else if query_path.is_dir() {
+        let files = lazycsv::file_system::scan_directory(&query_path)?;
+        if files.is_empty() {
+            anyhow::bail!("No CSV files found in {}", query_path.display());
+        }
+        files
+    } else {
+        anyhow::bail!("Path does not exist: {}", query_path.display());
+    };
+
+    let conn = Connection::open_in_memory().context("Failed to open DuckDB")?;
+    let mut writer = output_writer(cli_args)?;
+
+    for (idx, file_path) in csv_files.iter().enumerate() {
+        let table_name = lazycsv::query::table_name_from_path(file_path);
+        lazycsv::query::load_csv_file_into_duckdb(&conn, file_path, &table_name, &config)?;
+
+        if csv_files.len() > 1 {
+            if idx > 0 {
+                writeln!(writer)?;
+            }
+            let name = file_path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("unknown");
+            writeln!(writer, "--- {} ---", name)?;
+        }
+
+        print_column_stats(&conn, &table_name, &mut writer)?;
+    }
+
+    report_output_file(cli_args, "Stats");
+    Ok(())
+}
+
+/// Print per-column statistics for a table loaded in DuckDB.
+fn print_column_stats<W: std::io::Write>(
+    conn: &duckdb::Connection,
+    table_name: &str,
+    writer: &mut W,
+) -> Result<()> {
+    let escaped = table_name.replace('"', "\"\"");
+
+    // Get column names and types from DuckDB
+    let mut col_stmt = conn.prepare(&format!(
+        "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = '{}' ORDER BY ordinal_position",
+        escaped.replace('\'', "''")
+    ))?;
+    let col_info: Vec<(String, String)> = col_stmt
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    if col_info.is_empty() {
+        writeln!(writer, "(no columns)")?;
+        return Ok(());
+    }
+
+    let headers = [
+        "col_name",
+        "data_type",
+        "min",
+        "max",
+        "min_len",
+        "max_len",
+        "mean",
+        "stddev",
+        "median",
+        "mode",
+        "cardinality",
+    ];
+
+    let mut all_rows: Vec<Vec<String>> = Vec::new();
+
+    for (col_name, col_type) in &col_info {
+        let c = col_name.replace('"', "\"\"");
+
+        // Build per-column stats query
+        let stats_sql = format!(
+            "SELECT \
+                CAST(MIN(\"{c}\") AS VARCHAR), \
+                CAST(MAX(\"{c}\") AS VARCHAR), \
+                MIN(LENGTH(CAST(\"{c}\" AS VARCHAR))), \
+                MAX(LENGTH(CAST(\"{c}\" AS VARCHAR))), \
+                ROUND(AVG(TRY_CAST(\"{c}\" AS DOUBLE)), 4), \
+                ROUND(STDDEV_SAMP(TRY_CAST(\"{c}\" AS DOUBLE)), 4), \
+                ROUND(MEDIAN(TRY_CAST(\"{c}\" AS DOUBLE)), 4), \
+                COUNT(DISTINCT \"{c}\") \
+            FROM \"{table}\"",
+            c = c,
+            table = escaped
+        );
+
+        let stats = conn.query_row(&stats_sql, [], |row| {
+            Ok(vec![
+                row.get::<_, String>(0).unwrap_or_else(|_| "NULL".into()),
+                row.get::<_, String>(1).unwrap_or_else(|_| "NULL".into()),
+                row.get::<_, i64>(2)
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|_| "NULL".into()),
+                row.get::<_, i64>(3)
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|_| "NULL".into()),
+                duckdb_get_stat_string(row, 4),
+                duckdb_get_stat_string(row, 5),
+                duckdb_get_stat_string(row, 6),
+                row.get::<_, i64>(7)
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|_| "NULL".into()),
+            ])
+        })?;
+
+        // mode: most frequent value
+        let mode_sql = format!(
+            "SELECT CAST(\"{c}\" AS VARCHAR) FROM \"{table}\" \
+             GROUP BY \"{c}\" ORDER BY COUNT(*) DESC LIMIT 1",
+            c = c,
+            table = escaped
+        );
+        let mode_val = conn
+            .query_row(&mode_sql, [], |row| row.get::<_, String>(0))
+            .unwrap_or_else(|_| "NULL".to_string());
+
+        // [column, type, min, max, min_len, max_len, mean, stddev, median, mode, cardinality]
+        let mut row = vec![col_name.clone(), col_type.clone()];
+        // min, max
+        row.push(stats[0].clone());
+        row.push(stats[1].clone());
+        // min_len, max_len
+        row.push(stats[2].clone());
+        row.push(stats[3].clone());
+        // mean, stddev, median
+        row.push(stats[4].clone());
+        row.push(stats[5].clone());
+        row.push(stats[6].clone());
+        // mode
+        row.push(mode_val);
+        // cardinality
+        row.push(stats[7].clone());
+
+        all_rows.push(row);
+    }
+
+    // Output as CSV for pipeable results
+    let mut wtr = csv::Writer::from_writer(writer);
+    wtr.write_record(headers)?;
+    for row in &all_rows {
+        wtr.write_record(row)?;
+    }
+    wtr.flush()?;
+
+    Ok(())
+}
+
+/// Extract a stat value from a DuckDB row as a string, handling NULLs.
+fn duckdb_get_stat_string(row: &duckdb::Row, idx: usize) -> String {
+    if let Ok(v) = row.get::<_, f64>(idx) {
+        if v.fract() == 0.0 && v.abs() < i64::MAX as f64 {
+            return format!("{}", v as i64);
+        }
+        return format!("{}", v);
+    }
+    if let Ok(v) = row.get::<_, i64>(idx) {
+        return v.to_string();
+    }
+    if let Ok(v) = row.get::<_, String>(idx) {
+        return v;
+    }
+    "NULL".to_string()
+}
+
 /// Non-interactive row/column count mode with stdin support.
 fn execute_count_mode(cli_args: &cli::CliArgs) -> Result<()> {
     let separator = if cli_args.format {
@@ -1139,6 +1376,8 @@ fn execute_count_mode(cli_args: &cli::CliArgs) -> Result<()> {
     } else {
         '\0'
     };
+
+    let mut writer = output_writer(cli_args)?;
 
     if cli_args.file_path().is_none() && stdin_is_piped() {
         // Read from stdin
@@ -1152,6 +1391,14 @@ fn execute_count_mode(cli_args: &cli::CliArgs) -> Result<()> {
                 "stdin".to_string(),
             )?
         };
+        if cli_args.headers {
+            let headers: Vec<String> = (0..doc.column_count())
+                .map(|i| doc.header(lazycsv::ColIndex::new(i)))
+                .collect();
+            writeln!(writer, "{}", headers.join(", "))?;
+            report_output_file(cli_args, "Headers");
+            return Ok(());
+        }
         let mut parts = Vec::new();
         if cli_args.rows {
             let count = if doc.row_count() > 0 {
@@ -1167,7 +1414,8 @@ fn execute_count_mode(cli_args: &cli::CliArgs) -> Result<()> {
                 format_number(doc.column_count(), separator)
             ));
         }
-        println!("stdin: {}", parts.join(", "));
+        writeln!(writer, "stdin: {}", parts.join(", "))?;
+        report_output_file(cli_args, "Output");
         return Ok(());
     }
 
@@ -1190,6 +1438,21 @@ fn execute_count_mode(cli_args: &cli::CliArgs) -> Result<()> {
             .and_then(|n| n.to_str())
             .unwrap_or("unknown");
 
+        if cli_args.headers {
+            let headers = lazycsv::csv::Document::read_headers(
+                file,
+                cli_args.delimiter,
+                cli_args.no_headers,
+                cli_args.encoding.clone(),
+            )?;
+            if files.len() > 1 {
+                writeln!(writer, "{}: {}", name, headers.join(", "))?;
+            } else {
+                writeln!(writer, "{}", headers.join(", "))?;
+            }
+            continue;
+        }
+
         let mut parts = Vec::new();
 
         if cli_args.rows {
@@ -1211,8 +1474,230 @@ fn execute_count_mode(cli_args: &cli::CliArgs) -> Result<()> {
             parts.push(format!("{} columns", format_number(count, separator)));
         }
 
-        println!("{}: {}", name, parts.join(", "));
+        writeln!(writer, "{}: {}", name, parts.join(", "))?;
     }
+    report_output_file(cli_args, "Output");
+    Ok(())
+}
+
+/// Non-interactive dedup: remove duplicate rows and write CSV to stdout.
+fn execute_dedup(dedup_spec: &str, cli_args: &cli::CliArgs) -> Result<()> {
+    use duckdb::Connection;
+
+    let config = FileConfig::with_options(
+        cli_args.delimiter,
+        cli_args.no_headers,
+        cli_args.encoding.clone(),
+    );
+
+    // Resolve input file
+    let (file_path, _temp_cleanup) = if let Some(path) = cli_args.file_path() {
+        if lazycsv::csv::xlsx::is_spreadsheet(&path) {
+            let temp_dir = extract_xlsx_to_temp(&path, cli_args)?;
+            (temp_dir.clone(), Some(temp_dir))
+        } else if path.is_file() {
+            (path, None)
+        } else if path.is_dir() {
+            let csv_files = lazycsv::file_system::scan_directory(&path)?;
+            let first = csv_files
+                .into_iter()
+                .next()
+                .ok_or_else(|| anyhow::anyhow!("No CSV files found in {}", path.display()))?;
+            (first, None)
+        } else {
+            anyhow::bail!("Path does not exist: {}", path.display());
+        }
+    } else if stdin_is_piped() {
+        let temp_path = save_stdin_to_tempfile()?;
+        (temp_path.clone(), Some(temp_path))
+    } else {
+        anyhow::bail!("No input file specified. Provide a file path or pipe data via stdin.");
+    };
+
+    let conn = Connection::open_in_memory().context("Failed to open DuckDB")?;
+    let table_name = lazycsv::query::table_name_from_path(&file_path);
+    lazycsv::query::load_csv_file_into_duckdb(&conn, &file_path, &table_name, &config)?;
+
+    let escaped = table_name.replace('"', "\"\"");
+
+    // Get all column names
+    let mut col_stmt = conn.prepare(&format!(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = '{}' ORDER BY ordinal_position",
+        escaped.replace('\'', "''")
+    ))?;
+    let all_columns: Vec<String> = col_stmt
+        .query_map([], |row| row.get::<_, String>(0))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    if all_columns.is_empty() {
+        anyhow::bail!("No columns found in file");
+    }
+
+    // Resolve PK columns
+    let pk_columns = if dedup_spec.is_empty() {
+        // No PK specified: use all columns
+        all_columns.clone()
+    } else {
+        let specs: Vec<&str> = dedup_spec.split(',').map(|s| s.trim()).collect();
+        let mut pk = Vec::new();
+        for s in &specs {
+            if s.is_empty() {
+                continue;
+            }
+            if let Ok(num) = s.parse::<usize>() {
+                if num == 0 || num > all_columns.len() {
+                    anyhow::bail!("Column {} out of range (1-{})", num, all_columns.len());
+                }
+                pk.push(all_columns[num - 1].clone());
+            } else {
+                // Try case-insensitive header match
+                let found = all_columns
+                    .iter()
+                    .find(|c| c.eq_ignore_ascii_case(s))
+                    .cloned();
+                if let Some(col) = found {
+                    pk.push(col);
+                } else {
+                    anyhow::bail!("Column \"{}\" not found", s);
+                }
+            }
+        }
+        if pk.is_empty() {
+            anyhow::bail!("No valid columns specified for dedup");
+        }
+        pk
+    };
+
+    // Check for all-NULL PK rows (only when explicit PK columns specified)
+    let has_explicit_pk = !dedup_spec.is_empty();
+    if has_explicit_pk && !cli_args.allow_nulls {
+        let null_check_parts: Vec<String> = pk_columns
+            .iter()
+            .map(|c| format!("\"{}\" IS NULL", c.replace('"', "\"\"")))
+            .collect();
+        let null_check_sql = format!(
+            "SELECT COUNT(*) FROM \"{}\" WHERE {}",
+            escaped,
+            null_check_parts.join(" AND ")
+        );
+        let null_count: i64 = conn.query_row(&null_check_sql, [], |row| row.get(0))?;
+        if null_count > 0 {
+            anyhow::bail!(
+                "Found {} row(s) where all PK columns are NULL (ambiguous). \
+                 Use --allow-nulls to include them.",
+                null_count
+            );
+        }
+    }
+
+    // Build dedup query using ROW_NUMBER window function
+    let partition_cols: Vec<String> = pk_columns
+        .iter()
+        .map(|c| {
+            let escaped_col = format!("\"{}\"", c.replace('"', "\"\""));
+            if cli_args.ignore_case {
+                format!("LOWER(CAST({} AS VARCHAR))", escaped_col)
+            } else {
+                escaped_col
+            }
+        })
+        .collect();
+    let all_cols: Vec<String> = all_columns
+        .iter()
+        .map(|c| format!("\"{}\"", c.replace('"', "\"\"")))
+        .collect();
+
+    // "last wins" means we want the highest row position; "first wins" the lowest
+    let order = if cli_args.keep_first { "ASC" } else { "DESC" };
+
+    if cli_args.report_only {
+        // Report mode: show all rows that have duplicates (count > 1), with row numbers
+        let pk_col_names: Vec<String> = pk_columns
+            .iter()
+            .map(|c| format!("\"{}\"", c.replace('"', "\"\"")))
+            .collect();
+        let report_sql = format!(
+            "SELECT _rownum, {all_cols}, _dup_count FROM (\
+                SELECT *, COUNT(*) OVER (PARTITION BY {pk}) AS _dup_count, \
+                    ROW_NUMBER() OVER () AS _rownum \
+                FROM \"{table}\"\
+            ) WHERE _dup_count > 1 ORDER BY {pk_orig}, _rownum",
+            all_cols = all_cols.join(", "),
+            pk = partition_cols.join(", "),
+            pk_orig = pk_col_names.join(", "),
+            table = escaped
+        );
+
+        let col_count = all_columns.len();
+        let mut stmt = conn.prepare(&report_sql)?;
+        let rows = stmt
+            .query_map([], |row| {
+                let rownum: i64 = row.get(0)?;
+                let values: Vec<String> = (1..=col_count)
+                    .map(|i| lazycsv::query::duckdb_get_string(row, i))
+                    .collect();
+                let dup_count: i64 = row.get(col_count + 1)?;
+                Ok((rownum, values, dup_count))
+            })
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+        // Write CSV report to output
+        let mut wtr = csv::Writer::from_writer(output_writer(cli_args)?);
+
+        // Header: row_number, original columns, dup_count
+        let mut header = vec!["row_number".to_string()];
+        header.extend(all_columns.iter().cloned());
+        header.push("dup_count".to_string());
+        wtr.write_record(&header)?;
+
+        for row_result in rows {
+            let (rownum, values, dup_count) =
+                row_result.context("Failed to read report result row")?;
+            let mut record = vec![rownum.to_string()];
+            record.extend(values);
+            record.push(dup_count.to_string());
+            wtr.write_record(&record)?;
+        }
+        wtr.flush()?;
+        report_output_file(cli_args, "Duplicate report");
+    } else {
+        // Dedup mode: remove duplicates
+        let dedup_sql = format!(
+            "SELECT {cols} FROM (\
+                SELECT *, ROW_NUMBER() OVER (PARTITION BY {pk} ORDER BY _rownum {order}) AS _rn \
+                FROM (\
+                    SELECT *, ROW_NUMBER() OVER () AS _rownum FROM \"{table}\"\
+                )\
+            ) WHERE _rn = 1 ORDER BY _rownum",
+            cols = all_cols.join(", "),
+            pk = partition_cols.join(", "),
+            order = order,
+            table = escaped
+        );
+
+        let col_count = all_columns.len();
+        let mut stmt = conn.prepare(&dedup_sql)?;
+        let rows = stmt
+            .query_map([], |row| {
+                let values: Vec<String> = (0..col_count)
+                    .map(|i| lazycsv::query::duckdb_get_string(row, i))
+                    .collect();
+                Ok(values)
+            })
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+        // Write CSV to output (file or stdout)
+        let mut wtr = csv::Writer::from_writer(output_writer(cli_args)?);
+        wtr.write_record(&all_columns)?;
+        for row_result in rows {
+            let values = row_result.context("Failed to read dedup result row")?;
+            wtr.write_record(&values)?;
+        }
+        wtr.flush()?;
+        report_output_file(cli_args, "Deduplicated output");
+    }
+
     Ok(())
 }
 
@@ -1301,16 +1786,35 @@ fn execute_sort_and_output(sort_spec: &str, cli_args: &cli::CliArgs) -> Result<(
     let no_cancel = AtomicBool::new(false);
     doc.sort_by_columns(&col_indices, ascending, &no_cancel);
 
-    // Write sorted CSV to stdout
+    // Write sorted CSV to output
     let delimiter = doc.delimiter;
-    let stdout = std::io::stdout();
-    let mut out = std::io::BufWriter::new(stdout.lock());
+    let mut out = output_writer(cli_args)?;
     lazycsv::csv::write_csv_content(&mut out, &doc, delimiter)?;
+    report_output_file(cli_args, "Sorted output");
 
     Ok(())
 }
 
 /// Format a number with thousands separators. If `sep` is '\0', return plain number.
+/// Get output writer based on -o flag: file, or stdout.
+fn output_writer(cli_args: &cli::CliArgs) -> Result<Box<dyn std::io::Write>> {
+    let output_file = cli_args.output.as_deref().filter(|o| *o != "-");
+    if let Some(out) = output_file {
+        Ok(Box::new(std::io::BufWriter::new(
+            std::fs::File::create(out).context(format!("Failed to create output file: {}", out))?,
+        )))
+    } else {
+        Ok(Box::new(std::io::stdout().lock()))
+    }
+}
+
+/// Print message to stderr if -o file was specified.
+fn report_output_file(cli_args: &cli::CliArgs, label: &str) {
+    if let Some(out) = cli_args.output.as_deref().filter(|o| *o != "-") {
+        eprintln!("{} written to {}", label, out);
+    }
+}
+
 fn format_number(n: usize, sep: char) -> String {
     if sep == '\0' {
         return n.to_string();
