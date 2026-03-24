@@ -35,7 +35,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.14.0 | Cell Transforms & Data Cleanup | [x] | 40 |
 | v0.14.1 | Performance Optimization & Profiling | [x] | - |
 | v0.15.0 | System Clipboard & External Integration | [x] | - |
-| v0.15.1 | Testing & Reliability Improvements | [ ] | TBD |
+| v0.15.1 | Testing & Reliability Improvements | [x] | 861 |
 | v0.16.0 | Bulk Operations & Find/Replace | [x] | 32 |
 | v0.16.1 | Error Handling & Robustness | [ ] | TBD |
 | v0.17.0 | Advanced Filtering & Conditional Views | [ ] | TBD |
@@ -170,8 +170,8 @@ Reorganize codebase with clear module boundaries and comprehensive documentation
 **[v0.13.1](versions/v0.13.1.md) - Module Organization & Cleanup**
 Module system cleanup with clear dependencies and improved maintainability.
 
-**[v0.15.1](versions/v0.15.1.md) - Testing & Reliability Improvements**
-Testing infrastructure improvements with flaky test fixes and CI enhancements.
+**[v0.15.1](versions/v0.15.1.md) - Testing & Reliability Improvements** ✅ COMPLETE
+861 tests passing (all green). Fixed 19 tests broken by insert-mode persistence changes. Established coverage baseline: 73% line / 80% branch. Installed cargo-llvm-cov tooling. Reverted accidentally modified test data.
 
 **[v0.16.1](versions/v0.16.1.md) - Error Handling & Robustness**  
 Comprehensive error handling with graceful degradation and user-friendly messages.  
