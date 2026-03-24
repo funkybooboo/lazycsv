@@ -281,13 +281,13 @@ fn test_enter_commits_and_moves_down() {
     app.handle_key(key_event(KeyCode::Char('X'))).unwrap();
     app.handle_key(key_event(KeyCode::Enter)).unwrap();
 
-    // Should be back in Normal mode
-    assert_eq!(app.mode, Mode::Normal);
+    // Should stay in Insert mode (Enter now persists insert mode)
+    assert_eq!(app.mode, Mode::Insert);
     // Should have moved down
     let new_row = app.selected_row().unwrap().get();
     assert_eq!(new_row, initial_row + 1);
-    // Edit buffer should be cleared
-    assert!(app.edit_buffer.is_none());
+    // Edit buffer should be populated for the new cell
+    assert!(app.edit_buffer.is_some());
 }
 
 #[test]
@@ -298,7 +298,8 @@ fn test_tab_commits_and_moves_right() {
     app.handle_key(key_event(KeyCode::Char('i'))).unwrap();
     app.handle_key(key_event(KeyCode::Tab)).unwrap();
 
-    assert_eq!(app.mode, Mode::Normal);
+    // Should stay in Insert mode (Tab now persists insert mode)
+    assert_eq!(app.mode, Mode::Insert);
     let new_col = app.view_state.selected_column.get();
     assert_eq!(new_col, initial_col + 1);
 }
@@ -330,7 +331,8 @@ fn test_shift_tab_commits_and_moves_left() {
     app.handle_key(key_event(KeyCode::Char('i'))).unwrap();
     app.handle_key(shift_key_event(KeyCode::Tab)).unwrap();
 
-    assert_eq!(app.mode, Mode::Normal);
+    // Should stay in Insert mode
+    assert_eq!(app.mode, Mode::Insert);
     let new_col = app.view_state.selected_column.get();
     assert_eq!(new_col, initial_col - 1);
 }
@@ -704,6 +706,7 @@ fn test_typing_accented_characters() {
 fn test_tab_at_last_column_wraps_or_stays() {
     let mut app = create_test_app();
     let col_count = app.document.column_count();
+    let initial_row_count = app.document.row_count();
 
     // Move to last column
     for _ in 0..col_count {
@@ -713,8 +716,10 @@ fn test_tab_at_last_column_wraps_or_stays() {
     app.handle_key(key_event(KeyCode::Char('i'))).unwrap();
     app.handle_key(key_event(KeyCode::Tab)).unwrap();
 
-    // Should be in Normal mode after commit
-    assert_eq!(app.mode, Mode::Normal);
+    // Should stay in Insert mode, insert new row, and wrap to first column
+    assert_eq!(app.mode, Mode::Insert);
+    assert_eq!(app.view_state.selected_column.get(), 0);
+    assert_eq!(app.document.row_count(), initial_row_count + 1);
 }
 
 #[test]
@@ -725,8 +730,8 @@ fn test_shift_tab_at_first_column() {
     app.handle_key(key_event(KeyCode::Char('i'))).unwrap();
     app.handle_key(shift_key_event(KeyCode::Tab)).unwrap();
 
-    // Should be in Normal mode
-    assert_eq!(app.mode, Mode::Normal);
+    // Should stay in Insert mode
+    assert_eq!(app.mode, Mode::Insert);
     // Column should still be 0 (can't go negative)
     assert_eq!(app.view_state.selected_column.get(), 0);
 }
@@ -734,6 +739,7 @@ fn test_shift_tab_at_first_column() {
 #[test]
 fn test_enter_at_last_row() {
     let mut app = create_test_app();
+    let initial_row_count = app.document.row_count();
 
     // Move to last row
     app.handle_key(key_event(KeyCode::Char('G'))).unwrap();
@@ -742,10 +748,10 @@ fn test_enter_at_last_row() {
     app.handle_key(key_event(KeyCode::Char('i'))).unwrap();
     app.handle_key(key_event(KeyCode::Enter)).unwrap();
 
-    // Should be in Normal mode
-    assert_eq!(app.mode, Mode::Normal);
-    // Should still be on last row (can't go beyond)
-    assert_eq!(app.selected_row().unwrap().get(), last_row);
+    // Should stay in Insert mode, insert new row, and move to it
+    assert_eq!(app.mode, Mode::Insert);
+    assert_eq!(app.selected_row().unwrap().get(), last_row + 1);
+    assert_eq!(app.document.row_count(), initial_row_count + 1);
 }
 
 #[test]
@@ -847,13 +853,15 @@ fn test_edit_then_navigate_then_edit() {
     let mut app = create_test_app();
     let initial_row = app.selected_row().unwrap();
 
-    // Edit first cell with Tab (stays on same row, moves right)
+    // Edit first cell with Tab (stays in Insert mode, moves right)
     app.handle_key(key_event(KeyCode::Char('s'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('A'))).unwrap();
-    app.handle_key(key_event(KeyCode::Tab)).unwrap(); // Commits and moves right
+    app.handle_key(key_event(KeyCode::Tab)).unwrap(); // Commits and moves right, stays in Insert
 
-    // Edit second cell with Tab (commits)
-    app.handle_key(key_event(KeyCode::Char('s'))).unwrap();
+    // Already in Insert mode on second cell — clear and type B
+    // Need to clear existing content first: Ctrl+u clears line in insert mode
+    app.handle_key(KeyEvent::new(KeyCode::Char('u'), KeyModifiers::CONTROL))
+        .unwrap();
     app.handle_key(key_event(KeyCode::Char('B'))).unwrap();
     app.handle_key(key_event(KeyCode::Tab)).unwrap(); // Commits and moves right
 
@@ -991,16 +999,17 @@ fn test_multiple_enter_commits_traverse_column() {
     let mut app = create_test_app();
     let row_count = app.document.row_count();
 
-    // Edit and Enter through rows (stop before last since Enter won't go beyond)
-    // Start at row 0, so loop from 0 to row_count-1
-    for row in 0..(row_count) {
+    // Enter insert mode once, then Enter traverses down staying in Insert mode
+    app.handle_key(key_event(KeyCode::Char('i'))).unwrap();
+    for row in 0..(row_count - 1) {
         assert_eq!(app.selected_row().unwrap().get(), row);
-        app.handle_key(key_event(KeyCode::Char('i'))).unwrap();
         app.handle_key(key_event(KeyCode::Enter)).unwrap();
+        assert_eq!(app.mode, Mode::Insert);
     }
 
-    // Should be at last row
+    // Should be at last row, still in Insert mode
     assert_eq!(app.selected_row().unwrap().get(), row_count - 1);
+    assert_eq!(app.mode, Mode::Insert);
 }
 
 // ============================================================================

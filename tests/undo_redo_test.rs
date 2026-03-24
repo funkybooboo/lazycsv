@@ -588,8 +588,9 @@ fn test_insert_mode_edit_then_undo() {
     app.handle_key(key(KeyCode::Char('9'))).unwrap();
     app.handle_key(key(KeyCode::Char('9'))).unwrap();
 
-    // Commit with Enter
-    app.handle_key(key(KeyCode::Enter)).unwrap();
+    // Commit with Tab and exit insert mode
+    app.handle_key(key(KeyCode::Tab)).unwrap();
+    app.handle_key(key(KeyCode::Esc)).unwrap();
 
     assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(1)), "999");
 

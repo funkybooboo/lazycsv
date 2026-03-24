@@ -205,7 +205,10 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         }
 
         // Insert mode: 's' or 'r' - replace cell (clear + edit)
-        KeyCode::Char('s') | KeyCode::Char('r') if help::is_navigation_allowed(app) => {
+        KeyCode::Char('s') | KeyCode::Char('r')
+            if help::is_navigation_allowed(app)
+                && !key.modifiers.contains(KeyModifiers::CONTROL) =>
+        {
             mode_transitions::substitute_cell(app);
         }
 

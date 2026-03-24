@@ -37,7 +37,8 @@ fn test_w_saves_current_file() {
     // Make a change
     app.handle_key(key_event(KeyCode::Char('i'))).unwrap(); // Enter insert mode
     app.handle_key(key_event(KeyCode::Char('X'))).unwrap(); // Type X
-    app.handle_key(key_event(KeyCode::Enter)).unwrap(); // Commit edit
+    app.handle_key(key_event(KeyCode::Tab)).unwrap(); // Commit edit (stays in insert)
+    app.handle_key(key_event(KeyCode::Esc)).unwrap(); // Exit insert mode
 
     assert!(app.document.is_dirty);
 
@@ -65,7 +66,8 @@ fn test_wq_saves_and_quits() {
     // Make a change
     app.handle_key(key_event(KeyCode::Char('i'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('Y'))).unwrap();
-    app.handle_key(key_event(KeyCode::Enter)).unwrap();
+    app.handle_key(key_event(KeyCode::Tab)).unwrap();
+    app.handle_key(key_event(KeyCode::Esc)).unwrap(); // Exit insert mode
 
     assert!(app.document.is_dirty);
     assert!(!app.should_quit);
@@ -94,8 +96,9 @@ fn test_q_blocks_if_dirty() {
     // Make a change
     app.handle_key(key_event(KeyCode::Char('i'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('Z'))).unwrap();
-    app.handle_key(key_event(KeyCode::Enter)).unwrap();
+    app.handle_key(key_event(KeyCode::Tab)).unwrap();
 
+    app.handle_key(key_event(KeyCode::Esc)).unwrap(); // Exit insert mode
     assert!(app.document.is_dirty);
 
     // Try to quit with :q
@@ -140,8 +143,9 @@ fn test_q_bang_discards_changes() {
     // Make a change
     app.handle_key(key_event(KeyCode::Char('i'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('W'))).unwrap();
-    app.handle_key(key_event(KeyCode::Enter)).unwrap();
+    app.handle_key(key_event(KeyCode::Tab)).unwrap();
 
+    app.handle_key(key_event(KeyCode::Esc)).unwrap(); // Exit insert mode
     assert!(app.document.is_dirty);
 
     // Force quit with :q!
@@ -175,9 +179,10 @@ fn test_W_saves_all_dirty_files() {
     // Edit file1 - use 's' to replace cell content
     app.handle_key(key_event(KeyCode::Char('s'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('Q'))).unwrap();
-    app.handle_key(key_event(KeyCode::Enter)).unwrap();
+    app.handle_key(key_event(KeyCode::Tab)).unwrap();
 
-    // Verify the edit worked
+    app.handle_key(key_event(KeyCode::Esc)).unwrap(); // Exit insert mode
+                                                      // Verify the edit worked
     assert!(app.document.is_dirty);
     assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "Q");
 
@@ -196,8 +201,9 @@ fn test_W_saves_all_dirty_files() {
     // Edit file2 - use 's' to replace cell content
     app.handle_key(key_event(KeyCode::Char('s'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('R'))).unwrap();
-    app.handle_key(key_event(KeyCode::Enter)).unwrap();
+    app.handle_key(key_event(KeyCode::Tab)).unwrap();
 
+    app.handle_key(key_event(KeyCode::Esc)).unwrap(); // Exit insert mode
     assert!(app.document.is_dirty);
 
     // Save all with :W (capital W)
@@ -227,9 +233,10 @@ fn test_csv_writer_escapes_quotes() {
     app.handle_key(key_event(KeyCode::Char('H'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('i'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('"'))).unwrap();
-    app.handle_key(key_event(KeyCode::Enter)).unwrap();
+    app.handle_key(key_event(KeyCode::Tab)).unwrap();
 
-    // Save
+    app.handle_key(key_event(KeyCode::Esc)).unwrap(); // Exit insert mode
+                                                      // Save
     app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('w'))).unwrap();
     app.handle_key(key_event(KeyCode::Enter)).unwrap();
@@ -261,9 +268,10 @@ fn test_csv_writer_escapes_commas() {
     app.handle_key(key_event(KeyCode::Char('r'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('s'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('t'))).unwrap();
-    app.handle_key(key_event(KeyCode::Enter)).unwrap();
+    app.handle_key(key_event(KeyCode::Tab)).unwrap();
 
     // Save
+    app.handle_key(key_event(KeyCode::Esc)).unwrap(); // Exit insert mode
     app.handle_key(key_event(KeyCode::Char(':'))).unwrap();
     app.handle_key(key_event(KeyCode::Char('w'))).unwrap();
     app.handle_key(key_event(KeyCode::Enter)).unwrap();

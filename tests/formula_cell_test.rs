@@ -537,7 +537,8 @@ fn test_formula_via_keyboard() {
     let bar = app.cell_formula_or_value(RowIndex::new(1), ColIndex::new(1));
     assert_eq!(bar, "=SUM(B3:B6)");
 
-    // Navigate back to B1 and enter insert mode — should show formula
+    // Exit insert mode first (Enter now stays in insert mode), then navigate back
+    let _ = app.handle_key(key(KeyCode::Esc));
     let _ = app.handle_key(key(KeyCode::Char('k'))); // move back up to row 1
     let _ = app.handle_key(key(KeyCode::Char('i'))); // enter insert mode
     let edit_content = app.edit_buffer.as_ref().unwrap().content.clone();
