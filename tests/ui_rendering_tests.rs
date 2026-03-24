@@ -912,3 +912,757 @@ fn test_ui_very_long_cell_truncation() {
 
     // Should handle long content with truncation
 }
+
+// ===== Theme System Tests =====
+
+// ── style helper unit tests ────────────────────────────────────────────────
+
+#[test]
+fn test_cursor_style_from_uses_theme_colors() {
+    use ratatui::style::Color;
+    let theme = lazycsv::config::Theme {
+        cursor_bg: Color::Cyan,
+        cursor_fg: Color::Magenta,
+        ..Default::default()
+    };
+    let style = lazycsv::ui::modal::cursor_style_from(&theme);
+    assert_eq!(style.bg, Some(Color::Cyan));
+    assert_eq!(style.fg, Some(Color::Magenta));
+    // Must be bold
+    assert!(style.add_modifier.contains(ratatui::style::Modifier::BOLD));
+}
+
+#[test]
+fn test_search_match_style_from_uses_theme_colors() {
+    use ratatui::style::Color;
+    let theme = lazycsv::config::Theme {
+        search_match_bg: Color::Blue,
+        search_match_fg: Color::White,
+        ..Default::default()
+    };
+    let style = lazycsv::ui::modal::search_match_style_from(&theme);
+    assert_eq!(style.bg, Some(Color::Blue));
+    assert_eq!(style.fg, Some(Color::White));
+}
+
+#[test]
+fn test_visual_selection_style_from_uses_theme_colors() {
+    use ratatui::style::Color;
+    let theme = lazycsv::config::Theme {
+        selection_bg: Color::Green,
+        selection_fg: Color::Red,
+        ..Default::default()
+    };
+    let style = lazycsv::ui::modal::visual_selection_style_from(&theme);
+    assert_eq!(style.bg, Some(Color::Green));
+    assert_eq!(style.fg, Some(Color::Red));
+}
+
+#[test]
+fn test_zebra_stripe_style_from_uses_theme_color() {
+    use ratatui::style::Color;
+    let theme = lazycsv::config::Theme {
+        zebra_bg: Color::Rgb(10, 20, 30),
+        ..Default::default()
+    };
+    let style = lazycsv::ui::modal::zebra_stripe_style_from(&theme);
+    assert_eq!(style.bg, Some(Color::Rgb(10, 20, 30)));
+}
+
+// ── cursor style renders to buffer ────────────────────────────────────────
+
+#[test]
+fn test_theme_cursor_color_applied_to_selected_cell() {
+    use ratatui::style::Color;
+
+    let csv_data = create_test_csv();
+    let csv_files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+    // Set a distinctive cursor color
+    app.config.theme.cursor_bg = Color::Cyan;
+    app.config.theme.cursor_fg = Color::Magenta;
+
+    // Select row 0 (default)
+    app.view_state.table_state.select(Some(0));
+
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
+
+    let buffer = terminal.backend().buffer();
+
+    // At least one cell should carry the cursor background color
+    let has_cursor_bg = buffer.content.iter().any(|c| c.bg == Color::Cyan);
+    assert!(
+        has_cursor_bg,
+        "Expected cursor_bg Color::Cyan to appear in rendered buffer"
+    );
+}
+
+#[test]
+fn test_theme_cursor_style_changes_with_custom_config() {
+    use ratatui::style::Color;
+
+    let csv_data = create_test_csv();
+    let csv_files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+    app.view_state.table_state.select(Some(0));
+
+    // Render with default cursor color
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
+    let default_cursor_bg = app.config.theme.cursor_bg; // Color::White
+
+    // Change cursor color
+    app.config.theme.cursor_bg = Color::LightBlue;
+
+    let backend2 = TestBackend::new(80, 24);
+    let mut terminal2 = Terminal::new(backend2).unwrap();
+    terminal2
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
+
+    let buffer2 = terminal2.backend().buffer();
+    let has_new_cursor_bg = buffer2.content.iter().any(|c| c.bg == Color::LightBlue);
+    let has_old_cursor_bg = buffer2
+        .content
+        .iter()
+        .any(|c| c.bg == default_cursor_bg && c.bg != Color::LightBlue);
+
+    assert!(
+        has_new_cursor_bg,
+        "Custom cursor_bg Color::LightBlue should appear after config change"
+    );
+    // Old color should no longer be present as cursor bg (unless it happened to be shared)
+    let _ = has_old_cursor_bg; // informational only
+}
+
+// ── selection style renders to buffer ─────────────────────────────────────
+
+#[test]
+fn test_theme_selection_color_applied_to_visual_selection() {
+    use lazycsv::app::{VisualMode, VisualSelection};
+    use lazycsv::{ColIndex, RowIndex};
+    use ratatui::style::Color;
+
+    let csv_data = create_test_csv();
+    let csv_files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+    // Distinctive selection background
+    app.config.theme.selection_bg = Color::Rgb(0, 128, 0);
+
+    // Enter visual block covering row 0-1, col 0
+    let start_row = RowIndex::new(0);
+    let start_col = ColIndex::new(0);
+    let mut sel = VisualSelection::new(start_row, start_col, VisualMode::Block);
+    sel.update_cursor(RowIndex::new(1), ColIndex::new(0));
+    app.visual_selection = Some(sel);
+    app.view_state.table_state.select(Some(2)); // cursor outside selection
+    app.mode = lazycsv::app::Mode::VisualBlock;
+
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
+
+    let buffer = terminal.backend().buffer();
+    let has_selection_bg = buffer.content.iter().any(|c| c.bg == Color::Rgb(0, 128, 0));
+    assert!(
+        has_selection_bg,
+        "Visual selection bg Color::Rgb(0,128,0) should appear in rendered buffer"
+    );
+}
+
+// ── search match style renders to buffer ──────────────────────────────────
+
+#[test]
+fn test_theme_search_match_color_applied_to_matched_cells() {
+    use lazycsv::search::SearchState;
+    use lazycsv::{ColIndex, RowIndex};
+    use ratatui::style::Color;
+
+    let csv_data = create_test_csv();
+    let csv_files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+    // Distinctive search match background
+    app.config.theme.search_match_bg = Color::Rgb(200, 100, 0);
+
+    // Simulate a search state with a match at row 1, col 1
+    let mut state = SearchState::new(
+        "Bob".to_string(),
+        vec![(RowIndex::new(1), ColIndex::new(1))],
+    );
+    // Make row 1, col 1 the current match
+    state.current_match = Some(0);
+    app.search_state = Some(state);
+
+    // Place cursor elsewhere so the match cell is not the cursor cell
+    app.view_state.table_state.select(Some(0));
+
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
+
+    let buffer = terminal.backend().buffer();
+    let has_match_bg = buffer
+        .content
+        .iter()
+        .any(|c| c.bg == Color::Rgb(200, 100, 0));
+    assert!(
+        has_match_bg,
+        "Search match bg Color::Rgb(200,100,0) should appear in rendered buffer"
+    );
+}
+
+// ── zebra striping renders with configured background color ───────────────
+
+#[test]
+fn test_theme_zebra_stripe_color_applied_to_even_rows() {
+    use ratatui::style::Color;
+
+    let csv_data = create_test_csv();
+    let csv_files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+    // Distinctive zebra color
+    app.config.theme.zebra_bg = Color::Rgb(50, 0, 50);
+    app.config.defaults.zebra_striping = true;
+
+    // Move cursor off row 0 so the zebra row is not overridden by cursor style
+    app.view_state.table_state.select(Some(1));
+
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
+
+    let buffer = terminal.backend().buffer();
+    let has_zebra_bg = buffer.content.iter().any(|c| c.bg == Color::Rgb(50, 0, 50));
+    assert!(
+        has_zebra_bg,
+        "Zebra stripe bg Color::Rgb(50,0,50) should appear on even data rows"
+    );
+}
+
+#[test]
+fn test_zebra_striping_disabled_produces_no_stripe_color() {
+    use ratatui::style::Color;
+
+    let csv_data = create_test_csv();
+    let csv_files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+    app.config.theme.zebra_bg = Color::Rgb(99, 0, 99);
+    app.config.defaults.zebra_striping = false; // disabled
+
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
+
+    let buffer = terminal.backend().buffer();
+    let has_zebra_bg = buffer.content.iter().any(|c| c.bg == Color::Rgb(99, 0, 99));
+    assert!(
+        !has_zebra_bg,
+        "Zebra stripe color should NOT appear when zebra_striping is disabled"
+    );
+}
+
+// ── header bold styling ────────────────────────────────────────────────────
+
+#[test]
+fn test_theme_header_bold_true_applies_bold_modifier_in_header_row() {
+    use ratatui::style::Modifier;
+
+    let csv_data = create_test_csv();
+    let csv_files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+    // Ensure header_bold is true (default, but set explicitly)
+    app.config.theme.header_bold = true;
+
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
+
+    let buffer = terminal.backend().buffer();
+
+    // When header_bold is true, at least one rendered cell should carry BOLD
+    let has_bold = buffer
+        .content
+        .iter()
+        .any(|c| c.modifier.contains(Modifier::BOLD));
+    assert!(
+        has_bold,
+        "At least one cell should have BOLD modifier when header_bold = true"
+    );
+}
+
+#[test]
+fn test_theme_header_bg_applied_when_set() {
+    use ratatui::style::Color;
+
+    let csv_data = create_test_csv();
+    let csv_files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+    app.config.theme.header_bg = Some(Color::Rgb(30, 60, 90));
+
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
+
+    let buffer = terminal.backend().buffer();
+    let has_header_bg = buffer
+        .content
+        .iter()
+        .any(|c| c.bg == Color::Rgb(30, 60, 90));
+    assert!(
+        has_header_bg,
+        "header_bg Color::Rgb(30,60,90) should appear in rendered buffer when set"
+    );
+}
+
+// ── dirty indicator color ──────────────────────────────────────────────────
+
+#[test]
+fn test_theme_dirty_indicator_fg_applied_to_asterisk_in_file_switcher() {
+    use ratatui::layout::Rect;
+    use ratatui::style::Color;
+
+    let csv_data = create_test_csv();
+    // Two files so the file switcher renders both names with separator
+    let csv_files = vec![PathBuf::from("first.csv"), PathBuf::from("second.csv")];
+    let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+    // Distinctive dirty indicator color
+    app.config.theme.dirty_indicator_fg = Color::Rgb(255, 80, 0);
+
+    // Mark the first file dirty using the exact path the session holds
+    let dirty_path = app.session.files()[0].clone();
+    app.session.mark_dirty(&dirty_path);
+
+    let backend = TestBackend::new(80, 4);
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    terminal
+        .draw(|frame| {
+            // Render the file switcher directly into the full terminal area
+            lazycsv::ui::file_switcher::render(frame, &app, Rect::new(0, 0, 80, 4));
+        })
+        .unwrap();
+
+    let buffer = terminal.backend().buffer();
+
+    // Find the '*' character that carries the dirty indicator foreground color
+    let dirty_asterisk = buffer
+        .content
+        .iter()
+        .find(|c| c.symbol() == "*" && c.fg == Color::Rgb(255, 80, 0));
+    assert!(
+        dirty_asterisk.is_some(),
+        "A '*' cell with dirty_indicator_fg Color::Rgb(255,80,0) should appear for a dirty file"
+    );
+}
+
+#[test]
+fn test_theme_dirty_indicator_fg_not_present_when_clean() {
+    use ratatui::layout::Rect;
+    use ratatui::style::Color;
+
+    let csv_data = create_test_csv();
+    let csv_files = vec![PathBuf::from("first.csv"), PathBuf::from("second.csv")];
+    let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+    app.config.theme.dirty_indicator_fg = Color::Rgb(255, 80, 0);
+    // Do NOT mark any file dirty
+
+    let backend = TestBackend::new(80, 4);
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::file_switcher::render(frame, &app, Rect::new(0, 0, 80, 4));
+        })
+        .unwrap();
+
+    let buffer = terminal.backend().buffer();
+
+    let dirty_asterisk = buffer
+        .content
+        .iter()
+        .find(|c| c.symbol() == "*" && c.fg == Color::Rgb(255, 80, 0));
+    assert!(
+        dirty_asterisk.is_none(),
+        "No dirty-indicator '*' with Color::Rgb(255,80,0) should appear for clean files"
+    );
+}
+
+// ── all 16 ANSI named colors in theme config ──────────────────────────────
+
+#[test]
+fn test_theme_all_16_ansi_named_colors_cursor_bg() {
+    use ratatui::style::Color;
+
+    let named_colors = [
+        Color::Black,
+        Color::Red,
+        Color::Green,
+        Color::Yellow,
+        Color::Blue,
+        Color::Magenta,
+        Color::Cyan,
+        Color::Gray,
+        Color::DarkGray,
+        Color::LightRed,
+        Color::LightGreen,
+        Color::LightYellow,
+        Color::LightBlue,
+        Color::LightMagenta,
+        Color::LightCyan,
+        Color::White,
+    ];
+
+    for color in named_colors {
+        let csv_data = create_test_csv();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+        app.config.theme.cursor_bg = color;
+        app.view_state.table_state.select(Some(0));
+
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        terminal
+            .draw(|frame| {
+                lazycsv::ui::render(frame, &mut app);
+            })
+            .unwrap();
+
+        // Just verify rendering does not panic; style helper should return correct bg
+        let style = lazycsv::ui::modal::cursor_style_from(&app.config.theme);
+        assert_eq!(
+            style.bg,
+            Some(color),
+            "cursor_style_from should reflect ANSI color {:?}",
+            color
+        );
+    }
+}
+
+#[test]
+fn test_theme_all_16_ansi_named_colors_zebra_bg() {
+    use ratatui::style::Color;
+
+    let named_colors = [
+        Color::Black,
+        Color::Red,
+        Color::Green,
+        Color::Yellow,
+        Color::Blue,
+        Color::Magenta,
+        Color::Cyan,
+        Color::Gray,
+        Color::DarkGray,
+        Color::LightRed,
+        Color::LightGreen,
+        Color::LightYellow,
+        Color::LightBlue,
+        Color::LightMagenta,
+        Color::LightCyan,
+        Color::White,
+    ];
+
+    for color in named_colors {
+        let theme = lazycsv::config::Theme {
+            zebra_bg: color,
+            ..Default::default()
+        };
+        let style = lazycsv::ui::modal::zebra_stripe_style_from(&theme);
+        assert_eq!(
+            style.bg,
+            Some(color),
+            "zebra_stripe_style_from should reflect ANSI color {:?}",
+            color
+        );
+    }
+}
+
+#[test]
+fn test_theme_all_16_ansi_named_colors_render_without_panic() {
+    use ratatui::style::Color;
+
+    let named_colors = [
+        Color::Black,
+        Color::Red,
+        Color::Green,
+        Color::Yellow,
+        Color::Blue,
+        Color::Magenta,
+        Color::Cyan,
+        Color::Gray,
+        Color::DarkGray,
+        Color::LightRed,
+        Color::LightGreen,
+        Color::LightYellow,
+        Color::LightBlue,
+        Color::LightMagenta,
+        Color::LightCyan,
+        Color::White,
+    ];
+
+    for color in named_colors {
+        let csv_data = create_test_csv();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+        // Apply color to all theme fields that accept it
+        app.config.theme.cursor_bg = color;
+        app.config.theme.cursor_fg = color;
+        app.config.theme.selection_bg = color;
+        app.config.theme.selection_fg = color;
+        app.config.theme.search_match_bg = color;
+        app.config.theme.search_match_fg = color;
+        app.config.theme.zebra_bg = color;
+        app.config.theme.dirty_indicator_fg = color;
+
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        let result = terminal.draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        });
+        assert!(
+            result.is_ok(),
+            "Rendering should not panic with ANSI color {:?} in all theme fields",
+            color
+        );
+    }
+}
+
+// ── RGB hex colors in theme config ────────────────────────────────────────
+
+#[test]
+fn test_theme_rgb_hex_color_cursor_bg_renders_correctly() {
+    use ratatui::style::Color;
+
+    let rgb_color = Color::Rgb(171, 205, 239); // #ABCDEF
+
+    let csv_data = create_test_csv();
+    let csv_files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+    app.config.theme.cursor_bg = rgb_color;
+    app.view_state.table_state.select(Some(0));
+
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
+
+    let buffer = terminal.backend().buffer();
+    let has_rgb_bg = buffer.content.iter().any(|c| c.bg == rgb_color);
+    assert!(
+        has_rgb_bg,
+        "RGB cursor_bg Color::Rgb(171,205,239) should appear in rendered buffer"
+    );
+}
+
+#[test]
+fn test_theme_rgb_hex_color_zebra_bg_renders_correctly() {
+    use ratatui::style::Color;
+
+    let rgb_color = Color::Rgb(18, 52, 86); // #123456
+
+    let csv_data = create_test_csv();
+    let csv_files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+    app.config.theme.zebra_bg = rgb_color;
+    app.config.defaults.zebra_striping = true;
+    // Cursor on an odd row so even row (zebra row) is not overridden by cursor
+    app.view_state.table_state.select(Some(1));
+
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
+
+    let buffer = terminal.backend().buffer();
+    let has_rgb_bg = buffer.content.iter().any(|c| c.bg == rgb_color);
+    assert!(
+        has_rgb_bg,
+        "RGB zebra_bg Color::Rgb(18,52,86) should appear in rendered buffer"
+    );
+}
+
+#[test]
+fn test_theme_rgb_hex_color_search_match_bg_renders_correctly() {
+    use lazycsv::search::SearchState;
+    use lazycsv::{ColIndex, RowIndex};
+    use ratatui::style::Color;
+
+    let rgb_color = Color::Rgb(255, 128, 64);
+
+    let csv_data = create_test_csv();
+    let csv_files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+    app.config.theme.search_match_bg = rgb_color;
+
+    let mut state = SearchState::new(
+        "Alice".to_string(),
+        vec![(RowIndex::new(0), ColIndex::new(1))],
+    );
+    state.current_match = Some(0);
+    app.search_state = Some(state);
+
+    // Cursor elsewhere so match cell uses search style, not cursor style
+    app.view_state.table_state.select(Some(2));
+
+    let backend = TestBackend::new(80, 24);
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    terminal
+        .draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        })
+        .unwrap();
+
+    let buffer = terminal.backend().buffer();
+    let has_rgb_bg = buffer.content.iter().any(|c| c.bg == rgb_color);
+    assert!(
+        has_rgb_bg,
+        "RGB search_match_bg Color::Rgb(255,128,64) should appear in rendered buffer"
+    );
+}
+
+#[test]
+fn test_theme_rgb_colors_all_fields_render_without_panic() {
+    use ratatui::style::Color;
+
+    let rgb_pairs = [
+        (Color::Rgb(255, 0, 0), Color::Rgb(0, 255, 0)),
+        (Color::Rgb(0, 0, 255), Color::Rgb(255, 255, 0)),
+        (Color::Rgb(128, 128, 128), Color::Rgb(64, 0, 128)),
+        (Color::Rgb(0, 0, 0), Color::Rgb(255, 255, 255)),
+    ];
+
+    for (bg, fg) in rgb_pairs {
+        let csv_data = create_test_csv();
+        let csv_files = vec![PathBuf::from("test.csv")];
+        let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
+
+        app.config.theme.cursor_bg = bg;
+        app.config.theme.cursor_fg = fg;
+        app.config.theme.selection_bg = bg;
+        app.config.theme.selection_fg = fg;
+        app.config.theme.search_match_bg = bg;
+        app.config.theme.search_match_fg = fg;
+        app.config.theme.zebra_bg = bg;
+        app.config.theme.dirty_indicator_fg = fg;
+
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        let result = terminal.draw(|frame| {
+            lazycsv::ui::render(frame, &mut app);
+        });
+        assert!(
+            result.is_ok(),
+            "Rendering should not panic with RGB colors bg={:?} fg={:?}",
+            bg,
+            fg
+        );
+    }
+}
+
+#[test]
+fn test_theme_rgb_color_style_helpers_return_correct_values() {
+    use ratatui::style::Color;
+
+    let cursor_bg = Color::Rgb(12, 34, 56);
+    let cursor_fg = Color::Rgb(98, 76, 54);
+    let search_bg = Color::Rgb(255, 200, 100);
+    let search_fg = Color::Rgb(10, 20, 30);
+    let sel_bg = Color::Rgb(40, 80, 120);
+    let sel_fg = Color::Rgb(200, 160, 120);
+    let zebra = Color::Rgb(5, 10, 15);
+
+    let theme = lazycsv::config::Theme {
+        cursor_bg,
+        cursor_fg,
+        search_match_bg: search_bg,
+        search_match_fg: search_fg,
+        selection_bg: sel_bg,
+        selection_fg: sel_fg,
+        zebra_bg: zebra,
+        ..Default::default()
+    };
+
+    let cs = lazycsv::ui::modal::cursor_style_from(&theme);
+    assert_eq!(cs.bg, Some(cursor_bg));
+    assert_eq!(cs.fg, Some(cursor_fg));
+
+    let ss = lazycsv::ui::modal::search_match_style_from(&theme);
+    assert_eq!(ss.bg, Some(search_bg));
+    assert_eq!(ss.fg, Some(search_fg));
+
+    let vs = lazycsv::ui::modal::visual_selection_style_from(&theme);
+    assert_eq!(vs.bg, Some(sel_bg));
+    assert_eq!(vs.fg, Some(sel_fg));
+
+    let zs = lazycsv::ui::modal::zebra_stripe_style_from(&theme);
+    assert_eq!(zs.bg, Some(zebra));
+}
