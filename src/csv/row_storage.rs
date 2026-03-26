@@ -596,6 +596,8 @@ const INDEX_BUF_SIZE: usize = 1024 * 1024;
 /// Counts data rows (excludes header when `no_headers` is false).
 /// This is much faster than full CSV parsing since it only scans for
 /// newlines and quotes without parsing individual fields.
+///
+/// For files larger than 10 MB, uses parallel chunk processing with rayon.
 pub fn count_rows_fast(path: &Path, no_headers: bool) -> Result<usize> {
     let file =
         std::fs::File::open(path).context(format!("Failed to open file: {}", path.display()))?;
@@ -604,6 +606,25 @@ pub fn count_rows_fast(path: &Path, no_headers: bool) -> Result<usize> {
     if file_len == 0 {
         return Ok(0);
     }
+
+    const PARALLEL_THRESHOLD: usize = 10 * 1024 * 1024; // 10 MB
+    let row_count = if file_len >= PARALLEL_THRESHOLD {
+        count_rows_parallel(path, file_len)?
+    } else {
+        count_rows_sequential(file, file_len)?
+    };
+
+    // Subtract header row if headers are present
+    if !no_headers && row_count > 0 {
+        Ok(row_count - 1)
+    } else {
+        Ok(row_count)
+    }
+}
+
+/// Single-threaded row count for small files.
+fn count_rows_sequential(file: std::fs::File, _file_len: usize) -> Result<usize> {
+    use std::io::Seek;
 
     let mut reader = std::io::BufReader::with_capacity(INDEX_BUF_SIZE, file);
     let mut buf = vec![0u8; INDEX_BUF_SIZE];
@@ -644,32 +665,186 @@ pub fn count_rows_fast(path: &Path, no_headers: bool) -> Result<usize> {
                 // b == b'\n'
                 skip_next_quote = false;
                 if !in_quotes {
-                    // Only count if there's content after this newline
-                    // (We track absolute position to check if we're at file end)
                     row_count += 1;
                 }
             }
         }
     }
 
-    // The last "row" counted might be a trailing newline with no content after it.
-    // Check if the file ends with a newline — if so, don't count that empty trailing row.
-    // Re-read last byte to check.
-    let file2 = std::fs::File::open(path)?;
-    let last_byte = {
-        use std::io::Seek;
-        let mut f = file2;
-        f.seek(std::io::SeekFrom::End(-1))?;
-        let mut b = [0u8; 1];
-        f.read_exact(&mut b)?;
-        b[0]
-    };
-    if last_byte == b'\n' {
+    // Check if file ends with newline — don't count trailing empty row
+    let mut f = reader.into_inner();
+    f.seek(std::io::SeekFrom::End(-1))?;
+    let mut b = [0u8; 1];
+    f.read_exact(&mut b)?;
+    if b[0] == b'\n' {
         row_count -= 1;
     }
 
-    // Subtract row 0 if headers are present
-    if !no_headers && row_count > 0 {
+    Ok(row_count)
+}
+
+/// Result of scanning a chunk, computed for both possible starting quote states.
+struct ChunkScanResult {
+    /// Newlines counted assuming we enter this chunk NOT in quotes.
+    newlines_if_unquoted: usize,
+    /// Newlines counted assuming we enter this chunk IN quotes.
+    newlines_if_quoted: usize,
+    /// Whether quote state is flipped at end of chunk (odd unescaped quotes).
+    /// If true, the exit quote state is the opposite of the entry state.
+    flips_quote_state: bool,
+}
+
+/// Scan a byte slice, counting newlines for both possible entry quote states.
+/// Also tracks whether the chunk has an odd number of unescaped quotes (flips state).
+fn scan_chunk(chunk: &[u8]) -> ChunkScanResult {
+    let mut newlines_unquoted = 0usize; // newlines outside quotes, assuming start unquoted
+    let mut newlines_quoted = 0usize; // newlines outside quotes, assuming start quoted
+    let mut in_quotes_if_started_unquoted = false;
+    let mut in_quotes_if_started_quoted = true;
+    let mut skip_next_unquoted = false;
+    let mut skip_next_quoted = false;
+    let n = chunk.len();
+
+    let finder = memchr::memchr2_iter(b'\n', b'"', chunk);
+    for pos in finder {
+        let b = chunk[pos];
+        if b == b'"' {
+            // Path 1: started unquoted
+            if skip_next_unquoted {
+                skip_next_unquoted = false;
+            } else if in_quotes_if_started_unquoted {
+                let next_is_quote = pos + 1 < n && chunk[pos + 1] == b'"';
+                if next_is_quote {
+                    skip_next_unquoted = true;
+                } else {
+                    in_quotes_if_started_unquoted = false;
+                }
+            } else {
+                in_quotes_if_started_unquoted = true;
+            }
+
+            // Path 2: started quoted
+            if skip_next_quoted {
+                skip_next_quoted = false;
+            } else if in_quotes_if_started_quoted {
+                let next_is_quote = pos + 1 < n && chunk[pos + 1] == b'"';
+                if next_is_quote {
+                    skip_next_quoted = true;
+                } else {
+                    in_quotes_if_started_quoted = false;
+                }
+            } else {
+                in_quotes_if_started_quoted = true;
+            }
+        } else {
+            // b == b'\n'
+            skip_next_unquoted = false;
+            skip_next_quoted = false;
+            if !in_quotes_if_started_unquoted {
+                newlines_unquoted += 1;
+            }
+            if !in_quotes_if_started_quoted {
+                newlines_quoted += 1;
+            }
+        }
+    }
+
+    ChunkScanResult {
+        newlines_if_unquoted: newlines_unquoted,
+        newlines_if_quoted: newlines_quoted,
+        flips_quote_state: in_quotes_if_started_unquoted, // started false, ended true = flipped
+    }
+}
+
+/// Parallel row count using rayon. Splits file into chunks processed concurrently.
+fn count_rows_parallel(path: &Path, file_len: usize) -> Result<usize> {
+    use rayon::prelude::*;
+    use std::io::Seek;
+
+    let num_threads = rayon::current_num_threads().max(1);
+    let chunk_size = (file_len / num_threads).max(INDEX_BUF_SIZE);
+    let num_chunks = (file_len + chunk_size - 1) / chunk_size;
+
+    // Each thread reads its chunk incrementally in INDEX_BUF_SIZE sub-buffers
+    // to avoid allocating the entire chunk in memory at once.
+    let chunk_results: Vec<ChunkScanResult> = (0..num_chunks)
+        .into_par_iter()
+        .map(|i| {
+            let start = i * chunk_size;
+            let end = (start + chunk_size).min(file_len);
+            let remaining = end - start;
+
+            let mut file = std::fs::File::open(path).expect("Failed to open file for parallel read");
+            file.seek(std::io::SeekFrom::Start(start as u64))
+                .expect("Failed to seek");
+
+            let mut buf = vec![0u8; INDEX_BUF_SIZE];
+            let mut accum = ChunkScanResult {
+                newlines_if_unquoted: 0,
+                newlines_if_quoted: 0,
+                flips_quote_state: false,
+            };
+            let mut bytes_left = remaining;
+
+            while bytes_left > 0 {
+                let to_read = bytes_left.min(INDEX_BUF_SIZE);
+                let mut total_read = 0;
+                while total_read < to_read {
+                    let n = file.read(&mut buf[total_read..to_read]).expect("Failed to read chunk");
+                    if n == 0 {
+                        break;
+                    }
+                    total_read += n;
+                }
+                if total_read == 0 {
+                    break;
+                }
+
+                let sub = scan_chunk(&buf[..total_read]);
+
+                // Merge sub-result into accumulator.
+                // The accumulated flips_quote_state tells us the entry state for this sub-chunk:
+                // if flipped, the sub-chunk starts in the opposite state of the chunk's entry.
+                if accum.flips_quote_state {
+                    // Sub-chunk enters with flipped state relative to chunk entry
+                    accum.newlines_if_unquoted += sub.newlines_if_quoted;
+                    accum.newlines_if_quoted += sub.newlines_if_unquoted;
+                } else {
+                    accum.newlines_if_unquoted += sub.newlines_if_unquoted;
+                    accum.newlines_if_quoted += sub.newlines_if_quoted;
+                }
+                if sub.flips_quote_state {
+                    accum.flips_quote_state = !accum.flips_quote_state;
+                }
+
+                bytes_left -= total_read;
+            }
+
+            accum
+        })
+        .collect();
+
+    // Sequential reconciliation: walk chunks, pick correct count based on actual quote state
+    let mut row_count: usize = 1; // First row starts at byte 0
+    let mut in_quotes = false;
+
+    for result in &chunk_results {
+        if in_quotes {
+            row_count += result.newlines_if_quoted;
+        } else {
+            row_count += result.newlines_if_unquoted;
+        }
+        if result.flips_quote_state {
+            in_quotes = !in_quotes;
+        }
+    }
+
+    // Check trailing newline
+    let mut file = std::fs::File::open(path)?;
+    file.seek(std::io::SeekFrom::End(-1))?;
+    let mut b = [0u8; 1];
+    file.read_exact(&mut b)?;
+    if b[0] == b'\n' {
         row_count -= 1;
     }
 
