@@ -56,6 +56,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.25.0 | Spreadsheet Support & CLI Tools | [x] | 13 |
 | v0.26.0 | SQL History, DuckDB VIEW Optimization & CLI Output Flag | [x] | - |
 | v0.27.0 | CLI Data Tools, Per-Command Help, TUI Editing & File Save Fix | [x] | - |
+| v0.28.0 | Multi-Format Support (Parquet, JSON, SQLite) | [x] | 62 |
 | v1.0.0 | Stable Release & Polish | [ ] | - |
 
 **Total Tests Passing:** 1,403 tests (all integration and unit tests across vim_editor, SQL, magnifier, UI, keybindings, and core modules)
@@ -134,6 +135,9 @@ SQL query history popup (`Ctrl+H` in SQL editor): vim-style navigation (↑↓/j
 
 **[v0.27.0](versions/v0.27.0.md) - CLI Data Tools, Per-Command Help, TUI Editing & File Save Fix**
 New CLI commands: `-h` (print headers), `-t` (column statistics via DuckDB), `-D` (dedup with PK columns, `--keep-first`, `--allow-nulls`, `--ignore-case`, `--report-only`). Added `-o` output file support to `-t`, `-h`, `-r`/`-c`, `-s`. Per-command `--help` system (e.g., `-q --help`, `-D --help`) with command-specific examples; `-o` and dedup sub-flags hidden from main help. Changed help flag from `-h` to `--help` only (freeing `-h` for headers). TUI editing: 1-based row numbering (Excel-compatible), `r` to replace cell, Tab/Enter/arrows stay in Insert mode for seamless data entry, edit buffer horizontal scroll, `cw` cell copy (internal + system clipboard) with smart `p` paste. Fixed file save targeting wrong file with relative paths. Formula engine updated for 1-based cell references. Renamed `load_csv_*_into_sqlite` → `load_csv_*_into_duckdb`.
+
+**[v0.28.0](versions/v0.28.0.md) - Multi-Format Support (Parquet, JSON, SQLite)**
+Native support for Parquet, JSON/NDJSON, and SQLite files across all modes (TUI, `-q` query, `-r`/`-c`/`-h` counts/headers, `-C` clipboard copy, `-S` split). DuckDB used as universal reader — no new crate dependencies. SQLite table selection via second positional arg (like XLSX sheet selection). Parallel row counting with rayon for large files. Clipboard paste (`-P`) auto-detects JSON vs CSV and converts accordingly, with graceful fallback for non-tabular JSON. File discovery extended to find `.parquet`, `.json`, `.ndjson`, `.jsonl`, `.db`, `.sqlite`, `.sqlite3` files. Extension stripping in SQL queries handles all new formats. Piped-stdin detection improved to catch `cmd | lazycsv file` (previously only caught `cmd | lazycsv`). 62 integration tests.
 
 **[v0.9.0](versions/v0.9.0.md) - Configuration System**
 TOML-based config system with `~/.config/lazycsv/config.toml` (global) and `.lazycsv.toml` (per-directory). Theme customization (cursor, selection, search, zebra, header_bg, dirty_indicator colors). Default behaviors (delimiter, encoding, zebra_striping, max_column_width, undo_limit). SQL formatting config. 12 tests.

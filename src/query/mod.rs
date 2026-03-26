@@ -225,7 +225,10 @@ fn extract_sql_identifiers(sql: &str) -> std::collections::HashSet<String> {
 /// Handles bare identifiers (`myfile.csv`) and double-quoted identifiers
 /// (`"myfile.csv"`). Preserves string literals unchanged.
 pub fn strip_csv_extensions(sql: &str) -> String {
-    let extensions: &[&str] = &[".csv", ".tsv", ".txt"];
+    let extensions: &[&str] = &[
+        ".csv", ".tsv", ".txt", ".parquet", ".json", ".ndjson", ".jsonl", ".db", ".sqlite",
+        ".sqlite3",
+    ];
     let chars: Vec<char> = sql.chars().collect();
     let len = chars.len();
     let mut result = String::with_capacity(sql.len());
@@ -522,12 +525,28 @@ pub fn load_csv_file_into_duckdb(
     table_name: &str,
     config: &FileConfig,
 ) -> Result<()> {
+    let escaped_table = table_name.replace('"', "\"\"");
+
+    // Foreign formats (parquet, json, ndjson, sqlite): use DuckDB native readers
+    if let Some(sql) =
+        crate::csv::foreign_formats::duckdb_reader_sql(file_path, &escaped_table, None)
+    {
+        // SQLite needs the extension installed first
+        if crate::csv::foreign_formats::is_sqlite(file_path) {
+            conn.execute_batch("INSTALL sqlite; LOAD sqlite;").ok();
+        }
+        conn.execute_batch(&sql).context(format!(
+            "Failed to load '{}' via DuckDB",
+            file_path.display()
+        ))?;
+        return Ok(());
+    }
+
     // For custom encodings, fall back to manual loading
     if config.encoding.is_some() {
         return load_csv_file_into_duckdb_encoded(conn, file_path, table_name, config);
     }
 
-    let escaped_table = table_name.replace('"', "\"\"");
     let path_str = file_path.display().to_string().replace('\'', "''");
 
     // Build read_csv options

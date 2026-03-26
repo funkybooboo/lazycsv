@@ -4,6 +4,7 @@
 //! delimiters and encoding, and providing in-memory document access.
 
 pub mod document;
+pub mod foreign_formats;
 pub mod row_storage;
 pub mod writer;
 pub mod xlsx;

@@ -25,7 +25,19 @@ pub fn scan_directory(dir: &Path) -> Result<Vec<PathBuf>> {
         if path.is_file() {
             if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                 let lower = ext.to_ascii_lowercase();
-                if lower == "csv" || lower == "xlsx" || lower == "xls" || lower == "ods" {
+                if lower == "csv"
+                    || lower == "tsv"
+                    || lower == "xlsx"
+                    || lower == "xls"
+                    || lower == "ods"
+                    || lower == "parquet"
+                    || lower == "json"
+                    || lower == "ndjson"
+                    || lower == "jsonl"
+                    || lower == "db"
+                    || lower == "sqlite"
+                    || lower == "sqlite3"
+                {
                     csv_files.push(path);
                 }
             }
@@ -114,7 +126,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         File::create(temp_dir.path().join("data.csv")).unwrap();
         File::create(temp_dir.path().join("notes.txt")).unwrap();
-        File::create(temp_dir.path().join("config.json")).unwrap();
+        File::create(temp_dir.path().join("config.toml")).unwrap();
         File::create(temp_dir.path().join("other.csv")).unwrap();
 
         let target_file = temp_dir.path().join("data.csv");
@@ -351,7 +363,7 @@ mod tests {
     fn test_direct_scan_directory_no_csv_files() {
         let temp_dir = TempDir::new().unwrap();
         File::create(temp_dir.path().join("data.txt")).unwrap();
-        File::create(temp_dir.path().join("config.json")).unwrap();
+        File::create(temp_dir.path().join("config.toml")).unwrap();
 
         let result = scan_directory(temp_dir.path());
         assert!(result.is_ok());
@@ -366,7 +378,7 @@ mod tests {
         File::create(temp_dir.path().join("data.csv")).unwrap();
         File::create(temp_dir.path().join("notes.txt")).unwrap();
         File::create(temp_dir.path().join("other.csv")).unwrap();
-        File::create(temp_dir.path().join("config.json")).unwrap();
+        File::create(temp_dir.path().join("config.toml")).unwrap();
 
         let result = scan_directory(temp_dir.path());
         assert!(result.is_ok());

@@ -64,7 +64,7 @@ impl Document {
         Self::from_file_with_sheet(path, delimiter, no_headers, encoding_label, None)
     }
 
-    /// Load CSV or XLSX with optional sheet selection for spreadsheet files.
+    /// Load CSV, XLSX, or foreign format files with optional sheet/table selection.
     pub fn from_file_with_sheet(
         path: &Path,
         delimiter: Option<u8>,
@@ -72,6 +72,24 @@ impl Document {
         encoding_label: Option<String>,
         sheet_name: Option<&str>,
     ) -> Result<Self> {
+        // Foreign formats (parquet, json, ndjson, sqlite): load via DuckDB
+        if crate::csv::foreign_formats::is_foreign_format(path) {
+            let rows = crate::csv::foreign_formats::load_foreign_format(path, sheet_name)?;
+            let filename = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("unknown")
+                .to_string();
+            return Ok(Document {
+                storage: RowStorage::in_memory(rows),
+                filename,
+                is_dirty: false,
+                delimiter: ',',
+                generation: 0,
+                xlsx_formulas: vec![],
+            });
+        }
+
         // XLSX/XLS path: convert spreadsheet to in-memory rows
         if crate::csv::xlsx::is_spreadsheet(path) {
             let sheet = match sheet_name {
@@ -177,6 +195,13 @@ impl Document {
         no_headers: bool,
         encoding_label: Option<String>,
     ) -> Result<usize> {
+        // Foreign formats: load via DuckDB and count rows
+        if crate::csv::foreign_formats::is_foreign_format(path) {
+            let rows = crate::csv::foreign_formats::load_foreign_format(path, None)?;
+            // First row is header
+            return Ok(rows.len().saturating_sub(1));
+        }
+
         // Fast path: use memchr-based newline counting (same as TUI index builder).
         if encoding_label.is_none() {
             return crate::csv::row_storage::count_rows_fast(path, no_headers);
@@ -209,6 +234,12 @@ impl Document {
         delimiter: Option<u8>,
         encoding_label: Option<String>,
     ) -> Result<usize> {
+        // Foreign formats: load via DuckDB and count columns from header
+        if crate::csv::foreign_formats::is_foreign_format(path) {
+            let rows = crate::csv::foreign_formats::load_foreign_format(path, None)?;
+            return Ok(rows.first().map(|r| r.len()).unwrap_or(0));
+        }
+
         if encoding_label.is_none() {
             let file = std::fs::File::open(path)
                 .context(format!("Failed to open file: {}", path.display()))?;
@@ -245,6 +276,12 @@ impl Document {
         no_headers: bool,
         encoding_label: Option<String>,
     ) -> Result<Vec<String>> {
+        // Foreign formats: load via DuckDB and return column names
+        if crate::csv::foreign_formats::is_foreign_format(path) {
+            let rows = crate::csv::foreign_formats::load_foreign_format(path, None)?;
+            return Ok(rows.into_iter().next().unwrap_or_default());
+        }
+
         if no_headers {
             anyhow::bail!("Cannot read headers when --no-headers is set");
         }
@@ -335,7 +372,7 @@ impl Document {
         )
     }
 
-    /// Load CSV or XLSX with cancellation and optional sheet selection.
+    /// Load CSV, XLSX, or foreign format files with cancellation and optional sheet/table selection.
     pub fn from_file_cancellable_with_sheet(
         path: &Path,
         delimiter: Option<u8>,
@@ -344,6 +381,24 @@ impl Document {
         cancelled: &AtomicBool,
         sheet_name: Option<&str>,
     ) -> Result<Self> {
+        // Foreign formats (parquet, json, ndjson, sqlite): load via DuckDB
+        if crate::csv::foreign_formats::is_foreign_format(path) {
+            let rows = crate::csv::foreign_formats::load_foreign_format(path, sheet_name)?;
+            let filename = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("unknown")
+                .to_string();
+            return Ok(Document {
+                storage: RowStorage::in_memory(rows),
+                filename,
+                is_dirty: false,
+                delimiter: ',',
+                generation: 0,
+                xlsx_formulas: vec![],
+            });
+        }
+
         // XLSX/XLS path: convert spreadsheet to in-memory rows
         if crate::csv::xlsx::is_spreadsheet(path) {
             let sheet = match sheet_name {

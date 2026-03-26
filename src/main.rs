@@ -92,37 +92,69 @@ fn run_main() -> Result<()> {
         if let Some(parent) = out_path.parent().filter(|p| !p.as_os_str().is_empty()) {
             std::fs::create_dir_all(parent)?;
         }
-        // Auto-detect delimiter and convert to CSV if needed
-        let detected = lazycsv::csv::detect_delimiter(&content);
-        let output = if detected != b',' {
-            // Parse with detected delimiter and re-write as CSV
-            let reader = std::io::Cursor::new(content.as_bytes());
-            let doc = lazycsv::csv::Document::from_reader(
-                reader,
-                Some(detected),
-                false,
-                "clipboard.csv".to_string(),
-            )?;
-            let mut buf = Vec::new();
-            lazycsv::csv::write_csv_content(&mut buf, &doc, ',')?;
-            String::from_utf8(buf)?
+        // Detect format: JSON (array or NDJSON) vs CSV/delimited
+        let trimmed = content.trim_start();
+        let is_json = trimmed.starts_with('[') || trimmed.starts_with('{');
+
+        // Try JSON conversion; fall back to CSV if it fails or produces no data rows
+        let json_rows = if is_json {
+            let temp_file = std::env::temp_dir().join("lazycsv_clipboard.json");
+            std::fs::write(&temp_file, &content)?;
+            let result = lazycsv::csv::foreign_formats::load_foreign_format(&temp_file, None);
+            let _ = std::fs::remove_file(&temp_file);
+            match result {
+                Ok(rows) if rows.len() > 1 => Some(rows),
+                _ => None,
+            }
         } else {
-            content.clone()
+            None
         };
-        std::fs::write(&out_path, &output)?;
-        let lines = output.lines().count().saturating_sub(1);
-        let delim_name = match detected {
-            b'\t' => "tab",
-            b'|' => "pipe",
-            b';' => "semicolon",
-            _ => "comma",
-        };
-        eprintln!(
-            "Pasted {} rows to {} ({}-delimited input → CSV)",
-            lines,
-            out_path.display(),
-            delim_name
-        );
+
+        if let Some(rows) = json_rows {
+            let data_count = rows.len().saturating_sub(1);
+            let mut wtr = csv::Writer::from_path(&out_path)?;
+            for row in &rows {
+                wtr.write_record(row)?;
+            }
+            wtr.flush()?;
+            eprintln!(
+                "Pasted {} rows to {} (JSON input → CSV)",
+                data_count,
+                out_path.display()
+            );
+        } else {
+            // Auto-detect delimiter and convert to CSV if needed
+            let detected = lazycsv::csv::detect_delimiter(&content);
+            let output = if detected != b',' {
+                // Parse with detected delimiter and re-write as CSV
+                let reader = std::io::Cursor::new(content.as_bytes());
+                let doc = lazycsv::csv::Document::from_reader(
+                    reader,
+                    Some(detected),
+                    false,
+                    "clipboard.csv".to_string(),
+                )?;
+                let mut buf = Vec::new();
+                lazycsv::csv::write_csv_content(&mut buf, &doc, ',')?;
+                String::from_utf8(buf)?
+            } else {
+                content.clone()
+            };
+            std::fs::write(&out_path, &output)?;
+            let lines = output.lines().count().saturating_sub(1);
+            let delim_name = match detected {
+                b'\t' => "tab",
+                b'|' => "pipe",
+                b';' => "semicolon",
+                _ => "comma",
+            };
+            eprintln!(
+                "Pasted {} rows to {} ({}-delimited input → CSV)",
+                lines,
+                out_path.display(),
+                delim_name
+            );
+        }
         return Ok(());
     }
 
@@ -155,16 +187,29 @@ fn run_main() -> Result<()> {
     }
 
     // Piped stdin can't be used with the interactive TUI (stdin is needed for keyboard input)
-    if cli_args.file_path().is_none() && stdin_is_piped() {
-        let _ = crossterm::terminal::disable_raw_mode();
-        eprintln!("Piped stdin is not supported in interactive TUI mode.");
-        eprintln!("Use a non-interactive flag: -q <query>, --sort <col>, --headers, --rows, or --columns.");
-        eprintln!();
-        eprintln!("Examples:");
-        eprintln!("  cat data.csv | lazycsv -q \"SELECT * FROM stdin\"");
-        eprintln!("  cat data.csv | lazycsv --sort Salary");
-        eprintln!("  cat data.csv | lazycsv --rows");
-        std::process::exit(1);
+    if stdin_is_piped() {
+        if cli_args.file_path().is_none() {
+            let _ = crossterm::terminal::disable_raw_mode();
+            eprintln!("Piped stdin is not supported in interactive TUI mode.");
+            eprintln!("Use a non-interactive flag: -q <query>, --sort <col>, --headers, --rows, or --columns.");
+            eprintln!();
+            eprintln!("Examples:");
+            eprintln!("  cat data.csv | lazycsv -q \"SELECT * FROM stdin\"");
+            eprintln!("  cat data.csv | lazycsv --sort Salary");
+            eprintln!("  cat data.csv | lazycsv --rows");
+            std::process::exit(1);
+        } else {
+            let _ = crossterm::terminal::disable_raw_mode();
+            eprintln!(
+                "Cannot open interactive TUI when stdin is piped (keyboard input unavailable)."
+            );
+            eprintln!("Use '&&' instead of '|' to chain commands, or use a non-interactive flag.");
+            eprintln!();
+            eprintln!("Examples:");
+            eprintln!("  lazycsv -P && lazycsv clipboard.csv");
+            eprintln!("  lazycsv data.csv -q \"SELECT * FROM data\"");
+            std::process::exit(1);
+        }
     }
 
     // Interactive TUI mode: resolve files first, then show loading screen
@@ -186,7 +231,23 @@ fn run_main() -> Result<()> {
     }
 
     // For xlsx files, resolve sheet from CLI arg or prompt user
-    let sheet_name = if lazycsv::csv::xlsx::is_spreadsheet(&file_path) {
+    // For sqlite files, resolve table name from CLI arg or use first table
+    let sheet_name = if lazycsv::csv::foreign_formats::is_sqlite(&file_path) {
+        let cli_table = cli_args.sheet_from_path();
+        match lazycsv::csv::foreign_formats::get_sqlite_tables(&file_path) {
+            Ok(tables) => {
+                if let Some(spec) = cli_table {
+                    Some(spec.to_string())
+                } else {
+                    tables.into_iter().next()
+                }
+            }
+            Err(e) => {
+                restore_terminal(supports_enhancement);
+                return Err(e);
+            }
+        }
+    } else if lazycsv::csv::xlsx::is_spreadsheet(&file_path) {
         let cli_sheet = cli_args.sheet_from_path();
         match lazycsv::csv::xlsx::get_sheet_names(&file_path) {
             Ok(sheets) => {
@@ -728,7 +789,11 @@ fn stream_file_to_clipboard(path: &std::path::Path, cli_args: &cli::CliArgs) -> 
 
     let row_count;
 
-    if lazycsv::csv::xlsx::is_spreadsheet(path) {
+    if lazycsv::csv::foreign_formats::is_foreign_format(path) {
+        let rows = lazycsv::csv::foreign_formats::load_foreign_format(path, None)?;
+        row_count = rows.len().saturating_sub(1);
+        write_csv_rows(&mut pipe, &rows)?;
+    } else if lazycsv::csv::xlsx::is_spreadsheet(path) {
         let sheets = lazycsv::csv::xlsx::get_sheet_names(path)?;
         if sheets.is_empty() {
             anyhow::bail!("Spreadsheet has no sheets");
@@ -789,7 +854,12 @@ fn execute_split(
     std::fs::create_dir_all(&out_dir)
         .context(format!("Failed to create directory: {}", out_dir.display()))?;
 
-    if lazycsv::csv::xlsx::is_spreadsheet(path) {
+    if lazycsv::csv::foreign_formats::is_foreign_format(path) {
+        // Foreign formats: load into memory via DuckDB, then split
+        let rows = lazycsv::csv::foreign_formats::load_foreign_format(path, None)?;
+        split_in_memory_rows(&rows, rows_per_file, &out_dir)?;
+        Ok(())
+    } else if lazycsv::csv::xlsx::is_spreadsheet(path) {
         // Spreadsheets must be loaded into memory (no streaming)
         split_spreadsheet(path, rows_per_file, &out_dir, cli_args)
     } else {
@@ -818,6 +888,36 @@ fn split_spreadsheet(
         anyhow::bail!("File has no data rows");
     }
 
+    let header = &rows[0];
+    let data_rows = &rows[1..];
+    let mut file_num: usize = 0;
+    for chunk in data_rows.chunks(rows_per_file) {
+        let file_path = out_dir.join(format!("{}.csv", file_num));
+        let file = std::fs::File::create(&file_path)?;
+        let mut writer = std::io::BufWriter::with_capacity(1024 * 1024, file);
+        write_csv_rows(&mut writer, std::slice::from_ref(header))?;
+        write_csv_rows(&mut writer, chunk)?;
+        eprintln!("  {}.csv ({} rows)", file_num, chunk.len());
+        file_num += 1;
+    }
+    eprintln!(
+        "Split {} data rows into {} files in {}/",
+        data_rows.len(),
+        file_num,
+        out_dir.display()
+    );
+    Ok(())
+}
+
+/// Split in-memory rows (header + data) into multiple CSV files.
+fn split_in_memory_rows(
+    rows: &[Vec<String>],
+    rows_per_file: usize,
+    out_dir: &std::path::Path,
+) -> Result<()> {
+    if rows.len() <= 1 {
+        anyhow::bail!("File has no data rows");
+    }
     let header = &rows[0];
     let data_rows = &rows[1..];
     let mut file_num: usize = 0;

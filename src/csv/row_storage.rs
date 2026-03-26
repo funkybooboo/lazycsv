@@ -774,7 +774,8 @@ fn count_rows_parallel(path: &Path, file_len: usize) -> Result<usize> {
             let end = (start + chunk_size).min(file_len);
             let remaining = end - start;
 
-            let mut file = std::fs::File::open(path).expect("Failed to open file for parallel read");
+            let mut file =
+                std::fs::File::open(path).expect("Failed to open file for parallel read");
             file.seek(std::io::SeekFrom::Start(start as u64))
                 .expect("Failed to seek");
 
@@ -790,7 +791,9 @@ fn count_rows_parallel(path: &Path, file_len: usize) -> Result<usize> {
                 let to_read = bytes_left.min(INDEX_BUF_SIZE);
                 let mut total_read = 0;
                 while total_read < to_read {
-                    let n = file.read(&mut buf[total_read..to_read]).expect("Failed to read chunk");
+                    let n = file
+                        .read(&mut buf[total_read..to_read])
+                        .expect("Failed to read chunk");
                     if n == 0 {
                         break;
                     }
