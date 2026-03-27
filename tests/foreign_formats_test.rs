@@ -71,6 +71,21 @@ fn create_test_sqlite(dir: &std::path::Path) -> PathBuf {
     path
 }
 
+/// Helper: create a test gzip-compressed CSV file using DuckDB.
+fn create_test_csv_gz(dir: &std::path::Path) -> PathBuf {
+    let path = dir.join("test.csv.gz");
+    let conn = duckdb::Connection::open_in_memory().unwrap();
+    conn.execute_batch(&format!(
+        "COPY (SELECT 1 AS id, 'Alice' AS name, 30 AS age \
+         UNION ALL SELECT 2, 'Bob', 25 \
+         UNION ALL SELECT 3, 'Carol', 35) \
+         TO '{}' (FORMAT CSV, HEADER, COMPRESSION GZIP)",
+        path.display()
+    ))
+    .unwrap();
+    path
+}
+
 /// Verify loaded rows have expected structure: header + 3 data rows, 3 columns.
 fn assert_standard_3_rows(rows: &[Vec<String>]) {
     assert_eq!(
@@ -893,21 +908,6 @@ fn test_cli_directory_scan_finds_mixed_formats() {
 }
 
 // ── Gzip CSV Support (.csv.gz) ─────────────────────────────────
-
-/// Helper: create a test gzip-compressed CSV file using DuckDB.
-fn create_test_csv_gz(dir: &std::path::Path) -> PathBuf {
-    let path = dir.join("test.csv.gz");
-    let conn = duckdb::Connection::open_in_memory().unwrap();
-    conn.execute_batch(&format!(
-        "COPY (SELECT 1 AS id, 'Alice' AS name, 30 AS age \
-         UNION ALL SELECT 2, 'Bob', 25 \
-         UNION ALL SELECT 3, 'Carol', 35) \
-         TO '{}' (FORMAT CSV, HEADER, COMPRESSION GZIP)",
-        path.display()
-    ))
-    .unwrap();
-    path
-}
 
 #[test]
 fn test_is_gzip_detection() {
