@@ -24,7 +24,7 @@ fn main() {
                     std::process::exit(0);
                 }
             }
-            eprintln!("Error: {}", e);
+            eprintln!("Error: {:#}", e);
             std::process::exit(1);
         }
     }

@@ -72,6 +72,16 @@ impl Document {
         encoding_label: Option<String>,
         sheet_name: Option<&str>,
     ) -> Result<Self> {
+        // Gzip-compressed CSV files are only supported in query mode (-q)
+        if is_gzip(path) {
+            anyhow::bail!(
+                "Compressed files (.csv.gz) are too large for interactive viewing.\n\
+                 Use query mode instead: lazycsv {} -q \"SELECT * FROM {} LIMIT 100\"",
+                path.display(),
+                crate::query::table_name_from_path(path)
+            );
+        }
+
         // Foreign formats (parquet, json, ndjson, sqlite): load via DuckDB
         if crate::csv::foreign_formats::is_foreign_format(path) {
             let rows = crate::csv::foreign_formats::load_foreign_format(path, sheet_name)?;
@@ -381,6 +391,16 @@ impl Document {
         cancelled: &AtomicBool,
         sheet_name: Option<&str>,
     ) -> Result<Self> {
+        // Gzip-compressed CSV files are only supported in query mode (-q)
+        if is_gzip(path) {
+            anyhow::bail!(
+                "Compressed files (.csv.gz) are too large for interactive viewing.\n\
+                 Use query mode instead: lazycsv {} -q \"SELECT * FROM {} LIMIT 100\"",
+                path.display(),
+                crate::query::table_name_from_path(path)
+            );
+        }
+
         // Foreign formats (parquet, json, ndjson, sqlite): load via DuckDB
         if crate::csv::foreign_formats::is_foreign_format(path) {
             let rows = crate::csv::foreign_formats::load_foreign_format(path, sheet_name)?;
@@ -1044,6 +1064,14 @@ impl Document {
             xlsx_formulas: vec![],
         }
     }
+}
+
+/// Returns true if the file has a `.gz` extension (e.g. `data.csv.gz`).
+pub fn is_gzip(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.eq_ignore_ascii_case("gz"))
+        .unwrap_or(false)
 }
 
 #[cfg(test)]

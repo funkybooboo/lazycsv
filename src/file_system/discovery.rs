@@ -25,7 +25,7 @@ pub fn scan_directory(dir: &Path) -> Result<Vec<PathBuf>> {
         if path.is_file() {
             if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                 let lower = ext.to_ascii_lowercase();
-                if lower == "csv"
+                let is_supported = lower == "csv"
                     || lower == "tsv"
                     || lower == "xlsx"
                     || lower == "xls"
@@ -36,8 +36,18 @@ pub fn scan_directory(dir: &Path) -> Result<Vec<PathBuf>> {
                     || lower == "jsonl"
                     || lower == "db"
                     || lower == "sqlite"
-                    || lower == "sqlite3"
-                {
+                    || lower == "sqlite3";
+                // Also support .csv.gz, .tsv.gz
+                let is_gz_csv = lower == "gz" && {
+                    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+                    let inner = std::path::Path::new(stem)
+                        .extension()
+                        .and_then(|e| e.to_str())
+                        .unwrap_or("")
+                        .to_ascii_lowercase();
+                    inner == "csv" || inner == "tsv"
+                };
+                if is_supported || is_gz_csv {
                     csv_files.push(path);
                 }
             }

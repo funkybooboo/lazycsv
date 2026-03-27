@@ -891,3 +891,164 @@ fn test_cli_directory_scan_finds_mixed_formats() {
     assert!(stdout.contains("test.parquet"), "Should list parquet file");
     assert!(stdout.contains("test.json"), "Should list JSON file");
 }
+
+// ── Gzip CSV Support (.csv.gz) ─────────────────────────────────
+
+/// Helper: create a test gzip-compressed CSV file using DuckDB.
+fn create_test_csv_gz(dir: &std::path::Path) -> PathBuf {
+    let path = dir.join("test.csv.gz");
+    let conn = duckdb::Connection::open_in_memory().unwrap();
+    conn.execute_batch(&format!(
+        "COPY (SELECT 1 AS id, 'Alice' AS name, 30 AS age \
+         UNION ALL SELECT 2, 'Bob', 25 \
+         UNION ALL SELECT 3, 'Carol', 35) \
+         TO '{}' (FORMAT CSV, HEADER, COMPRESSION GZIP)",
+        path.display()
+    ))
+    .unwrap();
+    path
+}
+
+#[test]
+fn test_is_gzip_detection() {
+    assert!(lazycsv::csv::document::is_gzip(&PathBuf::from(
+        "data.csv.gz"
+    )));
+    assert!(lazycsv::csv::document::is_gzip(&PathBuf::from(
+        "data.tsv.gz"
+    )));
+    assert!(lazycsv::csv::document::is_gzip(&PathBuf::from(
+        "data.CSV.GZ"
+    )));
+    assert!(!lazycsv::csv::document::is_gzip(&PathBuf::from("data.csv")));
+    assert!(!lazycsv::csv::document::is_gzip(&PathBuf::from(
+        "data.parquet"
+    )));
+}
+
+#[test]
+fn test_table_name_from_path_csv_gz() {
+    assert_eq!(
+        lazycsv::query::table_name_from_path(&PathBuf::from("largedata.csv.gz")),
+        "largedata"
+    );
+    assert_eq!(
+        lazycsv::query::table_name_from_path(&PathBuf::from("data.tsv.gz")),
+        "data"
+    );
+    // Regular files still work
+    assert_eq!(
+        lazycsv::query::table_name_from_path(&PathBuf::from("data.csv")),
+        "data"
+    );
+    assert_eq!(
+        lazycsv::query::table_name_from_path(&PathBuf::from("data.parquet")),
+        "data"
+    );
+}
+
+#[test]
+fn test_strip_csv_gz_extension_in_query() {
+    let result = lazycsv::query::strip_csv_extensions("SELECT * FROM data.csv.gz");
+    assert_eq!(result, "SELECT * FROM data");
+
+    let result = lazycsv::query::strip_csv_extensions("SELECT * FROM data.tsv.gz");
+    assert_eq!(result, "SELECT * FROM data");
+}
+
+#[test]
+fn test_gzip_tui_load_returns_error() {
+    let dir = TempDir::new().unwrap();
+    let path = create_test_csv_gz(dir.path());
+
+    // TUI load should fail with a helpful error, not OOM
+    let result = Document::from_file(&path, None, false, None);
+    assert!(result.is_err());
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("query mode") || err.contains("-q"),
+        "Error should suggest query mode, got: {}",
+        err
+    );
+}
+
+#[test]
+fn test_cli_csv_gz_query() {
+    let dir = TempDir::new().unwrap();
+    let path = create_test_csv_gz(dir.path());
+
+    let output = Command::new(lazycsv_bin())
+        .args([
+            path.to_str().unwrap(),
+            "-q",
+            "SELECT count(*) as cnt FROM test",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "Query should succeed for .csv.gz, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains('3'), "Expected count of 3, got: {}", stdout);
+}
+
+#[test]
+fn test_cli_csv_gz_query_with_filter() {
+    let dir = TempDir::new().unwrap();
+    let path = create_test_csv_gz(dir.path());
+
+    let output = Command::new(lazycsv_bin())
+        .args([
+            path.to_str().unwrap(),
+            "-q",
+            "SELECT name FROM test WHERE age > 28 ORDER BY name",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Alice"));
+    assert!(stdout.contains("Carol"));
+    assert!(!stdout.contains("Bob"));
+}
+
+#[test]
+fn test_cli_csv_gz_tui_shows_error() {
+    let dir = TempDir::new().unwrap();
+    let path = create_test_csv_gz(dir.path());
+
+    // Opening .csv.gz without -q should fail with helpful message
+    let output = Command::new(lazycsv_bin())
+        .arg(path.to_str().unwrap())
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("-q") || stderr.contains("query mode"),
+        "Should suggest query mode, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_discovery_finds_csv_gz_files() {
+    let dir = TempDir::new().unwrap();
+    std::fs::write(dir.path().join("data.csv"), "a\n1").unwrap();
+    create_test_csv_gz(dir.path());
+
+    let files = lazycsv::file_system::scan_directory(dir.path()).unwrap();
+    assert_eq!(files.len(), 2);
+    assert!(files.iter().any(|p| p.extension().unwrap() == "csv"));
+    assert!(files
+        .iter()
+        .any(|p| p.file_name().unwrap().to_str().unwrap() == "test.csv.gz"));
+}

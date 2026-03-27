@@ -118,10 +118,22 @@ use std::sync::atomic::AtomicBool;
 /// assert_eq!(table_name_from_path(Path::new("unicode 国家.csv")), "unicode 国家");
 /// ```
 pub fn table_name_from_path(path: &Path) -> String {
-    path.file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("table")
-        .to_string()
+    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("table");
+    // For compound extensions like .csv.gz, strip the inner extension too
+    if path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.eq_ignore_ascii_case("gz"))
+        .unwrap_or(false)
+    {
+        std::path::Path::new(stem)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or(stem)
+            .to_string()
+    } else {
+        stem.to_string()
+    }
 }
 
 /// Determine which session files are referenced by a SQL query.
@@ -226,8 +238,8 @@ fn extract_sql_identifiers(sql: &str) -> std::collections::HashSet<String> {
 /// (`"myfile.csv"`). Preserves string literals unchanged.
 pub fn strip_csv_extensions(sql: &str) -> String {
     let extensions: &[&str] = &[
-        ".csv", ".tsv", ".txt", ".parquet", ".json", ".ndjson", ".jsonl", ".db", ".sqlite",
-        ".sqlite3",
+        ".csv.gz", ".tsv.gz", ".csv", ".tsv", ".txt", ".parquet", ".json", ".ndjson", ".jsonl",
+        ".db", ".sqlite", ".sqlite3",
     ];
     let chars: Vec<char> = sql.chars().collect();
     let len = chars.len();

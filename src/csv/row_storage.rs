@@ -763,7 +763,7 @@ fn count_rows_parallel(path: &Path, file_len: usize) -> Result<usize> {
 
     let num_threads = rayon::current_num_threads().max(1);
     let chunk_size = (file_len / num_threads).max(INDEX_BUF_SIZE);
-    let num_chunks = (file_len + chunk_size - 1) / chunk_size;
+    let num_chunks = file_len.div_ceil(chunk_size);
 
     // Each thread reads its chunk incrementally in INDEX_BUF_SIZE sub-buffers
     // to avoid allocating the entire chunk in memory at once.
