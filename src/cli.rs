@@ -2,11 +2,12 @@ use clap::Parser;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
-#[command(author, version, about = "LazyCSV: A blazing-fast CSV TUI viewer", long_about = None, disable_help_flag = true)]
+#[command(author, version, about = "LazyCSV: A blazing-fast TUI viewer for CSV, TSV, JSON, Parquet, Excel, and SQLite", long_about = None, disable_help_flag = true)]
 pub struct CliArgs {
-    /// Path to a CSV/XLSX file or directory, optionally followed by a sheet name or
+    /// Path to a data file or directory, optionally followed by a sheet name or
     /// 1-based sheet index for spreadsheet files.
-    /// Examples: lazycsv data.csv | lazycsv file.xlsx | lazycsv file.xlsx 2 | lazycsv file.xlsx "Sheet Name"
+    /// Supported formats: CSV, TSV, CSV.GZ, TSV.GZ, JSON, NDJSON/JSONL, Parquet, Excel (XLSX/XLS), ODS, SQLite (db/sqlite/sqlite3)
+    /// Examples: lazycsv data.csv | lazycsv data.parquet | lazycsv file.xlsx 2 | lazycsv db.sqlite
     #[arg(num_args = 0..=2)]
     pub path: Vec<String>,
 
@@ -73,10 +74,10 @@ pub struct CliArgs {
     )]
     pub sort: Option<String>,
 
-    /// Extract Excel sheets to CSV files (non-interactive mode).
+    /// Extract Excel/ODS sheets to CSV files (non-interactive mode).
     /// Uses the file path and optional sheet from positional args.
-    /// Examples: lazycsv file.xlsx -x | lazycsv file.xlsx 2 -x
-    #[arg(short = 'x', long = "xlsx", help = "Extract Excel sheets to CSV")]
+    /// Examples: lazycsv file.xlsx -x | lazycsv file.xlsx 2 -x | lazycsv file.ods -x
+    #[arg(short = 'x', long = "xlsx", help = "Extract Excel/ODS sheets to CSV")]
     pub xlsx: bool,
 
     /// Output for xlsx conversion (used with --xlsx).
@@ -254,16 +255,21 @@ pub fn print_command_help(cmd: &str) {
 }
 
 pub const QUERY_HELP: &str = "\
-Execute SQL queries against CSV files (non-interactive mode)
+Execute SQL queries against data files (non-interactive mode)
 
 Usage: lazycsv <FILE> -q <QUERY> [OPTIONS]
 
-The file is loaded as a DuckDB table named after the filename (without .csv).
-All CSV files in the same directory are available for JOINs.
+Supported formats: CSV, TSV, CSV.GZ, TSV.GZ, JSON, NDJSON/JSONL, Parquet, SQLite
+
+The file is loaded as a database table named after the filename (without extension).
+All supported files in the same directory are available for JOINs.
 
 Examples:
   lazycsv data.csv -q \"SELECT * FROM data WHERE age > 30\"
-  lazycsv data.csv -q \"SELECT name, count(*) FROM data GROUP BY name\"
+  lazycsv data.csv.gz -q \"SELECT count(*) FROM data GROUP BY name\"
+  lazycsv data.parquet -q \"SELECT name, sum(amount) FROM data GROUP BY name\"
+  lazycsv sqlite.db -q \"SELECT * FROM users LIMIT 10\"
+  lazycsv data.json -q \"SELECT id, status FROM data WHERE status = 'active'\"
   lazycsv . -q \"SELECT a.id, b.name FROM users a JOIN emails b ON a.id = b.user_id\"
   cat data.csv | lazycsv -q \"SELECT * FROM stdin ORDER BY name\"
   lazycsv data.csv -q \"SELECT * FROM data\" -o results.csv
