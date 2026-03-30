@@ -1,13 +1,16 @@
 //! File operations (rename, delete, move, copy, create) for file menu
 
-use super::{scan_directory, BrowserEntry};
+use super::{scan_directory_filtered, BrowserEntry};
 use crate::app::{App, FileOperation, Mode};
 use crate::input::{InputResult, StatusMessage};
 use anyhow::Result;
 
 /// Get the currently selected entry in the file browser
 fn get_selected_entry(app: &App) -> Result<BrowserEntry> {
-    let entries = scan_directory(&app.view_state.current_directory)?;
+    let entries = scan_directory_filtered(
+        &app.view_state.current_directory,
+        app.view_state.show_hidden_files,
+    )?;
     let filter = app.input_state.file_filter_buffer.to_lowercase();
 
     let filtered: Vec<&BrowserEntry> = entries

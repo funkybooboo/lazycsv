@@ -54,10 +54,11 @@ fn calculate_cell_style(
 ) -> Style {
     let theme = &app.config.theme;
     if is_selected {
-        super::modal::cursor_style_from(theme)
-    } else if is_in_visual_selection(app, row, col) {
+        return super::modal::cursor_style_from(theme);
+    }
+
+    let base = if is_in_visual_selection(app, row, col) {
         let mut style = Style::default().add_modifier(Modifier::REVERSED);
-        // Add underline to bottom edge of selection for a border effect
         if let Some(sel) = &app.visual_selection {
             let (_, end_row, _, _) = sel.bounds();
             if row == end_row {
@@ -76,7 +77,18 @@ fn calculate_cell_style(
         super::modal::zebra_stripe_style_from(theme)
     } else {
         Style::default()
+    };
+
+    // Apply per-column colors (layer on top of base style)
+    let col_idx = col.get();
+    let mut style = base;
+    if let Some(&bg) = app.view_state.column_bg_colors.get(&col_idx) {
+        style = style.bg(bg);
     }
+    if let Some(&fg) = app.view_state.column_fg_colors.get(&col_idx) {
+        style = style.fg(fg);
+    }
+    style
 }
 
 /// Check if a cell is within the current visual selection

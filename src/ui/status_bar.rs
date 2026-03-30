@@ -242,14 +242,18 @@ fn build_status_text(app: &App, right_side: &str, pending_indicator: &str, width
             build_three_part_status_line(&left, &center, &right, width)
         }
         crate::app::Mode::FileList => {
-            use crate::input::file_list_mode::scan_directory;
+            use crate::input::file_list_mode::scan_directory_filtered;
 
             let dirty = if app.document.is_dirty { "*" } else { "" };
             let filename = &app.document.filename;
             let filter = &app.input_state.file_filter_buffer;
 
             // Count filtered entries in current directory
-            let entries = scan_directory(&app.view_state.current_directory).unwrap_or_default();
+            let entries = scan_directory_filtered(
+                &app.view_state.current_directory,
+                app.view_state.show_hidden_files,
+            )
+            .unwrap_or_default();
             let filter_lower = filter.to_lowercase();
             let filtered_count = entries
                 .iter()

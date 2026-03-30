@@ -1554,7 +1554,7 @@ impl App {
         }
 
         // Execute query and convert result
-        on_progress("Running query...");
+        on_progress("Querying...");
         let (result_doc, cancelled_flag, error_msg) = sql_execution::execute_and_convert_query(
             &mut cache,
             query,

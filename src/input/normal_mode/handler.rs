@@ -233,6 +233,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             let current = app.session.column_width(col).unwrap_or(15);
             app.session
                 .set_column_width(col, current.saturating_add(2).min(200));
+            crate::config::views::save_current_views(app);
             return Ok(InputResult::Continue);
         }
 
@@ -242,6 +243,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             let current = app.session.column_width(col).unwrap_or(15);
             app.session
                 .set_column_width(col, current.saturating_sub(2).max(4));
+            crate::config::views::save_current_views(app);
             return Ok(InputResult::Continue);
         }
 

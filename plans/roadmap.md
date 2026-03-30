@@ -58,6 +58,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.27.0 | CLI Data Tools, Per-Command Help, TUI Editing & File Save Fix | [x] | - |
 | v0.28.0 | Multi-Format Support (Parquet, JSON, SQLite) | [x] | 70 |
 | v0.29.0 | CSV Generation, Parallel Performance & File Manager UX | [x] | 45+ |
+| v0.30.0 | Yazi-Style File Menu, Column Colors & View Persistence | [x] | - |
 | v1.0.0 | Stable Release & Polish | [ ] | - |
 
 **Total Tests Passing:** 1,403 tests (all integration and unit tests across vim_editor, SQL, magnifier, UI, keybindings, and core modules)
@@ -169,6 +170,9 @@ New `-g` CLI command generates synthetic CSV files with typed data schemas (cust
 
 **[v0.19.0](versions/v0.19.0.md) - Column Resize & Advanced Column Operations**
 Column width already complete from prior work. Column/row pinning: `:pin A,B` pins columns always-visible on left, `:pin 1,2` pins rows always-visible at top, `:unpin` clears both. Visual indicator: cyan + underline. Column type system: `:type A number/date/boolean/text` with validation on cell edit (rejects invalid values), type-aware sorting, and type indicators (#, D, ?) in column headers. Per-file state for all pin/type settings. 60+ tests.
+
+**[v0.30.0] - Yazi-Style File Menu, Column Colors & View Persistence**
+Complete yazi-inspired file menu overhaul: borderless layout with breadcrumb path header (`~/projects/lazycsv/test_data`), blue-colored directories, inverted white-on-black selection highlight bar, vertical separator bars between panes (parent 15% | current 42% | preview 42%), full-height CSV preview with alternating 8-color column coloring, scroll padding (5-item lookahead), wrap-around navigation (j/k at boundaries), hidden file toggle (`.` key), and yazi-style status bar with mode/size/filename/position badges. File details popup (`Tab` key) showing created/modified dates, mimetype, and comma-formatted row count. Per-column styling: `:bgcolor C red` and `:fgcolor C #ff0000` commands with 35+ named CSS colors (crimson, teal, gold, indigo, etc.) plus hex `#rrggbb`. View persistence to `~/.config/lazycsv/views.json`: column widths, bg/fg colors, column types, and frozen columns/rows saved immediately on change with canonical absolute-path keys; auto-loaded on file open from CLI or File Menu. `:clearview` command to reset saved settings. All file menu colors configurable via `config.toml` (`file_menu_dir_fg`, `file_menu_highlight_bg`, `file_menu_preview_col_1` through `_col_8`, etc.). Clean terminal exit (no zsh `%` indicator).
 
 ###  Planned Versions
 
@@ -311,6 +315,16 @@ LazyCSV uses vim-style modal editing with these modes:
 | `:sql` | Open SQL editor |
 | `:noh` | Clear search highlighting |
 
+### Column Styling Commands
+
+| Command | Action |
+|---------|--------|
+| `:bgcolor C red` | Set column C background to red |
+| `:fgcolor C #ff0000` | Set column C foreground to hex color |
+| `:bgcolor C clear` | Remove column background color |
+| `:fgcolor C clear` | Remove column foreground color |
+| `:clearview` | Clear all saved view settings for current file |
+
 ### Range Operations
 
 | Command | Action |
@@ -367,6 +381,15 @@ LazyCSV uses vim-style modal editing with these modes:
 ### File Navigation
 - `[` / `]` - Previous/next CSV file
 - `:files` - Show file menu
+
+### File Menu (Space+f)
+- `j`/`k` / arrows - Navigate (wraps around)
+- `h` / `l` - Parent directory / enter directory or open file
+- `.` - Toggle hidden files
+- `Tab` - File details popup (Info)
+- `/` - Search/filter files
+- `r`/`d`/`m`/`y`/`n` - Rename/delete/move/copy/new
+- `Esc` - Close popup or file menu
 
 ### Help
 - `?` - Quick reference overlay

@@ -254,6 +254,65 @@ impl Session {
         self.unfreeze_rows();
     }
 
+    // ── Path-based accessors for view persistence ─────────────
+
+    /// Get column widths for a specific file path.
+    pub fn column_widths_for(&self, path: &std::path::Path) -> Option<&HashMap<usize, u16>> {
+        self.column_widths.get(path)
+    }
+
+    /// Set a column width for a specific file path.
+    pub fn set_column_width_for(&mut self, path: &std::path::Path, col: usize, width: u16) {
+        self.column_widths
+            .entry(path.to_path_buf())
+            .or_default()
+            .insert(col, width);
+    }
+
+    /// Get column types for a specific file path.
+    pub fn column_types_for(&self, path: &std::path::Path) -> Option<&HashMap<usize, ColumnType>> {
+        self.column_types.get(path)
+    }
+
+    /// Set a column type for a specific file path.
+    pub fn set_column_type_for(
+        &mut self,
+        path: &std::path::Path,
+        col: usize,
+        col_type: ColumnType,
+    ) {
+        self.column_types
+            .entry(path.to_path_buf())
+            .or_default()
+            .insert(col, col_type);
+    }
+
+    /// Get frozen columns for a specific file path.
+    pub fn frozen_columns_for(&self, path: &std::path::Path) -> &[usize] {
+        self.frozen_columns
+            .get(path)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// Set frozen columns for a specific file path.
+    pub fn set_frozen_columns_for(&mut self, path: &std::path::Path, cols: Vec<usize>) {
+        self.frozen_columns.insert(path.to_path_buf(), cols);
+    }
+
+    /// Get frozen rows for a specific file path.
+    pub fn frozen_rows_for(&self, path: &std::path::Path) -> &[usize] {
+        self.frozen_rows
+            .get(path)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// Set frozen rows for a specific file path.
+    pub fn set_frozen_rows_for(&mut self, path: &std::path::Path, rows: Vec<usize>) {
+        self.frozen_rows.insert(path.to_path_buf(), rows);
+    }
+
     // ── Column types ──────────────────────────────────────────
 
     /// Get the column type for a column in the current file.

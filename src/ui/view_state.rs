@@ -4,7 +4,9 @@
 //! selection, scroll position, and viewport positioning modes.
 
 use crate::domain::position::ColIndex;
+use ratatui::style::Color;
 use ratatui::widgets::TableState;
+use std::collections::HashMap;
 
 /// Viewport positioning mode for view commands (zt, zz, zb)
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -54,6 +56,18 @@ pub struct ViewState {
     /// Current directory for file browser (yazi-style navigation)
     pub current_directory: std::path::PathBuf,
 
+    /// Whether to show hidden files (dotfiles) in the file browser
+    pub show_hidden_files: bool,
+
+    /// Whether the file details popup (Spot) is visible
+    pub file_spot_visible: bool,
+
+    /// Per-column background colors (column index -> color)
+    pub column_bg_colors: HashMap<usize, Color>,
+
+    /// Per-column foreground colors (column index -> color)
+    pub column_fg_colors: HashMap<usize, Color>,
+
     /// Number of columns that fit in the current terminal width (updated during rendering)
     pub visible_cols_count: usize,
 }
@@ -72,6 +86,10 @@ impl Default for ViewState {
             help_search_query: None,
             help_search_input_active: false,
             help_search_match_index: 0,
+            show_hidden_files: false,
+            file_spot_visible: false,
+            column_bg_colors: HashMap::new(),
+            column_fg_colors: HashMap::new(),
             current_directory: std::env::current_dir()
                 .unwrap_or_else(|_| std::path::PathBuf::from(".")),
             visible_cols_count: 10, // default, updated each render frame

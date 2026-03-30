@@ -1,6 +1,7 @@
 //! Command executor for ex-style commands (e.g., :q, :w, :sort)
 
 use crate::app::App;
+use crate::config::parse_color;
 use crate::csv::Document;
 use crate::input::actions::InputResult;
 use crate::input::StatusMessage;
@@ -26,8 +27,9 @@ pub fn execute(app: &mut App) -> Result<InputResult> {
     // Support both `:cA` (no space) and `:c A` (with space)
     // Exclude known commands that start with 'c' (count)
     let cmd_lower_full = cmd.to_lowercase();
-    let is_known_c_command =
-        cmd_lower_full.starts_with("count") || cmd_lower_full.starts_with("copy");
+    let is_known_c_command = cmd_lower_full.starts_with("count")
+        || cmd_lower_full.starts_with("copy")
+        || cmd_lower_full.starts_with("clearview");
     if !is_known_c_command && (cmd.starts_with('c') || cmd.starts_with('C')) {
         let rest = &cmd[1..]; // Get everything after 'c'
 
@@ -140,6 +142,9 @@ pub fn execute(app: &mut App) -> Result<InputResult> {
         "lower" | "lowercase" => execute_cell_transform(app, crate::transforms::to_lower),
         "title" | "titlecase" => execute_cell_transform(app, crate::transforms::to_title),
         "trim" => execute_cell_transform(app, crate::transforms::trim),
+        "bgcolor" => execute_column_color(app, _arg.unwrap_or(""), true),
+        "fgcolor" => execute_column_color(app, _arg.unwrap_or(""), false),
+        "clearview" => execute_clear_view(app),
         _ => {
             // Unknown command
             app.status_message = Some(StatusMessage::from(format!("Unknown command: :{}", cmd)));
@@ -592,6 +597,7 @@ fn execute_width(app: &mut App, arg: Option<&str>) -> Result<InputResult> {
         }
     }
 
+    crate::config::views::save_current_views(app);
     Ok(InputResult::Continue)
 }
 
@@ -684,6 +690,7 @@ fn execute_freeze(app: &mut App, arg: Option<&str>) -> Result<InputResult> {
         )));
     }
 
+    crate::config::views::save_current_views(app);
     Ok(InputResult::Continue)
 }
 
@@ -691,6 +698,7 @@ fn execute_freeze(app: &mut App, arg: Option<&str>) -> Result<InputResult> {
 /// `:unfreeze` clears all, `:unfreeze cols` clears columns only, `:unfreeze rows` clears rows only.
 fn execute_unfreeze(app: &mut App) -> Result<InputResult> {
     app.session.unfreeze_all();
+    crate::config::views::save_current_views(app);
     app.status_message = Some(StatusMessage::from("All columns and rows unpinned"));
     Ok(InputResult::Continue)
 }
@@ -765,6 +773,7 @@ fn execute_type(app: &mut App, arg: Option<&str>) -> Result<InputResult> {
     };
 
     app.session.set_column_type(col_index, col_type);
+    crate::config::views::save_current_views(app);
     app.status_message = Some(StatusMessage::from(format!(
         "Column {} type set to {}",
         col_spec.to_uppercase(),
@@ -832,4 +841,151 @@ fn execute_sort(app: &mut App, cmd_name: &str, arg: Option<&str>) -> Result<Inpu
         ));
     }
     Ok(InputResult::Continue)
+}
+
+/// Execute :bgcolor or :fgcolor command
+/// Usage: :bgcolor C red | :bgcolor C #ff0000 | :bgcolor C clear
+fn execute_column_color(app: &mut App, arg: &str, is_bg: bool) -> Result<InputResult> {
+    let kind = if is_bg { "bgcolor" } else { "fgcolor" };
+
+    let parts: Vec<&str> = arg.splitn(2, ' ').collect();
+    if parts.len() < 2 {
+        app.status_message = Some(StatusMessage::from(format!(
+            "Usage: :{} <column> <color> (e.g., :{} C red, :{} C #ff0000, :{} C clear)",
+            kind, kind, kind, kind
+        )));
+        return Ok(InputResult::Continue);
+    }
+
+    let col_spec = parts[0].trim();
+    let color_str = parts[1].trim();
+
+    // Resolve column specifier to index
+    let col_index = resolve_column_spec(app, col_spec);
+    let col_index = match col_index {
+        Ok(idx) => idx,
+        Err(msg) => {
+            app.status_message = Some(StatusMessage::from(msg));
+            return Ok(InputResult::Continue);
+        }
+    };
+
+    // Handle "clear" / "none" to remove color
+    if color_str.eq_ignore_ascii_case("clear") || color_str.eq_ignore_ascii_case("none") {
+        if is_bg {
+            app.view_state.column_bg_colors.remove(&col_index);
+        } else {
+            app.view_state.column_fg_colors.remove(&col_index);
+        }
+        // Persist immediately
+        crate::config::views::save_current_views(app);
+        let letter = column_index_to_letter(col_index);
+        app.status_message = Some(StatusMessage::from(format!(
+            "Cleared {} for column {}",
+            kind, letter
+        )));
+        return Ok(InputResult::Continue);
+    }
+
+    // Parse color
+    match parse_color(color_str) {
+        Some(color) => {
+            if is_bg {
+                app.view_state.column_bg_colors.insert(col_index, color);
+            } else {
+                app.view_state.column_fg_colors.insert(col_index, color);
+            }
+            // Persist immediately
+            crate::config::views::save_current_views(app);
+            let letter = column_index_to_letter(col_index);
+            app.status_message = Some(StatusMessage::from(format!(
+                "Set {} for column {} to {}",
+                kind, letter, color_str
+            )));
+        }
+        None => {
+            app.status_message = Some(StatusMessage::from(format!(
+                "Unknown color: {:?}. Use a named color (red, blue, etc.) or hex (#ff0000)",
+                color_str
+            )));
+        }
+    }
+
+    Ok(InputResult::Continue)
+}
+
+/// Resolve a column specifier (letter, number, or header name) to a 0-based index
+fn resolve_column_spec(app: &App, spec: &str) -> std::result::Result<usize, String> {
+    // Try as 1-based number
+    if let Ok(num) = spec.parse::<usize>() {
+        if num == 0 || num > app.document.column_count() {
+            return Err(format!(
+                "Column {} out of range (1-{})",
+                num,
+                app.document.column_count()
+            ));
+        }
+        return Ok(num - 1);
+    }
+
+    // Try header name (case-insensitive)
+    let header_row = app.document.storage.header_row();
+    if let Some(idx) = header_row
+        .iter()
+        .position(|name| name.eq_ignore_ascii_case(spec))
+    {
+        return Ok(idx);
+    }
+
+    // Try Excel-style column letter
+    if spec.chars().all(|c| c.is_ascii_alphabetic()) {
+        match excel_letter_to_column(spec) {
+            Ok(idx) if idx < app.document.column_count() => return Ok(idx),
+            _ => {}
+        }
+    }
+
+    Err(format!(
+        "Unknown column: {:?} (use letter like A, number like 1, or header name)",
+        spec
+    ))
+}
+
+/// Execute :clearview — remove all saved view settings for the current file
+fn execute_clear_view(app: &mut App) -> Result<InputResult> {
+    // Clear in-memory state
+    app.session.clear_all_column_widths();
+    app.session.unfreeze_all();
+    app.view_state.column_bg_colors.clear();
+    app.view_state.column_fg_colors.clear();
+
+    // Clear column types for current file
+    let file = app
+        .session
+        .files()
+        .get(app.session.active_file_index())
+        .cloned();
+    if let Some(ref path) = file {
+        // Remove from persisted views
+        let mut store = crate::config::views::load_views();
+        let key = crate::config::views::canonical_key(path);
+        store.files.remove(&key);
+        crate::config::views::save_views(&store);
+    }
+
+    app.status_message = Some(StatusMessage::from("View settings cleared"));
+    Ok(InputResult::Continue)
+}
+
+/// Convert a 0-based column index to an Excel-style letter (0=A, 1=B, 25=Z, 26=AA)
+fn column_index_to_letter(mut idx: usize) -> String {
+    let mut result = String::new();
+    loop {
+        result.insert(0, (b'A' + (idx % 26) as u8) as char);
+        if idx < 26 {
+            break;
+        }
+        idx = idx / 26 - 1;
+    }
+    result
 }

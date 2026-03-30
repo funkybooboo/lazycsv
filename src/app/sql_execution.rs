@@ -212,7 +212,6 @@ pub fn execute_and_convert_query(
         let temp_str = temp_path.display().to_string().replace('\'', "''");
         let copy_sql = format!("COPY ({}) TO '{}' (HEADER, DELIMITER ',')", query, temp_str);
 
-        on_progress("Exporting results...");
         if let Ok(row_count) = cache.conn().execute(&copy_sql, []) {
             let mb = std::fs::metadata(&temp_path)
                 .map(|m| m.len() as f64 / (1024.0 * 1024.0))

@@ -347,8 +347,28 @@ fn run_main() -> Result<()> {
         }
     };
 
+    // Load saved view settings for the active file
+    {
+        use lazycsv::config::views;
+        let store = views::load_views();
+        let active_path = app
+            .session
+            .files()
+            .get(app.session.active_file_index())
+            .cloned();
+        if let Some(ref path) = active_path {
+            let key = views::canonical_key(path);
+            if let Some(fv) = store.files.get(&key) {
+                views::apply_file_view(path, fv, &mut app.session, &mut app.view_state);
+            }
+        }
+    }
+
     // Run app (wrapped to ensure cleanup)
     let result = run(&mut terminal, &mut app);
+
+    // Save view settings for all open files before exit
+    lazycsv::config::views::save_current_views(&app);
 
     // Always restore terminal
     restore_terminal(supports_enhancement);
@@ -393,6 +413,11 @@ fn restore_terminal(supports_enhancement: bool) {
     ratatui::restore();
     // Ensure cursor is visible after leaving the TUI
     crossterm::execute!(std::io::stdout(), crossterm::cursor::Show).ok();
+    // Print a newline so zsh doesn't show the "no newline" indicator (%)
+    // Must use write + flush since std::process::exit() follows and won't flush buffers
+    use std::io::Write;
+    let _ = std::io::stdout().write_all(b"\n");
+    let _ = std::io::stdout().flush();
 }
 
 fn run(terminal: &mut Term, app: &mut App) -> Result<()> {

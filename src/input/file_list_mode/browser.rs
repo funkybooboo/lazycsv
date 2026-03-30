@@ -27,6 +27,14 @@ impl BrowserEntry {
 
 /// Scan directory for CSV files and subdirectories
 pub fn scan_directory(dir: &Path) -> Result<Vec<BrowserEntry>, std::io::Error> {
+    scan_directory_filtered(dir, false)
+}
+
+/// Scan directory with optional hidden file display
+pub fn scan_directory_filtered(
+    dir: &Path,
+    show_hidden: bool,
+) -> Result<Vec<BrowserEntry>, std::io::Error> {
     let mut entries = Vec::new();
 
     // Always add parent directory (..) if not at root
@@ -41,6 +49,15 @@ pub fn scan_directory(dir: &Path) -> Result<Vec<BrowserEntry>, std::io::Error> {
         let entry = entry?;
         let path = entry.path();
         let metadata = entry.metadata()?;
+
+        // Skip hidden files/directories unless show_hidden is true
+        if !show_hidden {
+            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                if name.starts_with('.') {
+                    continue;
+                }
+            }
+        }
 
         if metadata.is_dir() {
             // Add directories

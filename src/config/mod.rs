@@ -7,6 +7,8 @@
 //! All settings are optional — missing values use sensible defaults.
 //! Invalid values produce warnings but never panic.
 
+pub mod views;
+
 use ratatui::style::Color;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
@@ -43,6 +45,23 @@ pub struct Theme {
     pub header_bold: bool,
     pub header_bg: Option<Color>,
     pub dirty_indicator_fg: Color,
+    // File menu colors
+    pub file_menu_dir_fg: Color,
+    pub file_menu_highlight_bg: Color,
+    pub file_menu_highlight_fg: Color,
+    pub file_menu_separator_fg: Color,
+    pub file_menu_status_bg: Color,
+    pub file_menu_status_mode_bg: Color,
+    pub file_menu_status_accent_bg: Color,
+    pub file_menu_active_indicator_fg: Color,
+    pub file_menu_preview_col_1: Color,
+    pub file_menu_preview_col_2: Color,
+    pub file_menu_preview_col_3: Color,
+    pub file_menu_preview_col_4: Color,
+    pub file_menu_preview_col_5: Color,
+    pub file_menu_preview_col_6: Color,
+    pub file_menu_preview_col_7: Color,
+    pub file_menu_preview_col_8: Color,
 }
 
 /// SQL editor configuration.
@@ -78,6 +97,23 @@ impl Default for Theme {
             header_bold: true,
             header_bg: None,
             dirty_indicator_fg: Color::Red,
+            // File menu defaults
+            file_menu_dir_fg: Color::Blue,
+            file_menu_highlight_bg: Color::White,
+            file_menu_highlight_fg: Color::Black,
+            file_menu_separator_fg: Color::Gray,
+            file_menu_status_bg: Color::DarkGray,
+            file_menu_status_mode_bg: Color::Blue,
+            file_menu_status_accent_bg: Color::Magenta,
+            file_menu_active_indicator_fg: Color::Green,
+            file_menu_preview_col_1: Color::Blue,
+            file_menu_preview_col_2: Color::Green,
+            file_menu_preview_col_3: Color::Yellow,
+            file_menu_preview_col_4: Color::Cyan,
+            file_menu_preview_col_5: Color::Magenta,
+            file_menu_preview_col_6: Color::Red,
+            file_menu_preview_col_7: Color::LightBlue,
+            file_menu_preview_col_8: Color::LightGreen,
         }
     }
 }
@@ -124,6 +160,23 @@ struct TomlTheme {
     header_bold: Option<bool>,
     header_bg: Option<String>,
     dirty_indicator_fg: Option<String>,
+    // File menu colors
+    file_menu_dir_fg: Option<String>,
+    file_menu_highlight_bg: Option<String>,
+    file_menu_highlight_fg: Option<String>,
+    file_menu_separator_fg: Option<String>,
+    file_menu_status_bg: Option<String>,
+    file_menu_status_mode_bg: Option<String>,
+    file_menu_status_accent_bg: Option<String>,
+    file_menu_active_indicator_fg: Option<String>,
+    file_menu_preview_col_1: Option<String>,
+    file_menu_preview_col_2: Option<String>,
+    file_menu_preview_col_3: Option<String>,
+    file_menu_preview_col_4: Option<String>,
+    file_menu_preview_col_5: Option<String>,
+    file_menu_preview_col_6: Option<String>,
+    file_menu_preview_col_7: Option<String>,
+    file_menu_preview_col_8: Option<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -241,7 +294,7 @@ fn global_config_path() -> Option<PathBuf> {
 }
 
 /// Get the config directory (~/.config/lazycsv/).
-fn dirs_path() -> Option<PathBuf> {
+pub fn dirs_path() -> Option<PathBuf> {
     #[cfg(target_os = "macos")]
     {
         std::env::var("HOME")
@@ -366,6 +419,88 @@ fn apply_toml(config: &mut Config, toml: &TomlConfig, path: &Path, warnings: &mu
         "dirty_indicator_fg"
     );
 
+    // File menu colors
+    apply_color!(
+        config.theme.file_menu_dir_fg,
+        toml.theme.file_menu_dir_fg,
+        "file_menu_dir_fg"
+    );
+    apply_color!(
+        config.theme.file_menu_highlight_bg,
+        toml.theme.file_menu_highlight_bg,
+        "file_menu_highlight_bg"
+    );
+    apply_color!(
+        config.theme.file_menu_highlight_fg,
+        toml.theme.file_menu_highlight_fg,
+        "file_menu_highlight_fg"
+    );
+    apply_color!(
+        config.theme.file_menu_separator_fg,
+        toml.theme.file_menu_separator_fg,
+        "file_menu_separator_fg"
+    );
+    apply_color!(
+        config.theme.file_menu_status_bg,
+        toml.theme.file_menu_status_bg,
+        "file_menu_status_bg"
+    );
+    apply_color!(
+        config.theme.file_menu_status_mode_bg,
+        toml.theme.file_menu_status_mode_bg,
+        "file_menu_status_mode_bg"
+    );
+    apply_color!(
+        config.theme.file_menu_status_accent_bg,
+        toml.theme.file_menu_status_accent_bg,
+        "file_menu_status_accent_bg"
+    );
+    apply_color!(
+        config.theme.file_menu_active_indicator_fg,
+        toml.theme.file_menu_active_indicator_fg,
+        "file_menu_active_indicator_fg"
+    );
+    apply_color!(
+        config.theme.file_menu_preview_col_1,
+        toml.theme.file_menu_preview_col_1,
+        "file_menu_preview_col_1"
+    );
+    apply_color!(
+        config.theme.file_menu_preview_col_2,
+        toml.theme.file_menu_preview_col_2,
+        "file_menu_preview_col_2"
+    );
+    apply_color!(
+        config.theme.file_menu_preview_col_3,
+        toml.theme.file_menu_preview_col_3,
+        "file_menu_preview_col_3"
+    );
+    apply_color!(
+        config.theme.file_menu_preview_col_4,
+        toml.theme.file_menu_preview_col_4,
+        "file_menu_preview_col_4"
+    );
+    apply_color!(
+        config.theme.file_menu_preview_col_5,
+        toml.theme.file_menu_preview_col_5,
+        "file_menu_preview_col_5"
+    );
+    apply_color!(
+        config.theme.file_menu_preview_col_6,
+        toml.theme.file_menu_preview_col_6,
+        "file_menu_preview_col_6"
+    );
+    apply_color!(
+        config.theme.file_menu_preview_col_7,
+        toml.theme.file_menu_preview_col_7,
+        "file_menu_preview_col_7"
+    );
+    apply_color!(
+        config.theme.file_menu_preview_col_8,
+        toml.theme.file_menu_preview_col_8,
+        "file_menu_preview_col_8"
+    );
+
     if let Some(b) = toml.theme.header_bold {
         config.theme.header_bold = b;
     }
@@ -448,7 +583,7 @@ pub fn save_sql_history(history: &[String], limit: usize) {
 ///   "gray", "darkgray", "lightred", "lightgreen", "lightyellow", "lightblue",
 ///   "lightmagenta", "lightcyan"
 /// - Hex RGB: "#1e1e1e", "#ff0000"
-fn parse_color(s: &str) -> Option<Color> {
+pub fn parse_color(s: &str) -> Option<Color> {
     let s = s.trim().to_lowercase();
 
     // Hex color
@@ -459,16 +594,17 @@ fn parse_color(s: &str) -> Option<Color> {
         return Some(Color::Rgb(r, g, b));
     }
 
-    // Named colors
+    // Named colors (terminal + extended CSS-style)
     match s.as_str() {
+        // Terminal colors
         "black" => Some(Color::Black),
         "white" => Some(Color::White),
         "red" => Some(Color::Red),
         "green" => Some(Color::Green),
         "blue" => Some(Color::Blue),
         "yellow" => Some(Color::Yellow),
-        "cyan" => Some(Color::Cyan),
-        "magenta" => Some(Color::Magenta),
+        "cyan" | "aqua" => Some(Color::Cyan),
+        "magenta" | "fuchsia" => Some(Color::Magenta),
         "gray" | "grey" => Some(Color::Gray),
         "darkgray" | "darkgrey" => Some(Color::DarkGray),
         "lightred" => Some(Color::LightRed),
@@ -477,6 +613,37 @@ fn parse_color(s: &str) -> Option<Color> {
         "lightblue" => Some(Color::LightBlue),
         "lightmagenta" => Some(Color::LightMagenta),
         "lightcyan" => Some(Color::LightCyan),
+        // Grays
+        "silver" => Some(Color::Rgb(192, 192, 192)),
+        "dimgray" | "dimgrey" => Some(Color::Rgb(105, 105, 105)),
+        // Reds/Pinks
+        "crimson" => Some(Color::Rgb(220, 20, 60)),
+        "pink" => Some(Color::Rgb(255, 192, 203)),
+        "hotpink" => Some(Color::Rgb(255, 105, 180)),
+        "firebrick" => Some(Color::Rgb(178, 34, 34)),
+        // Blues
+        "darkblue" => Some(Color::Rgb(0, 0, 139)),
+        "teal" => Some(Color::Rgb(0, 128, 128)),
+        // Greens
+        "lime" => Some(Color::Rgb(0, 255, 0)),
+        "forestgreen" => Some(Color::Rgb(34, 139, 34)),
+        "seagreen" => Some(Color::Rgb(46, 139, 87)),
+        "olive" => Some(Color::Rgb(128, 128, 0)),
+        // Yellows/Oranges
+        "gold" => Some(Color::Rgb(255, 215, 0)),
+        "orange" => Some(Color::Rgb(255, 165, 0)),
+        "darkorange" => Some(Color::Rgb(255, 140, 0)),
+        "lemonchiffon" => Some(Color::Rgb(255, 250, 205)),
+        // Purples
+        "purple" => Some(Color::Rgb(128, 0, 128)),
+        "rebeccapurple" => Some(Color::Rgb(102, 51, 153)),
+        "indigo" => Some(Color::Rgb(75, 0, 130)),
+        // Browns/Beiges
+        "brown" => Some(Color::Rgb(165, 42, 42)),
+        "maroon" => Some(Color::Rgb(128, 0, 0)),
+        "sandybrown" => Some(Color::Rgb(244, 164, 96)),
+        "beige" => Some(Color::Rgb(245, 245, 220)),
+        "antiquewhite" => Some(Color::Rgb(250, 235, 215)),
         _ => None,
     }
 }

@@ -9,7 +9,7 @@ use crate::app::{App, Mode};
 use crate::input::actions::InputResult;
 use crate::input::StatusMessage;
 use anyhow::Result;
-pub use browser::{scan_directory, BrowserEntry};
+pub use browser::{scan_directory, scan_directory_filtered, BrowserEntry};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// Handle keyboard input in file list mode
@@ -20,9 +20,13 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     }
 
     match (key.code, key.modifiers) {
-        // Exit file manager
+        // Exit file manager (or close spot popup first)
         (KeyCode::Esc, _) | (KeyCode::Char('q'), KeyModifiers::NONE) => {
-            cancel(app);
+            if app.view_state.file_spot_visible {
+                app.view_state.file_spot_visible = false;
+            } else {
+                cancel(app);
+            }
             Ok(InputResult::Continue)
         }
 
@@ -35,9 +39,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
 
         // Navigation - vim keys and arrows
         (KeyCode::Up, _) | (KeyCode::Char('k'), KeyModifiers::NONE) => {
-            if app.view_state.file_list_selected > 0 {
-                app.view_state.file_list_selected -= 1;
-            }
+            move_up(app);
             Ok(InputResult::Continue)
         }
         (KeyCode::Down, _) | (KeyCode::Char('j'), KeyModifiers::NONE) => {
@@ -63,7 +65,9 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         (KeyCode::Char('G'), KeyModifiers::SHIFT) => {
             // Get browser entries for current directory
             let current_dir = app.view_state.current_directory.clone();
-            if let Ok(entries) = scan_directory(&current_dir) {
+            if let Ok(entries) =
+                scan_directory_filtered(&current_dir, app.view_state.show_hidden_files)
+            {
                 let filter = app.input_state.file_filter_buffer.to_lowercase();
                 let filtered_count = count_filtered_browser_entries(&entries, &filter);
                 if filtered_count > 0 {
@@ -81,6 +85,19 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         // Go up to parent directory
         (KeyCode::Left, _) | (KeyCode::Char('h'), KeyModifiers::NONE) => {
             navigate_to_parent(app);
+            Ok(InputResult::Continue)
+        }
+
+        // Toggle hidden files (yazi-style)
+        (KeyCode::Char('.'), KeyModifiers::NONE) => {
+            app.view_state.show_hidden_files = !app.view_state.show_hidden_files;
+            app.view_state.file_list_selected = 0;
+            Ok(InputResult::Continue)
+        }
+
+        // Toggle file details popup (yazi Spot)
+        (KeyCode::Tab, _) => {
+            app.view_state.file_spot_visible = !app.view_state.file_spot_visible;
             Ok(InputResult::Continue)
         }
 
@@ -111,7 +128,9 @@ fn handle_search_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             app.input_state.file_list_search_active = false;
             // Get browser entries for current directory
             let current_dir = app.view_state.current_directory.clone();
-            if let Ok(entries) = scan_directory(&current_dir) {
+            if let Ok(entries) =
+                scan_directory_filtered(&current_dir, app.view_state.show_hidden_files)
+            {
                 let filter = app.input_state.file_filter_buffer.to_lowercase();
                 let filtered_count = count_filtered_browser_entries(&entries, &filter);
                 if filtered_count == 0 && !app.input_state.file_filter_buffer.is_empty() {
@@ -154,15 +173,35 @@ fn cancel(app: &mut App) {
     app.view_state.file_list_selected = 0;
 }
 
-/// Move file list selection down
+/// Move file list selection up (wraps to bottom)
+fn move_up(app: &mut App) {
+    if app.view_state.file_list_selected > 0 {
+        app.view_state.file_list_selected -= 1;
+    } else {
+        // Wrap to bottom
+        let current_dir = app.view_state.current_directory.clone();
+        if let Ok(entries) = scan_directory_filtered(&current_dir, app.view_state.show_hidden_files)
+        {
+            let filter = app.input_state.file_filter_buffer.to_lowercase();
+            let filtered_count = count_filtered_browser_entries(&entries, &filter);
+            if filtered_count > 0 {
+                app.view_state.file_list_selected = filtered_count - 1;
+            }
+        }
+    }
+}
+
+/// Move file list selection down (wraps to top)
 fn move_down(app: &mut App) {
-    // Get browser entries for current directory
     let current_dir = app.view_state.current_directory.clone();
-    if let Ok(entries) = scan_directory(&current_dir) {
+    if let Ok(entries) = scan_directory_filtered(&current_dir, app.view_state.show_hidden_files) {
         let filter = app.input_state.file_filter_buffer.to_lowercase();
         let filtered_count = count_filtered_browser_entries(&entries, &filter);
         if app.view_state.file_list_selected + 1 < filtered_count {
             app.view_state.file_list_selected += 1;
+        } else {
+            // Wrap to top
+            app.view_state.file_list_selected = 0;
         }
     }
 }
@@ -202,10 +241,21 @@ fn switch_to_index(app: &mut App, target: usize, current: usize) {
 
 /// Navigate to parent directory (h key - yazi-style)
 fn navigate_to_parent(app: &mut App) {
-    let current_dir = &app.view_state.current_directory;
+    let current_dir = app.view_state.current_directory.clone();
     if let Some(parent) = current_dir.parent() {
-        app.view_state.current_directory = parent.to_path_buf();
-        app.view_state.file_list_selected = 0;
+        let parent_buf = parent.to_path_buf();
+        // Find the index of the directory we just came from in the parent listing
+        let selected = scan_directory_filtered(&parent_buf, app.view_state.show_hidden_files)
+            .ok()
+            .and_then(|entries| {
+                let dir_name = current_dir.file_name()?;
+                entries
+                    .iter()
+                    .position(|e| e.filename() == dir_name.to_str())
+            })
+            .unwrap_or(0);
+        app.view_state.current_directory = parent_buf;
+        app.view_state.file_list_selected = selected;
         app.input_state.clear_file_filter();
     }
 }
@@ -214,7 +264,7 @@ fn navigate_to_parent(app: &mut App) {
 fn navigate_into_selected(app: &mut App) -> Result<InputResult> {
     // Get browser entries for current directory
     let current_dir = app.view_state.current_directory.clone();
-    let entries = match scan_directory(&current_dir) {
+    let entries = match scan_directory_filtered(&current_dir, app.view_state.show_hidden_files) {
         Ok(e) => e,
         Err(err) => {
             app.status_message = Some(StatusMessage::from(format!(
@@ -286,6 +336,15 @@ fn load_csv_file(app: &mut App, path: std::path::PathBuf) -> Result<InputResult>
         if index != current {
             switch_to_index(app, index, current);
         }
+        // Apply saved view settings
+        {
+            use crate::config::views;
+            let store = views::load_views();
+            let key = views::canonical_key(&path);
+            if let Some(fv) = store.files.get(&key) {
+                views::apply_file_view(&path, fv, &mut app.session, &mut app.view_state);
+            }
+        }
         cancel(app);
         if index != current {
             return Ok(InputResult::ReloadFile);
@@ -323,6 +382,16 @@ fn load_csv_file(app: &mut App, path: std::path::PathBuf) -> Result<InputResult>
     app.view_state.table_state.select(Some(0));
     app.view_state.selected_column = crate::domain::position::ColIndex::new(0);
     app.view_state.column_scroll_offset = 0;
+
+    // Apply saved view settings for this file
+    {
+        use crate::config::views;
+        let store = views::load_views();
+        let key = views::canonical_key(&path);
+        if let Some(fv) = store.files.get(&key) {
+            views::apply_file_view(&path, fv, &mut app.session, &mut app.view_state);
+        }
+    }
 
     app.status_message = Some(StatusMessage::from(format!(
         "Loaded: {}",

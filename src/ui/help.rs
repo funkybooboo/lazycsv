@@ -147,6 +147,10 @@ fn build_help_text() -> Vec<Line<'static>> {
         Line::from("  :type A number     Set column type (number/date/boolean/text)"),
         Line::from("  :type A            Show column type"),
         Line::from("  :type A none       Clear column type"),
+        Line::from("  :bgcolor C red     Set column C background color"),
+        Line::from("  :fgcolor C #ff0    Set column C foreground color"),
+        Line::from("  :bgcolor C clear   Remove column color"),
+        Line::from("  :clearview         Clear all saved view settings"),
         Line::from(""),
         // ── Cell Transforms ───────────────────────────────────
         Line::from(Span::styled("CELL TRANSFORMS", super::modal::bold_style())),
@@ -179,8 +183,10 @@ fn build_help_text() -> Vec<Line<'static>> {
         Line::from("  l / Right / Enter  Enter directory or open file"),
         Line::from("  gg / G             Jump to top/bottom"),
         Line::from("  /                  Search/filter files"),
+        Line::from("  .                  Toggle hidden files"),
+        Line::from("  Tab                File details (Spot)"),
         Line::from("  r/d/m/y/n          Rename/delete/move/copy/new"),
-        Line::from("  q / Esc            Close file menu"),
+        Line::from("  q / Esc            Close file menu / popup"),
         Line::from(""),
         // ── SQL Editor ────────────────────────────────────────
         Line::from(Span::styled("SQL EDITOR", super::modal::bold_style())),
