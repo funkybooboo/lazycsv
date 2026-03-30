@@ -58,7 +58,7 @@ fn calculate_cell_style(
     }
 
     let base = if is_in_visual_selection(app, row, col) {
-        let mut style = Style::default().add_modifier(Modifier::REVERSED);
+        let mut style = super::modal::visual_selection_style_from(theme);
         if let Some(sel) = &app.visual_selection {
             let (_, end_row, _, _) = sel.bounds();
             if row == end_row {
@@ -79,16 +79,22 @@ fn calculate_cell_style(
         Style::default()
     };
 
-    // Apply per-column colors (layer on top of base style)
-    let col_idx = col.get();
-    let mut style = base;
-    if let Some(&bg) = app.view_state.column_bg_colors.get(&col_idx) {
-        style = style.bg(bg);
+    // Apply per-column colors only to normal/zebra cells (not visual selection or search matches)
+    let is_visual = is_in_visual_selection(app, row, col);
+    let is_search = search_state.map(|s| s.is_match(row, col)).unwrap_or(false);
+    if !is_visual && !is_search {
+        let col_idx = col.get();
+        let mut style = base;
+        if let Some(&bg) = app.view_state.column_bg_colors.get(&col_idx) {
+            style = style.bg(bg);
+        }
+        if let Some(&fg) = app.view_state.column_fg_colors.get(&col_idx) {
+            style = style.fg(fg);
+        }
+        style
+    } else {
+        base
     }
-    if let Some(&fg) = app.view_state.column_fg_colors.get(&col_idx) {
-        style = style.fg(fg);
-    }
-    style
 }
 
 /// Check if a cell is within the current visual selection
