@@ -81,6 +81,18 @@ fn run_main() -> Result<()> {
         return execute_generate(rows, cols, gen_type, &cli_args);
     }
 
+    // Catch likely typos: -r <N> or -c <N> without -g
+    if !cli_args.generate {
+        let has_row_value = cli_args.rows.as_deref().is_some_and(|v| !v.is_empty());
+        let has_col_value = cli_args.columns.as_deref().is_some_and(|v| !v.is_empty());
+        if has_row_value || has_col_value {
+            anyhow::bail!(
+                "Did you mean: lazycsv -g -r <ROWS> -c <COLUMNS> [-t <TYPE>] -o <FILE>\n  \
+                 The -g flag is required to generate CSV data"
+            );
+        }
+    }
+
     // Non-interactive xlsx-to-csv extraction mode
     if cli_args.xlsx {
         let path = cli_args
@@ -575,9 +587,10 @@ fn handle_sort_document(
 
     let cancelled = Arc::new(AtomicBool::new(false));
     let watcher = lazycsv::cancel::EscWatcher::spawn(&cancelled);
-    let completed = app
-        .document
-        .sort_by_columns(&col_indices, ascending, &cancelled);
+    let column_types = app.session.column_types().cloned().unwrap_or_default();
+    let completed =
+        app.document
+            .sort_by_columns_typed(&col_indices, ascending, &cancelled, &column_types);
     watcher.stop();
 
     if completed {

@@ -42,7 +42,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.17.1 | Module Organization & Cleanup | [ ] | TBD |
 | v0.18.0 | SQL IntelliSense & Auto-completion | [x] | TBD |
 | v0.18.1 | SQL IntelliSense Polish & Testing | [x] | 606 |
-| v0.19.0 | Column Resize & Advanced Column Operations | [ ] | TBD |
+| v0.19.0 | Column Resize & Advanced Column Operations | [x] | 60+ |
 | v0.19.1 | Documentation & Maintainability | [ ] | TBD |
 | v0.20.0 | Data Analysis, Statistics & Cell Formulas | [~] | 88 |
 | v0.20.1 | Technical Debt Reduction | [ ] | TBD |
@@ -167,6 +167,9 @@ Vim-style `:s` substitute with regex, row/column ranges, case-insensitive flag, 
 **[v0.29.0] - CSV Generation, Parallel Performance & File Manager UX**
 New `-g` CLI command generates synthetic CSV files with typed data schemas (customer, sales, marketing, weather, scientific, random) using parallel rayon-based generation across all CPU cores. `-r` (rows) and `-c` (columns) flags are context-sensitive: with `-g` they specify generation dimensions, without `-g` they print row/column counts as before. `-t` similarly doubles as stats flag and generation type selector. Parallelized search (`/` command) for mmap-backed documents: byte-level regex scan split across cores, candidate rows parsed in parallel bypassing the LRU cache. Parallelized `%s/pattern/replacement/g` substitute: parallel mmap byte scan to find candidate rows, parallel regex replacement, bulk edit overlay application. Writer optimization for lazy storage: contiguous unedited byte ranges written directly from mmap in bulk, reusable row buffer for edited rows, 8MB BufWriter, `sync_data()` instead of `sync_all()`. File manager UX: `ListState`-based scrolling so the `>` cursor stays visible when navigating past the viewport, Right/Left arrow keys to enter/exit directories, arrow keys exit search mode and immediately navigate the filtered list. Updated to rand 0.10. 45+ new tests covering generation (type validation, row/column counts, typed headers, column overflow, CSV crate roundtrip), lazy mmap search (basic, case-insensitive, regex, substring, header, invalid regex fallback, parity with in-memory results), writer bulk path with scattered edits, and CLI flag parsing for `-g`/`-r`/`-c`/`-t` dual semantics.
 
+**[v0.19.0](versions/v0.19.0.md) - Column Resize & Advanced Column Operations**
+Column width already complete from prior work. Column/row pinning: `:pin A,B` pins columns always-visible on left, `:pin 1,2` pins rows always-visible at top, `:unpin` clears both. Visual indicator: cyan + underline. Column type system: `:type A number/date/boolean/text` with validation on cell edit (rejects invalid values), type-aware sorting, and type indicators (#, D, ?) in column headers. Per-file state for all pin/type settings. 60+ tests.
+
 ###  Planned Versions
 
 **[v0.12.1](versions/v0.12.1.md) - UI System Testing** ✅ COMPLETE
@@ -196,11 +199,11 @@ SQL IntelliSense with table/column auto-completion and syntax validation.
 **[v0.18.1](versions/v0.18.1.md) - SQL IntelliSense Polish & Testing** ✅ COMPLETE
 Schema caching, fuzzy matching, Unicode support, auto-quoting for identifiers with spaces, comprehensive error prevention with inline diagnostics, query templates, and 50 integration tests. Fixed multiple Unicode/multi-byte panics across VimEditor and SQL systems.  
 
-**[v0.19.0](versions/v0.19.0.md) - Column Resize & Advanced Column Operations**  
-Interactive column resizing with visual feedback and advanced column manipulation.  
+**[v0.19.0](versions/v0.19.0.md) - Column Resize & Advanced Column Operations** ✅ COMPLETE
+Column width, column/row pinning, column type system with validation and type-aware sorting. 60+ tests.
 
-**[v0.19.1](versions/v0.19.1.md) - Documentation & Maintainability**  
-Documentation improvements with examples, troubleshooting guides, and API docs.  
+**[v0.19.1](versions/v0.19.1.md) - Documentation & Maintainability**
+Documentation improvements with examples, troubleshooting guides, and API docs.
 
 **[v0.20.0](versions/v0.20.0.md) - Data Analysis, Statistics & Cell Formulas** (IN PROGRESS)
 Column statistics commands (:stats, :sum, :avg, :count, :distinct), Excel-like cell formulas (=SUM, =AVERAGE, =IF, =VLOOKUP, and 20 more), formula bar display, auto re-evaluation, and formula completion popup.

@@ -42,8 +42,11 @@ pub struct ViewState {
     /// Selected index in file list (for FileList mode)
     pub file_list_selected: usize,
 
-    /// Help search query (None when not searching)
+    /// Help search query (None when not searching, Some for highlights + n/N navigation)
     pub help_search_query: Option<String>,
+
+    /// Whether the user is actively typing in the help search prompt
+    pub help_search_input_active: bool,
 
     /// Current match index in help search results
     pub help_search_match_index: usize,
@@ -67,6 +70,7 @@ impl Default for ViewState {
             help_scroll_offset: 0,
             file_list_selected: 0,
             help_search_query: None,
+            help_search_input_active: false,
             help_search_match_index: 0,
             current_directory: std::env::current_dir()
                 .unwrap_or_else(|_| std::path::PathBuf::from(".")),
@@ -94,8 +98,9 @@ impl ViewState {
     /// Hide the help overlay
     pub fn hide_help(&mut self) {
         self.help_overlay_visible = false;
-        self.help_scroll_offset = 0; // Reset scroll when closing
-        self.help_search_query = None; // Clear search when closing
+        self.help_scroll_offset = 0;
+        self.help_search_query = None;
+        self.help_search_input_active = false;
         self.help_search_match_index = 0;
     }
 

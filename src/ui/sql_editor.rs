@@ -186,6 +186,27 @@ fn render_completion_popup(
 
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, popup_inner);
+
+    // Scroll indicators: render on the right border of the popup
+    let total = filtered.len();
+    if total > visible_count {
+        let has_above = scroll_offset > 0;
+        let has_below = scroll_offset + visible_count < total;
+        let border_style = Style::default()
+            .fg(Color::White)
+            .bg(super::modal::COLOR_POPUP_BG);
+
+        // Place arrows on the right border column (popup_rect edge)
+        let border_x = popup_rect.right().saturating_sub(1);
+        if has_above {
+            let r = Rect::new(border_x, popup_rect.y + 1, 1, 1);
+            frame.render_widget(Paragraph::new("▲").style(border_style), r);
+        }
+        if has_below {
+            let r = Rect::new(border_x, popup_rect.bottom().saturating_sub(2), 1, 1);
+            frame.render_widget(Paragraph::new("▼").style(border_style), r);
+        }
+    }
 }
 
 const HISTORY_MAX_VISIBLE: usize = 10;
@@ -270,7 +291,7 @@ fn build_status_line<'a>(
     sql_error: Option<&str>,
     width: usize,
 ) -> Line<'a> {
-    let help_text = "Ctrl+Enter: execute | Ctrl+F: format | Ctrl+H: history | :w/:q | Esc: exit";
+    let help_text = "Ctrl+Enter: execute | Ctrl+F: format | Ctrl+H: history | Ctrl+N: complete | Ctrl+/: help | Esc: exit";
 
     // Left side: Mode or command buffer or error
     let left = if let Some(err) = sql_error {

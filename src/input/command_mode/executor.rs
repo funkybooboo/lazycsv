@@ -131,6 +131,9 @@ pub fn execute(app: &mut App) -> Result<InputResult> {
         "count" => super::stats::execute_count(app, _arg),
         "distinct" => super::stats::execute_distinct(app, _arg),
         "width" | "resize" => execute_width(app, _arg),
+        "freeze" | "pin" => execute_freeze(app, _arg),
+        "unfreeze" | "unpin" => execute_unfreeze(app),
+        "type" => execute_type(app, _arg),
         "copy" => execute_copy_to_clipboard(app),
         "paste" => execute_paste_from_clipboard(app),
         "upper" | "uppercase" => execute_cell_transform(app, crate::transforms::to_upper),
@@ -198,7 +201,7 @@ fn execute_write_quit(app: &mut App) -> Result<InputResult> {
 
 /// Execute :h/:help command
 fn execute_help(app: &mut App) -> Result<InputResult> {
-    app.status_message = Some(StatusMessage::from("Press ? for help"));
+    app.view_state.toggle_help();
     Ok(InputResult::Continue)
 }
 
@@ -589,6 +592,184 @@ fn execute_width(app: &mut App, arg: Option<&str>) -> Result<InputResult> {
         }
     }
 
+    Ok(InputResult::Continue)
+}
+
+/// Execute :freeze/:pin command — freeze columns or rows.
+/// Alphabetic specs (A,B) freeze columns; numeric specs (1,5) freeze rows.
+fn execute_freeze(app: &mut App, arg: Option<&str>) -> Result<InputResult> {
+    let arg = match arg {
+        Some(a) if !a.is_empty() => a,
+        _ => {
+            app.status_message = Some(StatusMessage::from(
+                "Usage: :freeze A,B (columns) or :freeze 1,3 (rows)",
+            ));
+            return Ok(InputResult::Continue);
+        }
+    };
+
+    let specs: Vec<&str> = arg
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
+    if specs.is_empty() {
+        app.status_message = Some(StatusMessage::from(
+            "Usage: :freeze A,B (columns) or :freeze 1,3 (rows)",
+        ));
+        return Ok(InputResult::Continue);
+    }
+
+    // Detect whether specs are numeric (rows) or alphabetic (columns)
+    let is_numeric = specs[0].chars().all(|c| c.is_ascii_digit());
+
+    if is_numeric {
+        // Freeze rows — user provides 1-based display row numbers,
+        // convert to 0-based internal indices.
+        let row_count = app.document.row_count();
+        let mut indices = Vec::new();
+        let mut names = Vec::new();
+        for spec in &specs {
+            match spec.parse::<usize>() {
+                Ok(n) if n >= 1 && n <= row_count => {
+                    indices.push(n - 1); // Convert display (1-based) to internal (0-based)
+                    names.push(spec.to_string());
+                }
+                Ok(_) => {
+                    app.status_message =
+                        Some(StatusMessage::from(format!("Row {} does not exist", spec)));
+                    return Ok(InputResult::Continue);
+                }
+                Err(_) => {
+                    app.status_message =
+                        Some(StatusMessage::from(format!("Invalid row number: {}", spec)));
+                    return Ok(InputResult::Continue);
+                }
+            }
+        }
+        app.session.freeze_rows(indices);
+        app.status_message = Some(StatusMessage::from(format!(
+            "Pinned row(s) {}",
+            names.join(", ")
+        )));
+    } else {
+        // Freeze columns
+        let col_count = app.document.column_count();
+        let mut indices = Vec::new();
+        let mut names = Vec::new();
+        for spec in &specs {
+            match excel_letter_to_column(spec) {
+                Ok(idx) if idx < col_count => {
+                    indices.push(idx);
+                    names.push(spec.to_uppercase());
+                }
+                Ok(_) => {
+                    app.status_message = Some(StatusMessage::from(format!(
+                        "Column {} does not exist",
+                        spec.to_uppercase()
+                    )));
+                    return Ok(InputResult::Continue);
+                }
+                Err(_) => {
+                    app.status_message =
+                        Some(StatusMessage::from(format!("Invalid column: {}", spec)));
+                    return Ok(InputResult::Continue);
+                }
+            }
+        }
+        app.session.freeze_columns(indices);
+        app.status_message = Some(StatusMessage::from(format!(
+            "Pinned column(s) {}",
+            names.join(", ")
+        )));
+    }
+
+    Ok(InputResult::Continue)
+}
+
+/// Execute :unfreeze/:unpin command.
+/// `:unfreeze` clears all, `:unfreeze cols` clears columns only, `:unfreeze rows` clears rows only.
+fn execute_unfreeze(app: &mut App) -> Result<InputResult> {
+    app.session.unfreeze_all();
+    app.status_message = Some(StatusMessage::from("All columns and rows unpinned"));
+    Ok(InputResult::Continue)
+}
+
+/// Execute :type command — set or show column data type.
+fn execute_type(app: &mut App, arg: Option<&str>) -> Result<InputResult> {
+    use crate::column::metadata::ColumnType;
+
+    let arg = match arg {
+        Some(a) if !a.is_empty() => a,
+        _ => {
+            app.status_message = Some(StatusMessage::from(
+                "Usage: :type <column> <number|date|boolean|text>",
+            ));
+            return Ok(InputResult::Continue);
+        }
+    };
+
+    let parts: Vec<&str> = arg.split_whitespace().collect();
+    let col_spec = parts[0];
+
+    let col_index = match excel_letter_to_column(col_spec) {
+        Ok(idx) => idx,
+        Err(_) => {
+            app.status_message = Some(StatusMessage::from(format!("Invalid column: {}", col_spec)));
+            return Ok(InputResult::Continue);
+        }
+    };
+
+    if col_index >= app.document.column_count() {
+        app.status_message = Some(StatusMessage::from(format!(
+            "Column {} does not exist",
+            col_spec.to_uppercase()
+        )));
+        return Ok(InputResult::Continue);
+    }
+
+    if parts.len() == 1 {
+        // Show current type
+        let type_name = app
+            .session
+            .column_type(col_index)
+            .map(|t| t.display_name())
+            .unwrap_or("none");
+        app.status_message = Some(StatusMessage::from(format!(
+            "Column {}: {}",
+            col_spec.to_uppercase(),
+            type_name
+        )));
+        return Ok(InputResult::Continue);
+    }
+
+    let type_name = parts[1];
+    if type_name.eq_ignore_ascii_case("none") || type_name.eq_ignore_ascii_case("clear") {
+        app.session.clear_column_type(col_index);
+        app.status_message = Some(StatusMessage::from(format!(
+            "Column {} type cleared",
+            col_spec.to_uppercase()
+        )));
+        return Ok(InputResult::Continue);
+    }
+
+    let col_type = match ColumnType::from_name(type_name) {
+        Some(t) => t,
+        None => {
+            app.status_message = Some(StatusMessage::from(format!(
+                "Unknown type '{}'. Valid: number, date, boolean, text",
+                type_name
+            )));
+            return Ok(InputResult::Continue);
+        }
+    };
+
+    app.session.set_column_type(col_index, col_type);
+    app.status_message = Some(StatusMessage::from(format!(
+        "Column {} type set to {}",
+        col_spec.to_uppercase(),
+        col_type.display_name()
+    )));
     Ok(InputResult::Continue)
 }
 

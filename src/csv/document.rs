@@ -1008,9 +1008,25 @@ impl Document {
         ascending: bool,
         cancelled: &std::sync::atomic::AtomicBool,
     ) -> bool {
-        let completed = self
-            .storage
-            .sort_by_columns(col_indices, ascending, cancelled);
+        self.sort_by_columns_typed(
+            col_indices,
+            ascending,
+            cancelled,
+            &std::collections::HashMap::new(),
+        )
+    }
+
+    /// Sort data rows with column type annotations for type-aware comparison.
+    pub fn sort_by_columns_typed(
+        &mut self,
+        col_indices: &[usize],
+        ascending: bool,
+        cancelled: &std::sync::atomic::AtomicBool,
+        column_types: &std::collections::HashMap<usize, crate::column::metadata::ColumnType>,
+    ) -> bool {
+        let completed =
+            self.storage
+                .sort_by_columns_typed(col_indices, ascending, cancelled, column_types);
         if completed {
             self.is_dirty = true;
             self.generation += 1;

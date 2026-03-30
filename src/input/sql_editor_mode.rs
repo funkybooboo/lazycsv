@@ -333,9 +333,9 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     if key.code == KeyCode::Char('n') && key.modifiers.contains(KeyModifiers::CONTROL) {
         let sql_text = editor.content();
 
-        // If editor is empty, show query templates instead of completions
+        // If editor is empty, show full help (templates + examples + tips)
         if sql_text.trim().is_empty() {
-            let items = build_template_items();
+            let items = build_sql_help_items();
             if !items.is_empty() {
                 app.sql_completion = Some(SqlCompletion::new(items, ""));
             }
@@ -482,6 +482,13 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         } else {
             app.status_message = Some(StatusMessage::new_owned("No SQL history yet".to_string()));
         }
+        return Ok(InputResult::Continue);
+    }
+
+    // --- Ctrl+/: SQL help, templates, examples & tips ---
+    if key.code == KeyCode::Char('/') && key.modifiers.contains(KeyModifiers::CONTROL) {
+        let items = build_sql_help_items();
+        app.sql_completion = Some(SqlCompletion::new(items, ""));
         return Ok(InputResult::Continue);
     }
 
@@ -1186,6 +1193,42 @@ fn build_template_items() -> Vec<CompletionItem> {
             ],
         },
     ]
+}
+
+/// Build SQL help items: interactive templates, query examples, and tips.
+/// Used by both Ctrl+/ (help) and Ctrl+N on empty editor.
+fn build_sql_help_items() -> Vec<CompletionItem> {
+    let mut items = Vec::new();
+
+    // ── Interactive Templates (with wizard steps) ─────
+    items.extend(build_template_items());
+
+    // ── Query Examples (insert example SQL) ───────────
+    let examples = [
+        ("Example: SELECT basics", "SELECT col1, col2 FROM tablename WHERE col1 = 'value'"),
+        ("Example: SELECT with LIMIT", "SELECT * FROM tablename LIMIT 100"),
+        ("Example: COUNT / GROUP BY", "SELECT col, COUNT(*) AS cnt\nFROM tablename\nGROUP BY col\nORDER BY cnt DESC"),
+        ("Example: Aggregate functions", "SELECT MIN(col), MAX(col), AVG(col), SUM(col)\nFROM tablename"),
+        ("Example: DISTINCT values", "SELECT DISTINCT col FROM tablename ORDER BY col"),
+        ("Example: LIKE pattern match", "SELECT * FROM tablename WHERE col LIKE '%pattern%'"),
+        ("Example: CASE expression", "SELECT col,\n  CASE WHEN col > 100 THEN 'high' ELSE 'low' END AS label\nFROM tablename"),
+        ("Example: Subquery / IN", "SELECT * FROM tablename\nWHERE col IN (SELECT col FROM other_table)"),
+        ("Example: Window function", "SELECT col,\n  ROW_NUMBER() OVER (PARTITION BY grp ORDER BY col) AS rn\nFROM tablename"),
+        ("Example: UPDATE rows", "UPDATE tablename SET col = 'new_value' WHERE col = 'old_value'"),
+        ("Example: INSERT row", "INSERT INTO tablename VALUES ('val1', 'val2')"),
+        ("Example: DELETE rows", "DELETE FROM tablename WHERE col = 'value'"),
+        ("Example: ADD column", "ALTER TABLE tablename ADD COLUMN new_col TEXT"),
+    ];
+    for (text, template) in examples {
+        items.push(CompletionItem {
+            text: text.to_string(),
+            kind: CompletionKind::Keyword,
+            template: Some(template.to_string()),
+            template_steps: vec![],
+        });
+    }
+
+    items
 }
 
 /// Format a SQL statement using the sqlformat crate.

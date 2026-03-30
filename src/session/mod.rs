@@ -3,6 +3,7 @@
 //! This module handles file switching between multiple CSV files and
 //! maintains the configuration settings for parsing CSV files.
 
+use crate::column::metadata::ColumnType;
 use crate::Document;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -80,6 +81,15 @@ pub struct Session {
 
     /// Per-file undo/redo history (preserved across file switches)
     history_cache: HashMap<PathBuf, crate::history::History>,
+
+    /// Per-file frozen (pinned) column indices, kept sorted.
+    frozen_columns: HashMap<PathBuf, Vec<usize>>,
+
+    /// Per-file frozen (pinned) row indices, kept sorted.
+    frozen_rows: HashMap<PathBuf, Vec<usize>>,
+
+    /// Per-file column type annotations.
+    column_types: HashMap<PathBuf, HashMap<usize, ColumnType>>,
 }
 
 impl Session {
@@ -96,6 +106,9 @@ impl Session {
             file_mtimes: HashMap::new(),
             column_widths: HashMap::new(),
             history_cache: HashMap::new(),
+            frozen_columns: HashMap::new(),
+            frozen_rows: HashMap::new(),
+            column_types: HashMap::new(),
         }
     }
 
@@ -185,6 +198,92 @@ impl Session {
     pub fn clear_all_column_widths(&mut self) {
         let file = &self.files[self.active_file_index];
         self.column_widths.remove(file);
+    }
+
+    // ── Frozen columns ─────────────────────────────────────────
+
+    /// Get frozen column indices for the current file (sorted).
+    pub fn frozen_columns(&self) -> &[usize] {
+        self.frozen_columns
+            .get(&self.files[self.active_file_index])
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// Freeze (pin) the given columns for the current file.
+    pub fn freeze_columns(&mut self, mut col_indices: Vec<usize>) {
+        col_indices.sort_unstable();
+        col_indices.dedup();
+        let file = self.files[self.active_file_index].clone();
+        self.frozen_columns.insert(file, col_indices);
+    }
+
+    /// Unfreeze all columns for the current file.
+    pub fn unfreeze_columns(&mut self) {
+        let file = &self.files[self.active_file_index];
+        self.frozen_columns.remove(file);
+    }
+
+    // ── Frozen rows ───────────────────────────────────────────
+
+    /// Get frozen row indices for the current file (sorted).
+    pub fn frozen_rows(&self) -> &[usize] {
+        self.frozen_rows
+            .get(&self.files[self.active_file_index])
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// Freeze (pin) the given rows for the current file.
+    pub fn freeze_rows(&mut self, mut row_indices: Vec<usize>) {
+        row_indices.sort_unstable();
+        row_indices.dedup();
+        let file = self.files[self.active_file_index].clone();
+        self.frozen_rows.insert(file, row_indices);
+    }
+
+    /// Unfreeze all rows for the current file.
+    pub fn unfreeze_rows(&mut self) {
+        let file = &self.files[self.active_file_index];
+        self.frozen_rows.remove(file);
+    }
+
+    /// Unfreeze all columns and rows for the current file.
+    pub fn unfreeze_all(&mut self) {
+        self.unfreeze_columns();
+        self.unfreeze_rows();
+    }
+
+    // ── Column types ──────────────────────────────────────────
+
+    /// Get the column type for a column in the current file.
+    pub fn column_type(&self, col_index: usize) -> Option<ColumnType> {
+        self.column_types
+            .get(&self.files[self.active_file_index])
+            .and_then(|types| types.get(&col_index))
+            .copied()
+    }
+
+    /// Get all column types for the current file.
+    pub fn column_types(&self) -> Option<&HashMap<usize, ColumnType>> {
+        self.column_types.get(&self.files[self.active_file_index])
+    }
+
+    /// Set the column type for a column in the current file.
+    pub fn set_column_type(&mut self, col_index: usize, col_type: ColumnType) {
+        let file = self.files[self.active_file_index].clone();
+        self.column_types
+            .entry(file)
+            .or_default()
+            .insert(col_index, col_type);
+    }
+
+    /// Clear the column type for a column in the current file.
+    pub fn clear_column_type(&mut self, col_index: usize) {
+        let file = &self.files[self.active_file_index];
+        if let Some(types) = self.column_types.get_mut(file) {
+            types.remove(&col_index);
+        }
     }
 
     /// Get delimiter for a specific file (default: ',')
@@ -290,7 +389,19 @@ impl Session {
         }
         // Migrate file mtime tracking
         if let Some(mtime) = self.file_mtimes.remove(&old_path) {
-            self.file_mtimes.insert(new_path, mtime);
+            self.file_mtimes.insert(new_path.clone(), mtime);
+        }
+        // Migrate frozen columns
+        if let Some(frozen) = self.frozen_columns.remove(&old_path) {
+            self.frozen_columns.insert(new_path.clone(), frozen);
+        }
+        // Migrate frozen rows
+        if let Some(frozen) = self.frozen_rows.remove(&old_path) {
+            self.frozen_rows.insert(new_path.clone(), frozen);
+        }
+        // Migrate column types
+        if let Some(types) = self.column_types.remove(&old_path) {
+            self.column_types.insert(new_path, types);
         }
     }
 
@@ -350,6 +461,9 @@ impl Session {
         self.query_output_files.remove(&removed);
         self.delimiters.remove(&removed);
         self.file_mtimes.remove(&removed);
+        self.frozen_columns.remove(&removed);
+        self.frozen_rows.remove(&removed);
+        self.column_types.remove(&removed);
 
         // Adjust active_file_index
         if self.files.is_empty() {
@@ -641,5 +755,160 @@ mod tests {
         session.unmark_query_output(&files[0]);
         assert!(!session.is_query_output(&files[0]));
         assert!(session.find_query_output_file().is_none());
+    }
+
+    // ── Frozen columns tests ─────────────────────────────
+
+    #[test]
+    fn test_freeze_columns() {
+        let files = test_files();
+        let mut session = Session::new(files, 0, FileConfig::new());
+
+        assert!(session.frozen_columns().is_empty());
+
+        session.freeze_columns(vec![2, 0, 2]); // duplicates and unsorted
+        assert_eq!(session.frozen_columns(), &[0, 2]); // sorted and deduped
+    }
+
+    #[test]
+    fn test_unfreeze_columns() {
+        let files = test_files();
+        let mut session = Session::new(files, 0, FileConfig::new());
+
+        session.freeze_columns(vec![0, 1]);
+        assert_eq!(session.frozen_columns().len(), 2);
+
+        session.unfreeze_columns();
+        assert!(session.frozen_columns().is_empty());
+    }
+
+    // ── Frozen rows tests ────────────────────────────────
+
+    #[test]
+    fn test_freeze_rows() {
+        let files = test_files();
+        let mut session = Session::new(files, 0, FileConfig::new());
+
+        assert!(session.frozen_rows().is_empty());
+
+        session.freeze_rows(vec![3, 1, 3]); // duplicates and unsorted
+        assert_eq!(session.frozen_rows(), &[1, 3]); // sorted and deduped
+    }
+
+    #[test]
+    fn test_unfreeze_rows() {
+        let files = test_files();
+        let mut session = Session::new(files, 0, FileConfig::new());
+
+        session.freeze_rows(vec![0, 5]);
+        assert_eq!(session.frozen_rows().len(), 2);
+
+        session.unfreeze_rows();
+        assert!(session.frozen_rows().is_empty());
+    }
+
+    #[test]
+    fn test_unfreeze_all_clears_both() {
+        let files = test_files();
+        let mut session = Session::new(files, 0, FileConfig::new());
+
+        session.freeze_columns(vec![0, 1]);
+        session.freeze_rows(vec![0, 2]);
+
+        session.unfreeze_all();
+        assert!(session.frozen_columns().is_empty());
+        assert!(session.frozen_rows().is_empty());
+    }
+
+    #[test]
+    fn test_frozen_per_file() {
+        let files = test_files();
+        let mut session = Session::new(files.clone(), 0, FileConfig::new());
+
+        // Freeze columns on file 0
+        session.freeze_columns(vec![0]);
+        assert_eq!(session.frozen_columns(), &[0]);
+
+        // Switch to file 1 — no frozen columns
+        session.next_file();
+        assert!(session.frozen_columns().is_empty());
+
+        // Switch back — still frozen
+        session.prev_file();
+        assert_eq!(session.frozen_columns(), &[0]);
+    }
+
+    // ── Column types tests ───────────────────────────────
+
+    #[test]
+    fn test_set_and_get_column_type() {
+        let files = test_files();
+        let mut session = Session::new(files, 0, FileConfig::new());
+
+        assert!(session.column_type(0).is_none());
+
+        session.set_column_type(0, ColumnType::Number);
+        assert_eq!(session.column_type(0), Some(ColumnType::Number));
+
+        session.set_column_type(1, ColumnType::Date);
+        assert_eq!(session.column_type(1), Some(ColumnType::Date));
+    }
+
+    #[test]
+    fn test_clear_column_type() {
+        let files = test_files();
+        let mut session = Session::new(files, 0, FileConfig::new());
+
+        session.set_column_type(0, ColumnType::Number);
+        assert!(session.column_type(0).is_some());
+
+        session.clear_column_type(0);
+        assert!(session.column_type(0).is_none());
+    }
+
+    #[test]
+    fn test_column_types_per_file() {
+        let files = test_files();
+        let mut session = Session::new(files.clone(), 0, FileConfig::new());
+
+        session.set_column_type(0, ColumnType::Number);
+        assert_eq!(session.column_type(0), Some(ColumnType::Number));
+
+        session.next_file();
+        assert!(session.column_type(0).is_none());
+
+        session.prev_file();
+        assert_eq!(session.column_type(0), Some(ColumnType::Number));
+    }
+
+    #[test]
+    fn test_rename_migrates_frozen_and_types() {
+        let files = test_files();
+        let mut session = Session::new(files.clone(), 0, FileConfig::new());
+
+        session.freeze_columns(vec![0]);
+        session.freeze_rows(vec![1]);
+        session.set_column_type(0, ColumnType::Date);
+
+        let new_path = PathBuf::from("renamed.csv");
+        session.rename_current_file(new_path.clone());
+
+        assert_eq!(session.frozen_columns(), &[0]);
+        assert_eq!(session.frozen_rows(), &[1]);
+        assert_eq!(session.column_type(0), Some(ColumnType::Date));
+    }
+
+    #[test]
+    fn test_remove_file_cleans_frozen_and_types() {
+        let files = test_files();
+        let mut session = Session::new(files.clone(), 0, FileConfig::new());
+
+        session.freeze_columns(vec![0]);
+        session.set_column_type(0, ColumnType::Number);
+
+        session.remove_file(&files[0]);
+        // After removal, active file changed — the old file's state is gone
+        assert!(session.frozen_columns().is_empty());
+        assert!(session.column_type(0).is_none());
     }
 }

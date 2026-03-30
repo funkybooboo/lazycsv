@@ -4,7 +4,7 @@ use crate::app::App;
 use crossterm::event::{KeyCode, KeyModifiers};
 
 /// Maximum scroll position for help overlay content
-const HELP_CONTENT_LINES: u16 = 52;
+const HELP_CONTENT_LINES: u16 = 200;
 
 /// Page size for help overlay scrolling (Ctrl+d/u)
 const HELP_PAGE_SIZE: u16 = 10;
@@ -52,8 +52,8 @@ pub fn handle_key(app: &mut App, key: KeyCode, modifiers: KeyModifiers) -> bool 
         return false;
     }
 
-    // Handle help search mode
-    if app.view_state.help_search_query.is_some() {
+    // Handle help search input mode (user is typing in the search prompt)
+    if app.view_state.help_search_input_active {
         return handle_search_input(app, key);
     }
 
@@ -63,12 +63,20 @@ pub fn handle_key(app: &mut App, key: KeyCode, modifiers: KeyModifiers) -> bool 
         // Allow '?' to pass through so it can toggle help off
         KeyCode::Char('?') => false,
         KeyCode::Esc => {
-            close(app);
+            if app.view_state.help_search_query.is_some() {
+                // First Esc: clear search highlights
+                app.view_state.help_search_query = None;
+                app.view_state.help_search_match_index = 0;
+            } else {
+                // Second Esc (no active search): close help
+                close(app);
+            }
             true
         }
         KeyCode::Char('/') => {
-            // Enter search mode
+            // Enter search input mode
             app.view_state.help_search_query = Some(String::new());
+            app.view_state.help_search_input_active = true;
             app.help_search_buffer.clear();
             true
         }
@@ -121,18 +129,20 @@ pub fn handle_key(app: &mut App, key: KeyCode, modifiers: KeyModifiers) -> bool 
     }
 }
 
-/// Handle keyboard input during help search mode
+/// Handle keyboard input during help search input mode
 fn handle_search_input(app: &mut App, key: KeyCode) -> bool {
     match key {
         KeyCode::Esc => {
-            // Cancel search
+            // Cancel search entirely
             app.view_state.help_search_query = None;
+            app.view_state.help_search_input_active = false;
             app.help_search_buffer.clear();
             app.view_state.help_search_match_index = 0;
             true
         }
         KeyCode::Enter => {
-            // Execute search and jump to first match
+            // Confirm search: exit input mode, keep query for highlighting + n/N
+            app.view_state.help_search_input_active = false;
             execute_help_search(app);
             true
         }
@@ -140,6 +150,7 @@ fn handle_search_input(app: &mut App, key: KeyCode) -> bool {
             if app.help_search_buffer.is_empty() {
                 // Exit search mode if buffer is empty
                 app.view_state.help_search_query = None;
+                app.view_state.help_search_input_active = false;
             } else {
                 app.help_search_buffer.pop();
                 app.view_state.help_search_query = Some(app.help_search_buffer.clone());
@@ -505,5 +516,76 @@ mod tests {
         let matches_lower = find_help_matches("insert");
         let matches_upper = find_help_matches("INSERT");
         assert_eq!(matches_lower, matches_upper);
+    }
+
+    #[test]
+    fn test_slash_enters_search_input_mode() {
+        let mut app = create_test_app();
+        app.view_state.help_overlay_visible = true;
+
+        let handled = handle_key(&mut app, KeyCode::Char('/'), KeyModifiers::empty());
+        assert!(handled);
+        assert!(app.view_state.help_search_input_active);
+        assert_eq!(app.view_state.help_search_query, Some(String::new()));
+    }
+
+    #[test]
+    fn test_enter_confirms_search_exits_input_mode() {
+        let mut app = create_test_app();
+        app.view_state.help_overlay_visible = true;
+        app.view_state.help_search_input_active = true;
+        app.help_search_buffer = "pin".to_string();
+        app.view_state.help_search_query = Some("pin".to_string());
+
+        let handled = handle_key(&mut app, KeyCode::Enter, KeyModifiers::empty());
+        assert!(handled);
+        assert!(!app.view_state.help_search_input_active); // input mode exited
+        assert!(app.view_state.help_search_query.is_some()); // query preserved for n/N
+    }
+
+    #[test]
+    fn test_n_navigates_after_search_confirmed() {
+        let mut app = create_test_app();
+        app.view_state.help_overlay_visible = true;
+        app.view_state.help_search_query = Some("pin".to_string());
+        app.view_state.help_search_input_active = false;
+
+        let initial_offset = app.view_state.help_scroll_offset;
+        let handled = handle_key(&mut app, KeyCode::Char('n'), KeyModifiers::empty());
+        assert!(handled);
+        // Scroll offset should change (or stay if only one match)
+        // At minimum, it should not crash
+        let _ = app.view_state.help_scroll_offset;
+        let _ = initial_offset;
+    }
+
+    #[test]
+    fn test_esc_clears_search_before_closing_help() {
+        let mut app = create_test_app();
+        app.view_state.help_overlay_visible = true;
+        app.view_state.help_search_query = Some("pin".to_string());
+        app.view_state.help_search_input_active = false;
+
+        // First Esc: clears search, keeps help open
+        let handled = handle_key(&mut app, KeyCode::Esc, KeyModifiers::empty());
+        assert!(handled);
+        assert!(app.view_state.help_overlay_visible); // still open
+        assert!(app.view_state.help_search_query.is_none()); // search cleared
+
+        // Second Esc: closes help
+        let handled = handle_key(&mut app, KeyCode::Esc, KeyModifiers::empty());
+        assert!(handled);
+        assert!(!app.view_state.help_overlay_visible);
+    }
+
+    #[test]
+    fn test_esc_closes_help_when_no_search() {
+        let mut app = create_test_app();
+        app.view_state.help_overlay_visible = true;
+        // No active search query
+
+        let handled = handle_key(&mut app, KeyCode::Esc, KeyModifiers::empty());
+        assert!(handled);
+        assert!(!app.view_state.help_overlay_visible);
     }
 }

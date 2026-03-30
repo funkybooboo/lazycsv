@@ -369,6 +369,17 @@ impl RowStorage {
         ascending: bool,
         cancelled: &std::sync::atomic::AtomicBool,
     ) -> bool {
+        self.sort_by_columns_typed(col_indices, ascending, cancelled, &HashMap::new())
+    }
+
+    /// Sort with column type annotations for type-aware comparison.
+    pub fn sort_by_columns_typed(
+        &mut self,
+        col_indices: &[usize],
+        ascending: bool,
+        cancelled: &std::sync::atomic::AtomicBool,
+        column_types: &HashMap<usize, crate::column::metadata::ColumnType>,
+    ) -> bool {
         use rayon::prelude::*;
         use std::sync::atomic::Ordering;
 
@@ -382,7 +393,7 @@ impl RowStorage {
                     if cancelled.load(Ordering::Relaxed) {
                         return std::cmp::Ordering::Equal;
                     }
-                    compare_rows(a, b, col_indices, ascending)
+                    compare_rows(a, b, col_indices, ascending, column_types)
                 });
                 !cancelled.load(Ordering::Relaxed)
             }
@@ -400,7 +411,12 @@ impl RowStorage {
                             return None;
                         }
                         let row_bytes = get_row_bytes(&s.mmap, &s.row_offsets, i);
-                        Some(extract_sort_keys(row_bytes, s.delimiter, col_indices))
+                        Some(extract_sort_keys(
+                            row_bytes,
+                            s.delimiter,
+                            col_indices,
+                            column_types,
+                        ))
                     })
                     .collect();
 
@@ -1115,12 +1131,28 @@ impl Ord for SortKey {
 }
 
 /// Extract sort keys from raw row bytes for the given column indices.
-fn extract_sort_keys(row_bytes: &[u8], delimiter: u8, col_indices: &[usize]) -> Vec<SortKey> {
+fn extract_sort_keys(
+    row_bytes: &[u8],
+    delimiter: u8,
+    col_indices: &[usize],
+    column_types: &HashMap<usize, crate::column::metadata::ColumnType>,
+) -> Vec<SortKey> {
     let row = parse_single_row(row_bytes, delimiter);
     col_indices
         .iter()
         .map(|&col| {
             let val = row.get(col).map(|s| s.as_str()).unwrap_or("");
+            if let Some(col_type) = column_types.get(&col) {
+                use crate::column::metadata::ColumnType;
+                match col_type {
+                    ColumnType::Number => {
+                        let n = val.replace(',', "").parse::<f64>().unwrap_or(f64::NAN);
+                        return SortKey::Numeric(n);
+                    }
+                    ColumnType::Text => return SortKey::Text(val.to_lowercase()),
+                    _ => {} // Date/Boolean: fall through to default heuristic
+                }
+            }
             match val.parse::<f64>() {
                 Ok(n) => SortKey::Numeric(n),
                 Err(_) => SortKey::Text(val.to_owned()),
@@ -1135,13 +1167,18 @@ fn compare_rows(
     b: &[String],
     col_indices: &[usize],
     ascending: bool,
+    column_types: &HashMap<usize, crate::column::metadata::ColumnType>,
 ) -> std::cmp::Ordering {
     for &col in col_indices {
         let va = a.get(col).map(|s| s.as_str()).unwrap_or("");
         let vb = b.get(col).map(|s| s.as_str()).unwrap_or("");
-        let ord = match (va.parse::<f64>(), vb.parse::<f64>()) {
-            (Ok(na), Ok(nb)) => na.partial_cmp(&nb).unwrap_or(std::cmp::Ordering::Equal),
-            _ => va.cmp(vb),
+        let ord = if let Some(col_type) = column_types.get(&col) {
+            col_type.compare(va, vb)
+        } else {
+            match (va.parse::<f64>(), vb.parse::<f64>()) {
+                (Ok(na), Ok(nb)) => na.partial_cmp(&nb).unwrap_or(std::cmp::Ordering::Equal),
+                _ => va.cmp(vb),
+            }
         };
         let ord = if ascending { ord } else { ord.reverse() };
         if ord != std::cmp::Ordering::Equal {

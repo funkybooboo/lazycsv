@@ -5,6 +5,7 @@
 //! screens.
 
 use ratatui::{
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
@@ -20,12 +21,14 @@ pub fn get_help_text() -> Vec<Line<'static>> {
 
 /// Build the help text lines
 fn build_help_text() -> Vec<Line<'static>> {
+    let version = env!("CARGO_PKG_VERSION");
     vec![
         Line::from(Span::styled(
-            "LazyCSV v0.6.0 - Keyboard Shortcuts",
+            format!("LazyCSV v{} - Keyboard Shortcuts & Commands", version),
             super::modal::bold_style(),
         )),
         Line::from(""),
+        // ── Navigation ────────────────────────────────────────
         Line::from(Span::styled("NAVIGATION", super::modal::bold_style())),
         Line::from("  hjkl / arrows      Move cursor (with count: 5j, 10h)"),
         Line::from("  w / b / e          Next/prev/last non-empty cell"),
@@ -34,109 +37,164 @@ fn build_help_text() -> Vec<Line<'static>> {
         Line::from("  5g                 Jump to row 5"),
         Line::from("  0 / $              First/last column"),
         Line::from("  Ctrl+d / Ctrl+u    Page down/up"),
+        Line::from("  :cA / :c1          Jump to column A (by letter or number)"),
         Line::from(""),
-        Line::from(Span::styled(
-            "COLUMN NAVIGATION",
-            super::modal::bold_style(),
-        )),
-        Line::from("  :cA                Jump to column A"),
-        Line::from("  :cB                Jump to column B"),
-        Line::from("  :cAA               Jump to column AA"),
-        Line::from("  :c1                Jump to column 1 (A)"),
-        Line::from("  :c27               Jump to column 27 (AA)"),
-        Line::from(""),
-        Line::from(Span::styled("COMMAND MODE", super::modal::bold_style())),
-        Line::from("  :                  Enter command mode"),
-        Line::from("  :q / :wq / :q!     Quit (save/force)"),
-        Line::from("  :w / :W            Save file / all files"),
-        Line::from("  :delim ;           Set delimiter to semicolon"),
-        Line::from("  :new A,B,C         Create new CSV with headers"),
-        Line::from("  :f <name>          Rename current file"),
-        Line::from("  :sort <col,...>    Sort ascending by column(s)"),
-        Line::from("  :sort! <col,...>   Sort descending by column(s)"),
-        Line::from("  Esc                Cancel command"),
-        Line::from(""),
-        Line::from(Span::styled("RANGE OPERATIONS", super::modal::bold_style())),
-        Line::from("  :5,10d             Delete rows 5-10"),
-        Line::from("  :5,10y             Yank rows 5-10"),
-        Line::from("  :%d / :%y          Delete/yank all data rows"),
-        Line::from("  :.d / :.y          Delete/yank current row"),
-        Line::from("  :$d / :$y          Delete/yank last row"),
-        Line::from(""),
-        Line::from(Span::styled("INSERT MODE", super::modal::bold_style())),
-        Line::from("  i / a              Edit cell (cursor at end)"),
-        Line::from("  I                  Edit cell (cursor at start)"),
-        Line::from("  A                  Edit cell (cursor at end)"),
+        // ── Editing ───────────────────────────────────────────
+        Line::from(Span::styled("EDITING", super::modal::bold_style())),
+        Line::from("  i / a              Edit cell (cursor at start/end)"),
+        Line::from("  I / A              Edit cell (cursor at start/end)"),
         Line::from("  s                  Replace cell (clear + edit)"),
+        Line::from("  r                  Replace cell content"),
         Line::from("  F2                 Edit cell"),
-        Line::from("  Delete             Clear cell (stay in Normal)"),
+        Line::from("  x / Delete         Clear cell"),
+        Line::from("  ~                  Toggle case"),
+        Line::from("  g~                 Title case"),
+        Line::from("  g.                 Toggle boolean"),
+        Line::from("  cw                 Copy cell (internal + clipboard)"),
+        Line::from("  u / Ctrl+r         Undo / redo"),
+        Line::from("  .                  Repeat last edit"),
         Line::from(""),
-        Line::from(Span::styled(
-            "INSERT MODE EDITING",
-            super::modal::bold_style(),
-        )),
+        // ── Insert Mode ───────────────────────────────────────
+        Line::from(Span::styled("INSERT MODE", super::modal::bold_style())),
         Line::from("  Enter              Commit, move down"),
         Line::from("  Shift+Enter        Commit, move up"),
-        Line::from("  Tab                Commit, move right"),
-        Line::from("  Shift+Tab          Commit, move left"),
+        Line::from("  Tab / Shift+Tab    Commit, move right/left"),
         Line::from("  Esc                Cancel edit"),
         Line::from("  Backspace          Delete char before cursor"),
         Line::from("  Ctrl+w             Delete word backward"),
         Line::from("  Ctrl+u             Delete to start"),
         Line::from(""),
+        // ── Row Operations ────────────────────────────────────
+        Line::from(Span::styled("ROW OPERATIONS", super::modal::bold_style())),
+        Line::from("  o / O              Insert row below/above"),
+        Line::from("  dd                 Delete row (5dd for 5 rows)"),
+        Line::from("  yy                 Yank (copy) row"),
+        Line::from("  p / P              Paste row below/above"),
+        Line::from("  gj / gk            Swap row down/up"),
+        Line::from(""),
+        // ── Column Operations ─────────────────────────────────
+        Line::from(Span::styled(
+            "COLUMN OPERATIONS (comma leader)",
+            super::modal::bold_style(),
+        )),
+        Line::from("  ,dd                Delete column"),
+        Line::from("  ,yy                Yank column"),
+        Line::from("  ,p / ,P            Paste column right/left"),
+        Line::from("  ,o / ,O            Insert column right/left"),
+        Line::from(""),
+        // ── Visual Mode ───────────────────────────────────────
+        Line::from(Span::styled("VISUAL MODE", super::modal::bold_style())),
+        Line::from("  v                  Visual block (rectangular)"),
+        Line::from("  V                  Visual line (whole rows)"),
+        Line::from("  ,v                 Visual column (whole columns)"),
+        Line::from("  d / y / p          Delete/yank/paste selection"),
+        Line::from("  gv                 Re-select last selection"),
+        Line::from(""),
+        // ── Search ────────────────────────────────────────────
+        Line::from(Span::styled("SEARCH", super::modal::bold_style())),
+        Line::from("  /pattern           Search (regex supported)"),
+        Line::from("  n / N              Next/previous match"),
+        Line::from("  *                  Search current cell content"),
+        Line::from("  :noh               Clear search highlighting"),
+        Line::from(""),
+        // ── Commands ──────────────────────────────────────────
+        Line::from(Span::styled("COMMANDS", super::modal::bold_style())),
+        Line::from("  :q / :wq / :q!     Quit (save/force)"),
+        Line::from("  :w / :w!           Save file"),
+        Line::from("  :h / :help         Show this help"),
+        Line::from("  :f <name>          Rename current file"),
+        Line::from("  :new A,B,C         Create new CSV with headers"),
+        Line::from("  :delim ;           Set delimiter"),
+        Line::from(""),
+        // ── Sort & Data ───────────────────────────────────────
+        Line::from(Span::styled("SORT & DATA", super::modal::bold_style())),
+        Line::from("  :sort Col          Sort ascending by column(s)"),
+        Line::from("  :sort! Col         Sort descending"),
+        Line::from("  :stats [Col]       Column statistics"),
+        Line::from("  :sum / :avg Col    Sum/average of column"),
+        Line::from("  :count / :distinct Column count/distinct values"),
+        Line::from(""),
+        // ── Find & Replace ────────────────────────────────────
+        Line::from(Span::styled("FIND & REPLACE", super::modal::bold_style())),
+        Line::from("  :s/old/new/        Replace in current cell"),
+        Line::from("  :%s/old/new/g      Replace all in all cells"),
+        Line::from("  :5,10s/old/new/g   Replace in row range"),
+        Line::from("  :B,Ds/old/new/g    Replace in column range"),
+        Line::from("  Flags: g (global), i (case-insensitive)"),
+        Line::from(""),
+        // ── Range Operations ──────────────────────────────────
+        Line::from(Span::styled("RANGE OPERATIONS", super::modal::bold_style())),
+        Line::from("  :5,10d / :5,10y    Delete/yank rows 5-10"),
+        Line::from("  :B,Dd / :B,Dy      Delete/yank columns B-D"),
+        Line::from("  :B,Dm A            Move columns B-D after A"),
+        Line::from("  :%d / :%y          All data rows"),
+        Line::from(""),
+        // ── Column Width, Pin & Type ──────────────────────────
+        Line::from(Span::styled(
+            "COLUMN/ROW PIN & TYPE",
+            super::modal::bold_style(),
+        )),
+        Line::from("  :width A 20        Set column A width to 20"),
+        Line::from("  :width A auto      Auto-size column A"),
+        Line::from("  :pin A,B           Pin columns (always visible)"),
+        Line::from("  :pin 1,2           Pin rows (always visible)"),
+        Line::from("  :unpin             Unpin all columns and rows"),
+        Line::from("  :type A number     Set column type (number/date/boolean/text)"),
+        Line::from("  :type A            Show column type"),
+        Line::from("  :type A none       Clear column type"),
+        Line::from(""),
+        // ── Cell Transforms ───────────────────────────────────
+        Line::from(Span::styled("CELL TRANSFORMS", super::modal::bold_style())),
+        Line::from("  :upper / :lower    Uppercase/lowercase current cell"),
+        Line::from("  :title             Title case current cell"),
+        Line::from("  :trim              Trim whitespace from cell"),
+        Line::from(""),
+        // ── Clipboard ─────────────────────────────────────────
+        Line::from(Span::styled("CLIPBOARD", super::modal::bold_style())),
+        Line::from("  :copy              Copy CSV to system clipboard"),
+        Line::from("  :paste             Paste from system clipboard"),
+        Line::from(""),
+        // ── Magnifier Mode ────────────────────────────────────
         Line::from(Span::styled("MAGNIFIER MODE", super::modal::bold_style())),
         Line::from("  Space+m            Open magnifier (full vim editor)"),
-        Line::from("  ZZ / :wq           Save and close magnifier"),
+        Line::from("  ZZ / :wq           Save and close"),
         Line::from("  :q!                Close without saving"),
         Line::from("  Alt+h/j/k/l        Navigate to adjacent cells"),
-        Line::from("  i/a/o/O            Enter insert mode"),
-        Line::from("  hjkl / w/b/e       Vim motions"),
-        Line::from("  dd / yy / p        Delete/yank/paste lines"),
-        Line::from("  x / s              Delete/substitute char"),
         Line::from(""),
-        Line::from(Span::styled("ROW OPERATIONS", super::modal::bold_style())),
-        Line::from("  o                  Insert row below, enter Insert"),
-        Line::from("  O                  Insert row above, enter Insert"),
-        Line::from("  dd                 Delete row"),
-        Line::from("  yy                 Yank (copy) row"),
-        Line::from("  p                  Paste row below"),
-        Line::from(""),
+        // ── Viewport & Files ──────────────────────────────────
         Line::from(Span::styled("VIEWPORT & FILES", super::modal::bold_style())),
         Line::from("  zt / zz / zb       Row at top/center/bottom"),
+        Line::from("  [ / ]              Previous/next file"),
         Line::from("  Space+f            Open file menu"),
         Line::from(""),
+        // ── File Menu ─────────────────────────────────────────
         Line::from(Span::styled("FILE MENU", super::modal::bold_style())),
-        Line::from("  j/k                Navigate down/up"),
+        Line::from("  j/k / arrows       Navigate up/down"),
+        Line::from("  h / Left           Go to parent directory"),
+        Line::from("  l / Right / Enter  Enter directory or open file"),
         Line::from("  gg / G             Jump to top/bottom"),
-        Line::from("  h                  Go to parent directory"),
-        Line::from("  l / Enter          Enter directory or open CSV"),
-        Line::from("  /                  Search/filter"),
-        Line::from("  r                  Rename file/directory"),
-        Line::from("  d                  Delete file/directory"),
-        Line::from("  m                  Move file/directory"),
-        Line::from("  y                  Copy file/directory"),
-        Line::from("  n                  Create new file"),
+        Line::from("  /                  Search/filter files"),
+        Line::from("  r/d/m/y/n          Rename/delete/move/copy/new"),
         Line::from("  q / Esc            Close file menu"),
         Line::from(""),
+        // ── SQL Editor ────────────────────────────────────────
         Line::from(Span::styled("SQL EDITOR", super::modal::bold_style())),
-        Line::from("  Space+q            Open SQL query editor"),
-        Line::from("  Enter              Execute query (results in output.csv)"),
-        Line::from("  Shift+Enter        Insert newline in query"),
-        Line::from("  Esc                Close editor without executing"),
-        Line::from("  Ctrl+u             Clear query buffer"),
+        Line::from("  Space+q / :sql     Open SQL query editor"),
+        Line::from("  Enter              Execute query"),
+        Line::from("  Shift+Enter        Insert newline"),
+        Line::from("  Ctrl+H             Query history"),
+        Line::from("  Ctrl+F             Format SQL"),
+        Line::from("  Tab                Auto-complete"),
+        Line::from("  Esc                Close editor"),
         Line::from(""),
-        Line::from(Span::styled("GLOBAL", super::modal::bold_style())),
-        Line::from("  :q / :q!           Quit (force quit)"),
-        Line::from("  ?                  Toggle this help"),
-        Line::from(""),
+        // ── Help Navigation ───────────────────────────────────
         Line::from(Span::styled("HELP NAVIGATION", super::modal::bold_style())),
-        Line::from("  j/k                Scroll down/up one line"),
-        Line::from("  Ctrl+d / Ctrl+u    Scroll down/up one page"),
-        Line::from("  Ctrl+f / Ctrl+b    Scroll down/up one page"),
+        Line::from("  j/k                Scroll down/up"),
+        Line::from("  Ctrl+d / Ctrl+u    Page down/up"),
         Line::from("  g / G              Jump to top/bottom"),
         Line::from("  /                  Search help text"),
-        Line::from("  n / N              Next/previous search match"),
-        Line::from("  Esc / ?            Close help"),
+        Line::from("  n / N              Next/previous match"),
+        Line::from("  ? / Esc            Close help"),
         Line::from(""),
     ]
 }
@@ -176,12 +234,78 @@ pub fn render_help_overlay(frame: &mut Frame, scroll_offset: u16, search_query: 
     // Split layout for content and status bar
     let (content_area, status_area) = super::modal::split_with_status_bar(inner);
 
-    // Render help content
-    let paragraph = Paragraph::new(help_text).scroll((scroll_offset, 0));
+    // Render help content, highlighting search matches if active
+    let display_text = if let Some(query) = search_query.filter(|q| !q.is_empty()) {
+        highlight_matches(help_text, query)
+    } else {
+        help_text
+    };
+    let paragraph = Paragraph::new(display_text).scroll((scroll_offset, 0));
     frame.render_widget(paragraph, content_area);
 
     // Render status bar with navigation hints
     render_help_status_bar(frame, search_query, status_area);
+}
+
+/// Highlight search query matches within help text lines.
+/// Each line's spans are flattened to a string, then split around
+/// case-insensitive matches with the matched portions highlighted.
+fn highlight_matches<'a>(lines: Vec<Line<'a>>, query: &str) -> Vec<Line<'a>> {
+    let query_lower = query.to_lowercase();
+    let highlight_style = Style::default()
+        .fg(Color::Black)
+        .bg(Color::Yellow)
+        .add_modifier(Modifier::BOLD);
+
+    lines
+        .into_iter()
+        .map(|line| {
+            // Collect all text and styles from existing spans
+            let full_text: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
+            let text_lower = full_text.to_lowercase();
+
+            // If no match in this line, return as-is
+            if !text_lower.contains(&query_lower) {
+                return line;
+            }
+
+            // Build new spans with highlights
+            let mut spans: Vec<Span<'a>> = Vec::new();
+            let mut pos = 0;
+            let bytes = full_text.as_bytes();
+            let query_bytes = query_lower.as_bytes();
+
+            while pos < full_text.len() {
+                // Find next match (case-insensitive)
+                let remaining_lower = &text_lower[pos..];
+                if let Some(match_offset) = remaining_lower.find(&query_lower) {
+                    let match_start = pos + match_offset;
+                    let match_end = match_start + query_bytes.len();
+
+                    // Text before the match
+                    if match_start > pos {
+                        spans.push(Span::raw(
+                            String::from_utf8_lossy(&bytes[pos..match_start]).into_owned(),
+                        ));
+                    }
+                    // The matched text (preserve original case)
+                    spans.push(Span::styled(
+                        String::from_utf8_lossy(&bytes[match_start..match_end]).into_owned(),
+                        highlight_style,
+                    ));
+                    pos = match_end;
+                } else {
+                    // No more matches — emit the rest
+                    spans.push(Span::raw(
+                        String::from_utf8_lossy(&bytes[pos..]).into_owned(),
+                    ));
+                    break;
+                }
+            }
+
+            Line::from(spans)
+        })
+        .collect()
 }
 
 /// Render the help status bar with navigation hints

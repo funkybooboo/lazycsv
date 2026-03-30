@@ -128,6 +128,19 @@ fn commit_edit(app: &mut App) {
 
             // Only mark dirty if content changed
             if buffer.content != buffer.original {
+                // Type validation: reject values that don't match the column type
+                if let Some(col_type) = app.session.column_type(col_idx.get()) {
+                    if !buffer.content.is_empty() {
+                        if let Err(reason) = col_type.validate(&buffer.content) {
+                            app.status_message = Some(crate::input::StatusMessage::from(format!(
+                                "Type error: {}",
+                                reason
+                            )));
+                            app.edit_buffer = Some(buffer);
+                            return; // Stay in insert mode so user can fix
+                        }
+                    }
+                }
                 app.commit_cell_value(row_idx, col_idx, buffer.content);
             }
         }

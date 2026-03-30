@@ -6,6 +6,7 @@
 use super::utils::column_to_excel_letter;
 use crate::app::Mode;
 use crate::domain::position::{ColIndex, RowIndex};
+use crate::session::Session;
 use crate::App;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -30,9 +31,6 @@ fn row_number_col_width(row_count: usize) -> u16 {
     };
     (digits + 1) as u16
 }
-
-/// Offset added to selected position to account for column letters row
-const HEADER_ROW_OFFSET: usize = 1;
 
 /// Calculate cell style based on selection, search matches, and visual mode
 ///
@@ -154,35 +152,6 @@ fn ideal_column_width(app: &crate::App, col_idx: usize) -> u16 {
     ideal.clamp(MIN_COLUMN_WIDTH, max_width)
 }
 
-/// Build the column letters row (A, B, C...) with highlighting for selected column
-fn build_column_letters_row<'a>(
-    start_col: usize,
-    end_col: usize,
-    selected_column: ColIndex,
-    theme: &crate::config::Theme,
-    row_num_width: usize,
-) -> Row<'a> {
-    let base_style = if let Some(bg) = theme.header_bg {
-        Style::default().bg(bg)
-    } else {
-        Style::default()
-    };
-    let mut col_letter_cells = vec![Cell::from(" ".repeat(row_num_width)).style(base_style)]; // Align with row numbers column
-
-    for i in start_col..end_col {
-        let letter = column_to_excel_letter(i);
-        let col_idx = ColIndex::new(i);
-        let style = if col_idx == selected_column {
-            super::modal::bold_style().patch(base_style)
-        } else {
-            super::modal::dim_style().patch(base_style)
-        };
-        col_letter_cells.push(Cell::from(letter).style(style));
-    }
-
-    Row::new(col_letter_cells).height(1)
-}
-
 /// Calculate scroll offset based on viewport mode and selected row
 fn calculate_scroll_offset(
     selected_idx: usize,
@@ -254,22 +223,115 @@ fn format_edit_buffer(content: &str, cursor: usize, max_width: usize) -> String 
     with_cursor.chars().skip(start).take(max_width).collect()
 }
 
-/// Build data rows with proper styling for the current selection
-fn build_data_rows(
+/// Minimum column width in characters
+const MIN_COLUMN_WIDTH: u16 = 8;
+
+/// Truncation threshold - only truncate truly massive content
+const TRUNCATE_THRESHOLD: usize = 100;
+
+/// Build column letters row from an explicit list of column indices.
+/// Frozen columns get an underline indicator, typed columns get a type suffix.
+fn build_column_letters_row_v2<'a>(
+    display_cols: &[usize],
+    frozen: &[usize],
+    selected_column: ColIndex,
+    theme: &crate::config::Theme,
+    session: &Session,
+    row_num_width: usize,
+) -> Row<'a> {
+    let base_style = if let Some(bg) = theme.header_bg {
+        Style::default().bg(bg)
+    } else {
+        Style::default()
+    };
+    let mut cells = vec![Cell::from(" ".repeat(row_num_width)).style(base_style)];
+
+    for &col_idx in display_cols {
+        let mut letter = column_to_excel_letter(col_idx);
+        // Append type indicator if column has a type set
+        if let Some(col_type) = session.column_type(col_idx) {
+            let ind = col_type.indicator();
+            if !ind.is_empty() {
+                letter = format!("{}{}", letter, ind).into();
+            }
+        }
+        let is_frozen = frozen.contains(&col_idx);
+        let is_selected = ColIndex::new(col_idx) == selected_column;
+        let style = if is_selected {
+            let mut s = super::modal::bold_style().patch(base_style);
+            if is_frozen {
+                s = s.add_modifier(Modifier::UNDERLINED);
+            }
+            s
+        } else if is_frozen {
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::UNDERLINED)
+                .patch(base_style)
+        } else {
+            super::modal::dim_style().patch(base_style)
+        };
+        cells.push(Cell::from(letter).style(style));
+    }
+
+    Row::new(cells).height(1)
+}
+
+/// Calculate column widths from an explicit list of column indices.
+fn calculate_column_widths_v2(
+    app: &crate::App,
+    area: &Rect,
+    display_cols: &[usize],
+    row_num_width: u16,
+) -> (Vec<Constraint>, Vec<u16>) {
+    let mut constraints = vec![Constraint::Length(row_num_width)];
+    let mut raw_widths = vec![row_num_width];
+
+    let available_width = area.width.saturating_sub(row_num_width);
+
+    if display_cols.is_empty() {
+        return (constraints, raw_widths);
+    }
+
+    let ideal_widths: Vec<u16> = display_cols
+        .iter()
+        .map(|&col_idx| ideal_column_width(app, col_idx))
+        .collect();
+
+    let total_ideal: u16 = ideal_widths.iter().sum();
+
+    if total_ideal <= available_width {
+        for width in ideal_widths {
+            constraints.push(Constraint::Length(width));
+            raw_widths.push(width);
+        }
+    } else {
+        let scale = available_width as f64 / total_ideal as f64;
+        for ideal in ideal_widths {
+            let scaled = ((ideal as f64 * scale) as u16).max(MIN_COLUMN_WIDTH);
+            constraints.push(Constraint::Length(scaled));
+            raw_widths.push(scaled);
+        }
+    }
+
+    (constraints, raw_widths)
+}
+
+/// Build data rows from an explicit list of column indices.
+fn build_data_rows_v2(
     app: &App,
     visible_rows: &[Vec<String>],
     scroll_offset: usize,
-    start_col: usize,
-    end_col: usize,
+    display_cols: &[usize],
     column_widths: &[u16],
     row_num_width: usize,
 ) -> Vec<Row<'static>> {
+    let frozen_rows = app.session.frozen_rows();
     let selected_column = app.view_state.selected_column;
     let selected_row_idx = app.selected_row().map(|r| r.get());
     let is_insert_mode = app.mode == Mode::Insert;
     let search_state = app.search_state.as_ref();
 
-    // Get edit buffer info if in Insert mode (formatted per-cell with column width)
     let edit_info = if is_insert_mode {
         app.edit_buffer
             .as_ref()
@@ -284,29 +346,32 @@ fn build_data_rows(
         .map(|(idx_in_window, row)| {
             let row_idx = scroll_offset + idx_in_window;
             let is_selected_row = selected_row_idx == Some(row_idx);
+            let is_pinned = frozen_rows.contains(&row_idx);
 
-            // Row number: right-align within the gutter width (minus 1 for the trailing space)
             let num_digits = row_num_width.saturating_sub(1);
             let row_num_display = format!("{:>width$}", row_idx + 1, width = num_digits);
-            let row_num_style = if is_selected_row {
+            let mut row_num_style = if is_selected_row {
                 super::modal::row_number_style()
             } else if app.config.defaults.zebra_striping && row_idx.is_multiple_of(2) {
                 super::modal::zebra_stripe_style_from(&app.config.theme)
             } else {
                 Style::default()
             };
+            if is_pinned {
+                row_num_style = row_num_style
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::UNDERLINED);
+            }
             let mut cells = vec![Cell::from(row_num_display).style(row_num_style)];
 
-            for (i, col_idx) in (start_col..end_col).enumerate() {
+            for (i, &col_idx) in display_cols.iter().enumerate() {
                 let is_selected = is_selected_row && ColIndex::new(col_idx) == selected_column;
 
-                // Get column width (skip first element which is row number column)
                 let col_width = column_widths
                     .get(i + 1)
                     .copied()
                     .unwrap_or(MIN_COLUMN_WIDTH) as usize;
 
-                // Show edit buffer content when editing this cell
                 let raw_value = if is_selected && is_insert_mode {
                     if let Some((ref content, cursor)) = edit_info {
                         format_edit_buffer(content, cursor, col_width.saturating_sub(1))
@@ -328,7 +393,6 @@ fn build_data_rows(
 
                 // Pad content to fill column width for consistent highlighting
                 let display_text = if is_selected {
-                    // Pad to column width minus 1 for some margin
                     let char_count = cell_value.chars().count();
                     let pad_width = col_width.saturating_sub(1);
                     if char_count < pad_width {
@@ -340,100 +404,19 @@ fn build_data_rows(
                     cell_value
                 };
 
-                // Highlight current cell with background color
                 let ri = RowIndex::new(row_idx);
                 let ci = ColIndex::new(col_idx);
-                let style = calculate_cell_style(app, search_state, ri, ci, is_selected);
+                let mut style = calculate_cell_style(app, search_state, ri, ci, is_selected);
+                if is_pinned && !is_selected {
+                    style = style.add_modifier(Modifier::UNDERLINED);
+                }
 
                 cells.push(Cell::from(display_text).style(style));
             }
 
-            Row::new(cells).height(1)
+            Row::new(cells)
         })
         .collect()
-}
-
-/// Minimum column width in characters
-const MIN_COLUMN_WIDTH: u16 = 8;
-
-/// Truncation threshold - only truncate truly massive content
-const TRUNCATE_THRESHOLD: usize = 100;
-
-/// Calculate column widths based on content
-/// Returns (constraints for Table widget, raw widths in characters)
-fn calculate_column_widths(
-    app: &crate::App,
-    area: &Rect,
-    start_col: usize,
-    end_col: usize,
-    row_num_width: u16,
-) -> (Vec<Constraint>, Vec<u16>) {
-    let mut constraints = vec![Constraint::Length(row_num_width)];
-    let mut raw_widths = vec![row_num_width];
-
-    // Calculate available width for data columns
-    let available_width = area.width.saturating_sub(row_num_width);
-    let visible_col_count = end_col - start_col;
-
-    if visible_col_count == 0 {
-        return (constraints, raw_widths);
-    }
-
-    // Calculate ideal width for each column based on content (or use manual width)
-    let mut ideal_widths: Vec<u16> = Vec::with_capacity(visible_col_count);
-    for col_idx in start_col..end_col {
-        // Check for manually set width first
-        if let Some(manual_width) = app.session.column_width(col_idx) {
-            ideal_widths.push(manual_width.max(MIN_COLUMN_WIDTH));
-            continue;
-        }
-
-        // Auto-size: get header width
-        let header_len = app
-            .document
-            .header(ColIndex::new(col_idx))
-            .len()
-            .max(column_to_excel_letter(col_idx).len());
-
-        // Sample data rows to find max width (sample first 100 rows for performance)
-        let sample_rows = app
-            .document
-            .get_rows_range(0, 100.min(app.document.row_count()));
-        let max_data_len = sample_rows
-            .iter()
-            .filter_map(|row| row.get(col_idx))
-            .map(|s| s.chars().count()) // Use char count for unicode support
-            .max()
-            .unwrap_or(0);
-
-        // Calculate ideal width with min/max constraints
-        let max_width = app.config.defaults.max_column_width;
-        let ideal = (header_len.max(max_data_len) + 2) as u16; // +2 for padding
-        let constrained = ideal.clamp(MIN_COLUMN_WIDTH, max_width);
-        ideal_widths.push(constrained);
-    }
-
-    // Calculate total ideal width
-    let total_ideal: u16 = ideal_widths.iter().sum();
-
-    // If we have room, use ideal widths; otherwise scale proportionally
-    if total_ideal <= available_width {
-        // Use ideal widths
-        for width in ideal_widths {
-            constraints.push(Constraint::Length(width));
-            raw_widths.push(width);
-        }
-    } else {
-        // Scale down proportionally to fit available space
-        let scale = available_width as f64 / total_ideal as f64;
-        for ideal in ideal_widths {
-            let scaled = ((ideal as f64 * scale) as u16).max(MIN_COLUMN_WIDTH);
-            constraints.push(Constraint::Length(scaled));
-            raw_widths.push(scaled);
-        }
-    }
-
-    (constraints, raw_widths)
 }
 
 /// Render the main CSV table with virtual scrolling support.
@@ -453,16 +436,36 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     // Compute row number gutter width based on actual row count
     let row_num_width = row_number_col_width(csv.row_count());
 
-    // Calculate visible columns dynamically based on terminal width
+    // Frozen columns: always displayed first, before the scrollable region.
+    let frozen: Vec<usize> = app
+        .session
+        .frozen_columns()
+        .iter()
+        .copied()
+        .filter(|&c| c < csv.column_count())
+        .collect();
+    let frozen_width: u16 = frozen.iter().map(|&c| ideal_column_width(app, c)).sum();
+
+    // Calculate visible scrollable columns (excluding frozen) from remaining width
+    let scroll_available = area.width.saturating_sub(frozen_width);
     let start_col = app.view_state.column_scroll_offset;
     let (start_col, end_col) = calculate_visible_columns(
         app,
         start_col,
         csv.column_count(),
-        area.width,
+        scroll_available,
         row_num_width,
     );
-    let visible_col_count = end_col - start_col;
+
+    // Build display_cols: frozen first, then scrollable (skipping any that are frozen)
+    let mut display_cols: Vec<usize> = frozen.clone();
+    for c in start_col..end_col {
+        if !frozen.contains(&c) {
+            display_cols.push(c);
+        }
+    }
+
+    let visible_col_count = display_cols.len();
 
     // Store for navigation code to use
     app.view_state.visible_cols_count = visible_col_count;
@@ -475,57 +478,93 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 
     // Build column letters row
-    let col_letters_row = build_column_letters_row(
-        start_col,
-        end_col,
+    let col_letters_row = build_column_letters_row_v2(
+        &display_cols,
+        &frozen,
         app.view_state.selected_column,
         &app.config.theme,
+        &app.session,
         row_num_width as usize,
     );
 
+    // Frozen rows: always displayed at top, before the scrollable region.
+    let frozen_row_indices: Vec<usize> = app
+        .session
+        .frozen_rows()
+        .iter()
+        .copied()
+        .filter(|&r| r < csv.row_count())
+        .collect();
+    let frozen_row_count = frozen_row_indices.len();
+
     // Calculate visible viewport for virtual scrolling
-    let table_height = area
+    // Subtract: title(1) + rule(1) + col letters(1) + frozen rows + status bar(1)
+    let scrollable_height = area
         .height
         .saturating_sub(TABLE_HEADER_HEIGHT)
-        .saturating_sub(STATUS_BAR_HEIGHT) as usize;
+        .saturating_sub(STATUS_BAR_HEIGHT)
+        .saturating_sub(frozen_row_count as u16) as usize;
 
     let selected_idx = app.view_state.table_state.selected().unwrap_or(0);
 
     // Calculate scroll offset based on viewport mode
     let scroll_offset = calculate_scroll_offset(
         selected_idx,
-        table_height,
+        scrollable_height,
         csv.row_count(),
         &app.view_state.viewport_mode,
     );
 
-    // Get visible rows for current viewport (all rows, starting from scroll offset)
-    let data_start = scroll_offset;
-    let end_row = (data_start + table_height).min(csv.row_count());
-    let visible_rows_vec = if data_start < csv.row_count() {
-        csv.get_rows_range(data_start, end_row)
-    } else {
-        vec![]
-    };
-    let visible_rows = visible_rows_vec.as_slice();
-
     // Calculate column widths first (needed for cell padding)
-    let (widths, raw_widths) =
-        calculate_column_widths(app, &area, start_col, end_col, row_num_width);
+    let (widths, raw_widths) = calculate_column_widths_v2(app, &area, &display_cols, row_num_width);
 
-    // Build data rows with column widths for proper cell padding
-    let rows = build_data_rows(
-        app,
-        visible_rows,
-        data_start,
-        start_col,
-        end_col,
-        &raw_widths,
-        row_num_width as usize,
-    );
+    // Build frozen rows (rendered as a separate table above the scrollable table)
+    let mut frozen_data_rows: Vec<Row<'static>> = Vec::new();
+    for &fr_idx in &frozen_row_indices {
+        let fr_rows = csv.get_rows_range(fr_idx, fr_idx + 1);
+        let rows = build_data_rows_v2(
+            app,
+            &fr_rows,
+            fr_idx,
+            &display_cols,
+            &raw_widths,
+            row_num_width as usize,
+        );
+        frozen_data_rows.extend(rows);
+    }
 
-    // Combine column letters row + data rows
-    let all_rows = std::iter::once(col_letters_row).chain(rows);
+    // Build scrollable rows: walk from scroll_offset, skip frozen rows,
+    // collect until we fill the scrollable viewport height.
+    let data_start = scroll_offset;
+    let mut scrollable_indices: Vec<usize> = Vec::with_capacity(scrollable_height);
+    let mut idx = data_start;
+    while scrollable_indices.len() < scrollable_height && idx < csv.row_count() {
+        if !frozen_row_indices.contains(&idx) {
+            scrollable_indices.push(idx);
+        }
+        idx += 1;
+    }
+
+    let mut scrollable_data_rows: Vec<Row<'static>> = Vec::new();
+    for &row_idx in &scrollable_indices {
+        let row_data = csv.get_rows_range(row_idx, row_idx + 1);
+        let rows = build_data_rows_v2(
+            app,
+            &row_data,
+            row_idx,
+            &display_cols,
+            &raw_widths,
+            row_num_width as usize,
+        );
+        scrollable_data_rows.extend(rows);
+    }
+
+    // Combine: column letters row + frozen rows + scrollable rows into one table.
+    // This avoids ratatui stateful widget scrolling issues with multiple tables.
+    let mut all_rows: Vec<Row<'static>> = Vec::new();
+    all_rows.push(col_letters_row);
+    all_rows.extend(frozen_data_rows);
+    all_rows.extend(scrollable_data_rows);
 
     // Split area: title bar + horizontal rule + table content
     let chunks = Layout::default()
@@ -538,7 +577,6 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
         .split(area);
 
     // Title bar: cell value on left (not truncated)
-    // Shows formula text for formula cells, otherwise raw cell value (like Excel's formula bar)
     let cell_value = if let Some(row_idx) = app.selected_row() {
         let content = app.cell_formula_or_value(row_idx, app.view_state.selected_column);
         if content.is_empty() {
@@ -554,27 +592,14 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     let title_bar = Paragraph::new(title_text).style(Style::default().add_modifier(Modifier::BOLD));
     frame.render_widget(title_bar, chunks[0]);
 
-    // Horizontal rule (using unicode box-drawing character)
+    // Horizontal rule
     let rule = Paragraph::new("─".repeat(area.width as usize));
     frame.render_widget(rule, chunks[1]);
 
-    // Create table widget without borders
+    // Render as a plain (non-stateful) widget — we handle scrolling ourselves
+    // via scroll_offset and the scrollable_indices list.
     let table = Table::new(all_rows, widths);
-
-    // Render stateful widget with adjusted selection state
-    // Virtual scrolling requires adjusting the selected position to be relative
-    // to the visible window, plus offset for column letters row
-    let mut adjusted_state = app.view_state.table_state;
-    if let Some(selected) = adjusted_state.selected() {
-        let position_in_window = if selected >= scroll_offset && selected < end_row {
-            selected - scroll_offset
-        } else {
-            0
-        };
-        adjusted_state.select(Some(position_in_window + HEADER_ROW_OFFSET));
-    }
-
-    frame.render_stateful_widget(table, chunks[2], &mut adjusted_state);
+    frame.render_widget(table, chunks[2]);
 }
 
 #[cfg(test)]
