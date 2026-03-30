@@ -319,3 +319,98 @@ fn test_match_count_accuracy() {
 
     assert_eq!(state.match_count(), 4); // 4 cells contain "test"
 }
+
+// ============================================================================
+// Lazy (mmap-backed) search tests — exercises the parallel byte scan path
+// ============================================================================
+
+use lazycsv::csv::row_storage::RowStorage;
+
+fn make_lazy_doc(csv_content: &str) -> Document {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let file_path = temp_dir.keep().join("test_lazy.csv");
+    std::fs::write(&file_path, csv_content).unwrap();
+    let storage = RowStorage::lazy_from_file(&file_path, None, false).unwrap();
+    Document::from_storage(storage, "test_lazy.csv".to_string(), ',')
+}
+
+#[test]
+fn test_lazy_search_basic() {
+    let doc = make_lazy_doc("Name,City\nAlice,Portland\nBob,Boston\nCharlie,Portland\n");
+    let matches = find_matches(&doc, "Portland");
+    assert_eq!(matches.len(), 2);
+    assert_eq!(matches[0], (RowIndex::new(1), ColIndex::new(1)));
+    assert_eq!(matches[1], (RowIndex::new(3), ColIndex::new(1)));
+}
+
+#[test]
+fn test_lazy_search_case_insensitive() {
+    let doc = make_lazy_doc("Name,City\nAlice,PORTLAND\nBob,portland\n");
+    let matches = find_matches(&doc, "Portland");
+    assert_eq!(matches.len(), 2);
+}
+
+#[test]
+fn test_lazy_search_no_results() {
+    let doc = make_lazy_doc("Name,City\nAlice,Portland\nBob,Boston\n");
+    let matches = find_matches(&doc, "xyz_not_found");
+    assert!(matches.is_empty());
+}
+
+#[test]
+fn test_lazy_search_regex_pattern() {
+    let doc = make_lazy_doc("Name,City\nAlice,Portland\nBob,Boston\nCharlie,Seattle\n");
+    // Non-anchored regex works with lazy byte scan
+    let matches = find_matches(&doc, r"[Bb]o");
+    assert_eq!(matches.len(), 2); // "Bob" and "Boston"
+}
+
+#[test]
+fn test_lazy_search_includes_header() {
+    let doc = make_lazy_doc("Name,City\nAlice,Portland\n");
+    let matches = find_matches(&doc, "Name");
+    assert_eq!(matches.len(), 1);
+    assert_eq!(matches[0], (RowIndex::new(0), ColIndex::new(0)));
+}
+
+#[test]
+fn test_lazy_search_substring() {
+    let doc = make_lazy_doc("Name,City\nAlice,Portland\nBob,Boston\n");
+    let matches = find_matches(&doc, "land");
+    assert_eq!(matches.len(), 1);
+    assert_eq!(matches[0], (RowIndex::new(1), ColIndex::new(1)));
+}
+
+#[test]
+fn test_lazy_search_invalid_regex_fallback() {
+    let doc = make_lazy_doc("Name,Value\ntest[,other\n");
+    // "[" is invalid regex — should fall back to literal
+    let matches = find_matches(&doc, "[");
+    assert_eq!(matches.len(), 1);
+    assert_eq!(matches[0], (RowIndex::new(1), ColIndex::new(0)));
+}
+
+#[test]
+fn test_lazy_search_matches_in_memory_results() {
+    // Verify lazy search produces the same results as in-memory search
+    let csv = "Name,City,Score\nAlice,Portland,85\nBob,Boston,92\nCharlie,Portland,78\nDiana,Seattle,95\n";
+
+    let in_mem = make_doc(vec![
+        vec!["Name", "City", "Score"],
+        vec!["Alice", "Portland", "85"],
+        vec!["Bob", "Boston", "92"],
+        vec!["Charlie", "Portland", "78"],
+        vec!["Diana", "Seattle", "95"],
+    ]);
+    let lazy = make_lazy_doc(csv);
+
+    for pattern in &["Portland", "Bo", "^[A-D]", r"\d{2}", "e"] {
+        let mem_matches = find_matches(&in_mem, pattern);
+        let lazy_matches = find_matches(&lazy, pattern);
+        assert_eq!(
+            mem_matches, lazy_matches,
+            "mismatch for pattern '{}'",
+            pattern
+        );
+    }
+}

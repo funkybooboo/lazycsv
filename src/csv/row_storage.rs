@@ -352,6 +352,13 @@ impl RowStorage {
         }
     }
 
+    pub fn lazy_storage_mut(&mut self) -> Option<&mut LazyStorage> {
+        match self {
+            RowStorage::InMemory { .. } => None,
+            RowStorage::Lazy(s) => Some(s),
+        }
+    }
+
     /// Sort data rows by column indices using parallel sort with cancellation.
     /// For Lazy storage: extracts sort keys and reorders row_offsets (no materialization).
     /// For InMemory storage: uses parallel sort directly on the rows.
@@ -514,6 +521,14 @@ impl LazyStorage {
     /// Edited rows overlay.
     pub fn edits(&self) -> &HashMap<usize, Vec<String>> {
         &self.edits
+    }
+
+    /// Bulk-insert pre-computed edited rows into the edit overlay.
+    /// Used by parallel substitute to apply changes computed off-thread.
+    pub fn bulk_set_edits(&mut self, rows: Vec<(usize, Vec<String>)>) {
+        for (row_idx, row_data) in rows {
+            self.edits.insert(row_idx, row_data);
+        }
     }
 
     /// Get the raw bytes for a specific logical row index.
@@ -1137,7 +1152,7 @@ fn compare_rows(
 }
 
 /// Extract the raw bytes for a given row index.
-fn get_row_bytes<'a>(data: &'a [u8], offsets: &[u64], idx: usize) -> &'a [u8] {
+pub(crate) fn get_row_bytes<'a>(data: &'a [u8], offsets: &[u64], idx: usize) -> &'a [u8] {
     let start = offsets[idx] as usize;
     let end = if idx + 1 < offsets.len() {
         offsets[idx + 1] as usize
@@ -1153,7 +1168,7 @@ fn get_row_bytes<'a>(data: &'a [u8], offsets: &[u64], idx: usize) -> &'a [u8] {
 }
 
 /// Parse a single CSV row from raw bytes using the csv crate.
-fn parse_single_row(bytes: &[u8], delimiter: u8) -> Vec<String> {
+pub(crate) fn parse_single_row(bytes: &[u8], delimiter: u8) -> Vec<String> {
     let mut reader = csv::ReaderBuilder::new()
         .has_headers(false)
         .delimiter(delimiter)

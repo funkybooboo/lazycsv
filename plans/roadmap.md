@@ -57,6 +57,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.26.0 | SQL History, DuckDB VIEW Optimization & CLI Output Flag | [x] | - |
 | v0.27.0 | CLI Data Tools, Per-Command Help, TUI Editing & File Save Fix | [x] | - |
 | v0.28.0 | Multi-Format Support (Parquet, JSON, SQLite) | [x] | 70 |
+| v0.29.0 | CSV Generation, Parallel Performance & File Manager UX | [x] | 45+ |
 | v1.0.0 | Stable Release & Polish | [ ] | - |
 
 **Total Tests Passing:** 1,403 tests (all integration and unit tests across vim_editor, SQL, magnifier, UI, keybindings, and core modules)
@@ -162,6 +163,9 @@ Already implemented in v0.25.0: `:copy`/`:paste` commands, `-C`/`-P` CLI flags, 
 
 **[v0.16.0](versions/v0.16.0.md) - Bulk Operations & Find/Replace**
 Vim-style `:s` substitute with regex, row/column ranges, case-insensitive flag, alternate delimiters. All undoable. 32 tests.
+
+**[v0.29.0] - CSV Generation, Parallel Performance & File Manager UX**
+New `-g` CLI command generates synthetic CSV files with typed data schemas (customer, sales, marketing, weather, scientific, random) using parallel rayon-based generation across all CPU cores. `-r` (rows) and `-c` (columns) flags are context-sensitive: with `-g` they specify generation dimensions, without `-g` they print row/column counts as before. `-t` similarly doubles as stats flag and generation type selector. Parallelized search (`/` command) for mmap-backed documents: byte-level regex scan split across cores, candidate rows parsed in parallel bypassing the LRU cache. Parallelized `%s/pattern/replacement/g` substitute: parallel mmap byte scan to find candidate rows, parallel regex replacement, bulk edit overlay application. Writer optimization for lazy storage: contiguous unedited byte ranges written directly from mmap in bulk, reusable row buffer for edited rows, 8MB BufWriter, `sync_data()` instead of `sync_all()`. File manager UX: `ListState`-based scrolling so the `>` cursor stays visible when navigating past the viewport, Right/Left arrow keys to enter/exit directories, arrow keys exit search mode and immediately navigate the filtered list. Updated to rand 0.10. 45+ new tests covering generation (type validation, row/column counts, typed headers, column overflow, CSV crate roundtrip), lazy mmap search (basic, case-insensitive, regex, substring, header, invalid regex fallback, parity with in-memory results), writer bulk path with scattered edits, and CLI flag parsing for `-g`/`-r`/`-c`/`-t` dual semantics.
 
 ###  Planned Versions
 

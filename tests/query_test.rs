@@ -202,7 +202,7 @@ fn test_query_no_headers() {
     );
     let stdout = String::from_utf8(output.stdout).unwrap();
     let lines: Vec<&str> = stdout.trim().lines().collect();
-    assert_eq!(lines.len(), 3); // header + 2 data rows
+    assert_eq!(lines.len(), 2); // 2 data rows (header suppressed by --no-headers)
     assert!(stdout.contains("Alice"));
     assert!(stdout.contains("Bob"));
 }

@@ -35,7 +35,9 @@ fn run_main() -> Result<()> {
 
     // Handle --help: show command-specific help if a command flag is present
     if cli_args.help {
-        if cli_args.dedup.is_some() {
+        if cli_args.add_header.is_some() {
+            cli::print_command_help("A");
+        } else if cli_args.dedup.is_some() {
             cli::print_command_help("D");
         } else if cli_args.query.is_some() {
             cli::print_command_help("q");
@@ -43,19 +45,40 @@ fn run_main() -> Result<()> {
             cli::print_command_help("x");
         } else if cli_args.split.is_some() {
             cli::print_command_help("S");
-        } else if cli_args.stats {
+        } else if cli_args.generate {
+            cli::print_command_help("g");
+        } else if cli_args.is_stats_flag() {
             cli::print_command_help("t");
         } else if cli_args.sort.is_some() {
             cli::print_command_help("s");
         } else if cli_args.headers {
             cli::print_command_help("h");
-        } else if cli_args.rows || cli_args.columns {
+        } else if cli_args.is_rows_flag() || cli_args.is_columns_flag() {
             cli::print_command_help("rc");
         } else {
             cli::CliArgs::command().print_help()?;
             println!();
         }
         return Ok(());
+    }
+
+    // Non-interactive generate mode: create synthetic CSV data
+    if cli_args.generate {
+        let rows = cli_args
+            .gen_rows()
+            .context("Usage: lazycsv -g -r <ROWS> -c <COLUMNS> [-t <TYPE>]\n  -r (rows) is required and must be a positive number")?;
+        let cols = cli_args
+            .gen_cols()
+            .context("Usage: lazycsv -g -r <ROWS> -c <COLUMNS> [-t <TYPE>]\n  -c (columns) is required and must be a positive number")?;
+        if rows == 0 {
+            anyhow::bail!("Row count must be greater than 0");
+        }
+        if cols == 0 {
+            anyhow::bail!("Column count must be greater than 0");
+        }
+        let gen_type = cli_args.gen_type();
+        lazycsv::generate::validate_type(gen_type).map_err(|e| anyhow::anyhow!(e))?;
+        return execute_generate(rows, cols, gen_type, &cli_args);
     }
 
     // Non-interactive xlsx-to-csv extraction mode
@@ -166,6 +189,11 @@ fn run_main() -> Result<()> {
         return execute_split(&path, rows_per_file, &cli_args);
     }
 
+    // Non-interactive add-header mode: prepend a header row to a CSV file
+    if let Some(ref header_spec) = cli_args.add_header {
+        return execute_add_header(header_spec, &cli_args);
+    }
+
     // Non-interactive dedup mode: remove duplicate rows and output CSV to stdout
     if let Some(ref dedup_spec) = cli_args.dedup {
         return execute_dedup(dedup_spec, &cli_args);
@@ -177,12 +205,12 @@ fn run_main() -> Result<()> {
     }
 
     // Non-interactive stats mode: print column statistics and exit
-    if cli_args.stats {
+    if cli_args.is_stats_flag() {
         return execute_stats_mode(&cli_args);
     }
 
     // Non-interactive row/column count mode: print counts and exit
-    if cli_args.headers || cli_args.rows || cli_args.columns {
+    if cli_args.headers || cli_args.is_rows_flag() || cli_args.is_columns_flag() {
         return execute_count_mode(&cli_args);
     }
 
@@ -836,6 +864,37 @@ fn stream_file_to_clipboard(path: &std::path::Path, cli_args: &cli::CliArgs) -> 
     Ok(row_count)
 }
 
+/// Generate a CSV file with synthetic data and write to stdout or file.
+fn execute_generate(
+    rows: usize,
+    cols: usize,
+    gen_type: &str,
+    cli_args: &cli::CliArgs,
+) -> Result<()> {
+    let output_path = cli_args.output.as_deref().filter(|s| *s != "-");
+
+    if let Some(path) = output_path {
+        let out_path = std::path::PathBuf::from(path);
+        if let Some(parent) = out_path.parent().filter(|p| !p.as_os_str().is_empty()) {
+            std::fs::create_dir_all(parent)?;
+        }
+        let mut file = std::io::BufWriter::new(std::fs::File::create(&out_path)?);
+        lazycsv::generate::generate_csv(&mut file, rows, cols, gen_type)?;
+        eprintln!(
+            "Generated {} rows x {} columns ({}) → {}",
+            rows,
+            cols,
+            gen_type,
+            out_path.display()
+        );
+    } else {
+        let stdout = std::io::stdout();
+        let mut writer = std::io::BufWriter::new(stdout.lock());
+        lazycsv::generate::generate_csv(&mut writer, rows, cols, gen_type)?;
+    }
+    Ok(())
+}
+
 /// Split a CSV/XLSX/ODS file into multiple CSV files with N rows each.
 fn execute_split(
     path: &std::path::Path,
@@ -1208,10 +1267,16 @@ fn execute_query_mode(query: &str, cli_args: &cli::CliArgs) -> Result<()> {
     let output_file = cli_args.output.as_deref().filter(|o| *o != "-");
     let result = if let Some(out) = output_file {
         let out_path = std::path::PathBuf::from(out);
-        lazycsv::query::execute_query_to_file(&query_path, query, &config, &out_path)
-            .inspect(|_| eprintln!("Query results written to {}", out_path.display()))
+        lazycsv::query::execute_query_to_file(
+            &query_path,
+            query,
+            &config,
+            &out_path,
+            cli_args.no_headers,
+        )
+        .inspect(|_| eprintln!("Query results written to {}", out_path.display()))
     } else {
-        lazycsv::query::execute_query(&query_path, query, &config)
+        lazycsv::query::execute_query(&query_path, query, &config, cli_args.no_headers)
     };
 
     // If clipboard requested, re-run the query to capture output (query is fast from SQLite cache)
@@ -1500,7 +1565,7 @@ fn execute_count_mode(cli_args: &cli::CliArgs) -> Result<()> {
             return Ok(());
         }
         let mut parts = Vec::new();
-        if cli_args.rows {
+        if cli_args.is_rows_flag() {
             let count = if doc.row_count() > 0 {
                 doc.row_count() - 1 // subtract row 0 (which typically contains column names)
             } else {
@@ -1508,7 +1573,7 @@ fn execute_count_mode(cli_args: &cli::CliArgs) -> Result<()> {
             };
             parts.push(format!("{} rows", format_number(count, separator)));
         }
-        if cli_args.columns {
+        if cli_args.is_columns_flag() {
             parts.push(format!(
                 "{} columns",
                 format_number(doc.column_count(), separator)
@@ -1555,7 +1620,7 @@ fn execute_count_mode(cli_args: &cli::CliArgs) -> Result<()> {
 
         let mut parts = Vec::new();
 
-        if cli_args.rows {
+        if cli_args.is_rows_flag() {
             let count = lazycsv::csv::Document::count_rows(
                 file,
                 cli_args.delimiter,
@@ -1565,7 +1630,7 @@ fn execute_count_mode(cli_args: &cli::CliArgs) -> Result<()> {
             parts.push(format!("{} rows", format_number(count, separator)));
         }
 
-        if cli_args.columns {
+        if cli_args.is_columns_flag() {
             let count = lazycsv::csv::Document::count_columns(
                 file,
                 cli_args.delimiter,
@@ -1891,6 +1956,122 @@ fn execute_sort_and_output(sort_spec: &str, cli_args: &cli::CliArgs) -> Result<(
     let mut out = output_writer(cli_args)?;
     lazycsv::csv::write_csv_content(&mut out, &doc, delimiter)?;
     report_output_file(cli_args, "Sorted output");
+
+    Ok(())
+}
+
+/// Non-interactive add-header mode: prepend a header row to a CSV file.
+///
+/// If `header_spec` is empty, generates C1, C2, ... headers based on column count.
+/// If `header_spec` is provided, parses it as CSV and validates the column count.
+/// With -o, writes to the output file; without -o, modifies the input file in place.
+fn execute_add_header(header_spec: &str, cli_args: &cli::CliArgs) -> Result<()> {
+    // Read file content (or stdin)
+    let (content, input_path) = if let Some(path) = cli_args.file_path() {
+        if !path.is_file() {
+            anyhow::bail!("Path does not exist or is not a file: {}", path.display());
+        }
+        let text = if let Some(ref enc) = cli_args.encoding {
+            let raw = std::fs::read(&path)?;
+            let label = encoding_rs::Encoding::for_label(enc.as_bytes())
+                .ok_or_else(|| anyhow::anyhow!("Unknown encoding: {}", enc))?;
+            let (decoded, _, _) = label.decode(&raw);
+            decoded.into_owned()
+        } else {
+            std::fs::read_to_string(&path).context(format!("Failed to read {}", path.display()))?
+        };
+        (text, Some(path))
+    } else if stdin_is_piped() {
+        let mut buf = String::new();
+        std::io::Read::read_to_string(&mut std::io::stdin().lock(), &mut buf)?;
+        (buf, None)
+    } else {
+        anyhow::bail!("No input file specified. Provide a file path or pipe data via stdin.");
+    };
+
+    if content.trim().is_empty() {
+        anyhow::bail!("Input file is empty");
+    }
+
+    // Detect delimiter
+    let delimiter = cli_args
+        .delimiter
+        .unwrap_or_else(|| lazycsv::csv::detect_delimiter(&content));
+    // Count columns from the first row
+    let first_line = content.lines().next().unwrap_or("");
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .delimiter(delimiter)
+        .from_reader(first_line.as_bytes());
+    let col_count = rdr
+        .records()
+        .next()
+        .and_then(|r| r.ok())
+        .map(|r| r.len())
+        .unwrap_or(0);
+
+    if col_count == 0 {
+        anyhow::bail!("Could not determine column count from input file");
+    }
+
+    // Build header row
+    let header_values: Vec<String> = if header_spec.is_empty() {
+        // Auto-generate C1, C2, ...
+        (1..=col_count).map(|i| format!("C{}", i)).collect()
+    } else {
+        // Parse user-provided CSV header
+        let mut rdr = csv::ReaderBuilder::new()
+            .has_headers(false)
+            .from_reader(header_spec.as_bytes());
+        let values: Vec<String> = rdr
+            .records()
+            .next()
+            .and_then(|r| r.ok())
+            .map(|r| r.iter().map(String::from).collect())
+            .unwrap_or_default();
+
+        if values.len() != col_count {
+            anyhow::bail!(
+                "Header has {} values but the CSV file has {} columns",
+                values.len(),
+                col_count
+            );
+        }
+        values
+    };
+
+    // Build the header line using the csv writer for proper escaping
+    let mut hdr_buf = Vec::new();
+    {
+        let mut wtr = csv::WriterBuilder::new()
+            .delimiter(delimiter)
+            .from_writer(&mut hdr_buf);
+        wtr.write_record(&header_values)?;
+        wtr.flush()?;
+    }
+    let header_line = String::from_utf8(hdr_buf)?;
+
+    // Combine header + original content
+    let output = format!("{}{}", header_line, content);
+
+    // Write output
+    let output_file = cli_args.output.as_deref().filter(|o| *o != "-");
+    if let Some(out) = output_file {
+        // Write to -o file
+        let out_path = std::path::PathBuf::from(out);
+        if let Some(parent) = out_path.parent().filter(|p| !p.as_os_str().is_empty()) {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(&out_path, &output)?;
+        eprintln!("Added header to {}", out_path.display());
+    } else if let Some(ref path) = input_path {
+        // Modify input file in place
+        std::fs::write(path, &output)?;
+        eprintln!("Added header to {}", path.display());
+    } else {
+        // stdin mode: write to stdout
+        std::io::Write::write_all(&mut std::io::stdout().lock(), output.as_bytes())?;
+    }
 
     Ok(())
 }

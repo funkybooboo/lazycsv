@@ -22,7 +22,7 @@
 //! # fn main() -> anyhow::Result<()> {
 //! // Execute query on CSV files in current directory
 //! let query = "SELECT name, price FROM products WHERE price > 100 ORDER BY price DESC";
-//! execute_query(Path::new("."), query, &FileConfig::default())?;
+//! execute_query(Path::new("."), query, &FileConfig::default(), false)?;
 //! # Ok(())
 //! # }
 //! ```
@@ -1060,7 +1060,12 @@ pub fn execute_query_to_document_cancellable(
 }
 
 /// Execute a SQL query against CSV files and write results as CSV to stdout.
-pub fn execute_query(path: &Path, query: &str, config: &FileConfig) -> Result<()> {
+pub fn execute_query(
+    path: &Path,
+    query: &str,
+    config: &FileConfig,
+    no_headers: bool,
+) -> Result<()> {
     let query = strip_csv_extensions(query);
     let query = query.as_str();
 
@@ -1099,7 +1104,9 @@ pub fn execute_query(path: &Path, query: &str, config: &FileConfig) -> Result<()
     let mut wtr = csv::Writer::from_writer(stdout.lock());
 
     // Write header row
-    wtr.write_record(&col_names)?;
+    if !no_headers {
+        wtr.write_record(&col_names)?;
+    }
 
     // Write data rows
     for row_result in rows {
@@ -1123,6 +1130,7 @@ pub fn execute_query_to_file(
     query: &str,
     config: &FileConfig,
     output_path: &Path,
+    no_headers: bool,
 ) -> Result<()> {
     let query = strip_csv_extensions(query);
     let query = query.as_str();
@@ -1148,7 +1156,11 @@ pub fn execute_query_to_file(
     }
 
     let out_str = output_path.display().to_string().replace('\'', "''");
-    let copy_sql = format!("COPY ({}) TO '{}' (HEADER, DELIMITER ',')", query, out_str);
+    let header_opt = if no_headers { "HEADER false" } else { "HEADER" };
+    let copy_sql = format!(
+        "COPY ({}) TO '{}' ({}, DELIMITER ',')",
+        query, out_str, header_opt
+    );
 
     conn.execute_batch(&copy_sql)
         .map_err(|e| enhance_sql_error(e, &conn, query))?;

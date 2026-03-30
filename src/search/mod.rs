@@ -82,8 +82,9 @@
 //! assert_eq!(matches.len(), 2); // "Alice" and "Age"
 //! ```
 
-use crate::csv::row_storage::LazyStorage;
+use crate::csv::row_storage::{get_row_bytes, parse_single_row, LazyStorage};
 use crate::{ColIndex, Document, RowIndex};
+use rayon::prelude::*;
 use regex::RegexBuilder;
 
 /// Search state tracking pattern, matches, and current position.
@@ -311,13 +312,12 @@ fn find_matches_in_memory(document: &Document, pattern: &str) -> Vec<(RowIndex, 
 /// Fast search for lazy (mmap-backed) documents.
 ///
 /// Strategy:
-/// 1. Use `regex::bytes::Regex` to find all byte positions matching the pattern in raw mmap bytes
+/// 1. Split the mmap into chunks and scan in parallel across all CPU cores
 /// 2. Binary search `row_offsets` to map each byte position to a row index
 /// 3. Collect unique candidate row indices
-/// 4. Parse only candidate rows and verify cell-level matches with the string regex
+/// 4. Parse candidate rows in parallel and verify cell-level matches
 /// 5. Also check all rows in the edit overlay
 fn find_matches_lazy(lazy: &LazyStorage, pattern: &str) -> Vec<(RowIndex, ColIndex)> {
-    let mut matches = Vec::new();
     let raw = lazy.raw_bytes();
     let offsets = lazy.row_offsets();
 
@@ -333,87 +333,151 @@ fn find_matches_lazy(lazy: &LazyStorage, pattern: &str) -> Vec<(RowIndex, ColInd
         _ => (StringMatcher::Literal(pattern.to_lowercase()), None),
     };
 
-    // Step 1: Find candidate rows by scanning raw bytes.
-    let mut candidate_rows = Vec::new();
-
-    if let Some(ref byte_re) = byte_re {
-        // Regex mode: scan raw bytes with byte regex
-        let mut last_row_idx = usize::MAX;
-        for m in byte_re.find_iter(raw) {
-            let byte_pos = m.start() as u64;
-            let row_idx = match offsets.binary_search(&byte_pos) {
-                Ok(i) => i,
-                Err(i) => i.saturating_sub(1),
-            };
-            if row_idx != last_row_idx {
-                candidate_rows.push(row_idx);
-                last_row_idx = row_idx;
-            }
-        }
+    // Step 1: Find candidate rows by scanning raw bytes in parallel.
+    // Split the mmap into chunks aligned to row boundaries and scan each chunk
+    // on a separate core.
+    let num_chunks = rayon::current_num_threads().max(1);
+    let mut candidate_rows: Vec<usize> = if raw.is_empty() || offsets.is_empty() {
+        Vec::new()
     } else {
-        // Literal fallback: use memchr memmem for fast byte-level substring search.
-        // Since we need case-insensitive, and raw bytes aren't lowercased,
-        // search for both the lowercase and original pattern bytes as an approximation.
-        // For correctness, search for common case variants.
-        let pat_lower = pattern.to_lowercase();
-        let pat_bytes = pat_lower.as_bytes();
+        // Build chunk boundaries aligned to row offsets
+        let total_rows = offsets.len();
+        let rows_per_chunk = (total_rows / num_chunks).max(1);
 
-        // For ASCII patterns, also try uppercase variant
-        let pat_upper = pattern.to_uppercase();
-        let pat_upper_bytes = pat_upper.as_bytes();
-
-        let finder_lower = memchr::memmem::find_iter(raw, pat_bytes);
-        let finder_upper = if pat_bytes != pat_upper_bytes {
-            Some(memchr::memmem::find_iter(raw, pat_upper_bytes))
-        } else {
-            None
-        };
-
-        let mut row_set = std::collections::BTreeSet::new();
-
-        for byte_pos in finder_lower {
-            let row_idx = match offsets.binary_search(&(byte_pos as u64)) {
-                Ok(i) => i,
-                Err(i) => i.saturating_sub(1),
+        let mut chunk_ranges: Vec<(usize, usize)> = Vec::new(); // (byte_start, byte_end)
+        let mut start_row = 0;
+        while start_row < total_rows {
+            let end_row = (start_row + rows_per_chunk).min(total_rows);
+            let byte_start = offsets[start_row] as usize;
+            let byte_end = if end_row < total_rows {
+                offsets[end_row] as usize
+            } else {
+                raw.len()
             };
-            row_set.insert(row_idx);
-        }
-        if let Some(finder) = finder_upper {
-            for byte_pos in finder {
-                let row_idx = match offsets.binary_search(&(byte_pos as u64)) {
-                    Ok(i) => i,
-                    Err(i) => i.saturating_sub(1),
-                };
-                row_set.insert(row_idx);
+            if byte_start < byte_end {
+                chunk_ranges.push((byte_start, byte_end));
             }
+            start_row = end_row;
         }
 
-        candidate_rows = row_set.into_iter().collect();
-    }
+        if let Some(ref byte_re) = byte_re {
+            // Regex mode: scan each chunk in parallel
+            chunk_ranges
+                .par_iter()
+                .flat_map(|&(byte_start, byte_end)| {
+                    let chunk = &raw[byte_start..byte_end];
+                    let mut rows = Vec::new();
+                    let mut last_row_idx = usize::MAX;
+                    for m in byte_re.find_iter(chunk) {
+                        let abs_pos = (byte_start + m.start()) as u64;
+                        let row_idx = match offsets.binary_search(&abs_pos) {
+                            Ok(i) => i,
+                            Err(i) => i.saturating_sub(1),
+                        };
+                        if row_idx != last_row_idx {
+                            rows.push(row_idx);
+                            last_row_idx = row_idx;
+                        }
+                    }
+                    rows
+                })
+                .collect()
+        } else {
+            // Literal fallback: use memchr memmem in parallel across chunks
+            let pat_lower = pattern.to_lowercase();
+            let pat_bytes_owned = pat_lower.into_bytes();
+            let pat_upper = pattern.to_uppercase();
+            let pat_upper_owned = pat_upper.into_bytes();
+            let search_upper = pat_bytes_owned != pat_upper_owned;
+
+            chunk_ranges
+                .par_iter()
+                .flat_map(|&(byte_start, byte_end)| {
+                    let chunk = &raw[byte_start..byte_end];
+                    let mut rows = std::collections::BTreeSet::new();
+
+                    for pos in memchr::memmem::find_iter(chunk, &pat_bytes_owned) {
+                        let abs_pos = (byte_start + pos) as u64;
+                        let row_idx = match offsets.binary_search(&abs_pos) {
+                            Ok(i) => i,
+                            Err(i) => i.saturating_sub(1),
+                        };
+                        rows.insert(row_idx);
+                    }
+                    if search_upper {
+                        for pos in memchr::memmem::find_iter(chunk, &pat_upper_owned) {
+                            let abs_pos = (byte_start + pos) as u64;
+                            let row_idx = match offsets.binary_search(&abs_pos) {
+                                Ok(i) => i,
+                                Err(i) => i.saturating_sub(1),
+                            };
+                            rows.insert(row_idx);
+                        }
+                    }
+
+                    rows.into_iter().collect::<Vec<_>>()
+                })
+                .collect()
+        }
+    };
 
     // Step 2: Also include all edited rows as candidates (edits may not be in mmap).
     let edits = lazy.edits();
     for &row_idx in edits.keys() {
-        // Insert in sorted order will be handled by dedup below
         candidate_rows.push(row_idx);
     }
     candidate_rows.sort_unstable();
     candidate_rows.dedup();
 
-    // Step 3: Parse only candidate rows and verify matches at the cell level.
-    for &row_idx in &candidate_rows {
-        let row = lazy.parse_row_public(row_idx);
-        for (col_idx, cell) in row.iter().enumerate() {
-            if string_matcher.is_match(cell) {
-                matches.push((RowIndex::new(row_idx), ColIndex::new(col_idx)));
-            }
-        }
-    }
+    // Step 3: Parse candidate rows in parallel and verify matches at the cell level.
+    // We bypass the LRU cache and parse directly from mmap bytes for thread safety.
+    let delimiter = lazy.delimiter();
+    let sort_order = lazy.sort_order();
+    let header = lazy.header();
 
-    // Step 4: Also search row 0.
-    // Row 0 might already be in candidates from byte scan, but ensure it's checked.
-    if !candidate_rows.contains(&0) {
-        let header = lazy.header();
+    // Pre-collect edited rows into a Vec for Sync access (HashMap is Sync but let's be explicit)
+    let edits_snapshot: Vec<(usize, Vec<String>)> =
+        edits.iter().map(|(&k, v)| (k, v.clone())).collect();
+
+    let mut matches: Vec<(RowIndex, ColIndex)> = candidate_rows
+        .par_iter()
+        .flat_map(|&row_idx| {
+            let row = if row_idx == 0 {
+                header.to_vec()
+            } else if let Some((_, edited)) = edits_snapshot.iter().find(|(k, _)| *k == row_idx) {
+                edited.clone()
+            } else {
+                // Parse directly from mmap (thread-safe, no cache)
+                let phys = match sort_order {
+                    Some(order) => {
+                        let data_idx = row_idx - 1;
+                        if data_idx < order.len() {
+                            order[data_idx]
+                        } else {
+                            row_idx
+                        }
+                    }
+                    None => row_idx,
+                };
+                if phys < offsets.len() {
+                    let bytes = get_row_bytes(raw, offsets, phys);
+                    parse_single_row(bytes, delimiter)
+                } else {
+                    vec![]
+                }
+            };
+            let mut cell_matches = Vec::new();
+            for (col_idx, cell) in row.iter().enumerate() {
+                if string_matcher.is_match(cell) {
+                    cell_matches.push((RowIndex::new(row_idx), ColIndex::new(col_idx)));
+                }
+            }
+            cell_matches
+        })
+        .collect();
+
+    // Step 4: Also search row 0 if not already a candidate.
+    if candidate_rows.first() != Some(&0) {
         for (col_idx, cell) in header.iter().enumerate() {
             if string_matcher.is_match(cell) {
                 matches.push((RowIndex::new(0), ColIndex::new(col_idx)));

@@ -73,18 +73,15 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             Ok(InputResult::Continue)
         }
 
-        // Open selected file (same as 'l' — uses browser entries, not session files)
-        (KeyCode::Enter, _) => navigate_into_selected(app),
+        // Open selected file / enter directory
+        (KeyCode::Enter, _) | (KeyCode::Right, _) | (KeyCode::Char('l'), KeyModifiers::NONE) => {
+            navigate_into_selected(app)
+        }
 
-        // Yazi-style directory navigation
-        (KeyCode::Char('h'), KeyModifiers::NONE) => {
-            // Go up to parent directory
+        // Go up to parent directory
+        (KeyCode::Left, _) | (KeyCode::Char('h'), KeyModifiers::NONE) => {
             navigate_to_parent(app);
             Ok(InputResult::Continue)
-        }
-        (KeyCode::Char('l'), KeyModifiers::NONE) => {
-            // Enter directory or open file
-            navigate_into_selected(app)
         }
 
         // File operations
@@ -129,6 +126,12 @@ fn handle_search_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             app.input_state.pop_file_filter_char();
             app.view_state.file_list_selected = 0;
             Ok(InputResult::Continue)
+        }
+
+        // Arrow keys / vim nav: exit search mode and navigate the filtered list
+        KeyCode::Up | KeyCode::Down | KeyCode::Left | KeyCode::Right => {
+            app.input_state.file_list_search_active = false;
+            handle(app, key)
         }
 
         // Accept any character in search mode

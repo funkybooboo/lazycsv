@@ -10,10 +10,12 @@
 //! - Regex patterns supported
 
 use crate::app::App;
+use crate::csv::row_storage::{get_row_bytes, parse_single_row};
 use crate::domain::position::{ColIndex, RowIndex};
 use crate::input::actions::InputResult;
 use crate::input::StatusMessage;
 use anyhow::Result;
+use rayon::prelude::*;
 use regex::Regex;
 
 /// Parsed substitute command
@@ -198,6 +200,27 @@ fn execute_substitute(app: &mut App, range: SubRange, sub: SubCommand) -> Result
         }
     };
 
+    // Use parallel fast path for large lazy documents with full-width ranges
+    let is_full_width = col_start == 0 && col_end >= app.document.column_count().saturating_sub(1);
+    if is_full_width && app.document.is_lazy() {
+        return execute_substitute_parallel(
+            app, row_start, row_end, col_start, col_end, &regex, &sub,
+        );
+    }
+
+    execute_substitute_sequential(app, row_start, row_end, col_start, col_end, &regex, &sub)
+}
+
+/// Sequential substitute — used for small ranges and in-memory documents.
+fn execute_substitute_sequential(
+    app: &mut App,
+    row_start: usize,
+    row_end: usize,
+    col_start: usize,
+    col_end: usize,
+    regex: &Regex,
+    sub: &SubCommand,
+) -> Result<InputResult> {
     let mut total_replacements = 0;
     let mut cells_changed = 0;
     let mut undo_commands = Vec::new();
@@ -226,7 +249,6 @@ fn execute_substitute(app: &mut App, range: SubRange, sub: SubCommand) -> Result
             };
 
             if new_value != old_value {
-                // Count replacements
                 let matches: usize = regex.find_iter(&old_value).count();
                 total_replacements += if sub.global { matches } else { 1.min(matches) };
                 cells_changed += 1;
@@ -242,6 +264,224 @@ fn execute_substitute(app: &mut App, range: SubRange, sub: SubCommand) -> Result
         }
     }
 
+    finish_substitute(app, undo_commands, total_replacements, cells_changed)
+}
+
+/// Parallel substitute for lazy (mmap-backed) documents.
+///
+/// Strategy:
+/// 1. Scan raw mmap bytes in parallel to find candidate rows containing the pattern
+/// 2. Parse candidate rows and apply regex replacements in parallel
+/// 3. Apply changed rows to the document edit overlay in bulk
+fn execute_substitute_parallel(
+    app: &mut App,
+    row_start: usize,
+    row_end: usize,
+    col_start: usize,
+    col_end: usize,
+    regex: &Regex,
+    sub: &SubCommand,
+) -> Result<InputResult> {
+    let lazy = app.document.storage.lazy_storage().unwrap();
+    let raw = lazy.raw_bytes();
+    let offsets = lazy.row_offsets();
+    let delimiter = lazy.delimiter();
+    let sort_order = lazy.sort_order();
+    let edits = lazy.edits();
+
+    // Step 1: Find candidate rows by scanning raw bytes in parallel.
+    let byte_re = regex::bytes::RegexBuilder::new(regex.as_str())
+        .case_insensitive(sub.case_insensitive)
+        .build();
+
+    let num_chunks = rayon::current_num_threads().max(1);
+    let total_rows = offsets.len();
+    let rows_per_chunk = (total_rows / num_chunks).max(1);
+
+    let mut chunk_ranges: Vec<(usize, usize)> = Vec::new();
+    let mut sr = 0;
+    while sr < total_rows {
+        let er = (sr + rows_per_chunk).min(total_rows);
+        let byte_start = offsets[sr] as usize;
+        let byte_end = if er < total_rows {
+            offsets[er] as usize
+        } else {
+            raw.len()
+        };
+        if byte_start < byte_end {
+            chunk_ranges.push((byte_start, byte_end));
+        }
+        sr = er;
+    }
+
+    let mut candidate_rows: Vec<usize> = if let Ok(ref byte_re) = byte_re {
+        chunk_ranges
+            .par_iter()
+            .flat_map(|&(byte_start, byte_end)| {
+                let chunk = &raw[byte_start..byte_end];
+                let mut rows = Vec::new();
+                let mut last_row_idx = usize::MAX;
+                for m in byte_re.find_iter(chunk) {
+                    let abs_pos = (byte_start + m.start()) as u64;
+                    let row_idx = match offsets.binary_search(&abs_pos) {
+                        Ok(i) => i,
+                        Err(i) => i.saturating_sub(1),
+                    };
+                    if row_idx != last_row_idx {
+                        rows.push(row_idx);
+                        last_row_idx = row_idx;
+                    }
+                }
+                rows
+            })
+            .collect()
+    } else {
+        // Literal fallback: scan for pattern bytes in parallel
+        let pat_lower = regex.as_str().to_lowercase().into_bytes();
+        let pat_upper = regex.as_str().to_uppercase().into_bytes();
+        let search_upper = pat_lower != pat_upper;
+
+        chunk_ranges
+            .par_iter()
+            .flat_map(|&(byte_start, byte_end)| {
+                let chunk = &raw[byte_start..byte_end];
+                let mut rows = std::collections::BTreeSet::new();
+                for pos in memchr::memmem::find_iter(chunk, &pat_lower) {
+                    let abs_pos = (byte_start + pos) as u64;
+                    let row_idx = match offsets.binary_search(&abs_pos) {
+                        Ok(i) => i,
+                        Err(i) => i.saturating_sub(1),
+                    };
+                    rows.insert(row_idx);
+                }
+                if search_upper {
+                    for pos in memchr::memmem::find_iter(chunk, &pat_upper) {
+                        let abs_pos = (byte_start + pos) as u64;
+                        let row_idx = match offsets.binary_search(&abs_pos) {
+                            Ok(i) => i,
+                            Err(i) => i.saturating_sub(1),
+                        };
+                        rows.insert(row_idx);
+                    }
+                }
+                rows.into_iter().collect::<Vec<_>>()
+            })
+            .collect()
+    };
+
+    // Also include edited rows as candidates
+    for &row_idx in edits.keys() {
+        candidate_rows.push(row_idx);
+    }
+    candidate_rows.sort_unstable();
+    candidate_rows.dedup();
+
+    // Filter to the requested range
+    candidate_rows.retain(|&r| r >= row_start && r <= row_end);
+
+    // Step 2: Parse candidate rows in parallel, apply replacements, collect results.
+    type SubResult = (usize, Vec<String>, Vec<(usize, String, String)>);
+    let results: Vec<SubResult> = candidate_rows
+        .par_iter()
+        .filter_map(|&row_idx| {
+            // Parse the row from mmap or edits
+            let mut row = if let Some(edited) = edits.get(&row_idx) {
+                edited.clone()
+            } else {
+                let phys = match sort_order {
+                    Some(order) => {
+                        let data_idx = row_idx - 1;
+                        if data_idx < order.len() {
+                            order[data_idx]
+                        } else {
+                            row_idx
+                        }
+                    }
+                    None => row_idx,
+                };
+                if phys < offsets.len() {
+                    let bytes = get_row_bytes(raw, offsets, phys);
+                    parse_single_row(bytes, delimiter)
+                } else {
+                    return None;
+                }
+            };
+
+            // Apply replacements to cells in the requested column range
+            let mut cell_changes = Vec::new();
+            let c_end = col_end.min(row.len().saturating_sub(1));
+            for col_idx in col_start..=c_end {
+                if col_idx >= row.len() {
+                    break;
+                }
+                let old_value = &row[col_idx];
+                let new_value = if sub.global {
+                    regex
+                        .replace_all(old_value, sub.replacement.as_str())
+                        .to_string()
+                } else {
+                    regex
+                        .replace(old_value, sub.replacement.as_str())
+                        .to_string()
+                };
+                if new_value != *old_value {
+                    cell_changes.push((col_idx, old_value.clone(), new_value.clone()));
+                    row[col_idx] = new_value;
+                }
+            }
+
+            if cell_changes.is_empty() {
+                None
+            } else {
+                Some((row_idx, row, cell_changes))
+            }
+        })
+        .collect();
+
+    // Step 3: Apply results to document on the main thread.
+    let mut total_replacements = 0usize;
+    let mut cells_changed = 0usize;
+    let mut undo_commands = Vec::new();
+    let mut bulk_edits = Vec::new();
+
+    for (row_idx, new_row, cell_changes) in results {
+        for (col_idx, old_value, new_value) in cell_changes {
+            let match_count = regex.find_iter(&old_value).count();
+            total_replacements += if sub.global {
+                match_count
+            } else {
+                1.min(match_count)
+            };
+            cells_changed += 1;
+            undo_commands.push(crate::history::EditCommand::SetCell {
+                row: RowIndex::new(row_idx),
+                col: ColIndex::new(col_idx),
+                old_value,
+                new_value,
+            });
+        }
+        bulk_edits.push((row_idx, new_row));
+    }
+
+    // Bulk-apply edits to the lazy storage overlay
+    if let Some(lazy_mut) = app.document.storage.lazy_storage_mut() {
+        lazy_mut.bulk_set_edits(bulk_edits);
+    }
+    if cells_changed > 0 {
+        app.document.is_dirty = true;
+        app.document.generation += 1;
+    }
+
+    finish_substitute(app, undo_commands, total_replacements, cells_changed)
+}
+
+/// Finalize substitute: push undo commands, set status message.
+fn finish_substitute(
+    app: &mut App,
+    mut undo_commands: Vec<crate::history::EditCommand>,
+    total_replacements: usize,
+    cells_changed: usize,
+) -> Result<InputResult> {
     if !undo_commands.is_empty() {
         if undo_commands.len() == 1 {
             app.history.push(undo_commands.remove(0));

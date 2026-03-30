@@ -40,20 +40,40 @@ pub struct CliArgs {
     pub headers: bool,
 
     /// Print column statistics for each CSV file (non-interactive mode).
+    /// With -g: specify data type (customer, sales, marketing, weather, scientific, random).
     #[arg(
         short = 't',
-        long,
-        help = "Print column statistics (type, min, max, mean, etc.)"
+        long = "stats",
+        num_args = 0..=1,
+        default_missing_value = "",
+        require_equals = false,
+        help = "Print column statistics; with -g: data type (customer,sales,marketing,weather,scientific,random)"
     )]
-    pub stats: bool,
+    pub stats: Option<String>,
 
     /// Print row count for each CSV file (non-interactive mode).
-    #[arg(short = 'r', long, help = "Print row count for each CSV file")]
-    pub rows: bool,
+    /// With -g: specify number of rows to generate (required).
+    #[arg(
+        short = 'r',
+        long = "rows",
+        num_args = 0..=1,
+        default_missing_value = "",
+        require_equals = false,
+        help = "Print row count; with -g: number of rows to generate"
+    )]
+    pub rows: Option<String>,
 
     /// Print column count for each CSV file (non-interactive mode).
-    #[arg(short = 'c', long, help = "Print column count for each CSV file")]
-    pub columns: bool,
+    /// With -g: specify number of columns to generate (required).
+    #[arg(
+        short = 'c',
+        long = "columns",
+        num_args = 0..=1,
+        default_missing_value = "",
+        require_equals = false,
+        help = "Print column count; with -g: number of columns to generate"
+    )]
+    pub columns: Option<String>,
 
     /// Format numbers with locale-aware thousands separators.
     #[arg(
@@ -122,6 +142,19 @@ pub struct CliArgs {
     )]
     pub split: Option<usize>,
 
+    /// Add a header row to a CSV file (non-interactive mode).
+    /// If a CSV header string is provided, those values are used.
+    /// If no value is provided, generates C1, C2, ... headers based on column count.
+    #[arg(
+        short = 'A',
+        long = "add-header",
+        num_args = 0..=1,
+        default_missing_value = "",
+        require_equals = true,
+        help = "Add header row to CSV (e.g., -A or -A=\"Name,Age,City\")"
+    )]
+    pub add_header: Option<String>,
+
     /// Remove duplicate rows from a CSV file (non-interactive mode).
     /// Optionally specify PK columns by name or 1-based index (comma-separated).
     /// If no columns specified, all columns are used for deduplication.
@@ -168,6 +201,17 @@ pub struct CliArgs {
     )]
     pub report_only: bool,
 
+    /// Generate a CSV file with synthetic data (non-interactive mode).
+    /// Requires -r <rows> and -c <columns>. Optionally -t <type> (default: random).
+    /// Types: customer, sales, marketing, weather, scientific, random.
+    /// Examples: lazycsv -g -r 1000 -c 10 | lazycsv -g -r 500 -c 5 -t sales -o data.csv
+    #[arg(
+        short = 'g',
+        long = "generate",
+        help = "Generate a CSV file with synthetic data"
+    )]
+    pub generate: bool,
+
     /// Print help (use with -D for dedup-specific options)
     #[arg(long = "help", action = clap::ArgAction::SetTrue, help = "Print help")]
     pub help: bool,
@@ -182,6 +226,48 @@ impl CliArgs {
     /// Get the sheet specifier from positional args (second positional arg).
     pub fn sheet_from_path(&self) -> Option<&str> {
         self.path.get(1).map(|s| s.as_str())
+    }
+
+    /// Whether -r was used as a boolean flag (no value or empty value, without -g).
+    pub fn is_rows_flag(&self) -> bool {
+        !self.generate && self.rows.as_deref() == Some("")
+    }
+
+    /// Whether -c was used as a boolean flag (no value or empty value, without -g).
+    pub fn is_columns_flag(&self) -> bool {
+        !self.generate && self.columns.as_deref() == Some("")
+    }
+
+    /// Whether -t was used as a boolean flag (no value or empty value, without -g).
+    pub fn is_stats_flag(&self) -> bool {
+        !self.generate && self.stats.as_deref() == Some("")
+    }
+
+    /// Get the generate row count from -r <N> (when -g is present).
+    pub fn gen_rows(&self) -> Option<usize> {
+        if !self.generate {
+            return None;
+        }
+        self.rows.as_deref().and_then(|s| s.parse().ok())
+    }
+
+    /// Get the generate column count from -c <N> (when -g is present).
+    pub fn gen_cols(&self) -> Option<usize> {
+        if !self.generate {
+            return None;
+        }
+        self.columns.as_deref().and_then(|s| s.parse().ok())
+    }
+
+    /// Get the generate data type from -t <type> (when -g is present). Defaults to "random".
+    pub fn gen_type(&self) -> &str {
+        if !self.generate {
+            return "random";
+        }
+        match self.stats.as_deref() {
+            Some(s) if !s.is_empty() => s,
+            _ => "random",
+        }
     }
 }
 
@@ -230,7 +316,9 @@ fn detect_command_for_help(args: &[String]) -> Option<&'static str> {
             "-x" | "--xlsx" => return Some("x"),
             "-t" | "--stats" => return Some("t"),
             "-h" | "--headers" => return Some("h"),
+            "-g" | "--generate" => return Some("g"),
             "-r" | "--rows" | "-c" | "--columns" => return Some("rc"),
+            _ if arg.starts_with("-A") || arg.starts_with("--add-header") => return Some("A"),
             _ if arg.starts_with("-D") || arg.starts_with("--dedup") => return Some("D"),
             _ => {}
         }
@@ -249,7 +337,9 @@ pub fn print_command_help(cmd: &str) {
         "s" => print!("{}", SORT_HELP),
         "h" => print!("{}", HEADERS_HELP),
         "rc" => print!("{}", COUNT_HELP),
+        "A" => print!("{}", ADD_HEADER_HELP),
         "D" => print!("{}", DEDUP_HELP),
+        "g" => print!("{}", GENERATE_HELP),
         _ => {}
     }
 }
@@ -400,6 +490,30 @@ Options:
   -e, --encoding       File encoding
 ";
 
+pub const ADD_HEADER_HELP: &str = "\
+Add a header row to a CSV file (non-interactive mode)
+
+Usage: lazycsv <FILE> -A[=\"Header1,Header2,...\"] [OPTIONS]
+
+If header values are provided, they are used as the header row.
+If omitted, generates C1, C2, C3, ... based on the number of columns.
+The number of provided header values must match the number of columns in the file.
+
+By default, the input file is modified in place. Use -o to write to a different file.
+
+Examples:
+  lazycsv data.csv -A                           Add auto-generated headers (C1, C2, ...)
+  lazycsv data.csv -A=\"Name,Age,City\"            Add custom headers
+  lazycsv data.csv -A -o output.csv             Add headers, write to new file
+  lazycsv data.csv -A=\"Name,Age\" -o output.csv   Custom headers to new file
+  cat data.csv | lazycsv -A                     Add headers to piped input (stdout)
+
+Options:
+  -o, --output <FILE>  Write to a file instead of modifying in place
+  -d, --delimiter      Custom delimiter for input file
+  -e, --encoding       File encoding
+";
+
 pub const DEDUP_HELP: &str = "\
 Deduplicate rows in a CSV file
 
@@ -424,6 +538,32 @@ Options:
       --report-only    Report duplicate rows instead of removing them
                        Output includes: row_number, original columns, dup_count
   -o, --output <FILE>  Write output to a file instead of stdout
+";
+
+pub const GENERATE_HELP: &str = "\
+Generate a CSV file with synthetic data (non-interactive mode)
+
+Usage: lazycsv -g -r <ROWS> -c <COLUMNS> [-t <TYPE>] [OPTIONS]
+
+ROWS and COLUMNS are required. TYPE defaults to 'random'.
+
+Available types:
+  customer    Customer data (ID, Name, Email, Phone, City, State, ...)
+  sales       Sales records (OrderID, Date, Product, Quantity, Price, ...)
+  marketing   Marketing metrics (CampaignID, Channel, Impressions, Clicks, ...)
+  weather     Weather observations (Date, City, TempHigh, TempLow, Humidity, ...)
+  scientific  Scientific measurements (ExperimentID, Sensor, Temp, Pressure, ...)
+  random      Random mixed-type columns (C1, C2, C3, ...)
+
+Examples:
+  lazycsv -g -r 1000 -c 10                Generate 1000 rows, 10 columns (random)
+  lazycsv -g -r 500 -c 8 -t sales         Generate 500 rows of sales data
+  lazycsv -g -r 10000 -c 5 -t weather     Generate weather data
+  lazycsv -g -r 100 -c 6 -o data.csv      Generate and write to file
+  lazycsv -g -r 1000 -c 10 -t customer | lazycsv -q \"SELECT * FROM stdin WHERE State = 'CA'\"
+
+Options:
+  -o, --output <FILE>  Write to a file instead of stdout
 ";
 
 #[cfg(test)]
@@ -595,5 +735,81 @@ mod tests {
         assert_eq!(args.file_path(), Some(PathBuf::from("data.csv")));
         assert_eq!(args.delimiter, Some(b';'));
         assert_eq!(args.query, Some("SELECT * FROM data".to_string()));
+    }
+
+    // ── Generate flag tests ──────────────────────────────────
+
+    #[test]
+    fn test_cli_generate_with_rows_cols() {
+        let args = CliArgs::try_parse_from(["lazycsv", "-g", "-r", "1000", "-c", "10"]);
+        assert!(args.is_ok());
+        let args = args.unwrap();
+        assert!(args.generate);
+        assert_eq!(args.gen_rows(), Some(1000));
+        assert_eq!(args.gen_cols(), Some(10));
+        assert_eq!(args.gen_type(), "random"); // default
+    }
+
+    #[test]
+    fn test_cli_generate_with_type() {
+        let args =
+            CliArgs::try_parse_from(["lazycsv", "-g", "-r", "500", "-c", "8", "-t", "sales"]);
+        assert!(args.is_ok());
+        let args = args.unwrap();
+        assert!(args.generate);
+        assert_eq!(args.gen_rows(), Some(500));
+        assert_eq!(args.gen_cols(), Some(8));
+        assert_eq!(args.gen_type(), "sales");
+    }
+
+    #[test]
+    fn test_cli_generate_without_rows_returns_none() {
+        let args = CliArgs::try_parse_from(["lazycsv", "-g", "-c", "10"]);
+        assert!(args.is_ok());
+        let args = args.unwrap();
+        assert!(args.generate);
+        assert_eq!(args.gen_rows(), None); // -r not provided
+    }
+
+    #[test]
+    fn test_cli_generate_without_cols_returns_none() {
+        let args = CliArgs::try_parse_from(["lazycsv", "-g", "-r", "100"]);
+        assert!(args.is_ok());
+        let args = args.unwrap();
+        assert!(args.generate);
+        assert_eq!(args.gen_cols(), None); // -c not provided
+    }
+
+    #[test]
+    fn test_cli_rows_flag_without_generate() {
+        // -r alone (no -g) should act as boolean flag
+        let args = CliArgs::try_parse_from(["lazycsv", "data.csv", "-r"]);
+        assert!(args.is_ok());
+        let args = args.unwrap();
+        assert!(!args.generate);
+        assert!(args.is_rows_flag());
+        assert_eq!(args.gen_rows(), None); // not in generate mode
+    }
+
+    #[test]
+    fn test_cli_stats_flag_without_generate() {
+        // -t alone (no -g) should act as stats flag
+        let args = CliArgs::try_parse_from(["lazycsv", "data.csv", "-t"]);
+        assert!(args.is_ok());
+        let args = args.unwrap();
+        assert!(!args.generate);
+        assert!(args.is_stats_flag());
+    }
+
+    #[test]
+    fn test_cli_generate_type_via_stats_flag() {
+        // -t with -g provides the generation type
+        let args =
+            CliArgs::try_parse_from(["lazycsv", "-g", "-r", "10", "-c", "5", "-t", "weather"]);
+        assert!(args.is_ok());
+        let args = args.unwrap();
+        assert!(args.generate);
+        assert!(!args.is_stats_flag()); // -g overrides stats meaning
+        assert_eq!(args.gen_type(), "weather");
     }
 }

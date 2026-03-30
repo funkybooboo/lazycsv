@@ -29,16 +29,16 @@ pub fn write_csv_atomic(document: &Document, path: &Path, delimiter: char) -> Re
     {
         let file = fs::File::create(&temp_path)
             .context(format!("Failed to create temp file: {:?}", temp_path))?;
-        let mut writer = std::io::BufWriter::with_capacity(1024 * 1024, file);
+        let mut writer = std::io::BufWriter::with_capacity(8 * 1024 * 1024, file);
 
         write_csv_content(&mut writer, document, delimiter)
             .context("Failed to write CSV content")?;
 
-        // Flush buffer and ensure all data is written to disk
+        // Flush buffer and sync data (not metadata) to disk
         let file = writer
             .into_inner()
             .map_err(|e| anyhow::anyhow!("Failed to flush write buffer: {}", e))?;
-        file.sync_all().context("Failed to sync file to disk")?;
+        file.sync_data().context("Failed to sync file to disk")?;
     }
 
     // Atomically rename temp to target (overwrites if exists)
@@ -67,33 +67,84 @@ pub fn write_csv_content<W: Write>(
             let offsets = s.row_offsets();
             let sort_order = s.sort_order();
 
-            for logical_idx in 1..count {
-                if let Some(edited_row) = edits.get(&logical_idx) {
-                    // Edited row: write from parsed data with proper escaping
-                    write_csv_row(writer, edited_row, delimiter)?;
-                } else {
-                    // Unedited row: copy raw bytes directly from mmap
-                    let phys = match sort_order {
-                        Some(order) => order[logical_idx - 1],
-                        None => logical_idx,
-                    };
-                    let start = offsets[phys] as usize;
-                    let end = if phys + 1 < offsets.len() {
-                        offsets[phys + 1] as usize
-                    } else {
-                        raw.len()
-                    };
-                    // Write raw bytes (already includes delimiter, quotes, etc.)
-                    let row_bytes = &raw[start..end];
-                    // Trim trailing \r\n or \n, we'll add our own newline
-                    let mut trim_end = row_bytes.len();
-                    while trim_end > 0
-                        && (row_bytes[trim_end - 1] == b'\n' || row_bytes[trim_end - 1] == b'\r')
-                    {
-                        trim_end -= 1;
+            // When unsorted, batch contiguous unedited row ranges into single bulk writes.
+            if sort_order.is_none() {
+                // Pre-sort edits by index to avoid HashMap lookups in the loop
+                let mut sorted_edits: Vec<(usize, &Vec<String>)> = edits
+                    .iter()
+                    .map(|(&idx, row)| (idx, row))
+                    .filter(|&(idx, _)| idx >= 1 && idx < count)
+                    .collect();
+                sorted_edits.sort_unstable_by_key(|&(idx, _)| idx);
+
+                // Reusable buffer for serializing edited rows (avoids per-row allocation)
+                let delim_byte = delimiter as u8;
+                let mut row_buf = Vec::with_capacity(256);
+
+                let mut cursor = 1usize;
+                for &(edit_idx, edited_row) in &sorted_edits {
+                    if edit_idx < cursor {
+                        continue;
                     }
-                    writer.write_all(&row_bytes[..trim_end])?;
-                    writeln!(writer)?;
+                    // Write the contiguous unedited range [cursor, edit_idx) directly from mmap
+                    if cursor < edit_idx {
+                        let bulk_start = offsets[cursor] as usize;
+                        let bulk_end = offsets[edit_idx] as usize;
+                        if bulk_start < bulk_end {
+                            writer.write_all(&raw[bulk_start..bulk_end])?;
+                        }
+                    }
+                    // Write the edited row using reusable buffer
+                    row_buf.clear();
+                    for (i, cell) in edited_row.iter().enumerate() {
+                        if i > 0 {
+                            row_buf.push(delim_byte);
+                        }
+                        append_csv_cell(&mut row_buf, cell, delimiter);
+                    }
+                    row_buf.push(b'\n');
+                    writer.write_all(&row_buf)?;
+
+                    cursor = edit_idx + 1;
+                }
+                // Write the remaining unedited tail
+                if cursor < count {
+                    let bulk_start = offsets[cursor] as usize;
+                    let bulk_end = raw.len();
+                    if bulk_start < bulk_end {
+                        writer.write_all(&raw[bulk_start..bulk_end])?;
+                        if raw[raw.len() - 1] != b'\n' {
+                            writer.write_all(b"\n")?;
+                        }
+                    }
+                }
+            } else {
+                // Sorted: physical order differs from logical, write row by row
+                for logical_idx in 1..count {
+                    if let Some(edited_row) = edits.get(&logical_idx) {
+                        write_csv_row(writer, edited_row, delimiter)?;
+                    } else {
+                        let phys = match sort_order {
+                            Some(order) => order[logical_idx - 1],
+                            None => logical_idx,
+                        };
+                        let start = offsets[phys] as usize;
+                        let end = if phys + 1 < offsets.len() {
+                            offsets[phys + 1] as usize
+                        } else {
+                            raw.len()
+                        };
+                        let row_bytes = &raw[start..end];
+                        let mut trim_end = row_bytes.len();
+                        while trim_end > 0
+                            && (row_bytes[trim_end - 1] == b'\n'
+                                || row_bytes[trim_end - 1] == b'\r')
+                        {
+                            trim_end -= 1;
+                        }
+                        writer.write_all(&row_bytes[..trim_end])?;
+                        writeln!(writer)?;
+                    }
                 }
             }
             Ok(())
@@ -108,46 +159,49 @@ pub fn write_csv_content<W: Write>(
     }
 }
 
-/// Write a single CSV row with proper escaping
+/// Write a single CSV row with proper escaping.
+/// Builds the entire row into a reusable buffer to minimize write syscalls.
 fn write_csv_row<W: Write>(writer: &mut W, row: &[String], delimiter: char) -> Result<()> {
+    let delim_byte = delimiter as u8;
+    // Estimate capacity: sum of cell lengths + delimiters + newline
+    let cap: usize = row.iter().map(|c| c.len() + 3).sum();
+    let mut buf = Vec::with_capacity(cap);
+
     for (i, cell) in row.iter().enumerate() {
         if i > 0 {
-            write!(writer, "{}", delimiter)?;
+            buf.push(delim_byte);
         }
-        write_csv_cell(writer, cell, delimiter)?;
+        append_csv_cell(&mut buf, cell, delimiter);
     }
-    writeln!(writer)?;
+    buf.push(b'\n');
+
+    writer.write_all(&buf)?;
     Ok(())
 }
 
-/// Write a single CSV cell with proper escaping
+/// Append a properly escaped CSV cell to a byte buffer.
 ///
 /// Escaping rules:
 /// - If cell contains delimiter, quotes, or newlines: wrap in quotes
 /// - If cell contains quotes: double them (e.g., " becomes "")
-fn write_csv_cell<W: Write>(writer: &mut W, cell: &str, delimiter: char) -> Result<()> {
-    // Check if cell needs quoting
+fn append_csv_cell(buf: &mut Vec<u8>, cell: &str, delimiter: char) {
     let needs_quotes = cell.contains(delimiter)
         || cell.contains('"')
         || cell.contains('\n')
         || cell.contains('\r');
 
     if needs_quotes {
-        write!(writer, "\"")?;
-        // Escape quotes by doubling them
-        for ch in cell.chars() {
-            if ch == '"' {
-                write!(writer, "\"\"")?;
-            } else {
-                write!(writer, "{}", ch)?;
+        buf.push(b'"');
+        for &byte in cell.as_bytes() {
+            if byte == b'"' {
+                buf.push(b'"');
             }
+            buf.push(byte);
         }
-        write!(writer, "\"")?;
+        buf.push(b'"');
     } else {
-        write!(writer, "{}", cell)?;
+        buf.extend_from_slice(cell.as_bytes());
     }
-
-    Ok(())
 }
 
 #[cfg(test)]
@@ -449,5 +503,77 @@ mod tests {
         assert_eq!(lines[1], "Alice,30,NYC");
         assert_eq!(lines[2], "Bob,25,LA");
         assert_eq!(lines[3], "Charlie,35,Chicago");
+    }
+
+    #[test]
+    fn test_write_lazy_bulk_path_with_scattered_edits() {
+        use crate::csv::row_storage::RowStorage;
+        use crate::domain::position::{ColIndex, RowIndex};
+
+        // Create a CSV with enough rows to test the bulk write path
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("bulk_test.csv");
+        let mut csv = String::from("Name,Value\n");
+        for i in 1..=20 {
+            csv.push_str(&format!("Row{},{}\n", i, i * 10));
+        }
+        fs::write(&file_path, &csv).unwrap();
+
+        let storage = RowStorage::lazy_from_file(&file_path, None, false).unwrap();
+        let mut doc = Document::from_storage(storage, "bulk_test.csv".to_string(), ',');
+        assert!(doc.storage.is_lazy());
+
+        // Edit a few scattered rows (simulates %s/x/y/g with sparse matches)
+        doc.set_cell(RowIndex::new(3), ColIndex::new(0), "EDITED3".to_string());
+        doc.set_cell(RowIndex::new(10), ColIndex::new(0), "EDITED10".to_string());
+        doc.set_cell(RowIndex::new(15), ColIndex::new(0), "EDITED15".to_string());
+
+        // Write and verify
+        let mut output = Vec::new();
+        write_csv_content(&mut output, &doc, ',').unwrap();
+        let result = String::from_utf8(output).unwrap();
+        let lines: Vec<&str> = result.trim().split('\n').collect();
+
+        assert_eq!(lines.len(), 21, "header + 20 data rows");
+        assert_eq!(lines[0], "Name,Value");
+        assert_eq!(lines[1], "Row1,10"); // unedited
+        assert_eq!(lines[2], "Row2,20"); // unedited
+        assert_eq!(lines[3], "EDITED3,30"); // edited
+        assert_eq!(lines[4], "Row4,40"); // unedited
+        assert_eq!(lines[10], "EDITED10,100"); // edited
+        assert_eq!(lines[15], "EDITED15,150"); // edited
+        assert_eq!(lines[20], "Row20,200"); // unedited tail
+    }
+
+    #[test]
+    fn test_write_lazy_bulk_path_roundtrip() {
+        use crate::csv::row_storage::RowStorage;
+        use crate::domain::position::{ColIndex, RowIndex};
+
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("roundtrip_bulk.csv");
+        fs::write(
+            &file_path,
+            "A,B,C\nfoo,bar,baz\nhello,world,test\nalpha,beta,gamma\n",
+        )
+        .unwrap();
+
+        let storage = RowStorage::lazy_from_file(&file_path, None, false).unwrap();
+        let mut doc = Document::from_storage(storage, "roundtrip_bulk.csv".to_string(), ',');
+
+        // Edit first and last data rows
+        doc.set_cell(RowIndex::new(1), ColIndex::new(1), "CHANGED".to_string());
+        doc.set_cell(RowIndex::new(3), ColIndex::new(2), "MODIFIED".to_string());
+
+        // Write atomically and re-read
+        let out_path = temp_dir.path().join("output.csv");
+        write_csv_atomic(&doc, &out_path, ',').unwrap();
+
+        let content = fs::read_to_string(&out_path).unwrap();
+        let lines: Vec<&str> = content.trim().split('\n').collect();
+        assert_eq!(lines[0], "A,B,C");
+        assert_eq!(lines[1], "foo,CHANGED,baz");
+        assert_eq!(lines[2], "hello,world,test");
+        assert_eq!(lines[3], "alpha,beta,MODIFIED");
     }
 }

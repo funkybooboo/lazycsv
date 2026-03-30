@@ -7,6 +7,7 @@ pub mod csv;
 pub mod domain;
 pub mod file_system;
 pub mod formula;
+pub mod generate;
 pub mod history;
 pub mod input;
 pub mod magnifier;

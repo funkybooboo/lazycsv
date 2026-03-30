@@ -11,7 +11,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Clear, List, ListItem, Paragraph},
+    widgets::{Clear, List, ListItem, ListState, Paragraph},
     Frame,
 };
 
@@ -272,7 +272,8 @@ fn render_current_column(
         frame.render_widget(empty, area);
     } else {
         let list = List::new(items);
-        frame.render_widget(list, area);
+        let mut state = ListState::default().with_selected(Some(selected_idx));
+        frame.render_stateful_widget(list, area, &mut state);
     }
 }
 
