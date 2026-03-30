@@ -6,6 +6,7 @@ mod browser;
 mod operations;
 
 use crate::app::{App, Mode};
+use crate::config::views;
 use crate::input::actions::InputResult;
 use crate::input::StatusMessage;
 use anyhow::Result;
@@ -338,7 +339,6 @@ fn load_csv_file(app: &mut App, path: std::path::PathBuf) -> Result<InputResult>
         }
         // Apply saved view settings
         {
-            use crate::config::views;
             let store = views::load_views();
             let key = views::canonical_key(&path);
             if let Some(fv) = store.files.get(&key) {

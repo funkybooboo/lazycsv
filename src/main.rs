@@ -4,6 +4,7 @@ use crossterm::event::{
     self, Event, KeyEventKind, KeyboardEnhancementFlags, PopKeyboardEnhancementFlags,
     PushKeyboardEnhancementFlags,
 };
+use lazycsv::config::views;
 use lazycsv::{cli, ui, App, FileConfig, InputResult};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
@@ -349,7 +350,6 @@ fn run_main() -> Result<()> {
 
     // Load saved view settings for the active file
     {
-        use lazycsv::config::views;
         let store = views::load_views();
         let active_path = app
             .session
@@ -368,7 +368,7 @@ fn run_main() -> Result<()> {
     let result = run(&mut terminal, &mut app);
 
     // Save view settings for all open files before exit
-    lazycsv::config::views::save_current_views(&app);
+    views::save_current_views(&app);
 
     // Always restore terminal
     restore_terminal(supports_enhancement);

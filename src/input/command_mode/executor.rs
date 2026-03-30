@@ -2,6 +2,7 @@
 
 use crate::app::App;
 use crate::config::parse_color;
+use crate::config::views;
 use crate::csv::Document;
 use crate::input::actions::InputResult;
 use crate::input::StatusMessage;
@@ -597,7 +598,7 @@ fn execute_width(app: &mut App, arg: Option<&str>) -> Result<InputResult> {
         }
     }
 
-    crate::config::views::save_current_views(app);
+    views::save_current_views(app);
     Ok(InputResult::Continue)
 }
 
@@ -690,7 +691,7 @@ fn execute_freeze(app: &mut App, arg: Option<&str>) -> Result<InputResult> {
         )));
     }
 
-    crate::config::views::save_current_views(app);
+    views::save_current_views(app);
     Ok(InputResult::Continue)
 }
 
@@ -698,7 +699,7 @@ fn execute_freeze(app: &mut App, arg: Option<&str>) -> Result<InputResult> {
 /// `:unfreeze` clears all, `:unfreeze cols` clears columns only, `:unfreeze rows` clears rows only.
 fn execute_unfreeze(app: &mut App) -> Result<InputResult> {
     app.session.unfreeze_all();
-    crate::config::views::save_current_views(app);
+    views::save_current_views(app);
     app.status_message = Some(StatusMessage::from("All columns and rows unpinned"));
     Ok(InputResult::Continue)
 }
@@ -773,7 +774,7 @@ fn execute_type(app: &mut App, arg: Option<&str>) -> Result<InputResult> {
     };
 
     app.session.set_column_type(col_index, col_type);
-    crate::config::views::save_current_views(app);
+    views::save_current_views(app);
     app.status_message = Some(StatusMessage::from(format!(
         "Column {} type set to {}",
         col_spec.to_uppercase(),
@@ -878,7 +879,7 @@ fn execute_column_color(app: &mut App, arg: &str, is_bg: bool) -> Result<InputRe
             app.view_state.column_fg_colors.remove(&col_index);
         }
         // Persist immediately
-        crate::config::views::save_current_views(app);
+        views::save_current_views(app);
         let letter = column_index_to_letter(col_index);
         app.status_message = Some(StatusMessage::from(format!(
             "Cleared {} for column {}",
@@ -896,7 +897,7 @@ fn execute_column_color(app: &mut App, arg: &str, is_bg: bool) -> Result<InputRe
                 app.view_state.column_fg_colors.insert(col_index, color);
             }
             // Persist immediately
-            crate::config::views::save_current_views(app);
+            views::save_current_views(app);
             let letter = column_index_to_letter(col_index);
             app.status_message = Some(StatusMessage::from(format!(
                 "Set {} for column {} to {}",
@@ -967,10 +968,10 @@ fn execute_clear_view(app: &mut App) -> Result<InputResult> {
         .cloned();
     if let Some(ref path) = file {
         // Remove from persisted views
-        let mut store = crate::config::views::load_views();
-        let key = crate::config::views::canonical_key(path);
+        let mut store = views::load_views();
+        let key = views::canonical_key(path);
         store.files.remove(&key);
-        crate::config::views::save_views(&store);
+        views::save_views(&store);
     }
 
     app.status_message = Some(StatusMessage::from("View settings cleared"));
