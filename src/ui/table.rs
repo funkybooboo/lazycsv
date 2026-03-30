@@ -56,7 +56,15 @@ fn calculate_cell_style(
     if is_selected {
         super::modal::cursor_style_from(theme)
     } else if is_in_visual_selection(app, row, col) {
-        super::modal::visual_selection_style_from(theme).fg(Color::White)
+        let mut style = Style::default().add_modifier(Modifier::REVERSED);
+        // Add underline to bottom edge of selection for a border effect
+        if let Some(sel) = &app.visual_selection {
+            let (_, end_row, _, _) = sel.bounds();
+            if row == end_row {
+                style = style.add_modifier(Modifier::UNDERLINED);
+            }
+        }
+        style
     } else if search_state
         .map(|s| s.is_current_match(row, col))
         .unwrap_or(false)

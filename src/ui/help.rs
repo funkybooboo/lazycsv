@@ -84,11 +84,16 @@ fn build_help_text() -> Vec<Line<'static>> {
         Line::from(""),
         // ── Visual Mode ───────────────────────────────────────
         Line::from(Span::styled("VISUAL MODE", super::modal::bold_style())),
-        Line::from("  v                  Visual block (rectangular)"),
+        Line::from("  v                  Visual block (rectangular select)"),
         Line::from("  V                  Visual line (whole rows)"),
         Line::from("  ,v                 Visual column (whole columns)"),
+        Line::from("  hjkl / arrows      Extend selection"),
         Line::from("  d / y / p          Delete/yank/paste selection"),
+        Line::from("  Y                  Copy selection to system clipboard (CSV)"),
+        Line::from("  Esc                Cancel selection"),
         Line::from("  gv                 Re-select last selection"),
+        Line::from(""),
+        Line::from("  Workflow: v -> hjkl to select -> Y to copy to clipboard"),
         Line::from(""),
         // ── Search ────────────────────────────────────────────
         Line::from(Span::styled("SEARCH", super::modal::bold_style())),

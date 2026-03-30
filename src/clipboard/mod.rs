@@ -2,10 +2,54 @@
 //!
 //! Three independent buffers:
 //! - Row buffer: for row operations (yy/dd/p/P/o/O, Visual Line)
-//! - Column buffer: for column operations (,yy/,dd/,p/,P/,o/,O, Visual Column)  
+//! - Column buffer: for column operations (,yy/,dd/,p/,P/,o/,O, Visual Column)
 //! - Region buffer: for rectangular selections (Visual Block)
 //!
 //! No cross-buffer pasting between the three buffers.
+//!
+//! Also provides `copy_text_to_system_clipboard` for copying to the OS clipboard.
+
+/// Copy text to the system clipboard via platform-specific command.
+/// Returns Ok(()) on success, Err on failure.
+pub fn copy_text_to_system_clipboard(text: &str) -> Result<(), String> {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
+    #[cfg(target_os = "macos")]
+    let child_result = Command::new("pbcopy").stdin(Stdio::piped()).spawn();
+
+    #[cfg(target_os = "linux")]
+    let child_result = Command::new("xclip")
+        .args(["-selection", "clipboard"])
+        .stdin(Stdio::piped())
+        .spawn()
+        .or_else(|_| {
+            Command::new("xsel")
+                .args(["--clipboard", "--input"])
+                .stdin(Stdio::piped())
+                .spawn()
+        })
+        .or_else(|_| Command::new("wl-copy").stdin(Stdio::piped()).spawn());
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    let child_result: Result<std::process::Child, std::io::Error> = Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "Clipboard not supported on this platform",
+    ));
+
+    match child_result {
+        Ok(mut child) => {
+            if let Some(ref mut stdin) = child.stdin {
+                stdin
+                    .write_all(text.as_bytes())
+                    .map_err(|e| format!("Failed to write to clipboard: {}", e))?;
+            }
+            let _ = child.wait();
+            Ok(())
+        }
+        Err(e) => Err(format!("Clipboard error: {}", e)),
+    }
+}
 
 /// Internal buffer shared by both row and column clipboards
 #[derive(Debug, Clone, Default)]

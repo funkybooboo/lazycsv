@@ -2,10 +2,11 @@
 //!
 //! This module handles keyboard input for visual modes (Block, Line, Column).
 
-use crate::app::{App, Mode};
+use crate::app::{App, Mode, VisualMode};
+use crate::clipboard::copy_text_to_system_clipboard;
 use crate::domain::position::{ColIndex, RowIndex};
 use crate::input::visual_mode::{handle_visual_delete, handle_visual_paste, handle_visual_yank};
-use crate::input::InputResult;
+use crate::input::{InputResult, StatusMessage};
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 
@@ -90,9 +91,14 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             handle_visual_delete(app)?;
         }
 
-        // Yank operation
+        // Yank operation (internal clipboard)
         KeyCode::Char('y') => {
             handle_visual_yank(app)?;
+        }
+
+        // Yank to system clipboard as CSV
+        KeyCode::Char('Y') => {
+            yank_to_system_clipboard(app);
         }
 
         // Paste operation
@@ -104,4 +110,76 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     }
 
     Ok(InputResult::Continue)
+}
+
+/// Yank the visual selection to the system clipboard as CSV text.
+fn yank_to_system_clipboard(app: &mut App) {
+    let selection = match app.visual_selection {
+        Some(sel) => sel,
+        None => return,
+    };
+
+    let (start_row, end_row, start_col, end_col) = selection.bounds();
+
+    // Determine row/col ranges based on visual mode
+    let (r_start, r_end, c_start, c_end) = match selection.mode {
+        VisualMode::Block => (
+            start_row.get(),
+            end_row.get(),
+            start_col.get(),
+            end_col.get(),
+        ),
+        VisualMode::Line => (
+            start_row.get(),
+            end_row.get(),
+            0,
+            app.document.column_count().saturating_sub(1),
+        ),
+        VisualMode::Column => (
+            1, // skip header row
+            app.document.row_count().saturating_sub(1),
+            start_col.get(),
+            end_col.get(),
+        ),
+    };
+
+    // Build CSV text from selected cells
+    let mut csv_lines = Vec::new();
+    for row_idx in r_start..=r_end {
+        let mut cells = Vec::new();
+        for col_idx in c_start..=c_end {
+            let value = app
+                .document
+                .cell(RowIndex::new(row_idx), ColIndex::new(col_idx));
+            // Quote values containing commas, quotes, or newlines
+            if value.contains(',') || value.contains('"') || value.contains('\n') {
+                cells.push(format!("\"{}\"", value.replace('"', "\"\"")));
+            } else {
+                cells.push(value);
+            }
+        }
+        csv_lines.push(cells.join(","));
+    }
+    let csv_text = csv_lines.join("\n");
+
+    let rows = r_end - r_start + 1;
+    let cols = c_end - c_start + 1;
+
+    match copy_text_to_system_clipboard(&csv_text) {
+        Ok(()) => {
+            app.status_message = Some(StatusMessage::from(format!(
+                "Copied {}x{} cells to system clipboard",
+                rows, cols
+            )));
+        }
+        Err(e) => {
+            app.status_message = Some(StatusMessage::from(format!("Clipboard error: {}", e)));
+        }
+    }
+
+    // Move cursor to selection start and exit visual mode
+    app.view_state.table_state.select(Some(start_row.get()));
+    app.view_state.selected_column = start_col;
+    app.last_visual_selection = app.visual_selection.take();
+    app.mode = Mode::Normal;
 }
