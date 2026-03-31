@@ -1,3 +1,4 @@
+pub mod conditional;
 pub mod file_manager;
 pub mod file_switcher;
 pub mod help;

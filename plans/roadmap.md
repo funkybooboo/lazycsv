@@ -38,7 +38,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.15.1 | Testing & Reliability Improvements | [x] | 861 |
 | v0.16.0 | Bulk Operations & Find/Replace | [x] | 32 |
 | v0.16.1 | Error Handling & Robustness | [x] | 10 |
-| v0.17.0 | Advanced Filtering & Conditional Views | [ ] | TBD |
+| v0.17.0 | Conditional Formatting | [x] | - |
 | v0.17.1 | Module Organization & Cleanup | [ ] | TBD |
 | v0.18.0 | SQL IntelliSense & Auto-completion | [x] | TBD |
 | v0.18.1 | SQL IntelliSense Polish & Testing | [x] | 606 |
@@ -174,6 +174,9 @@ Column width already complete from prior work. Column/row pinning: `:pin A,B` pi
 **[v0.30.0] - Yazi-Style File Menu, Column Colors & View Persistence**
 Complete yazi-inspired file menu overhaul: borderless layout with breadcrumb path header (`~/projects/lazycsv/test_data`), blue-colored directories, inverted white-on-black selection highlight bar, vertical separator bars between panes (parent 15% | current 42% | preview 42%), full-height CSV preview with alternating 8-color column coloring, scroll padding (5-item lookahead), wrap-around navigation (j/k at boundaries), hidden file toggle (`.` key), and yazi-style status bar with mode/size/filename/position badges. File details popup (`Tab` key) showing created/modified dates, mimetype, and comma-formatted row count. Per-column styling: `:bgcolor C red` and `:fgcolor C #ff0000` commands with 35+ named CSS colors (crimson, teal, gold, indigo, etc.) plus hex `#rrggbb`. View persistence to `~/.config/lazycsv/views.json`: column widths, bg/fg colors, column types, and frozen columns/rows saved immediately on change with canonical absolute-path keys; auto-loaded on file open from CLI or File Menu. `:clearview` command to reset saved settings. All file menu colors configurable via `config.toml` (`file_menu_dir_fg`, `file_menu_highlight_bg`, `file_menu_preview_col_1` through `_col_8`, etc.). Clean terminal exit (no zsh `%` indicator).
 
+**[v0.17.0] - Conditional Formatting**
+Conditional formatting via `:bgcolor`/`:fgcolor` commands: `:bgcolor C red > 100` applies color only to cells matching a condition. Supports `=`/`==`, `!=`, `>`, `<`, `>=`, `<=`, `~` (regex) operators. Compound conditions with `&&` (AND) and `||` (OR) (e.g., `:fgcolor C red > 32 && < 35`, `:bgcolor C blue = 25 || = 15`). Multiple rules per column with first-match-wins semantics. Rule management: `:bgcolor C list` shows numbered rules, `:bgcolor C remove 2` deletes a specific rule, `:bgcolor C clear` removes all rules. Numeric comparisons auto-strip `$` and commas. Conditional rules persisted in `views.json` alongside unconditional color rules and restored on file open.
+
 ###  Planned Versions
 
 **[v0.12.1](versions/v0.12.1.md) - UI System Testing** ✅ COMPLETE
@@ -191,11 +194,11 @@ Module system cleanup with clear dependencies and improved maintainability.
 **[v0.16.1](versions/v0.16.1.md) - Error Handling & Robustness** ✅ COMPLETE
 Audit found only 14 production unwrap/expect calls (all safe). Fixed 2 slightly risky unwraps (row_storage HashMap lookup, substitute command char index). Updated error handling docs. 10 existing error handling tests cover malformed CSVs, permissions, file-not-found, binary files.  
 
-**[v0.17.0](versions/v0.17.0.md) - Advanced Filtering & Conditional Views**  
-Advanced filtering with multiple conditions and saved filter presets.  
+**[v0.17.0](versions/v0.17.0.md) - Conditional Formatting** ✅ COMPLETE
+Conditional formatting via `:bgcolor`/`:fgcolor` with condition operators (`=`, `!=`, `>`, `<`, `>=`, `<=`, `~`), compound `&&`/`||` conditions, rule management (`list`/`remove`/`clear`), persisted in `views.json`.
 
-**[v0.17.1](versions/v0.17.1.md) - Module Organization & Cleanup**  
-Filter system cleanup with clear abstractions and comprehensive testing.  
+**[v0.17.1](versions/v0.17.1.md) - Module Organization & Cleanup**
+Filter system cleanup with clear abstractions and comprehensive testing.
 
 **[v0.18.0](versions/v0.18.0.md) - SQL IntelliSense & Auto-completion**
 SQL IntelliSense with table/column auto-completion and syntax validation.
@@ -315,14 +318,20 @@ LazyCSV uses vim-style modal editing with these modes:
 | `:sql` | Open SQL editor |
 | `:noh` | Clear search highlighting |
 
-### Column Styling Commands
+### Column Styling & Conditional Formatting
 
 | Command | Action |
 |---------|--------|
 | `:bgcolor C red` | Set column C background to red |
 | `:fgcolor C #ff0000` | Set column C foreground to hex color |
-| `:bgcolor C clear` | Remove column background color |
-| `:fgcolor C clear` | Remove column foreground color |
+| `:bgcolor C red > 100` | Conditional: cells greater than 100 |
+| `:bgcolor C red = "val"` | Conditional: cells equal to "val" |
+| `:bgcolor C red ~ "pat"` | Conditional: regex match |
+| `:fgcolor C red > 32 && < 35` | Compound AND condition |
+| `:bgcolor C red = 1 \|\| = 2` | Compound OR condition |
+| `:bgcolor C list` | List color rules for column |
+| `:bgcolor C remove 2` | Remove rule #2 |
+| `:bgcolor C clear` | Remove all color rules for column |
 | `:clearview` | Clear all saved view settings for current file |
 
 ### Range Operations

@@ -91,21 +91,24 @@ fn test_file_list_cursor_navigation_down() {
     let _ = app.handle_key(key_event(KeyCode::Char('j')));
     assert_eq!(app.view_state.file_list_selected, 2); // file2.csv
 
-    // Keep pressing 'j' until we reach the last file
+    // Keep pressing 'j' until we wrap back to 0 (yazi-style wrap-around)
     // Note: Browser shows all entries in directory, not just session files
     let mut last_index = app.view_state.file_list_selected;
+    let mut max_index = last_index;
     for _ in 0..20 {
         let _ = app.handle_key(key_event(KeyCode::Char('j')));
         let new_index = app.view_state.file_list_selected;
-        if new_index == last_index {
-            break; // Reached the end
+        if new_index == 0 && last_index > 0 {
+            break; // Wrapped around to top
+        }
+        if new_index > max_index {
+            max_index = new_index;
         }
         last_index = new_index;
     }
 
-    // Pressing 'j' at the end should not move beyond last file
-    let _ = app.handle_key(key_event(KeyCode::Char('j')));
-    assert_eq!(app.view_state.file_list_selected, last_index);
+    // Pressing 'j' past the end should wrap to 0 (yazi-style)
+    assert_eq!(app.view_state.file_list_selected, 0);
 }
 
 #[test]
@@ -134,9 +137,12 @@ fn test_file_list_cursor_navigation_up() {
     let _ = app.handle_key(key_event(KeyCode::Char('k')));
     assert_eq!(app.view_state.file_list_selected, 0);
 
-    // Pressing 'k' at the top should not move beyond first file
+    // Pressing 'k' at the top should wrap to bottom (yazi-style)
     let _ = app.handle_key(key_event(KeyCode::Char('k')));
-    assert_eq!(app.view_state.file_list_selected, 0);
+    assert!(
+        app.view_state.file_list_selected > 0,
+        "Should wrap to bottom"
+    );
 }
 
 #[test]
@@ -331,16 +337,15 @@ fn test_file_list_single_file_navigation() {
     let _ = app.handle_key(key_event(KeyCode::Char('j')));
     assert_eq!(app.view_state.file_list_selected, 1);
 
-    // Pressing j again should stay at 1 (end of list)
+    // Pressing j again should wrap to 0 (yazi-style)
     let _ = app.handle_key(key_event(KeyCode::Char('j')));
-    assert_eq!(app.view_state.file_list_selected, 1);
-
-    // Pressing k moves back to 0
-    let _ = app.handle_key(key_event(KeyCode::Char('k')));
     assert_eq!(app.view_state.file_list_selected, 0);
 
-    // Navigate to file1.csv and press Enter
-    let _ = app.handle_key(key_event(KeyCode::Char('j')));
+    // Pressing k at 0 wraps to bottom (yazi-style)
+    let _ = app.handle_key(key_event(KeyCode::Char('k')));
+    assert_eq!(app.view_state.file_list_selected, 1);
+
+    // We're now at file1.csv (index 1), press Enter to open it
     let _ = app.handle_key(key_event(KeyCode::Enter));
 
     // Should stay on file 1 and return to Normal mode
@@ -447,11 +452,11 @@ fn test_file_list_shift_g_jumps_to_bottom() {
     let bottom_index = app.view_state.file_list_selected;
     assert!(bottom_index > 0, "Should jump to a position > 0");
 
-    // Verify we're at the bottom by trying to move down
+    // Verify we're at the bottom by trying to move down (wraps to 0)
     let _ = app.handle_key(key_event(KeyCode::Char('j')));
     assert_eq!(
-        app.view_state.file_list_selected, bottom_index,
-        "Should stay at bottom"
+        app.view_state.file_list_selected, 0,
+        "Should wrap to top (yazi-style)"
     );
 }
 

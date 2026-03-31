@@ -7,6 +7,7 @@ use crate::csv::Document;
 use crate::input::actions::InputResult;
 use crate::input::StatusMessage;
 use crate::navigation;
+use crate::ui::conditional::ConditionType;
 use crate::ui::utils::excel_letter_to_column;
 use anyhow::Result;
 
@@ -845,25 +846,32 @@ fn execute_sort(app: &mut App, cmd_name: &str, arg: Option<&str>) -> Result<Inpu
 }
 
 /// Execute :bgcolor or :fgcolor command
-/// Usage: :bgcolor C red | :bgcolor C #ff0000 | :bgcolor C clear
+/// Usage:
+///   :bgcolor C red                    - all cells in column C
+///   :bgcolor C red = "value"          - cells equal to "value"
+///   :bgcolor C red != "value"         - cells not equal to "value"
+///   :bgcolor C red > 100              - cells > 100 (numeric)
+///   :bgcolor C red ~ "pattern"        - cells matching regex
+///   :bgcolor C clear                  - remove all rules for column
 fn execute_column_color(app: &mut App, arg: &str, is_bg: bool) -> Result<InputResult> {
+    use crate::ui::conditional::ColorRule;
+
     let kind = if is_bg { "bgcolor" } else { "fgcolor" };
 
     let parts: Vec<&str> = arg.splitn(2, ' ').collect();
     if parts.len() < 2 {
         app.status_message = Some(StatusMessage::from(format!(
-            "Usage: :{} <column> <color> (e.g., :{} C red, :{} C #ff0000, :{} C clear)",
-            kind, kind, kind, kind
+            "Usage: :{0} <col> <color> [op value] (e.g., :{0} C red, :{0} C red > 100, :{0} C red ~ \"pat\")",
+            kind
         )));
         return Ok(InputResult::Continue);
     }
 
     let col_spec = parts[0].trim();
-    let color_str = parts[1].trim();
+    let rest = parts[1].trim();
 
     // Resolve column specifier to index
-    let col_index = resolve_column_spec(app, col_spec);
-    let col_index = match col_index {
+    let col_index = match resolve_column_spec(app, col_spec) {
         Ok(idx) => idx,
         Err(msg) => {
             app.status_message = Some(StatusMessage::from(msg));
@@ -871,14 +879,13 @@ fn execute_column_color(app: &mut App, arg: &str, is_bg: bool) -> Result<InputRe
         }
     };
 
-    // Handle "clear" / "none" to remove color
-    if color_str.eq_ignore_ascii_case("clear") || color_str.eq_ignore_ascii_case("none") {
+    // Handle "clear" / "none"
+    if rest.eq_ignore_ascii_case("clear") || rest.eq_ignore_ascii_case("none") {
         if is_bg {
             app.view_state.column_bg_colors.remove(&col_index);
         } else {
             app.view_state.column_fg_colors.remove(&col_index);
         }
-        // Persist immediately
         views::save_current_views(app);
         let letter = column_index_to_letter(col_index);
         app.status_message = Some(StatusMessage::from(format!(
@@ -888,31 +895,265 @@ fn execute_column_color(app: &mut App, arg: &str, is_bg: bool) -> Result<InputRe
         return Ok(InputResult::Continue);
     }
 
-    // Parse color
-    match parse_color(color_str) {
-        Some(color) => {
-            if is_bg {
-                app.view_state.column_bg_colors.insert(col_index, color);
-            } else {
-                app.view_state.column_fg_colors.insert(col_index, color);
-            }
-            // Persist immediately
-            views::save_current_views(app);
-            let letter = column_index_to_letter(col_index);
+    // Handle "list" — show all rules for this column
+    if rest.eq_ignore_ascii_case("list") {
+        let map = if is_bg {
+            &app.view_state.column_bg_colors
+        } else {
+            &app.view_state.column_fg_colors
+        };
+        let letter = column_index_to_letter(col_index);
+        if let Some(rules) = map.get(&col_index) {
+            let lines: Vec<String> = rules
+                .iter()
+                .enumerate()
+                .map(|(i, rule)| {
+                    let color_str = crate::config::views::color_to_string(rule.color);
+                    let cond_str = crate::ui::conditional::format_condition(&rule.condition);
+                    format!("  {}: {} {}", i + 1, color_str, cond_str)
+                })
+                .collect();
             app.status_message = Some(StatusMessage::from(format!(
-                "Set {} for column {} to {}",
-                kind, letter, color_str
+                "{} rules for column {}:{}",
+                kind,
+                letter,
+                lines.join(",")
+            )));
+        } else {
+            app.status_message = Some(StatusMessage::from(format!(
+                "No {} rules for column {}",
+                kind, letter
             )));
         }
+        return Ok(InputResult::Continue);
+    }
+
+    // Handle "remove N" — remove a specific rule by 1-based index
+    if let Some(num_str) = rest
+        .strip_prefix("remove ")
+        .or_else(|| rest.strip_prefix("rm "))
+    {
+        let num_str = num_str.trim();
+        if let Ok(idx) = num_str.parse::<usize>() {
+            let map = if is_bg {
+                &mut app.view_state.column_bg_colors
+            } else {
+                &mut app.view_state.column_fg_colors
+            };
+            let letter = column_index_to_letter(col_index);
+            if let Some(rules) = map.get_mut(&col_index) {
+                if idx >= 1 && idx <= rules.len() {
+                    rules.remove(idx - 1);
+                    if rules.is_empty() {
+                        map.remove(&col_index);
+                    }
+                    views::save_current_views(app);
+                    app.status_message = Some(StatusMessage::from(format!(
+                        "Removed {} rule {} for column {}",
+                        kind, idx, letter
+                    )));
+                } else {
+                    app.status_message = Some(StatusMessage::from(format!(
+                        "Rule {} out of range (1-{})",
+                        idx,
+                        rules.len()
+                    )));
+                }
+            } else {
+                app.status_message = Some(StatusMessage::from(format!(
+                    "No {} rules for column {}",
+                    kind, letter
+                )));
+            }
+            return Ok(InputResult::Continue);
+        }
+    }
+
+    // Parse: <color> [operator value]
+    // Split rest into color and optional condition
+    let (color_str, condition_str) = parse_color_and_condition(rest);
+
+    let color = match parse_color(color_str) {
+        Some(c) => c,
         None => {
             app.status_message = Some(StatusMessage::from(format!(
                 "Unknown color: {:?}. Use a named color (red, blue, etc.) or hex (#ff0000)",
                 color_str
             )));
+            return Ok(InputResult::Continue);
+        }
+    };
+
+    // Parse condition if present
+    let condition = if let Some(cond) = condition_str {
+        match parse_condition(cond) {
+            Ok(c) => c,
+            Err(msg) => {
+                app.status_message = Some(StatusMessage::from(msg));
+                return Ok(InputResult::Continue);
+            }
+        }
+    } else {
+        ConditionType::Always
+    };
+
+    let rule = ColorRule { condition, color };
+    let map = if is_bg {
+        &mut app.view_state.column_bg_colors
+    } else {
+        &mut app.view_state.column_fg_colors
+    };
+
+    // For unconditional rules, replace all existing rules
+    // For conditional rules, append to the list
+    if matches!(rule.condition, ConditionType::Always) {
+        map.insert(col_index, vec![rule]);
+    } else {
+        map.entry(col_index).or_default().push(rule);
+    }
+
+    views::save_current_views(app);
+    let letter = column_index_to_letter(col_index);
+    let desc = if condition_str.is_some() {
+        format!(
+            "Set conditional {} for column {} to {}",
+            kind, letter, color_str
+        )
+    } else {
+        format!("Set {} for column {} to {}", kind, letter, color_str)
+    };
+    app.status_message = Some(StatusMessage::from(desc));
+
+    Ok(InputResult::Continue)
+}
+
+/// Split a string like "red > 100" into ("red", Some("> 100")) or ("red", None).
+fn parse_color_and_condition(s: &str) -> (&str, Option<&str>) {
+    // Operators that signal start of condition
+    let operators = ["!=", ">=", "<=", ">", "<", "=", "~"];
+    for op in &operators {
+        if let Some(pos) = s.find(op) {
+            // Everything before the operator is the color (trimmed)
+            let color_part = s[..pos].trim();
+            let cond_part = s[pos..].trim();
+            if !color_part.is_empty() && !cond_part.is_empty() {
+                return (color_part, Some(cond_part));
+            }
+        }
+    }
+    (s, None)
+}
+
+/// Parse a condition string, supporting compound conditions with && and ||.
+/// Examples: `= "foo"`, `> 32 && < 35`, `= 25 || = 15 || = 10`
+/// Parse a single condition (no && or ||).
+fn parse_single_condition(s: &str) -> std::result::Result<ConditionType, String> {
+    let s = s.trim();
+
+    // Try two-char operators first
+    for (prefix, make) in [
+        (
+            "!=",
+            make_not_equals as fn(&str) -> std::result::Result<ConditionType, String>,
+        ),
+        (
+            ">=",
+            make_gte as fn(&str) -> std::result::Result<ConditionType, String>,
+        ),
+        (
+            "<=",
+            make_lte as fn(&str) -> std::result::Result<ConditionType, String>,
+        ),
+    ] {
+        if let Some(rest) = s.strip_prefix(prefix) {
+            return make(rest.trim());
         }
     }
 
-    Ok(InputResult::Continue)
+    // Single/double-char operators
+    if let Some(rest) = s.strip_prefix("==") {
+        let val = unquote(rest.trim());
+        return Ok(ConditionType::Equals(val));
+    }
+    if let Some(rest) = s.strip_prefix('=') {
+        let val = unquote(rest.trim());
+        return Ok(ConditionType::Equals(val));
+    }
+    if let Some(rest) = s.strip_prefix('>') {
+        let val = rest
+            .trim()
+            .parse::<f64>()
+            .map_err(|_| format!("Expected number after >, got {:?}", rest.trim()))?;
+        return Ok(ConditionType::GreaterThan(val));
+    }
+    if let Some(rest) = s.strip_prefix('<') {
+        let val = rest
+            .trim()
+            .parse::<f64>()
+            .map_err(|_| format!("Expected number after <, got {:?}", rest.trim()))?;
+        return Ok(ConditionType::LessThan(val));
+    }
+    if let Some(rest) = s.strip_prefix('~') {
+        let pattern = unquote(rest.trim());
+        let re = regex::Regex::new(&pattern)
+            .map_err(|e| format!("Invalid regex {:?}: {}", pattern, e))?;
+        return Ok(ConditionType::RegexMatch(re));
+    }
+
+    Err(format!(
+        "Unknown condition: {:?}. Use =, !=, >, <, >=, <=, ~, && or ||",
+        s
+    ))
+}
+
+/// Parse a condition string, supporting compound conditions with && and ||.
+fn parse_condition(s: &str) -> std::result::Result<ConditionType, String> {
+    let s = s.trim();
+
+    // Check for compound conditions
+    if s.contains("&&") {
+        let parts: Vec<&str> = s.split("&&").collect();
+        let subs: std::result::Result<Vec<ConditionType>, String> = parts
+            .iter()
+            .map(|p| parse_single_condition(p.trim()))
+            .collect();
+        return Ok(ConditionType::And(subs?));
+    }
+    if s.contains("||") {
+        let parts: Vec<&str> = s.split("||").collect();
+        let subs: std::result::Result<Vec<ConditionType>, String> = parts
+            .iter()
+            .map(|p| parse_single_condition(p.trim()))
+            .collect();
+        return Ok(ConditionType::Or(subs?));
+    }
+
+    parse_single_condition(s)
+}
+
+fn make_not_equals(s: &str) -> std::result::Result<ConditionType, String> {
+    Ok(ConditionType::NotEquals(unquote(s)))
+}
+fn make_gte(s: &str) -> std::result::Result<ConditionType, String> {
+    let val = s
+        .parse::<f64>()
+        .map_err(|_| format!("Expected number after >=, got {:?}", s))?;
+    Ok(ConditionType::GreaterThanOrEqual(val))
+}
+fn make_lte(s: &str) -> std::result::Result<ConditionType, String> {
+    let val = s
+        .parse::<f64>()
+        .map_err(|_| format!("Expected number after <=, got {:?}", s))?;
+    Ok(ConditionType::LessThanOrEqual(val))
+}
+
+/// Strip surrounding quotes from a string if present.
+fn unquote(s: &str) -> String {
+    if (s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')) {
+        s[1..s.len() - 1].to_string()
+    } else {
+        s.to_string()
+    }
 }
 
 /// Resolve a column specifier (letter, number, or header name) to a 0-based index

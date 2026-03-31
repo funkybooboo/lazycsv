@@ -51,6 +51,7 @@ fn calculate_cell_style(
     row: RowIndex,
     col: ColIndex,
     is_selected: bool,
+    cell_value: &str,
 ) -> Style {
     let theme = &app.config.theme;
     if is_selected {
@@ -79,17 +80,21 @@ fn calculate_cell_style(
         Style::default()
     };
 
-    // Apply per-column colors only to normal/zebra cells (not visual selection or search matches)
+    // Apply per-column color rules only to normal/zebra cells
     let is_visual = is_in_visual_selection(app, row, col);
     let is_search = search_state.map(|s| s.is_match(row, col)).unwrap_or(false);
     if !is_visual && !is_search {
         let col_idx = col.get();
         let mut style = base;
-        if let Some(&bg) = app.view_state.column_bg_colors.get(&col_idx) {
-            style = style.bg(bg);
+        if let Some(rules) = app.view_state.column_bg_colors.get(&col_idx) {
+            if let Some(color) = super::conditional::evaluate_rules(rules, cell_value) {
+                style = style.bg(color);
+            }
         }
-        if let Some(&fg) = app.view_state.column_fg_colors.get(&col_idx) {
-            style = style.fg(fg);
+        if let Some(rules) = app.view_state.column_fg_colors.get(&col_idx) {
+            if let Some(color) = super::conditional::evaluate_rules(rules, cell_value) {
+                style = style.fg(color);
+            }
         }
         style
     } else {
@@ -432,7 +437,10 @@ fn build_data_rows_v2(
 
                 let ri = RowIndex::new(row_idx);
                 let ci = ColIndex::new(col_idx);
-                let mut style = calculate_cell_style(app, search_state, ri, ci, is_selected);
+                // Use original cell value for conditional rule matching
+                let original_value = row.get(col_idx).cloned().unwrap_or_default();
+                let mut style =
+                    calculate_cell_style(app, search_state, ri, ci, is_selected, &original_value);
                 if is_pinned && !is_selected {
                     style = style.add_modifier(Modifier::UNDERLINED);
                 }

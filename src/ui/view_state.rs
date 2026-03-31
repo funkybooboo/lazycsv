@@ -4,7 +4,7 @@
 //! selection, scroll position, and viewport positioning modes.
 
 use crate::domain::position::ColIndex;
-use ratatui::style::Color;
+use crate::ui::conditional::ColorRule;
 use ratatui::widgets::TableState;
 use std::collections::HashMap;
 
@@ -62,11 +62,11 @@ pub struct ViewState {
     /// Whether the file details popup (Spot) is visible
     pub file_spot_visible: bool,
 
-    /// Per-column background colors (column index -> color)
-    pub column_bg_colors: HashMap<usize, Color>,
+    /// Per-column background color rules (column index -> rules, first match wins)
+    pub column_bg_colors: HashMap<usize, Vec<ColorRule>>,
 
-    /// Per-column foreground colors (column index -> color)
-    pub column_fg_colors: HashMap<usize, Color>,
+    /// Per-column foreground color rules (column index -> rules, first match wins)
+    pub column_fg_colors: HashMap<usize, Vec<ColorRule>>,
 
     /// Number of columns that fit in the current terminal width (updated during rendering)
     pub visible_cols_count: usize,
