@@ -4,7 +4,7 @@
 //! selection, scroll position, and viewport positioning modes.
 
 use crate::domain::position::ColIndex;
-use crate::ui::conditional::ColorRule;
+use crate::ui::conditional::{ColorRule, RowConditionalRule};
 use ratatui::widgets::TableState;
 use std::collections::HashMap;
 
@@ -68,6 +68,18 @@ pub struct ViewState {
     /// Per-column foreground color rules (column index -> rules, first match wins)
     pub column_fg_colors: HashMap<usize, Vec<ColorRule>>,
 
+    /// Per-row background color rules (row index -> rules, first match wins)
+    pub row_bg_colors: HashMap<usize, Vec<ColorRule>>,
+
+    /// Per-row foreground color rules (row index -> rules, first match wins)
+    pub row_fg_colors: HashMap<usize, Vec<ColorRule>>,
+
+    /// Row conditional bg rules (# syntax — apply to rows matching column conditions)
+    pub row_cond_bg: Vec<RowConditionalRule>,
+
+    /// Row conditional fg rules (# syntax — apply to rows matching column conditions)
+    pub row_cond_fg: Vec<RowConditionalRule>,
+
     /// Number of columns that fit in the current terminal width (updated during rendering)
     pub visible_cols_count: usize,
 }
@@ -90,6 +102,10 @@ impl Default for ViewState {
             file_spot_visible: false,
             column_bg_colors: HashMap::new(),
             column_fg_colors: HashMap::new(),
+            row_bg_colors: HashMap::new(),
+            row_fg_colors: HashMap::new(),
+            row_cond_bg: Vec::new(),
+            row_cond_fg: Vec::new(),
             current_directory: std::env::current_dir()
                 .unwrap_or_else(|_| std::path::PathBuf::from(".")),
             visible_cols_count: 10, // default, updated each render frame

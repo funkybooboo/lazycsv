@@ -80,12 +80,27 @@ fn calculate_cell_style(
         Style::default()
     };
 
-    // Apply per-column color rules only to normal/zebra cells
+    // Apply per-row and per-column color rules only to normal/zebra cells
     let is_visual = is_in_visual_selection(app, row, col);
     let is_search = search_state.map(|s| s.is_match(row, col)).unwrap_or(false);
     if !is_visual && !is_search {
         let col_idx = col.get();
+        let row_idx = row.get();
         let mut style = base;
+
+        // Row colors (applied first, column colors can override)
+        if let Some(rules) = app.view_state.row_bg_colors.get(&row_idx) {
+            if let Some(color) = super::conditional::evaluate_rules(rules, cell_value) {
+                style = style.bg(color);
+            }
+        }
+        if let Some(rules) = app.view_state.row_fg_colors.get(&row_idx) {
+            if let Some(color) = super::conditional::evaluate_rules(rules, cell_value) {
+                style = style.fg(color);
+            }
+        }
+
+        // Column colors (override row colors if both set)
         if let Some(rules) = app.view_state.column_bg_colors.get(&col_idx) {
             if let Some(color) = super::conditional::evaluate_rules(rules, cell_value) {
                 style = style.bg(color);
@@ -441,6 +456,29 @@ fn build_data_rows_v2(
                 let original_value = row.get(col_idx).cloned().unwrap_or_default();
                 let mut style =
                     calculate_cell_style(app, search_state, ri, ci, is_selected, &original_value);
+
+                // Apply row conditional rules (# syntax)
+                if !is_selected {
+                    let get_col_value =
+                        |c: usize| -> String { row.get(c).cloned().unwrap_or_default() };
+                    if !app.view_state.row_cond_bg.is_empty() {
+                        if let Some(color) = super::conditional::evaluate_row_conditional_rules(
+                            &app.view_state.row_cond_bg,
+                            &get_col_value,
+                        ) {
+                            style = style.bg(color);
+                        }
+                    }
+                    if !app.view_state.row_cond_fg.is_empty() {
+                        if let Some(color) = super::conditional::evaluate_row_conditional_rules(
+                            &app.view_state.row_cond_fg,
+                            &get_col_value,
+                        ) {
+                            style = style.fg(color);
+                        }
+                    }
+                }
+
                 if is_pinned && !is_selected {
                     style = style.add_modifier(Modifier::UNDERLINED);
                 }
