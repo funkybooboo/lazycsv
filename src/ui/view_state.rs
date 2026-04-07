@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 /// Layout information captured during rendering for mouse coordinate mapping.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct MouseLayout {
     /// The table content area (chunks[2] from render_table)
     pub table_content_area: Rect,
@@ -39,26 +39,6 @@ pub struct MouseLayout {
     pub row_reorder: Option<(usize, usize)>,
     /// Display column index where a resize handle is being hovered (for visual indicator)
     pub resize_hover_col: Option<usize>,
-}
-
-impl Default for MouseLayout {
-    fn default() -> Self {
-        Self {
-            table_content_area: Rect::default(),
-            display_cols: Vec::new(),
-            raw_widths: Vec::new(),
-            frozen_row_indices: Vec::new(),
-            scrollable_indices: Vec::new(),
-            row_num_width: 0,
-            file_list_area: Rect::default(),
-            last_click: None,
-            drag_anchor: None,
-            col_resize: None,
-            col_reorder: None,
-            row_reorder: None,
-            resize_hover_col: None,
-        }
-    }
 }
 
 /// Viewport positioning mode for view commands (zt, zz, zb)

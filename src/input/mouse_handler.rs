@@ -49,8 +49,7 @@ pub fn handle_mouse(app: &mut App, event: MouseEvent) -> InputResult {
 
             // Check for double-click (same position within time threshold)
             let is_double =
-                if let Some((prev_time, prev_x, prev_y)) = app.view_state.mouse_layout.last_click
-                {
+                if let Some((prev_time, prev_x, prev_y)) = app.view_state.mouse_layout.last_click {
                     prev_x == x && prev_y == y && prev_time.elapsed().as_millis() < DOUBLE_CLICK_MS
                 } else {
                     false
@@ -102,9 +101,7 @@ pub fn handle_mouse(app: &mut App, event: MouseEvent) -> InputResult {
             }
             InputResult::Continue
         }
-        MouseEventKind::Moved => {
-            handle_mouse_move(app, event.column, event.row)
-        }
+        MouseEventKind::Moved => handle_mouse_move(app, event.column, event.row),
         MouseEventKind::ScrollUp => handle_scroll(app, true),
         MouseEventKind::ScrollDown => handle_scroll(app, false),
         _ => InputResult::Continue,
@@ -114,7 +111,10 @@ pub fn handle_mouse(app: &mut App, event: MouseEvent) -> InputResult {
 /// Handle a left mouse click at terminal coordinates (x, y).
 fn handle_left_click(app: &mut App, x: u16, y: u16) -> InputResult {
     // Check for column header click (start column reorder drag)
-    if matches!(app.mode, Mode::Normal | Mode::VisualBlock | Mode::VisualLine | Mode::VisualColumn) {
+    if matches!(
+        app.mode,
+        Mode::Normal | Mode::VisualBlock | Mode::VisualLine | Mode::VisualColumn
+    ) {
         let layout = &app.view_state.mouse_layout;
         let area = layout.table_content_area;
         if let Some(col_idx) = resolve_column_header(layout, area, x, y) {
@@ -560,8 +560,7 @@ fn handle_table_click(app: &mut App, x: u16, y: u16) -> InputResult {
 
     // Adjust horizontal scroll if needed
     if target_col >= app.view_state.column_scroll_offset + app.view_state.visible_cols_count {
-        app.view_state.column_scroll_offset =
-            target_col - app.view_state.visible_cols_count + 1;
+        app.view_state.column_scroll_offset = target_col - app.view_state.visible_cols_count + 1;
     } else if target_col < app.view_state.column_scroll_offset {
         app.view_state.column_scroll_offset = target_col;
     }
@@ -614,8 +613,7 @@ fn handle_drag(app: &mut App, x: u16, y: u16) -> InputResult {
 
     // Adjust horizontal scroll if needed
     if target_col >= app.view_state.column_scroll_offset + app.view_state.visible_cols_count {
-        app.view_state.column_scroll_offset =
-            target_col - app.view_state.visible_cols_count + 1;
+        app.view_state.column_scroll_offset = target_col - app.view_state.visible_cols_count + 1;
     } else if target_col < app.view_state.column_scroll_offset {
         app.view_state.column_scroll_offset = target_col;
     }
@@ -754,7 +752,12 @@ fn handle_context_menu_click(app: &mut App, x: u16, y: u16) -> InputResult {
 
     // Check if click is inside the menu popup
     let item_count = menu.items.len() as u16;
-    let max_label = menu.items.iter().map(|i| i.label().len()).max().unwrap_or(4);
+    let max_label = menu
+        .items
+        .iter()
+        .map(|i| i.label().len())
+        .max()
+        .unwrap_or(4);
     let popup_width: u16 = (max_label as u16 + 4).max(14);
     let popup_height = item_count + 2;
 
@@ -854,13 +857,12 @@ fn execute_context_action(app: &mut App, item: ContextMenuItem) {
                     let _ = crate::clipboard::copy_text_to_system_clipboard(&value);
                     let old_value = value;
                     app.document.set_cell(row_idx, col_idx, String::new());
-                    app.history
-                        .push(crate::history::EditCommand::SetCell {
-                            row: row_idx,
-                            col: col_idx,
-                            old_value,
-                            new_value: String::new(),
-                        });
+                    app.history.push(crate::history::EditCommand::SetCell {
+                        row: row_idx,
+                        col: col_idx,
+                        old_value,
+                        new_value: String::new(),
+                    });
                     app.status_message = Some(StatusMessage::from("Cell cut"));
                 }
             }
@@ -875,8 +877,7 @@ fn execute_context_action(app: &mut App, item: ContextMenuItem) {
                     let value = app.document.cell(row_idx, col_idx).to_string();
                     app.clipboard.yank_cell(value.clone());
                     let _ = crate::clipboard::copy_text_to_system_clipboard(&value);
-                    app.status_message =
-                        Some(StatusMessage::from(format!("Copied: {}", value)));
+                    app.status_message = Some(StatusMessage::from(format!("Copied: {}", value)));
                 }
             }
         }
@@ -890,22 +891,17 @@ fn execute_context_action(app: &mut App, item: ContextMenuItem) {
                     // Single cell paste
                     let old_value = app.document.cell(row_idx, col_idx).to_string();
                     app.document.set_cell(row_idx, col_idx, value.clone());
-                    app.history
-                        .push(crate::history::EditCommand::SetCell {
-                            row: row_idx,
-                            col: col_idx,
-                            old_value,
-                            new_value: value.clone(),
-                        });
-                    app.status_message =
-                        Some(StatusMessage::from(format!("Pasted: {}", value)));
+                    app.history.push(crate::history::EditCommand::SetCell {
+                        row: row_idx,
+                        col: col_idx,
+                        old_value,
+                        new_value: value.clone(),
+                    });
+                    app.status_message = Some(StatusMessage::from(format!("Pasted: {}", value)));
                 } else if app.clipboard.region().is_some() {
                     // Paste region at current cell
-                    app.visual_selection = Some(VisualSelection::new(
-                        row_idx,
-                        col_idx,
-                        VisualMode::Block,
-                    ));
+                    app.visual_selection =
+                        Some(VisualSelection::new(row_idx, col_idx, VisualMode::Block));
                     let _ = crate::input::visual_mode::handle_visual_paste(app);
                 } else if app.clipboard.rows().is_some() {
                     // Paste rows at current position
@@ -926,13 +922,12 @@ fn execute_context_action(app: &mut App, item: ContextMenuItem) {
                     let old_value = app.document.cell(row_idx, col_idx).to_string();
                     if !old_value.is_empty() {
                         app.document.set_cell(row_idx, col_idx, String::new());
-                        app.history
-                            .push(crate::history::EditCommand::SetCell {
-                                row: row_idx,
-                                col: col_idx,
-                                old_value,
-                                new_value: String::new(),
-                            });
+                        app.history.push(crate::history::EditCommand::SetCell {
+                            row: row_idx,
+                            col: col_idx,
+                            old_value,
+                            new_value: String::new(),
+                        });
                     }
                     app.status_message = Some(StatusMessage::from("Cell cleared"));
                 }
@@ -1033,13 +1028,12 @@ fn finalize_column_reorder(app: &mut App, src_col: usize, x: u16, y: u16) -> Inp
 
     let actual_insert = app.document.move_columns(from_start, from_end, to_before);
 
-    app.history
-        .push(crate::history::EditCommand::MoveColumns {
-            from_start,
-            from_end,
-            to_before,
-            actual_insert,
-        });
+    app.history.push(crate::history::EditCommand::MoveColumns {
+        from_start,
+        from_end,
+        to_before,
+        actual_insert,
+    });
 
     app.view_state.selected_column = ColIndex::new(actual_insert);
     app.status_message = Some(StatusMessage::from(format!(
@@ -1126,7 +1120,12 @@ mod tests {
             ],
             "test.csv".into(),
         );
-        let mut app = App::new(document, vec![PathBuf::from("test.csv")], 0, FileConfig::new());
+        let mut app = App::new(
+            document,
+            vec![PathBuf::from("test.csv")],
+            0,
+            FileConfig::new(),
+        );
 
         app.view_state.mouse_layout = MouseLayout {
             table_content_area: Rect::new(0, 2, 40, 8),
@@ -1316,7 +1315,9 @@ mod tests {
         let mut app = create_test_app();
         app.mode = Mode::VisualBlock;
         app.visual_selection = Some(VisualSelection::new(
-            RowIndex::new(0), ColIndex::new(0), VisualMode::Block,
+            RowIndex::new(0),
+            ColIndex::new(0),
+            VisualMode::Block,
         ));
 
         handle_table_click(&mut app, 5, 3);
@@ -1490,8 +1491,14 @@ mod tests {
     fn test_context_menu_down() {
         let mut app = create_test_app();
         app.context_menu = Some(ContextMenu {
-            x: 0, y: 0, selected: 0,
-            items: vec![ContextMenuItem::Cut, ContextMenuItem::Copy, ContextMenuItem::Paste],
+            x: 0,
+            y: 0,
+            selected: 0,
+            items: vec![
+                ContextMenuItem::Cut,
+                ContextMenuItem::Copy,
+                ContextMenuItem::Paste,
+            ],
         });
         use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
         handle_context_menu_key(&mut app, KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
@@ -1502,8 +1509,14 @@ mod tests {
     fn test_context_menu_skips_separator() {
         let mut app = create_test_app();
         app.context_menu = Some(ContextMenu {
-            x: 0, y: 0, selected: 0,
-            items: vec![ContextMenuItem::Copy, ContextMenuItem::Separator, ContextMenuItem::Clear],
+            x: 0,
+            y: 0,
+            selected: 0,
+            items: vec![
+                ContextMenuItem::Copy,
+                ContextMenuItem::Separator,
+                ContextMenuItem::Clear,
+            ],
         });
         use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
         handle_context_menu_key(&mut app, KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
@@ -1514,7 +1527,9 @@ mod tests {
     fn test_context_menu_escape() {
         let mut app = create_test_app();
         app.context_menu = Some(ContextMenu {
-            x: 0, y: 0, selected: 0,
+            x: 0,
+            y: 0,
+            selected: 0,
             items: vec![ContextMenuItem::Copy],
         });
         use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -1559,7 +1574,10 @@ mod tests {
         app.view_state.table_state.select(Some(2));
         app.view_state.selected_column = ColIndex::new(0);
         execute_context_action(&mut app, ContextMenuItem::Paste);
-        assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(0)), "pasted");
+        assert_eq!(
+            app.document.cell(RowIndex::new(2), ColIndex::new(0)),
+            "pasted"
+        );
     }
 
     #[test]

@@ -277,6 +277,7 @@ const TRUNCATE_THRESHOLD: usize = 100;
 
 /// Build column letters row from an explicit list of column indices.
 /// Frozen columns get an underline indicator, typed columns get a type suffix.
+#[allow(clippy::too_many_arguments)]
 fn build_column_letters_row_v2<'a>(
     display_cols: &[usize],
     frozen: &[usize],
@@ -313,12 +314,7 @@ fn build_column_letters_row_v2<'a>(
             let col_width = raw_widths.get(display_idx + 1).copied().unwrap_or(8) as usize;
             let letter_len = letter.len();
             if col_width > letter_len + 1 {
-                letter = format!(
-                    "{}{}↔",
-                    letter,
-                    " ".repeat(col_width - letter_len - 2)
-                )
-                .into();
+                letter = format!("{}{}↔", letter, " ".repeat(col_width - letter_len - 2)).into();
             }
         }
 
@@ -660,8 +656,6 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
         csv.row_count(),
         &app.view_state.viewport_mode,
     );
-
-
 
     // Build frozen rows (rendered as a separate table above the scrollable table)
     let mut frozen_data_rows: Vec<Row<'static>> = Vec::new();

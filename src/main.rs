@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use clap::CommandFactory;
 use crossterm::event::{
-    self, DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind,
-    KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+    self, DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind, KeyboardEnhancementFlags,
+    PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
 };
 use lazycsv::config::views;
 use lazycsv::{cli, ui, App, FileConfig, InputResult};

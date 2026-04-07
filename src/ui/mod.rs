@@ -281,7 +281,12 @@ fn render_context_menu(frame: &mut ratatui::Frame, menu: &crate::app::ContextMen
     };
 
     let item_count = menu.items.len() as u16;
-    let max_label = menu.items.iter().map(|i| i.label().len()).max().unwrap_or(4);
+    let max_label = menu
+        .items
+        .iter()
+        .map(|i| i.label().len())
+        .max()
+        .unwrap_or(4);
     let popup_width: u16 = (max_label as u16 + 4).max(14); // label + padding + borders
     let popup_height = item_count + 2; // +2 for borders
 
@@ -324,9 +329,7 @@ fn render_context_menu(frame: &mut ratatui::Frame, menu: &crate::app::ContextMen
                     .fg(Color::White)
                     .add_modifier(Modifier::BOLD)
             } else {
-                Style::default()
-                    .bg(modal::COLOR_POPUP_BG)
-                    .fg(Color::White)
+                Style::default().bg(modal::COLOR_POPUP_BG).fg(Color::White)
             };
             Line::from(Span::styled(label, style))
         })
