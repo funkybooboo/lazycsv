@@ -52,6 +52,17 @@ pub enum EditCommand {
     /// Two rows swapped
     SwapRows { a: RowIndex, b: RowIndex },
 
+    /// Column(s) moved from one position to another
+    MoveColumns {
+        from_start: ColIndex,
+        from_end: ColIndex,
+        to_before: usize,
+        actual_insert: usize,
+    },
+
+    /// Row moved from one position to another (via sequential swaps)
+    MoveRow { from: RowIndex, to: RowIndex },
+
     /// Compound operation (multiple commands as a single undo step)
     Compound(Vec<EditCommand>),
 }
@@ -107,6 +118,41 @@ impl EditCommand {
             EditCommand::SwapRows { a, b } => {
                 doc.swap_rows(*a, *b); // swap is its own inverse
             }
+            EditCommand::MoveColumns {
+                from_start,
+                from_end,
+                actual_insert,
+                ..
+            } => {
+                // Undo: move columns back from actual_insert to original position.
+                // move_columns internally adjusts: if to_before > src, insert_at = to_before - count.
+                // We want insert_at = from_start, so:
+                //   moved left  (actual < from): to_before = from_start + count
+                //   moved right (actual > from): to_before = from_start
+                let count = from_end.get() - from_start.get() + 1;
+                let move_back_start = ColIndex::new(*actual_insert);
+                let move_back_end = ColIndex::new(actual_insert + count - 1);
+                let to_before = if *actual_insert < from_start.get() {
+                    from_start.get() + count
+                } else {
+                    from_start.get()
+                };
+                doc.move_columns(move_back_start, move_back_end, to_before);
+            }
+            EditCommand::MoveRow { from, to } => {
+                // Undo: move row back from `to` to `from` via sequential swaps
+                let f = from.get();
+                let t = to.get();
+                if t < f {
+                    for i in t..f {
+                        doc.swap_rows(RowIndex::new(i), RowIndex::new(i + 1));
+                    }
+                } else {
+                    for i in (f..t).rev() {
+                        doc.swap_rows(RowIndex::new(i), RowIndex::new(i + 1));
+                    }
+                }
+            }
             EditCommand::Compound(commands) => {
                 // Undo in reverse order
                 for cmd in commands.iter().rev() {
@@ -155,6 +201,27 @@ impl EditCommand {
             }
             EditCommand::SwapRows { a, b } => {
                 doc.swap_rows(*a, *b);
+            }
+            EditCommand::MoveColumns {
+                from_start,
+                from_end,
+                to_before,
+                ..
+            } => {
+                doc.move_columns(*from_start, *from_end, *to_before);
+            }
+            EditCommand::MoveRow { from, to } => {
+                let f = from.get();
+                let t = to.get();
+                if f < t {
+                    for i in f..t {
+                        doc.swap_rows(RowIndex::new(i), RowIndex::new(i + 1));
+                    }
+                } else {
+                    for i in (t..f).rev() {
+                        doc.swap_rows(RowIndex::new(i), RowIndex::new(i + 1));
+                    }
+                }
             }
             EditCommand::Compound(commands) => {
                 // Redo in forward order
@@ -592,5 +659,159 @@ mod tests {
         assert_eq!(doc.row_count(), orig_count - 1);
         // Row 2 is now ["7","8","9"] again
         assert_eq!(doc.cell(RowIndex::new(2), ColIndex::new(0)), "7");
+    }
+
+    // ── MoveColumns undo/redo ──────────────────────────────────────
+
+    #[test]
+    fn test_undo_move_columns() {
+        let mut doc = test_doc();
+        let mut history = History::new(100);
+
+        // Original: A, B, C
+        assert_eq!(doc.header(ColIndex::new(0)), "A");
+        assert_eq!(doc.header(ColIndex::new(1)), "B");
+        assert_eq!(doc.header(ColIndex::new(2)), "C");
+
+        // Move column A (0) to after C → to_before=3
+        let actual_insert = doc.move_columns(ColIndex::new(0), ColIndex::new(0), 3);
+        history.push(EditCommand::MoveColumns {
+            from_start: ColIndex::new(0),
+            from_end: ColIndex::new(0),
+            to_before: 3,
+            actual_insert,
+        });
+
+        // After: B, C, A
+        assert_eq!(doc.header(ColIndex::new(0)), "B");
+        assert_eq!(doc.header(ColIndex::new(1)), "C");
+        assert_eq!(doc.header(ColIndex::new(2)), "A");
+
+        // Undo → back to A, B, C
+        history.undo(&mut doc);
+        assert_eq!(doc.header(ColIndex::new(0)), "A");
+        assert_eq!(doc.header(ColIndex::new(1)), "B");
+        assert_eq!(doc.header(ColIndex::new(2)), "C");
+    }
+
+    #[test]
+    fn test_redo_move_columns() {
+        let mut doc = test_doc();
+        let mut history = History::new(100);
+
+        let actual_insert = doc.move_columns(ColIndex::new(0), ColIndex::new(0), 3);
+        history.push(EditCommand::MoveColumns {
+            from_start: ColIndex::new(0),
+            from_end: ColIndex::new(0),
+            to_before: 3,
+            actual_insert,
+        });
+
+        history.undo(&mut doc);
+        assert_eq!(doc.header(ColIndex::new(0)), "A");
+
+        history.redo(&mut doc);
+        // Should be B, C, A again
+        assert_eq!(doc.header(ColIndex::new(0)), "B");
+        assert_eq!(doc.header(ColIndex::new(1)), "C");
+        assert_eq!(doc.header(ColIndex::new(2)), "A");
+    }
+
+    #[test]
+    fn test_undo_move_columns_left() {
+        let mut doc = test_doc();
+        let mut history = History::new(100);
+
+        // Move column C (2) to before A → to_before=0
+        let actual_insert = doc.move_columns(ColIndex::new(2), ColIndex::new(2), 0);
+        history.push(EditCommand::MoveColumns {
+            from_start: ColIndex::new(2),
+            from_end: ColIndex::new(2),
+            to_before: 0,
+            actual_insert,
+        });
+
+        // After: C, A, B
+        assert_eq!(doc.header(ColIndex::new(0)), "C");
+        assert_eq!(doc.header(ColIndex::new(1)), "A");
+        assert_eq!(doc.header(ColIndex::new(2)), "B");
+
+        history.undo(&mut doc);
+        assert_eq!(doc.header(ColIndex::new(0)), "A");
+        assert_eq!(doc.header(ColIndex::new(1)), "B");
+        assert_eq!(doc.header(ColIndex::new(2)), "C");
+    }
+
+    // ── MoveRow undo/redo ──────────────────────────────────────────
+
+    #[test]
+    fn test_undo_move_row_down() {
+        let mut doc = test_doc();
+        let mut history = History::new(100);
+
+        // Move row 1 ("1","2","3") down to row 3
+        for i in 1..3 {
+            doc.swap_rows(RowIndex::new(i), RowIndex::new(i + 1));
+        }
+        history.push(EditCommand::MoveRow {
+            from: RowIndex::new(1),
+            to: RowIndex::new(3),
+        });
+
+        // After move: row 1="4", row 2="7", row 3="1"
+        assert_eq!(doc.cell(RowIndex::new(1), ColIndex::new(0)), "4");
+        assert_eq!(doc.cell(RowIndex::new(3), ColIndex::new(0)), "1");
+
+        // Undo → back to original: row 1="1", row 2="4", row 3="7"
+        history.undo(&mut doc);
+        assert_eq!(doc.cell(RowIndex::new(1), ColIndex::new(0)), "1");
+        assert_eq!(doc.cell(RowIndex::new(2), ColIndex::new(0)), "4");
+        assert_eq!(doc.cell(RowIndex::new(3), ColIndex::new(0)), "7");
+    }
+
+    #[test]
+    fn test_redo_move_row_down() {
+        let mut doc = test_doc();
+        let mut history = History::new(100);
+
+        for i in 1..3 {
+            doc.swap_rows(RowIndex::new(i), RowIndex::new(i + 1));
+        }
+        history.push(EditCommand::MoveRow {
+            from: RowIndex::new(1),
+            to: RowIndex::new(3),
+        });
+
+        history.undo(&mut doc);
+        assert_eq!(doc.cell(RowIndex::new(1), ColIndex::new(0)), "1");
+
+        history.redo(&mut doc);
+        assert_eq!(doc.cell(RowIndex::new(1), ColIndex::new(0)), "4");
+        assert_eq!(doc.cell(RowIndex::new(3), ColIndex::new(0)), "1");
+    }
+
+    #[test]
+    fn test_undo_move_row_up() {
+        let mut doc = test_doc();
+        let mut history = History::new(100);
+
+        // Move row 3 ("7","8","9") up to row 1
+        for i in (1..3).rev() {
+            doc.swap_rows(RowIndex::new(i), RowIndex::new(i + 1));
+        }
+        history.push(EditCommand::MoveRow {
+            from: RowIndex::new(3),
+            to: RowIndex::new(1),
+        });
+
+        // After: row 1="7", row 2="1", row 3="4"
+        assert_eq!(doc.cell(RowIndex::new(1), ColIndex::new(0)), "7");
+        assert_eq!(doc.cell(RowIndex::new(2), ColIndex::new(0)), "1");
+        assert_eq!(doc.cell(RowIndex::new(3), ColIndex::new(0)), "4");
+
+        history.undo(&mut doc);
+        assert_eq!(doc.cell(RowIndex::new(1), ColIndex::new(0)), "1");
+        assert_eq!(doc.cell(RowIndex::new(2), ColIndex::new(0)), "4");
+        assert_eq!(doc.cell(RowIndex::new(3), ColIndex::new(0)), "7");
     }
 }

@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use clap::CommandFactory;
 use crossterm::event::{
-    self, Event, KeyEventKind, KeyboardEnhancementFlags, PopKeyboardEnhancementFlags,
-    PushKeyboardEnhancementFlags,
+    self, DisableMouseCapture, EnableMouseCapture, Event, KeyEventKind,
+    KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
 };
 use lazycsv::config::views;
 use lazycsv::{cli, ui, App, FileConfig, InputResult};
@@ -271,6 +271,9 @@ fn run_main() -> Result<()> {
         .ok();
     }
 
+    // Enable mouse capture for click and scroll support
+    crossterm::execute!(std::io::stdout(), EnableMouseCapture).ok();
+
     // For xlsx files, resolve sheet from CLI arg or prompt user
     // For sqlite files, resolve table name from CLI arg or use first table
     let sheet_name = if lazycsv::csv::foreign_formats::is_sqlite(&file_path) {
@@ -407,6 +410,13 @@ fn resolve_sheet_spec(spec: &str, sheets: &[String]) -> Result<String> {
 }
 
 fn restore_terminal(supports_enhancement: bool) {
+    // Reset mouse pointer shape to default
+    {
+        use std::io::Write;
+        let _ = write!(std::io::stdout(), "\x1b]22;default\x07");
+        let _ = std::io::stdout().flush();
+    }
+    crossterm::execute!(std::io::stdout(), DisableMouseCapture).ok();
     if supports_enhancement {
         crossterm::execute!(std::io::stdout(), PopKeyboardEnhancementFlags).ok();
     }
@@ -433,12 +443,20 @@ fn run(terminal: &mut Term, app: &mut App) -> Result<()> {
         }
 
         if event::poll(Duration::from_millis(100)).context("Failed to poll for events")? {
-            if let Event::Key(key) = event::read().context("Failed to read event")? {
-                if key.kind == KeyEventKind::Press {
-                    let result = app.handle_key(key)?;
+            match event::read().context("Failed to read event")? {
+                Event::Key(key) => {
+                    if key.kind == KeyEventKind::Press {
+                        let result = app.handle_key(key)?;
+                        needs_redraw = true;
+                        handle_input_result(terminal, app, result)?;
+                    }
+                }
+                Event::Mouse(mouse) => {
+                    let result = app.handle_mouse(mouse);
                     needs_redraw = true;
                     handle_input_result(terminal, app, result)?;
                 }
+                _ => {}
             }
         }
 

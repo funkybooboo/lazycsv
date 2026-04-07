@@ -15,6 +15,11 @@ pub const MAX_COMMAND_COUNT: usize = 100000;
 
 /// Handle keyboard input events
 pub fn handle_key(app: &mut App, key: KeyEvent) -> Result<InputResult> {
+    // If context menu is open, route keys to it first
+    if app.context_menu.is_some() {
+        return Ok(crate::input::mouse_handler::handle_context_menu_key(app, key));
+    }
+
     match app.mode {
         Mode::Normal => crate::input::normal_mode::handle(app, key),
         Mode::Command => crate::input::command_mode::handle(app, key),

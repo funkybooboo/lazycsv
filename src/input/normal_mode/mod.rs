@@ -24,8 +24,8 @@
 //! - `mode_transitions`: Mode switching (i, a, :, /, Space+q, Space+m)
 //! - `navigation`: Navigation helpers (Enter, Ctrl+d, Ctrl+u)
 
-mod commands;
-mod editing;
+pub(crate) mod commands;
+pub(crate) mod editing;
 mod handler;
 mod help;
 mod mode_transitions;

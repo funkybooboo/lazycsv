@@ -11,6 +11,7 @@ pub mod handler;
 pub mod insert_mode;
 pub mod keybindings;
 pub mod magnifier_mode;
+pub mod mouse_handler;
 pub mod normal_mode;
 pub mod search_mode;
 pub mod sql_editor_mode;

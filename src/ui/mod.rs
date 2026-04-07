@@ -96,6 +96,11 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     if app.formula_completion.is_some() && app.mode == crate::app::Mode::Insert {
         render_formula_completion(frame, app);
     }
+
+    // Render context menu if active
+    if let Some(ref menu) = app.context_menu {
+        render_context_menu(frame, menu);
+    }
 }
 
 /// Render file operation prompt overlay
@@ -264,6 +269,71 @@ fn render_formula_completion(frame: &mut ratatui::Frame, app: &crate::app::App) 
 
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, popup_inner);
+}
+
+/// Render right-click context menu popup
+fn render_context_menu(frame: &mut ratatui::Frame, menu: &crate::app::ContextMenu) {
+    use ratatui::{
+        layout::Rect,
+        style::{Color, Modifier, Style},
+        text::{Line, Span},
+        widgets::{Block, Borders, Clear},
+    };
+
+    let item_count = menu.items.len() as u16;
+    let max_label = menu.items.iter().map(|i| i.label().len()).max().unwrap_or(4);
+    let popup_width: u16 = (max_label as u16 + 4).max(14); // label + padding + borders
+    let popup_height = item_count + 2; // +2 for borders
+
+    let frame_area = frame.area();
+
+    // Position near the click, clamped to screen
+    let x = menu.x.min(frame_area.right().saturating_sub(popup_width));
+    let y = menu.y.min(frame_area.bottom().saturating_sub(popup_height));
+
+    let popup_rect = Rect::new(x, y, popup_width, popup_height);
+
+    frame.render_widget(Clear, popup_rect);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .style(Style::default().bg(modal::COLOR_POPUP_BG));
+    let inner = block.inner(popup_rect);
+    frame.render_widget(block, popup_rect);
+
+    let inner_width = inner.width as usize;
+    let lines: Vec<Line<'static>> = menu
+        .items
+        .iter()
+        .enumerate()
+        .map(|(i, item)| {
+            if *item == crate::app::ContextMenuItem::Separator {
+                let sep = "─".repeat(inner_width);
+                return Line::from(Span::styled(
+                    sep,
+                    Style::default()
+                        .bg(modal::COLOR_POPUP_BG)
+                        .fg(Color::DarkGray),
+                ));
+            }
+            let is_selected = i == menu.selected;
+            let label = format!(" {:<width$}", item.label(), width = inner_width - 1);
+            let style = if is_selected {
+                Style::default()
+                    .bg(Color::Blue)
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+                    .bg(modal::COLOR_POPUP_BG)
+                    .fg(Color::White)
+            };
+            Line::from(Span::styled(label, style))
+        })
+        .collect();
+
+    let paragraph = ratatui::widgets::Paragraph::new(lines);
+    frame.render_widget(paragraph, inner);
 }
 
 // Re-export public utilities and types

@@ -857,6 +857,55 @@ pub struct App {
 
     /// Formula completion popup state (shown during insert mode when typing '=')
     pub formula_completion: Option<SqlCompletion>,
+
+    /// Right-click context menu state
+    pub context_menu: Option<ContextMenu>,
+}
+
+/// Right-click context menu state
+#[derive(Debug, Clone)]
+pub struct ContextMenu {
+    /// Terminal position where the menu should appear
+    pub x: u16,
+    pub y: u16,
+    /// Currently highlighted menu item index
+    pub selected: usize,
+    /// Menu items
+    pub items: Vec<ContextMenuItem>,
+}
+
+/// A single context menu item
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ContextMenuItem {
+    Cut,
+    Copy,
+    Paste,
+    Separator,
+    Clear,
+    ColumnDelete,
+    ColumnInsertBefore,
+    ColumnInsertAfter,
+    RowDelete,
+    RowInsertAbove,
+    RowInsertBelow,
+}
+
+impl ContextMenuItem {
+    pub fn label(self) -> &'static str {
+        match self {
+            ContextMenuItem::Cut => "Cut",
+            ContextMenuItem::Copy => "Copy",
+            ContextMenuItem::Paste => "Paste",
+            ContextMenuItem::Clear => "Clear",
+            ContextMenuItem::Separator => "",
+            ContextMenuItem::ColumnDelete => "Delete",
+            ContextMenuItem::ColumnInsertBefore => "Insert Before",
+            ContextMenuItem::ColumnInsertAfter => "Insert After",
+            ContextMenuItem::RowDelete => "Delete",
+            ContextMenuItem::RowInsertAbove => "Insert Above",
+            ContextMenuItem::RowInsertBelow => "Insert Below",
+        }
+    }
 }
 
 /// File operation being prompted for
@@ -1023,6 +1072,7 @@ impl App {
             file_operation_buffer: String::new(),
             formula_store: crate::formula::FormulaStore::new(),
             formula_completion: None,
+            context_menu: None,
         };
         let xlsx_formulas = std::mem::take(&mut app.document.xlsx_formulas);
         for ((row, col), raw) in xlsx_formulas {
@@ -1049,6 +1099,11 @@ impl App {
     /// Handle keyboard input events
     pub fn handle_key(&mut self, key: KeyEvent) -> Result<InputResult> {
         crate::input::handle_key(self, key)
+    }
+
+    /// Handle mouse input events
+    pub fn handle_mouse(&mut self, event: crossterm::event::MouseEvent) -> InputResult {
+        crate::input::mouse_handler::handle_mouse(self, event)
     }
 
     /// Get current selected row index (for status display)

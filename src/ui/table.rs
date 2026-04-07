@@ -284,6 +284,9 @@ fn build_column_letters_row_v2<'a>(
     theme: &crate::config::Theme,
     session: &Session,
     row_num_width: usize,
+    resize_hover_col: Option<usize>,
+    raw_widths: &[u16],
+    col_reorder: Option<(usize, usize)>,
 ) -> Row<'a> {
     let base_style = if let Some(bg) = theme.header_bg {
         Style::default().bg(bg)
@@ -292,7 +295,7 @@ fn build_column_letters_row_v2<'a>(
     };
     let mut cells = vec![Cell::from(" ".repeat(row_num_width)).style(base_style)];
 
-    for &col_idx in display_cols {
+    for (display_idx, &col_idx) in display_cols.iter().enumerate() {
         let mut letter = column_to_excel_letter(col_idx);
         // Append type indicator if column has a type set
         if let Some(col_type) = session.column_type(col_idx) {
@@ -301,9 +304,56 @@ fn build_column_letters_row_v2<'a>(
                 letter = format!("{}{}", letter, ind).into();
             }
         }
+
+        // If hovering on this column's right border, append a resize indicator
+        // raw_widths index is display_idx + 1 (index 0 is the gutter)
+        let is_resize_hover = resize_hover_col == Some(display_idx + 1);
+        if is_resize_hover {
+            // Pad and place the ↔ indicator at the right edge of the cell
+            let col_width = raw_widths.get(display_idx + 1).copied().unwrap_or(8) as usize;
+            let letter_len = letter.len();
+            if col_width > letter_len + 1 {
+                letter = format!(
+                    "{}{}↔",
+                    letter,
+                    " ".repeat(col_width - letter_len - 2)
+                )
+                .into();
+            }
+        }
+
         let is_frozen = frozen.contains(&col_idx);
         let is_selected = ColIndex::new(col_idx) == selected_column;
-        let style = if is_selected {
+
+        // Column reorder drag indicators
+        let is_reorder_src = col_reorder.map(|(s, _)| s == col_idx).unwrap_or(false);
+        let is_reorder_dst = col_reorder
+            .map(|(s, d)| d == col_idx && s != d)
+            .unwrap_or(false);
+
+        if is_reorder_dst {
+            // Show insertion marker: prepend ▸ to the drop target column header
+            letter = format!("▸{}", letter).into();
+        }
+
+        let style = if is_reorder_src {
+            // Dim the source column being dragged
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::DIM)
+                .patch(base_style)
+        } else if is_reorder_dst {
+            // Highlight the drop target
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD)
+                .patch(base_style)
+        } else if is_resize_hover {
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD)
+                .patch(base_style)
+        } else if is_selected {
             let mut s = super::modal::bold_style().patch(base_style);
             if is_frozen {
                 s = s.add_modifier(Modifier::UNDERLINED);
@@ -395,8 +445,26 @@ fn build_data_rows_v2(
             let is_pinned = frozen_rows.contains(&row_idx);
 
             let num_digits = row_num_width.saturating_sub(1);
-            let row_num_display = format!("{:>width$}", row_idx + 1, width = num_digits);
-            let mut row_num_style = if is_selected_row {
+            let row_reorder = app.view_state.mouse_layout.row_reorder;
+            let is_reorder_src = row_reorder.map(|(s, _)| s == row_idx).unwrap_or(false);
+            let is_reorder_dst = row_reorder
+                .map(|(s, d)| d == row_idx && s != d)
+                .unwrap_or(false);
+
+            let row_num_display = if is_reorder_dst {
+                format!("{:>width$}", "▸", width = num_digits)
+            } else {
+                format!("{:>width$}", row_idx + 1, width = num_digits)
+            };
+            let mut row_num_style = if is_reorder_src {
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::DIM)
+            } else if is_reorder_dst {
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD)
+            } else if is_selected_row {
                 super::modal::row_number_style()
             } else if app.config.defaults.zebra_striping && row_idx.is_multiple_of(2) {
                 super::modal::zebra_stripe_style_from(&app.config.theme)
@@ -550,6 +618,9 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 
     // Build column letters row
+    // Calculate column widths first (needed for cell padding and resize indicator)
+    let (widths, raw_widths) = calculate_column_widths_v2(app, &area, &display_cols, row_num_width);
+
     let col_letters_row = build_column_letters_row_v2(
         &display_cols,
         &frozen,
@@ -557,6 +628,9 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
         &app.config.theme,
         &app.session,
         row_num_width as usize,
+        app.view_state.mouse_layout.resize_hover_col,
+        &raw_widths,
+        app.view_state.mouse_layout.col_reorder,
     );
 
     // Frozen rows: always displayed at top, before the scrollable region.
@@ -587,8 +661,7 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
         &app.view_state.viewport_mode,
     );
 
-    // Calculate column widths first (needed for cell padding)
-    let (widths, raw_widths) = calculate_column_widths_v2(app, &area, &display_cols, row_num_width);
+
 
     // Build frozen rows (rendered as a separate table above the scrollable table)
     let mut frozen_data_rows: Vec<Row<'static>> = Vec::new();
@@ -667,6 +740,14 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     // Horizontal rule
     let rule = Paragraph::new("─".repeat(area.width as usize));
     frame.render_widget(rule, chunks[1]);
+
+    // Store layout info for mouse coordinate mapping
+    app.view_state.mouse_layout.table_content_area = chunks[2];
+    app.view_state.mouse_layout.display_cols = display_cols;
+    app.view_state.mouse_layout.raw_widths = raw_widths;
+    app.view_state.mouse_layout.frozen_row_indices = frozen_row_indices;
+    app.view_state.mouse_layout.scrollable_indices = scrollable_indices;
+    app.view_state.mouse_layout.row_num_width = row_num_width;
 
     // Render as a plain (non-stateful) widget — we handle scrolling ourselves
     // via scroll_offset and the scrollable_indices list.
