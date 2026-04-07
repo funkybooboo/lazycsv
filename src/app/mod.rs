@@ -1101,8 +1101,8 @@ impl App {
         crate::input::handle_key(self, key)
     }
 
-    /// Handle mouse input events
-    pub fn handle_mouse(&mut self, event: crossterm::event::MouseEvent) -> InputResult {
+    /// Handle mouse input events. Returns (InputResult, needs_redraw).
+    pub fn handle_mouse(&mut self, event: crossterm::event::MouseEvent) -> (InputResult, bool) {
         crate::input::mouse_handler::handle_mouse(self, event)
     }
 

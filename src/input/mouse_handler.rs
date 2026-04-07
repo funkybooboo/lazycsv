@@ -8,7 +8,7 @@ use crate::domain::position::{ColIndex, RowIndex};
 use crate::input::handler::{enter_insert_mode, CursorPosition, InitialContent};
 use crate::input::InputResult;
 use crate::ui::ViewportMode;
-use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use std::io::Write;
 use std::time::Instant;
 
@@ -32,19 +32,20 @@ fn reset_pointer() {
 }
 
 /// Handle a mouse event and return the appropriate input result.
-pub fn handle_mouse(app: &mut App, event: MouseEvent) -> InputResult {
+/// Returns (InputResult, needs_redraw).
+pub fn handle_mouse(app: &mut App, event: MouseEvent) -> (InputResult, bool) {
     match event.kind {
         MouseEventKind::Down(MouseButton::Left) => {
             let (x, y) = (event.column, event.row);
 
             // If context menu is open, handle click on it or dismiss
             if app.context_menu.is_some() {
-                return handle_context_menu_click(app, x, y);
+                return (handle_context_menu_click(app, x, y), true);
             }
 
             // Check for column resize grab on header row border
             if try_start_column_resize(app, x, y) {
-                return InputResult::Continue;
+                return (InputResult::Continue, false);
             }
 
             // Check for double-click (same position within time threshold)
@@ -55,56 +56,82 @@ pub fn handle_mouse(app: &mut App, event: MouseEvent) -> InputResult {
                     false
                 };
 
-            if is_double {
+            let result = if is_double {
                 app.view_state.mouse_layout.last_click = None;
                 handle_double_click(app, x, y)
             } else {
                 app.view_state.mouse_layout.last_click = Some((Instant::now(), x, y));
                 handle_left_click(app, x, y)
-            }
+            };
+            (result, true)
         }
         MouseEventKind::Down(MouseButton::Right) => {
-            handle_right_click(app, event.column, event.row)
+            (handle_right_click(app, event.column, event.row), true)
         }
         MouseEventKind::Drag(MouseButton::Left) => {
             // If a column resize is active, handle it
             if app.view_state.mouse_layout.col_resize.is_some() {
-                return handle_column_resize_drag(app, event.column);
+                return (handle_column_resize_drag(app, event.column), true);
             }
-            // Column or row reorder drags are finalized on mouse-up;
-            // during drag, just show the drop target by highlighting
+            // Column or row reorder drags
             if app.view_state.mouse_layout.col_reorder.is_some()
                 || app.view_state.mouse_layout.row_reorder.is_some()
             {
-                return handle_reorder_drag(app, event.column, event.row);
+                return (handle_reorder_drag(app, event.column, event.row), true);
             }
-            handle_drag(app, event.column, event.row)
+            // Selection drag — only redraw when selected cell actually changes
+            let prev_row = app.view_state.table_state.selected();
+            let prev_col = app.view_state.selected_column;
+            let result = handle_drag(app, event.column, event.row);
+            let changed = app.view_state.table_state.selected() != prev_row
+                || app.view_state.selected_column != prev_col;
+            (result, changed)
         }
         MouseEventKind::Up(MouseButton::Left) => {
             let had_drag = app.view_state.mouse_layout.col_reorder.is_some()
                 || app.view_state.mouse_layout.row_reorder.is_some()
                 || app.view_state.mouse_layout.col_resize.is_some();
 
-            // Finalize column reorder
             if let Some((src_col, _)) = app.view_state.mouse_layout.col_reorder.take() {
                 reset_pointer();
-                return finalize_column_reorder(app, src_col, event.column, event.row);
+                return (
+                    finalize_column_reorder(app, src_col, event.column, event.row),
+                    true,
+                );
             }
-            // Finalize row reorder
             if let Some((src_row, _)) = app.view_state.mouse_layout.row_reorder.take() {
                 reset_pointer();
-                return finalize_row_reorder(app, src_row, event.column, event.row);
+                return (
+                    finalize_row_reorder(app, src_row, event.column, event.row),
+                    true,
+                );
             }
             app.view_state.mouse_layout.col_resize = None;
+            app.view_state.mouse_layout.last_edge_scroll = None;
             if had_drag {
                 reset_pointer();
             }
-            InputResult::Continue
+            (InputResult::Continue, had_drag)
         }
-        MouseEventKind::Moved => handle_mouse_move(app, event.column, event.row),
-        MouseEventKind::ScrollUp => handle_scroll(app, true),
-        MouseEventKind::ScrollDown => handle_scroll(app, false),
-        _ => InputResult::Continue,
+        MouseEventKind::Moved => (handle_mouse_move(app, event.column, event.row), false),
+        MouseEventKind::ScrollUp => {
+            // Shift+ScrollUp = scroll left (for terminals that don't send ScrollLeft)
+            if event.modifiers.contains(KeyModifiers::SHIFT) {
+                (handle_horizontal_scroll(app, true), true)
+            } else {
+                (handle_scroll(app, true), true)
+            }
+        }
+        MouseEventKind::ScrollDown => {
+            if event.modifiers.contains(KeyModifiers::SHIFT) {
+                (handle_horizontal_scroll(app, false), true)
+            } else {
+                (handle_scroll(app, false), true)
+            }
+        }
+        MouseEventKind::ScrollLeft => (handle_horizontal_scroll(app, true), true),
+        MouseEventKind::ScrollRight => (handle_horizontal_scroll(app, false), true),
+        _ => (InputResult::Continue, false),
     }
 }
 
@@ -220,7 +247,7 @@ fn handle_mouse_move(app: &mut App, x: u16, y: u16) -> InputResult {
 }
 
 /// Check if mouse position is near a column border in the header row.
-/// Returns the display column index (into raw_widths) if hovering on a border.
+/// Returns the display column index (1-based into col_positions) if hovering on a border.
 fn detect_resize_border(app: &App, x: u16, y: u16) -> Option<usize> {
     let layout = &app.view_state.mouse_layout;
     let area = layout.table_content_area;
@@ -229,20 +256,17 @@ fn detect_resize_border(app: &App, x: u16, y: u16) -> Option<usize> {
         return None;
     }
 
-    let rel_x = x - area.x;
-    let rel_y = (y - area.y) as usize;
-
-    if rel_y != 0 {
+    if (y - area.y) != 0 {
         return None;
     }
 
-    let mut edge_x: u16 = 0;
-    for (i, &width) in layout.raw_widths.iter().enumerate() {
-        edge_x += width;
-        if i > 0 && rel_x + RESIZE_GRAB_ZONE >= edge_x && rel_x <= edge_x + RESIZE_GRAB_ZONE {
+    // Check proximity to each column right edge using col_positions.
+    let positions = &layout.col_positions;
+    for i in 1..positions.len().saturating_sub(1) {
+        let right_edge = positions[i + 1];
+        if x + RESIZE_GRAB_ZONE >= right_edge && x <= right_edge + RESIZE_GRAB_ZONE {
             return Some(i);
         }
-        edge_x += 1; // column spacing
     }
 
     None
@@ -326,11 +350,15 @@ fn resolve_row_gutter(
         return None;
     }
 
-    let rel_x = x - area.x;
     let rel_y = (y - area.y) as usize;
 
-    // Must be in the gutter column (rel_x < row_num_width)
-    if rel_x >= layout.row_num_width {
+    // Must be in the gutter column (before first data column)
+    let gutter_end = layout
+        .col_positions
+        .get(1)
+        .copied()
+        .unwrap_or(area.x + layout.row_num_width);
+    if x >= gutter_end {
         return None;
     }
 
@@ -350,6 +378,21 @@ fn resolve_row_gutter(
     }
 }
 
+/// Map an absolute x coordinate to a display column index using resolved col_positions.
+/// Returns None if x falls in the gutter (index 0) or outside all columns.
+fn resolve_x_to_display_col(layout: &crate::ui::view_state::MouseLayout, x: u16) -> Option<usize> {
+    let positions = &layout.col_positions;
+    for i in 0..positions.len().saturating_sub(1) {
+        if x >= positions[i] && x < positions[i + 1] {
+            if i == 0 {
+                return None; // row number gutter
+            }
+            return Some(i - 1); // display_cols index
+        }
+    }
+    None
+}
+
 /// Resolve a click on the column letters row to a column index, if any.
 fn resolve_column_header(
     layout: &crate::ui::view_state::MouseLayout,
@@ -360,29 +403,11 @@ fn resolve_column_header(
     if x < area.x || x >= area.x + area.width || y < area.y || y >= area.y + area.height {
         return None;
     }
-
-    let rel_x = x - area.x;
-    let rel_y = (y - area.y) as usize;
-
-    // Only match the column letters row (row 0 in the table content area)
-    if rel_y != 0 {
+    if (y - area.y) != 0 {
         return None;
     }
-
-    // Map x to column (same logic as resolve_table_cell)
-    let mut cumulative_x: u16 = 0;
-    for (i, &width) in layout.raw_widths.iter().enumerate() {
-        let col_end = cumulative_x + width;
-        if rel_x < col_end {
-            if i == 0 {
-                return None; // row number gutter
-            }
-            return layout.display_cols.get(i - 1).copied();
-        }
-        cumulative_x = col_end + 1;
-    }
-
-    None
+    let idx = resolve_x_to_display_col(layout, x)?;
+    layout.display_cols.get(idx).copied()
 }
 
 /// Resolve terminal coordinates to a (row_index, col_index) table cell, if any.
@@ -395,18 +420,13 @@ fn resolve_table_cell(
     if x < area.x || x >= area.x + area.width || y < area.y || y >= area.y + area.height {
         return None;
     }
-
-    let rel_x = x - area.x;
     let rel_y = (y - area.y) as usize;
-
-    // Row 0 is the column letters row
     if rel_y == 0 {
         return None;
     }
 
     let frozen_count = layout.frozen_row_indices.len();
     let data_rel_y = rel_y - 1;
-
     let target_row = if data_rel_y < frozen_count {
         layout.frozen_row_indices.get(data_rel_y).copied()?
     } else {
@@ -414,57 +434,42 @@ fn resolve_table_cell(
         layout.scrollable_indices.get(scroll_rel).copied()?
     };
 
-    // Map x to column
-    let mut cumulative_x: u16 = 0;
-    for (i, &width) in layout.raw_widths.iter().enumerate() {
-        let col_end = cumulative_x + width;
-        if rel_x < col_end {
-            if i == 0 {
-                return None; // row number gutter
-            }
-            let col = *layout.display_cols.get(i - 1)?;
-            return Some((target_row, col));
-        }
-        cumulative_x = col_end + 1;
-    }
-
-    None
+    let idx = resolve_x_to_display_col(layout, x)?;
+    let col = *layout.display_cols.get(idx)?;
+    Some((target_row, col))
 }
 
 /// Move the insert-mode edit cursor to the clicked position within the current cell.
 fn move_insert_cursor(
     app: &mut App,
     layout: &crate::ui::view_state::MouseLayout,
-    area: ratatui::layout::Rect,
+    _area: ratatui::layout::Rect,
     x: u16,
 ) {
-    let rel_x = x - area.x;
     let selected_col = app.view_state.selected_column.get();
 
-    // Find the x start and width of the selected column
+    // Find the x start and width of the selected column using col_positions
+    let positions = &layout.col_positions;
     let mut col_start_x: u16 = 0;
     let mut col_width: u16 = 0;
     let mut found = false;
 
-    for (i, &width) in layout.raw_widths.iter().enumerate() {
-        if i > 0 {
-            if let Some(&dc) = layout.display_cols.get(i - 1) {
-                if dc == selected_col {
-                    col_width = width;
-                    found = true;
-                    break;
-                }
-            }
+    for (i, &dc) in layout.display_cols.iter().enumerate() {
+        if dc == selected_col {
+            col_start_x = positions.get(i + 1).copied().unwrap_or(0);
+            let col_end_x = positions.get(i + 2).copied().unwrap_or(col_start_x);
+            col_width = col_end_x.saturating_sub(col_start_x).saturating_sub(1);
+            found = true;
+            break;
         }
-        col_start_x = col_start_x + width + 1;
     }
 
     if !found {
         return;
     }
 
-    let char_offset = if rel_x >= col_start_x {
-        (rel_x - col_start_x) as usize
+    let char_offset = if x >= col_start_x {
+        (x - col_start_x) as usize
     } else {
         0
     };
@@ -532,6 +537,22 @@ fn handle_scroll(app: &mut App, up: bool) -> InputResult {
     }
 }
 
+/// Handle horizontal mouse scroll (trackpad two-finger left/right).
+fn handle_horizontal_scroll(app: &mut App, left: bool) -> InputResult {
+    match app.mode {
+        Mode::Normal | Mode::VisualBlock | Mode::VisualLine | Mode::VisualColumn => {
+            let count = 3;
+            if left {
+                crate::navigation::commands::move_left_by(app, count);
+            } else {
+                crate::navigation::commands::move_right_by(app, count);
+            }
+            InputResult::Continue
+        }
+        _ => InputResult::Continue,
+    }
+}
+
 /// Map a click in the table area to a cell and navigate to it.
 fn handle_table_click(app: &mut App, x: u16, y: u16) -> InputResult {
     let layout = &app.view_state.mouse_layout;
@@ -553,22 +574,19 @@ fn handle_table_click(app: &mut App, x: u16, y: u16) -> InputResult {
     // Record drag anchor for potential drag selection
     app.view_state.mouse_layout.drag_anchor = Some((target_row, target_col));
 
-    // Navigate to the target cell
+    // Navigate to the target cell, preserving the current scroll position.
+    // The clicked cell is already visible on screen (resolve_table_cell succeeded),
+    // so lock the viewport to the current scroll offset to prevent recentering.
+    let scroll_offset = app.view_state.mouse_layout.last_scroll_offset;
     app.view_state.table_state.select(Some(target_row));
     app.view_state.selected_column = ColIndex::new(target_col);
-    app.view_state.viewport_mode = ViewportMode::Auto;
-
-    // Adjust horizontal scroll if needed
-    if target_col >= app.view_state.column_scroll_offset + app.view_state.visible_cols_count {
-        app.view_state.column_scroll_offset = target_col - app.view_state.visible_cols_count + 1;
-    } else if target_col < app.view_state.column_scroll_offset {
-        app.view_state.column_scroll_offset = target_col;
-    }
+    app.view_state.viewport_mode = ViewportMode::Fixed(scroll_offset);
 
     InputResult::Continue
 }
 
 /// Handle mouse drag to extend a visual block selection.
+/// Supports auto-scrolling when dragging past the visible edges.
 fn handle_drag(app: &mut App, x: u16, y: u16) -> InputResult {
     // Only handle drag in normal or visual block mode
     if !matches!(app.mode, Mode::Normal | Mode::VisualBlock) {
@@ -578,7 +596,50 @@ fn handle_drag(app: &mut App, x: u16, y: u16) -> InputResult {
     let layout = app.view_state.mouse_layout.clone();
     let area = layout.table_content_area;
 
-    let Some((target_row, target_col)) = resolve_table_cell(&layout, area, x, y) else {
+    // Try to resolve the cell under the cursor, or auto-scroll if past edges
+    let (target_row, target_col) = if let Some(cell) = resolve_table_cell(&layout, area, x, y) {
+        cell
+    } else if layout.drag_anchor.is_some() {
+        // Mouse is outside the table area — throttle edge scrolling to ~20 rows/sec
+        let now = Instant::now();
+        let elapsed = app
+            .view_state
+            .mouse_layout
+            .last_edge_scroll
+            .map(|last| now.duration_since(last).as_millis());
+        if let Some(ms) = elapsed {
+            if ms < 50 {
+                return InputResult::Continue;
+            }
+        }
+        app.view_state.mouse_layout.last_edge_scroll = Some(now);
+
+        let row_count = app.document.row_count();
+        let col_count = app.document.column_count();
+        let current_row = app.view_state.table_state.selected().unwrap_or(0);
+        let current_col = app.view_state.selected_column.get();
+
+        // Vertical: above header row → scroll up, below table → scroll down
+        let target_row = if y <= area.y + 1 {
+            current_row.saturating_sub(1)
+        } else if y >= area.y + area.height {
+            (current_row + 1).min(row_count.saturating_sub(1))
+        } else {
+            current_row
+        };
+
+        // Horizontal: left of data area → scroll left, right of table → scroll right
+        let gutter_end = layout.col_positions.get(1).copied().unwrap_or(0);
+        let target_col = if x < gutter_end {
+            current_col.saturating_sub(1)
+        } else if x >= area.x + area.width {
+            (current_col + 1).min(col_count.saturating_sub(1))
+        } else {
+            current_col
+        };
+
+        (target_row, target_col)
+    } else {
         return InputResult::Continue;
     };
 
@@ -606,10 +667,27 @@ fn handle_drag(app: &mut App, x: u16, y: u16) -> InputResult {
         sel.update_cursor(RowIndex::new(target_row), ColIndex::new(target_col));
     }
 
-    // Move the navigation cursor to follow
+    // Move the navigation cursor to follow.
+    // Use Fixed viewport to prevent Auto from recentering the view.
+    // Only adjust scroll by 1 row when the target is outside the current viewport.
+    let scroll_offset = app.view_state.mouse_layout.last_scroll_offset;
+    let scrollable_height = (area.height as usize)
+        .saturating_sub(1) // column letters row
+        .saturating_sub(layout.frozen_row_indices.len());
+
+    let new_scroll = if target_row >= scroll_offset + scrollable_height {
+        // Target is below the visible area — scroll down by 1
+        scroll_offset + 1
+    } else if target_row < scroll_offset {
+        // Target is above the visible area — scroll up by 1
+        scroll_offset.saturating_sub(1)
+    } else {
+        scroll_offset
+    };
+
     app.view_state.table_state.select(Some(target_row));
     app.view_state.selected_column = ColIndex::new(target_col);
-    app.view_state.viewport_mode = ViewportMode::Auto;
+    app.view_state.viewport_mode = ViewportMode::Fixed(new_scroll);
 
     // Adjust horizontal scroll if needed
     if target_col >= app.view_state.column_scroll_offset + app.view_state.visible_cols_count {
@@ -1127,10 +1205,12 @@ mod tests {
             FileConfig::new(),
         );
 
+        // col_positions: gutter(0), col0(4), col1(15), col2(26), trailing(36)
         app.view_state.mouse_layout = MouseLayout {
             table_content_area: Rect::new(0, 2, 40, 8),
             display_cols: vec![0, 1, 2],
             raw_widths: vec![3, 10, 10, 10],
+            col_positions: vec![0, 4, 15, 26, 36],
             frozen_row_indices: vec![],
             scrollable_indices: vec![0, 1, 2, 3, 4],
             row_num_width: 3,
@@ -1141,6 +1221,8 @@ mod tests {
             col_reorder: None,
             row_reorder: None,
             resize_hover_col: None,
+            last_scroll_offset: 0,
+            last_edge_scroll: None,
         };
 
         app
@@ -1280,8 +1362,9 @@ mod tests {
     #[test]
     fn test_resize_border_at_edge() {
         let app = create_test_app();
-        // Gutter(3)+col0(10)=13, edge at x=13. x=12 → 12+2>=13 ✓
-        assert_eq!(detect_resize_border(&app, 12, 2), Some(1));
+        // col_positions: [0, 4, 15, 26, 36]. Right edge of col0 is positions[2]=15.
+        // x=14 → 14+2>=15 ✓
+        assert_eq!(detect_resize_border(&app, 14, 2), Some(1));
     }
 
     #[test]
@@ -1401,7 +1484,7 @@ mod tests {
         app.view_state.mouse_layout.drag_anchor = Some((0, 0));
 
         handle_drag(&mut app, 15, 4);
-        handle_drag(&mut app, 25, 6);
+        handle_drag(&mut app, 26, 6); // col2 starts at x=26
 
         let sel = app.visual_selection.unwrap();
         assert_eq!(sel.cursor, (RowIndex::new(3), ColIndex::new(2)));

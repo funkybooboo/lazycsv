@@ -19,6 +19,9 @@ pub struct MouseLayout {
     pub display_cols: Vec<usize>,
     /// Width of each display column (including row number gutter at index 0)
     pub raw_widths: Vec<u16>,
+    /// Resolved column x-start positions matching the Table widget layout.
+    /// Index 0 = gutter, 1..N = data columns, N+1 = trailing right edge.
+    pub col_positions: Vec<u16>,
     /// Row indices for frozen rows (displayed at top)
     pub frozen_row_indices: Vec<usize>,
     /// Row indices for scrollable rows (in display order)
@@ -39,15 +42,20 @@ pub struct MouseLayout {
     pub row_reorder: Option<(usize, usize)>,
     /// Display column index where a resize handle is being hovered (for visual indicator)
     pub resize_hover_col: Option<usize>,
+    /// Last rendered vertical scroll offset (for mouse click viewport preservation)
+    pub last_scroll_offset: usize,
+    /// Timestamp of last edge-scroll during drag (for throttling)
+    pub last_edge_scroll: Option<Instant>,
 }
 
 /// Viewport positioning mode for view commands (zt, zz, zb)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ViewportMode {
-    Auto,   // Auto-center when possible (default)
-    Top,    // Selected row at top (zt)
-    Center, // Selected row centered (zz)
-    Bottom, // Selected row at bottom (zb)
+    Auto,         // Auto-center when possible (default)
+    Top,          // Selected row at top (zt)
+    Center,       // Selected row centered (zz)
+    Bottom,       // Selected row at bottom (zb)
+    Fixed(usize), // Keep scroll at this exact offset (used by mouse clicks)
 }
 
 /// Holds state for the UI/View layer

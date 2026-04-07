@@ -378,6 +378,16 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             nav::page_up(app);
         }
 
+        // Shift+Arrow: start/extend visual block selection
+        KeyCode::Up | KeyCode::Down | KeyCode::Left | KeyCode::Right
+            if help::is_navigation_allowed(app) && key.modifiers.contains(KeyModifiers::SHIFT) =>
+        {
+            // Enter visual block mode with current cell as anchor
+            visual_mode::enter_block_mode(app);
+            // Delegate the arrow key to the visual mode handler to extend selection
+            return crate::input::visual_mode::handle(app, key);
+        }
+
         // Navigation commands
         _ if help::is_navigation_allowed(app) => {
             navigation::handle_navigation(app, key.code)?;

@@ -230,6 +230,10 @@ fn calculate_scroll_offset(
             // zb: selected row at bottom of screen
             selected_idx.saturating_sub(table_height.saturating_sub(1))
         }
+        crate::ui::ViewportMode::Fixed(offset) => {
+            // Mouse click: keep scroll exactly where it was
+            (*offset).min(total_rows.saturating_sub(table_height))
+        }
     }
 }
 
@@ -379,7 +383,12 @@ fn calculate_column_widths_v2(
     let mut constraints = vec![Constraint::Length(row_num_width)];
     let mut raw_widths = vec![row_num_width];
 
-    let available_width = area.width.saturating_sub(row_num_width);
+    // Account for column spacing (1px between each column, including after gutter)
+    let spacing_total = display_cols.len() as u16; // 1px spacing per column gap
+    let available_width = area
+        .width
+        .saturating_sub(row_num_width)
+        .saturating_sub(spacing_total);
 
     if display_cols.is_empty() {
         return (constraints, raw_widths);
@@ -398,11 +407,32 @@ fn calculate_column_widths_v2(
             raw_widths.push(width);
         }
     } else {
-        let scale = available_width as f64 / total_ideal as f64;
-        for ideal in ideal_widths {
-            let scaled = ((ideal as f64 * scale) as u16).max(MIN_COLUMN_WIDTH);
-            constraints.push(Constraint::Length(scaled));
-            raw_widths.push(scaled);
+        // Scale widths to fit, ensuring they sum exactly to available_width
+        let mut scaled_widths: Vec<u16> = ideal_widths
+            .iter()
+            .map(|&ideal| ((ideal as f64 / total_ideal as f64) * available_width as f64) as u16)
+            .map(|w| w.max(MIN_COLUMN_WIDTH))
+            .collect();
+
+        // Distribute any rounding remainder to the widest columns
+        let sum: u16 = scaled_widths.iter().sum();
+        if sum < available_width {
+            let mut remainder = available_width - sum;
+            // Sort indices by width descending to distribute to largest first
+            let mut indices: Vec<usize> = (0..scaled_widths.len()).collect();
+            indices.sort_by(|&a, &b| scaled_widths[b].cmp(&scaled_widths[a]));
+            for &idx in indices.iter().cycle() {
+                if remainder == 0 {
+                    break;
+                }
+                scaled_widths[idx] += 1;
+                remainder -= 1;
+            }
+        }
+
+        for width in scaled_widths {
+            constraints.push(Constraint::Length(width));
+            raw_widths.push(width);
         }
     }
 
@@ -657,6 +687,9 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
         &app.view_state.viewport_mode,
     );
 
+    // Store the scroll offset for mouse click viewport preservation
+    app.view_state.mouse_layout.last_scroll_offset = scroll_offset;
+
     // Build frozen rows (rendered as a separate table above the scrollable table)
     let mut frozen_data_rows: Vec<Row<'static>> = Vec::new();
     for &fr_idx in &frozen_row_indices {
@@ -735,10 +768,32 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     let rule = Paragraph::new("─".repeat(area.width as usize));
     frame.render_widget(rule, chunks[1]);
 
+    // Compute column positions deterministically from the resolved widths.
+    // This matches the Table widget's layout: each column followed by 1px spacing.
+    let col_positions = {
+        let start_x = chunks[2].x;
+        let mut positions = Vec::with_capacity(widths.len() + 1);
+        let mut x = start_x;
+        for (i, constraint) in widths.iter().enumerate() {
+            positions.push(x);
+            let w = match constraint {
+                Constraint::Length(l) => *l,
+                _ => 0,
+            };
+            x += w;
+            if i + 1 < widths.len() {
+                x += 1; // column spacing
+            }
+        }
+        positions.push(x);
+        positions
+    };
+
     // Store layout info for mouse coordinate mapping
     app.view_state.mouse_layout.table_content_area = chunks[2];
     app.view_state.mouse_layout.display_cols = display_cols;
     app.view_state.mouse_layout.raw_widths = raw_widths;
+    app.view_state.mouse_layout.col_positions = col_positions;
     app.view_state.mouse_layout.frozen_row_indices = frozen_row_indices;
     app.view_state.mouse_layout.scrollable_indices = scrollable_indices;
     app.view_state.mouse_layout.row_num_width = row_num_width;

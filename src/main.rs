@@ -452,8 +452,16 @@ fn run(terminal: &mut Term, app: &mut App) -> Result<()> {
                     }
                 }
                 Event::Mouse(mouse) => {
-                    let result = app.handle_mouse(mouse);
-                    needs_redraw = true;
+                    // Skip Moved events — they fire on every pixel of mouse
+                    // movement and cause expensive redraws with column
+                    // width recalculation.
+                    if matches!(mouse.kind, crossterm::event::MouseEventKind::Moved) {
+                        continue;
+                    }
+                    let (result, mouse_redraw) = app.handle_mouse(mouse);
+                    if mouse_redraw {
+                        needs_redraw = true;
+                    }
                     handle_input_result(terminal, app, result)?;
                 }
                 _ => {}
