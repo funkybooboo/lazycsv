@@ -6,17 +6,63 @@ use crate::app::{App, Mode, VisualMode};
 use crate::clipboard::copy_text_to_system_clipboard;
 use crate::domain::position::{ColIndex, RowIndex};
 use crate::input::visual_mode::{handle_visual_delete, handle_visual_paste, handle_visual_yank};
-use crate::input::{InputResult, StatusMessage};
+use crate::input::{InputResult, PendingCommand, StatusMessage};
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 
 /// Handle keyboard input in Visual mode (Block, Line, Column)
 pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
+    // If stats overlay is visible, handle overlay navigation first
+    if app.view_state.stats_overlay_visible {
+        match key.code {
+            KeyCode::Char('j') | KeyCode::Down => {
+                if let Some(ref mut data) = app.view_state.stats_overlay_data {
+                    data.scroll_offset = data.scroll_offset.saturating_add(1);
+                }
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                if let Some(ref mut data) = app.view_state.stats_overlay_data {
+                    data.scroll_offset = data.scroll_offset.saturating_sub(1);
+                }
+            }
+            KeyCode::Esc | KeyCode::Char('q') => {
+                app.view_state.stats_overlay_visible = false;
+                app.view_state.stats_overlay_data = None;
+            }
+            _ => {}
+        }
+        return Ok(InputResult::Continue);
+    }
+
     // Get current visual selection or initialize if missing
     if app.visual_selection.is_none() {
         // Should not happen, but handle gracefully
         app.mode = Mode::Normal;
         return Ok(InputResult::Continue);
+    }
+
+    // Handle pending 'g' command (gs = stats overlay, gg = go to first row)
+    if app.input_state.pending_command == Some(PendingCommand::G) {
+        app.input_state.pending_command = None;
+        match key.code {
+            KeyCode::Char('s') => {
+                crate::input::command_mode::stats::open_stats_overlay(app);
+                return Ok(InputResult::Continue);
+            }
+            KeyCode::Char('g') => {
+                // gg: move to first row
+                if let Some(sel) = &mut app.visual_selection {
+                    let new_row = RowIndex::new(0);
+                    app.view_state.table_state.select(Some(0));
+                    sel.update_cursor(new_row, app.view_state.selected_column);
+                }
+                return Ok(InputResult::Continue);
+            }
+            _ => {
+                // Unknown g-command, ignore
+                return Ok(InputResult::Continue);
+            }
+        }
     }
 
     match key.code {
@@ -104,6 +150,22 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         // Paste operation
         KeyCode::Char('p') => {
             handle_visual_paste(app)?;
+        }
+
+        // Pending g-command (gs = stats, gg = top)
+        KeyCode::Char('g') => {
+            app.input_state
+                .set_pending_command(PendingCommand::G);
+        }
+
+        // Go to last row
+        KeyCode::Char('G') => {
+            let last_row = app.document.row_count().saturating_sub(1);
+            if let Some(sel) = &mut app.visual_selection {
+                let new_row = RowIndex::new(last_row);
+                app.view_state.table_state.select(Some(last_row));
+                sel.update_cursor(new_row, app.view_state.selected_column);
+            }
         }
 
         _ => {}

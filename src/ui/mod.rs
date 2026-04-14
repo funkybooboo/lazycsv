@@ -6,6 +6,7 @@ pub mod magnifier;
 pub mod modal;
 pub mod sql_editor;
 // mod sql_editor_helpers; // DEPRECATED: Old SQL editor code, removed in v0.11.0
+pub mod stats_overlay;
 pub mod status_bar;
 pub mod table;
 pub mod utils;
@@ -95,6 +96,13 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     // Render formula completion popup if active (in insert mode)
     if app.formula_completion.is_some() && app.mode == crate::app::Mode::Insert {
         render_formula_completion(frame, app);
+    }
+
+    // Render statistics overlay if active
+    if app.view_state.stats_overlay_visible {
+        if let Some(ref data) = app.view_state.stats_overlay_data {
+            stats_overlay::render(frame, data);
+        }
     }
 
     // Render context menu if active

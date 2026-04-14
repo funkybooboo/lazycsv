@@ -670,12 +670,14 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     let frozen_row_count = frozen_row_indices.len();
 
     // Calculate visible viewport for virtual scrolling
-    // Subtract: title(1) + rule(1) + col letters(1) + frozen rows + status bar(1)
+    // Subtract: title(1) + rule(1) + col letters(1) + frozen rows + status bar(1) + footer(0 or 1)
+    let footer_height: u16 = if app.view_state.show_footer_row { 1 } else { 0 };
     let scrollable_height = area
         .height
         .saturating_sub(TABLE_HEADER_HEIGHT)
         .saturating_sub(STATUS_BAR_HEIGHT)
-        .saturating_sub(frozen_row_count as u16) as usize;
+        .saturating_sub(frozen_row_count as u16)
+        .saturating_sub(footer_height) as usize;
 
     let selected_idx = app.view_state.table_state.selected().unwrap_or(0);
 
@@ -731,12 +733,18 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
         scrollable_data_rows.extend(rows);
     }
 
-    // Combine: column letters row + frozen rows + scrollable rows into one table.
+    // Combine: column letters row + frozen rows + scrollable rows + optional footer.
     // This avoids ratatui stateful widget scrolling issues with multiple tables.
     let mut all_rows: Vec<Row<'static>> = Vec::new();
     all_rows.push(col_letters_row);
     all_rows.extend(frozen_data_rows);
     all_rows.extend(scrollable_data_rows);
+
+    // Optional footer row showing column totals
+    if app.view_state.show_footer_row {
+        let footer = build_footer_row(app, &display_cols, row_num_width);
+        all_rows.push(footer);
+    }
 
     // Split area: title bar + horizontal rule + table content
     let chunks = Layout::default()
@@ -802,6 +810,45 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     // via scroll_offset and the scrollable_indices list.
     let table = Table::new(all_rows, widths);
     frame.render_widget(table, chunks[2]);
+}
+
+/// Build a footer row showing column totals/summaries.
+///
+/// For each visible column, shows the sum if >50% of values are numeric,
+/// otherwise shows the count of non-empty values. The gutter cell displays "Σ".
+fn build_footer_row(app: &App, display_cols: &[usize], row_num_width: u16) -> Row<'static> {
+    use crate::input::command_mode::stats::{compute_selection_stats, format_number};
+
+    let row_count = app.document.row_count();
+
+    // Gutter cell with sigma symbol
+    let gutter_label = format!("{:>width$}", "\u{03A3}", width = row_num_width as usize);
+    let mut cells: Vec<Cell<'static>> = vec![Cell::from(gutter_label)
+        .style(Style::default().add_modifier(Modifier::BOLD).fg(Color::DarkGray))];
+
+    for &col_idx in display_cols {
+        // Collect all data cell values for this column
+        let values: Vec<String> = (0..row_count)
+            .map(|r| app.document.storage.get_cell(r, col_idx))
+            .collect();
+
+        let stats = compute_selection_stats(&values);
+
+        let summary = if stats.numeric_count > 0 && stats.numeric_count * 2 >= stats.count {
+            // >50% numeric: show sum
+            format!("\u{03A3} {}", format_number(stats.sum))
+        } else {
+            // Mostly text: show non-empty count
+            let non_empty = values.iter().filter(|v| !v.trim().is_empty()).count();
+            format!("# {}", non_empty)
+        };
+
+        cells.push(
+            Cell::from(summary).style(Style::default().add_modifier(Modifier::DIM).fg(Color::Cyan)),
+        );
+    }
+
+    Row::new(cells).style(Style::default().bg(Color::Rgb(25, 25, 25)))
 }
 
 #[cfg(test)]

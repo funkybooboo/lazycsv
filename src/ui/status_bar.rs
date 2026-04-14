@@ -46,9 +46,48 @@ fn build_three_part_status_line(left: &str, center: &str, right: &str, width: us
     )
 }
 
+/// Build visual mode selection statistics for the right side of the status bar.
+fn build_visual_stats(app: &App, sel: &crate::app::VisualSelection) -> String {
+    use crate::input::command_mode::stats::{
+        collect_visual_selection_flat, compute_selection_stats, format_number,
+        visual_selection_cell_count,
+    };
+
+    let cell_count = visual_selection_cell_count(app, sel);
+
+    // Performance guard: skip numeric aggregation for very large selections
+    if cell_count > 10_000 {
+        return format!("Count: {} (large selection) ", cell_count);
+    }
+
+    let values = collect_visual_selection_flat(app, sel);
+    let stats = compute_selection_stats(&values);
+
+    if stats.numeric_count == 0 {
+        format!("Count: {} ", stats.count)
+    } else {
+        format!(
+            "Sum: {} | Avg: {} | Count: {} ",
+            format_number(stats.sum),
+            format_number(stats.avg),
+            stats.numeric_count
+        )
+    }
+}
+
 /// Build the right side of the status bar with enhanced position and cell info
 fn build_right_side(app: &App) -> String {
     use crate::ui::utils::{column_to_excel_letter, format_number};
+
+    // In visual mode, show selection statistics instead of position info
+    if matches!(
+        app.mode,
+        crate::app::Mode::VisualBlock | crate::app::Mode::VisualLine | crate::app::Mode::VisualColumn
+    ) {
+        if let Some(ref sel) = app.visual_selection {
+            return build_visual_stats(app, sel);
+        }
+    }
 
     let selected_row = app.selected_row().map(|r| r.get()).unwrap_or(0);
     let col_letter = column_to_excel_letter(app.view_state.selected_column.get());

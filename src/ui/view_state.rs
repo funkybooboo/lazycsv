@@ -58,6 +58,28 @@ pub enum ViewportMode {
     Fixed(usize), // Keep scroll at this exact offset (used by mouse clicks)
 }
 
+/// Per-column statistics for the stats overlay popup.
+#[derive(Debug, Clone)]
+pub struct ColumnStats {
+    pub name: String,
+    pub total_count: usize,
+    pub non_empty_count: usize,
+    pub numeric_count: usize,
+    pub sum: Option<f64>,
+    pub avg: Option<f64>,
+    pub min: Option<f64>,
+    pub max: Option<f64>,
+    pub distinct_count: usize,
+}
+
+/// Data for the statistics overlay popup.
+#[derive(Debug, Clone)]
+pub struct StatsOverlayData {
+    pub title: String,
+    pub columns: Vec<ColumnStats>,
+    pub scroll_offset: u16,
+}
+
 /// Holds state for the UI/View layer
 #[derive(Debug)]
 pub struct ViewState {
@@ -124,6 +146,15 @@ pub struct ViewState {
     /// Number of columns that fit in the current terminal width (updated during rendering)
     pub visible_cols_count: usize,
 
+    /// Whether the footer row (column totals) is visible
+    pub show_footer_row: bool,
+
+    /// Whether the statistics overlay popup is visible
+    pub stats_overlay_visible: bool,
+
+    /// Data for the statistics overlay popup
+    pub stats_overlay_data: Option<StatsOverlayData>,
+
     /// Layout info captured during rendering for mouse coordinate mapping
     pub mouse_layout: MouseLayout,
 }
@@ -153,6 +184,9 @@ impl Default for ViewState {
             current_directory: std::env::current_dir()
                 .unwrap_or_else(|_| std::path::PathBuf::from(".")),
             visible_cols_count: 10, // default, updated each render frame
+            show_footer_row: false,
+            stats_overlay_visible: false,
+            stats_overlay_data: None,
             mouse_layout: MouseLayout::default(),
         }
     }

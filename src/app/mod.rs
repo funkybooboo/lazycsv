@@ -1026,6 +1026,7 @@ impl App {
         // Initialize view state - start at row 0 (displays as row 1)
         let mut view_state = ViewState::default();
         view_state.table_state.select(Some(0));
+        view_state.show_footer_row = config.defaults.show_footer;
 
         // Create input state
         let input_state = InputState::new();

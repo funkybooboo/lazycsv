@@ -92,8 +92,11 @@ fn build_help_text() -> Vec<Line<'static>> {
         Line::from("  Y                  Copy selection to system clipboard (CSV)"),
         Line::from("  Esc                Cancel selection"),
         Line::from("  gv                 Re-select last selection"),
+        Line::from("  gs                 Statistics popup for selection"),
+        Line::from("  gg / G             Move to first/last row"),
         Line::from(""),
         Line::from("  Workflow: v -> hjkl to select -> Y to copy to clipboard"),
+        Line::from("  Stats shown in status bar during selection"),
         Line::from(""),
         // ── Search ────────────────────────────────────────────
         Line::from(Span::styled("SEARCH", super::modal::bold_style())),
@@ -115,9 +118,10 @@ fn build_help_text() -> Vec<Line<'static>> {
         Line::from(Span::styled("SORT & DATA", super::modal::bold_style())),
         Line::from("  :sort Col          Sort ascending by column(s)"),
         Line::from("  :sort! Col         Sort descending"),
-        Line::from("  :stats [Col]       Column statistics"),
+        Line::from("  :stats [Col]       Column statistics (popup in visual mode)"),
         Line::from("  :sum / :avg Col    Sum/average of column"),
         Line::from("  :count / :distinct Column count/distinct values"),
+        Line::from("  :footer            Toggle column totals footer row"),
         Line::from(""),
         // ── Find & Replace ────────────────────────────────────
         Line::from(Span::styled("FIND & REPLACE", super::modal::bold_style())),

@@ -710,3 +710,34 @@ fn test_visual_modes_save_to_last_selection() {
     app.handle_key(key(KeyCode::Char('y'))).unwrap();
     assert!(app.last_visual_selection.is_some());
 }
+
+#[test]
+fn test_gs_opens_stats_overlay() {
+    // Create app with numeric data
+    let doc = Document::new(
+        vec!["Name".into(), "Value".into()],
+        vec![
+            vec!["A".into(), "10".into()],
+            vec!["B".into(), "20".into()],
+            vec!["C".into(), "30".into()],
+        ],
+        "test.csv".to_string(),
+    );
+    let files = vec![PathBuf::from("test.csv")];
+    let mut app = App::new(doc, files, 0, FileConfig::new());
+
+    // Enter visual mode
+    app.handle_key(key(KeyCode::Char('v'))).unwrap();
+    assert_eq!(app.mode, Mode::VisualBlock);
+
+    // Move down to select some rows
+    app.handle_key(key(KeyCode::Char('j'))).unwrap();
+    app.handle_key(key(KeyCode::Char('j'))).unwrap();
+
+    // Press 'g' then 's' — should open stats overlay
+    app.handle_key(key(KeyCode::Char('g'))).unwrap();
+    app.handle_key(key(KeyCode::Char('s'))).unwrap();
+
+    assert!(app.view_state.stats_overlay_visible);
+    assert!(app.view_state.stats_overlay_data.is_some());
+}

@@ -30,6 +30,7 @@ pub struct Defaults {
     pub zebra_striping: bool,
     pub max_column_width: u16,
     pub undo_limit: usize,
+    pub show_footer: bool,
 }
 
 /// Theme/color configuration.
@@ -80,6 +81,7 @@ impl Default for Defaults {
             zebra_striping: true,
             max_column_width: 100,
             undo_limit: 1000,
+            show_footer: false,
         }
     }
 }
@@ -146,6 +148,7 @@ struct TomlDefaults {
     zebra_striping: Option<bool>,
     max_column_width: Option<u16>,
     undo_limit: Option<usize>,
+    show_footer: Option<bool>,
 }
 
 #[derive(Deserialize, Default)]
@@ -375,6 +378,9 @@ fn apply_toml(config: &mut Config, toml: &TomlConfig, path: &Path, warnings: &mu
         } else {
             warnings.push(format!("{}: undo_limit must be >= 1, got {}", file, u));
         }
+    }
+    if let Some(f) = toml.defaults.show_footer {
+        config.defaults.show_footer = f;
     }
 
     // Theme — helper to apply a color field with warning on bad value

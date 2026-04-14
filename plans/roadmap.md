@@ -44,7 +44,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.18.1 | SQL IntelliSense Polish & Testing | [x] | 606 |
 | v0.19.0 | Column Resize & Advanced Column Operations | [x] | 60+ |
 | v0.19.1 | Documentation & Maintainability | [ ] | TBD |
-| v0.20.0 | Data Analysis, Statistics & Cell Formulas | [~] | 88 |
+| v0.20.0 | Data Analysis, Statistics & Cell Formulas | [x] | 88 |
 | v0.20.1 | Technical Debt Reduction | [ ] | TBD |
 | v0.21.0 | Export & Import (JSON, Markdown, TSV) | [ ] | TBD |
 | v0.21.1 | Code Coverage & Test Quality | [ ] | TBD |
@@ -212,8 +212,8 @@ Column width, column/row pinning, column type system with validation and type-aw
 **[v0.19.1](versions/v0.19.1.md) - Documentation & Maintainability**
 Documentation improvements with examples, troubleshooting guides, and API docs.
 
-**[v0.20.0](versions/v0.20.0.md) - Data Analysis, Statistics & Cell Formulas** (IN PROGRESS)
-Column statistics commands (:stats, :sum, :avg, :count, :distinct), Excel-like cell formulas (=SUM, =AVERAGE, =IF, =VLOOKUP, and 20 more), formula bar display, auto re-evaluation, and formula completion popup.
+**[v0.20.0](versions/v0.20.0.md) - Data Analysis, Statistics & Cell Formulas** ✅ COMPLETE
+Column statistics commands (:stats, :sum, :avg, :count, :distinct), Excel-like cell formulas (=SUM, =AVERAGE, =IF, =VLOOKUP, and 20 more), formula bar display, auto re-evaluation, and formula completion popup. Visual mode selection statistics in status bar (Sum/Avg/Count). Toggleable `:footer` row with column totals (Σ sum for numeric, # count for text). Statistics overlay popup via `gs` in visual mode with per-column stats table (count, numeric, sum, avg, min, max, distinct). Config option `show_footer` in `[defaults]`.
 
 **[v0.20.1](versions/v0.20.1.md) - Technical Debt Reduction**  
 Technical debt cleanup with code simplification and pattern consolidation.  

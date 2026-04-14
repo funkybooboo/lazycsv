@@ -146,6 +146,19 @@ pub fn execute(app: &mut App) -> Result<InputResult> {
         "trim" => execute_cell_transform(app, crate::transforms::trim),
         "bgcolor" => execute_column_color(app, _arg.unwrap_or(""), true),
         "fgcolor" => execute_column_color(app, _arg.unwrap_or(""), false),
+        "footer" => {
+            app.view_state.show_footer_row = !app.view_state.show_footer_row;
+            let state = if app.view_state.show_footer_row {
+                "on"
+            } else {
+                "off"
+            };
+            app.status_message = Some(crate::input::StatusMessage::from(format!(
+                "Footer totals: {}",
+                state
+            )));
+            Ok(InputResult::Continue)
+        }
         "clearview" => execute_clear_view(app),
         _ => {
             // Unknown command
