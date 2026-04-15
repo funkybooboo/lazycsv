@@ -189,6 +189,16 @@ fn build_help_text() -> Vec<Line<'static>> {
         Line::from("  :copy              Copy CSV to system clipboard"),
         Line::from("  :paste             Paste from system clipboard"),
         Line::from(""),
+        // ── Export ────────────────────────────────────────────
+        Line::from(Span::styled("EXPORT", super::modal::bold_style())),
+        Line::from("  :export json       Export to JSON (array of objects)"),
+        Line::from("  :export tsv        Export to TSV"),
+        Line::from("  :export md         Export to Markdown table"),
+        Line::from("  :export xlsx       Export to XLSX spreadsheet"),
+        Line::from("  :export parquet    Export to Parquet"),
+        Line::from("  :export json path  Export to specific file"),
+        Line::from("  Visual: select cells, then :export <format>"),
+        Line::from(""),
         // ── Magnifier Mode ────────────────────────────────────
         Line::from(Span::styled("MAGNIFIER MODE", super::modal::bold_style())),
         Line::from("  Space+m            Open magnifier (full vim editor)"),

@@ -49,7 +49,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.29.0 | CSV Generation, Parallel Performance & File Manager UX | [x] | 45+ |
 | v0.30.0 | Yazi-Style File Menu, Column Colors & View Persistence | [x] | - |
 | v0.20.1 | Technical Debt Reduction | [x] | - |
-| v0.21.0 | Export & Import (JSON, Markdown, TSV) | [ ] | TBD |
+| v0.21.0 | Multi-Format Export (JSON, TSV, Markdown, XLSX, Parquet) | [x] | 14 |
 | v0.22.0 | Macros & Command Recording | [ ] | TBD |
 | v0.22.1 | Performance Benchmarking & Tuning | [ ] | TBD |
 | v0.23.0 | Final Architecture Review | [ ] | TBD |
@@ -206,8 +206,8 @@ Column statistics commands (:stats, :sum, :avg, :count, :distinct), Excel-like c
 **[v0.20.1](versions/v0.20.1.md) - Technical Debt Reduction** ✅ COMPLETE
 Decomposed God objects: `app/mod.rs` 3,289→320 lines (15 sub-modules), `executor.rs` 1,666→857 (color/condition system extracted), `mouse_handler.rs` 1,833→1,247 (coords, context menu, reorder extracted), `config/mod.rs` 1,383→939 (TOML parsing, watcher, SQL history extracted). 22 new focused sub-module files. Zero clippy warnings. Updated duckdb 1.10501→1.10502, lru 0.16.3→0.16.4.  
 
-**[v0.21.0](versions/v0.21.0.md) - Export & Import (JSON, Markdown, TSV)**  
-Multi-format export/import with format detection and conversion.  
+**[v0.21.0](versions/v0.21.0.md) - Multi-Format Export** ✅ COMPLETE
+`:export` command for JSON, TSV, Markdown, XLSX, and Parquet. Type-preserving JSON (numbers, booleans, nulls). XLSX via `rust_xlsxwriter` with numeric detection. Parquet via DuckDB. Visual selection export. CLI `-o` auto-detects format from extension in query, sort, and dedup modes. 14 tests.  
 
 **[v0.22.0](versions/v0.22.0.md) - Macros & Command Recording**  
 Macro recording and playback with saved macro library.  

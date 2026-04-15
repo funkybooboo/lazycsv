@@ -158,6 +158,7 @@ pub fn execute(app: &mut App) -> Result<InputResult> {
             Ok(InputResult::Continue)
         }
         "clearview" => super::colors::execute_clear_view(app),
+        "export" => execute_export(app, _arg),
         _ => {
             // Unknown command
             app.status_message = Some(StatusMessage::from(format!("Unknown command: :{}", cmd)));
@@ -853,5 +854,95 @@ fn execute_sort(app: &mut App, cmd_name: &str, arg: Option<&str>) -> Result<Inpu
             "Usage: :sort <col,...> or :sort! <col,...> (e.g., :sort 1 or :sort! Name,Age)",
         ));
     }
+    Ok(InputResult::Continue)
+}
+
+/// Execute :export <format> [file]
+fn execute_export(app: &mut App, arg: Option<&str>) -> Result<InputResult> {
+    use crate::domain::position::{ColIndex, RowIndex};
+    use crate::export::{self, ExportFormat};
+
+    let arg = match arg {
+        Some(a) if !a.is_empty() => a,
+        _ => {
+            app.status_message = Some(StatusMessage::from(
+                "Usage: :export <format> [file] (formats: json, tsv, md, xlsx, parquet)",
+            ));
+            return Ok(InputResult::Continue);
+        }
+    };
+
+    let parts: Vec<&str> = arg.splitn(2, ' ').collect();
+    let format = match ExportFormat::from_name(parts[0]) {
+        Some(f) => f,
+        None => {
+            app.status_message = Some(StatusMessage::from(format!(
+                "Unknown format '{}'. Supported: json, tsv, md, xlsx, parquet",
+                parts[0]
+            )));
+            return Ok(InputResult::Continue);
+        }
+    };
+
+    if format == ExportFormat::Csv {
+        app.status_message = Some(StatusMessage::from("Use :w to save as CSV"));
+        return Ok(InputResult::Continue);
+    }
+
+    // Determine output path
+    let output_path = if let Some(explicit) = parts.get(1) {
+        std::path::PathBuf::from(explicit.trim())
+    } else {
+        let base = std::path::Path::new(&app.document.filename)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("output");
+        std::path::PathBuf::from(format!("{}.{}", base, format.extension()))
+    };
+
+    // Collect data — respect visual selection if active
+    let (headers, rows) = if let Some(ref sel) = app.visual_selection {
+        let (start_row, end_row, start_col, end_col) = sel.bounds();
+        let headers: Vec<String> = (start_col.get()..=end_col.get())
+            .map(|c| {
+                app.document
+                    .storage
+                    .header_row()
+                    .get(c)
+                    .cloned()
+                    .unwrap_or_else(|| format!("Col{}", c + 1))
+            })
+            .collect();
+        let rows: Vec<Vec<String>> = (start_row.get()..=end_row.get())
+            .map(|r| {
+                (start_col.get()..=end_col.get())
+                    .map(|c| app.document.cell(RowIndex::new(r), ColIndex::new(c)))
+                    .collect()
+            })
+            .collect();
+        (headers, rows)
+    } else {
+        export::collect_document_data(&app.document)
+    };
+
+    match export::export_to_file(format, &output_path, &headers, &rows) {
+        Ok(()) => {
+            app.status_message = Some(StatusMessage::from(format!(
+                "Exported {} rows to \"{}\"",
+                rows.len(),
+                output_path.display()
+            )));
+        }
+        Err(e) => {
+            app.status_message = Some(StatusMessage::from(format!("Export error: {}", e)));
+        }
+    }
+
+    // Return to normal mode if in visual mode
+    if app.visual_selection.is_some() {
+        app.last_visual_selection = app.visual_selection.take();
+        app.mode = crate::app::Mode::Normal;
+    }
+
     Ok(InputResult::Continue)
 }

@@ -6,6 +6,7 @@ pub mod column;
 pub mod config;
 pub mod csv;
 pub mod domain;
+pub mod export;
 pub mod file_system;
 pub mod formula;
 pub mod generate;

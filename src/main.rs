@@ -1331,14 +1331,25 @@ fn execute_query_mode(query: &str, cli_args: &cli::CliArgs) -> Result<()> {
     let output_file = cli_args.output.as_deref().filter(|o| *o != "-");
     let result = if let Some(out) = output_file {
         let out_path = std::path::PathBuf::from(out);
-        lazycsv::query::execute_query_to_file(
-            &query_path,
-            query,
-            &config,
-            &out_path,
-            cli_args.no_headers,
-        )
-        .inspect(|_| eprintln!("Query results written to {}", out_path.display()))
+
+        // Detect non-CSV format from extension
+        let format = lazycsv::export::ExportFormat::from_extension(&out_path);
+        if matches!(format, Some(f) if f != lazycsv::export::ExportFormat::Csv) {
+            // Run query to document, then export in requested format
+            let doc = lazycsv::query::execute_query_to_doc_from_path(&query_path, query, &config)?;
+            let (headers, rows) = lazycsv::export::collect_document_data(&doc);
+            lazycsv::export::export_to_file(format.unwrap(), &out_path, &headers, &rows)
+                .inspect(|_| eprintln!("Query results exported to {}", out_path.display()))
+        } else {
+            lazycsv::query::execute_query_to_file(
+                &query_path,
+                query,
+                &config,
+                &out_path,
+                cli_args.no_headers,
+            )
+            .inspect(|_| eprintln!("Query results written to {}", out_path.display()))
+        }
     } else {
         lazycsv::query::execute_query(&query_path, query, &config, cli_args.no_headers)
     };
@@ -1916,15 +1927,43 @@ fn execute_dedup(dedup_spec: &str, cli_args: &cli::CliArgs) -> Result<()> {
             })
             .map_err(|e| anyhow::anyhow!("{}", e))?;
 
-        // Write CSV to output (file or stdout)
-        let mut wtr = csv::Writer::from_writer(output_writer(cli_args)?);
-        wtr.write_record(&all_columns)?;
-        for row_result in rows {
-            let values = row_result.context("Failed to read dedup result row")?;
-            wtr.write_record(&values)?;
+        // Write output — detect format from -o extension
+        if let Some(out_path) = cli_args.output.as_deref().filter(|o| *o != "-") {
+            let path = std::path::Path::new(out_path);
+            let format = lazycsv::export::ExportFormat::from_extension(path);
+            if matches!(
+                format,
+                Some(
+                    lazycsv::export::ExportFormat::Json
+                        | lazycsv::export::ExportFormat::Tsv
+                        | lazycsv::export::ExportFormat::Markdown
+                        | lazycsv::export::ExportFormat::Xlsx
+                )
+            ) {
+                let collected: Vec<Vec<String>> = rows
+                    .collect::<std::result::Result<Vec<_>, _>>()
+                    .context("Failed to read dedup result")?;
+                lazycsv::export::export_to_file(format.unwrap(), path, &all_columns, &collected)?;
+                eprintln!("Deduplicated output exported to {}", path.display());
+            } else {
+                let mut wtr = csv::Writer::from_writer(output_writer(cli_args)?);
+                wtr.write_record(&all_columns)?;
+                for row_result in rows {
+                    let values = row_result.context("Failed to read dedup result row")?;
+                    wtr.write_record(&values)?;
+                }
+                wtr.flush()?;
+                report_output_file(cli_args, "Deduplicated output");
+            }
+        } else {
+            let mut wtr = csv::Writer::from_writer(output_writer(cli_args)?);
+            wtr.write_record(&all_columns)?;
+            for row_result in rows {
+                let values = row_result.context("Failed to read dedup result row")?;
+                wtr.write_record(&values)?;
+            }
+            wtr.flush()?;
         }
-        wtr.flush()?;
-        report_output_file(cli_args, "Deduplicated output");
     }
 
     Ok(())
@@ -2015,7 +2054,17 @@ fn execute_sort_and_output(sort_spec: &str, cli_args: &cli::CliArgs) -> Result<(
     let no_cancel = AtomicBool::new(false);
     doc.sort_by_columns(&col_indices, ascending, &no_cancel);
 
-    // Write sorted CSV to output
+    // Write sorted output — detect format from -o extension
+    if let Some(out_path) = cli_args.output.as_deref().filter(|o| *o != "-") {
+        let path = std::path::Path::new(out_path);
+        let format = lazycsv::export::ExportFormat::from_extension(path);
+        if matches!(format, Some(f) if f != lazycsv::export::ExportFormat::Csv) {
+            let (headers, rows) = lazycsv::export::collect_document_data(&doc);
+            lazycsv::export::export_to_file(format.unwrap(), path, &headers, &rows)?;
+            eprintln!("Sorted output exported to {}", path.display());
+            return Ok(());
+        }
+    }
     let delimiter = doc.delimiter;
     let mut out = output_writer(cli_args)?;
     lazycsv::csv::write_csv_content(&mut out, &doc, delimiter)?;
