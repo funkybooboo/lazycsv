@@ -29,7 +29,8 @@ pub fn write_xlsx(path: &Path, headers: &[String], rows: &[Vec<String>]) -> Resu
                 continue;
             }
             // Try to write as number for proper Excel handling
-            if let Ok(n) = cell.parse::<f64>() {
+            // Strip currency symbols and commas for numeric detection
+            if let Some(n) = parse_as_number(cell) {
                 worksheet.write_number(xlsx_row, col, n)?;
             } else if cell.eq_ignore_ascii_case("true") || cell.eq_ignore_ascii_case("false") {
                 worksheet.write_boolean(xlsx_row, col, cell.eq_ignore_ascii_case("true"))?;
@@ -44,6 +45,23 @@ pub fn write_xlsx(path: &Path, headers: &[String], rows: &[Vec<String>]) -> Resu
         .context(format!("Failed to write XLSX: {}", path.display()))?;
 
     Ok(())
+}
+
+/// Try to parse a cell value as a number, stripping currency symbols and commas.
+fn parse_as_number(s: &str) -> Option<f64> {
+    let trimmed = s.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    // Strip leading currency symbols
+    let cleaned = trimmed
+        .trim_start_matches('$')
+        .trim_start_matches('€')
+        .trim_start_matches('£')
+        .trim_start_matches('¥');
+    // Strip commas (thousands separator)
+    let cleaned = cleaned.replace(',', "");
+    cleaned.parse::<f64>().ok()
 }
 
 #[cfg(test)]
