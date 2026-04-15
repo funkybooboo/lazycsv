@@ -29,6 +29,7 @@
 //! - `executor`: Command parsing and execution dispatch
 //! - `range_commands`: Range-based operations (delete, yank, etc.)
 
+mod colors;
 mod executor;
 mod handler;
 mod range_commands;

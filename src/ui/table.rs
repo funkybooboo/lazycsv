@@ -823,8 +823,11 @@ fn build_footer_row(app: &App, display_cols: &[usize], row_num_width: u16) -> Ro
 
     // Gutter cell with sigma symbol
     let gutter_label = format!("{:>width$}", "\u{03A3}", width = row_num_width as usize);
-    let mut cells: Vec<Cell<'static>> = vec![Cell::from(gutter_label)
-        .style(Style::default().add_modifier(Modifier::BOLD).fg(Color::DarkGray))];
+    let mut cells: Vec<Cell<'static>> = vec![Cell::from(gutter_label).style(
+        Style::default()
+            .add_modifier(Modifier::BOLD)
+            .fg(Color::DarkGray),
+    )];
 
     for &col_idx in display_cols {
         // Collect all data cell values for this column

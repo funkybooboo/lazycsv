@@ -30,8 +30,6 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.11.1 | SQL Editor Refactoring & Quality | [x] | 1,251 |
 | v0.12.0 | UI Consistency & Standardization | [x] | 1,403 |
 | v0.12.1 | UI System Testing | [x] | 54 |
-| v0.13.0 | Repository Organization & Structure | [ ] | TBD |
-| v0.13.1 | Module Organization & Cleanup | [ ] | TBD |
 | v0.14.0 | Cell Transforms & Data Cleanup | [x] | 40 |
 | v0.14.1 | Performance Optimization & Profiling | [x] | - |
 | v0.15.0 | System Clipboard & External Integration | [x] | - |
@@ -39,19 +37,10 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.16.0 | Bulk Operations & Find/Replace | [x] | 32 |
 | v0.16.1 | Error Handling & Robustness | [x] | 10 |
 | v0.17.0 | Conditional Formatting | [x] | - |
-| v0.17.1 | Module Organization & Cleanup | [ ] | TBD |
 | v0.18.0 | SQL IntelliSense & Auto-completion | [x] | TBD |
 | v0.18.1 | SQL IntelliSense Polish & Testing | [x] | 606 |
 | v0.19.0 | Column Resize & Advanced Column Operations | [x] | 60+ |
-| v0.19.1 | Documentation & Maintainability | [ ] | TBD |
 | v0.20.0 | Data Analysis, Statistics & Cell Formulas | [x] | 88 |
-| v0.20.1 | Technical Debt Reduction | [ ] | TBD |
-| v0.21.0 | Export & Import (JSON, Markdown, TSV) | [ ] | TBD |
-| v0.21.1 | Code Coverage & Test Quality | [ ] | TBD |
-| v0.22.0 | Macros & Command Recording | [ ] | TBD |
-| v0.22.1 | Performance Benchmarking & Tuning | [ ] | TBD |
-| v0.23.0 | Final Architecture Review | [ ] | TBD |
-| v0.23.1 | Final Architecture Polish | [ ] | TBD |
 | v0.24.0 | Performance, CLI Pipeline & SQL Type Intelligence | [x] | TBD |
 | v0.25.0 | Spreadsheet Support & CLI Tools | [x] | 13 |
 | v0.26.0 | SQL History, DuckDB VIEW Optimization & CLI Output Flag | [x] | - |
@@ -59,6 +48,17 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.28.0 | Multi-Format Support (Parquet, JSON, SQLite) | [x] | 70 |
 | v0.29.0 | CSV Generation, Parallel Performance & File Manager UX | [x] | 45+ |
 | v0.30.0 | Yazi-Style File Menu, Column Colors & View Persistence | [x] | - |
+| v0.20.1 | Technical Debt Reduction | [x] | - |
+| v0.21.0 | Export & Import (JSON, Markdown, TSV) | [ ] | TBD |
+| v0.22.0 | Macros & Command Recording | [ ] | TBD |
+| v0.22.1 | Performance Benchmarking & Tuning | [ ] | TBD |
+| v0.23.0 | Final Architecture Review | [ ] | TBD |
+| v0.23.1 | Final Architecture Polish | [ ] | TBD |
+| v0.31.0 | Documentation & Maintainability | [ ] | TBD |
+| v0.31.1 | Repository Organization & Structure | [ ] | TBD |
+| v0.31.2 | Module Organization & Cleanup | [ ] | TBD |
+| v0.31.3 | Module Organization & Cleanup | [ ] | TBD |
+| v0.31.4 | Code Coverage & Test Quality | [ ] | TBD |
 | v1.0.0 | Stable Release & Polish | [ ] | - |
 
 **Total Tests Passing:** 1,403 tests (all integration and unit tests across vim_editor, SQL, magnifier, UI, keybindings, and core modules)
@@ -182,12 +182,6 @@ Conditional formatting via `:bgcolor`/`:fgcolor` commands: `:bgcolor C red > 100
 **[v0.12.1](versions/v0.12.1.md) - UI System Testing** ✅ COMPLETE
 54 UI rendering tests covering theme system (cursor, selection, search, zebra, header, dirty indicator colors), all 16 ANSI named colors, RGB hex colors, terminal size edge cases. Theme documentation with gruvbox, solarized, and nord example themes. Zero clippy warnings.
 
-**[v0.13.0](versions/v0.13.0.md) - Repository Organization & Structure**
-Reorganize codebase with clear module boundaries and comprehensive documentation.
-
-**[v0.13.1](versions/v0.13.1.md) - Module Organization & Cleanup**
-Module system cleanup with clear dependencies and improved maintainability.
-
 **[v0.15.1](versions/v0.15.1.md) - Testing & Reliability Improvements** ✅ COMPLETE
 861 tests passing (all green). Fixed 19 tests broken by insert-mode persistence changes. Established coverage baseline: 73% line / 80% branch. Installed cargo-llvm-cov tooling. Reverted accidentally modified test data.
 
@@ -196,9 +190,6 @@ Audit found only 14 production unwrap/expect calls (all safe). Fixed 2 slightly 
 
 **[v0.17.0](versions/v0.17.0.md) - Conditional Formatting** ✅ COMPLETE
 Conditional formatting via `:bgcolor`/`:fgcolor` with condition operators (`=`, `!=`, `>`, `<`, `>=`, `<=`, `~`), compound `&&`/`||` conditions, rule management (`list`/`remove`/`clear`), persisted in `views.json`.
-
-**[v0.17.1](versions/v0.17.1.md) - Module Organization & Cleanup**
-Filter system cleanup with clear abstractions and comprehensive testing.
 
 **[v0.18.0](versions/v0.18.0.md) - SQL IntelliSense & Auto-completion**
 SQL IntelliSense with table/column auto-completion and syntax validation.
@@ -209,20 +200,14 @@ Schema caching, fuzzy matching, Unicode support, auto-quoting for identifiers wi
 **[v0.19.0](versions/v0.19.0.md) - Column Resize & Advanced Column Operations** ✅ COMPLETE
 Column width, column/row pinning, column type system with validation and type-aware sorting. 60+ tests.
 
-**[v0.19.1](versions/v0.19.1.md) - Documentation & Maintainability**
-Documentation improvements with examples, troubleshooting guides, and API docs.
-
 **[v0.20.0](versions/v0.20.0.md) - Data Analysis, Statistics & Cell Formulas** ✅ COMPLETE
 Column statistics commands (:stats, :sum, :avg, :count, :distinct), Excel-like cell formulas (=SUM, =AVERAGE, =IF, =VLOOKUP, and 20 more), formula bar display, auto re-evaluation, and formula completion popup. Visual mode selection statistics in status bar (Sum/Avg/Count). Toggleable `:footer` row with column totals (Σ sum for numeric, # count for text). Statistics overlay popup via `gs` in visual mode with per-column stats table (count, numeric, sum, avg, min, max, distinct). Config option `show_footer` in `[defaults]`.
 
-**[v0.20.1](versions/v0.20.1.md) - Technical Debt Reduction**  
-Technical debt cleanup with code simplification and pattern consolidation.  
+**[v0.20.1](versions/v0.20.1.md) - Technical Debt Reduction** ✅ COMPLETE
+Decomposed God objects: `app/mod.rs` 3,289→320 lines (15 sub-modules), `executor.rs` 1,666→857 (color/condition system extracted), `mouse_handler.rs` 1,833→1,247 (coords, context menu, reorder extracted), `config/mod.rs` 1,383→939 (TOML parsing, watcher, SQL history extracted). 22 new focused sub-module files. Zero clippy warnings. Updated duckdb 1.10501→1.10502, lru 0.16.3→0.16.4.  
 
 **[v0.21.0](versions/v0.21.0.md) - Export & Import (JSON, Markdown, TSV)**  
 Multi-format export/import with format detection and conversion.  
-
-**[v0.21.1](versions/v0.21.1.md) - Code Coverage & Test Quality**  
-Improve code coverage to 90%+ with comprehensive test suite.  
 
 **[v0.22.0](versions/v0.22.0.md) - Macros & Command Recording**  
 Macro recording and playback with saved macro library.  
@@ -235,6 +220,21 @@ Comprehensive architecture review with refactoring for long-term maintainability
 
 **[v0.23.1](versions/v0.23.1.md) - Final Architecture Polish**  
 Final architecture cleanup with documentation and code quality improvements.  
+
+**[v0.31.0](versions/v0.31.0.md) - Documentation & Maintainability**  
+Documentation improvements with examples, troubleshooting guides, and API docs.  
+
+**[v0.31.1](versions/v0.13.0.md) - Repository Organization & Structure**  
+Reorganize codebase with clear module boundaries and comprehensive documentation.  
+
+**[v0.31.2](versions/v0.13.1.md) - Module Organization & Cleanup**  
+Module system cleanup with clear dependencies and improved maintainability.  
+
+**[v0.31.3](versions/v0.17.1.md) - Module Organization & Cleanup**  
+Filter system cleanup with clear abstractions and comprehensive testing.  
+
+**[v0.31.4](versions/v0.21.1.md) - Code Coverage & Test Quality**  
+Improve code coverage to 90%+ with comprehensive test suite.  
 
 **[v1.0.0](versions/v1.0.0.md) - Stable Release & Polish**  
 Production-ready release with comprehensive documentation and polish.  

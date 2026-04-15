@@ -108,10 +108,7 @@ pub(crate) fn collect_visual_selection_values(
 }
 
 /// Collect all cell values from a visual selection as a flat list.
-pub(crate) fn collect_visual_selection_flat(
-    app: &App,
-    sel: &VisualSelection,
-) -> Vec<String> {
+pub(crate) fn collect_visual_selection_flat(app: &App, sel: &VisualSelection) -> Vec<String> {
     let columns = collect_visual_selection_values(app, sel);
     columns.into_iter().flat_map(|(_, vals)| vals).collect()
 }

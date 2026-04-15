@@ -32,13 +32,13 @@ pub fn render(frame: &mut Frame, data: &StatsOverlayData) {
 
     // Header row
     let header_style = Style::default().add_modifier(Modifier::BOLD);
-    lines.push(Line::from(vec![
-        Span::styled(
-            format!("{:<20} {:>8} {:>8} {:>12} {:>12} {:>12} {:>12} {:>8}",
-                "Column", "Count", "Numeric", "Sum", "Avg", "Min", "Max", "Distinct"),
-            header_style,
+    lines.push(Line::from(vec![Span::styled(
+        format!(
+            "{:<20} {:>8} {:>8} {:>12} {:>12} {:>12} {:>12} {:>8}",
+            "Column", "Count", "Numeric", "Sum", "Avg", "Min", "Max", "Distinct"
         ),
-    ]));
+        header_style,
+    )]));
 
     // Separator
     lines.push(Line::from(
@@ -47,10 +47,22 @@ pub fn render(frame: &mut Frame, data: &StatsOverlayData) {
 
     // Data rows
     for col in &data.columns {
-        let sum_str = col.sum.map(format_number).unwrap_or_else(|| "-".to_string());
-        let avg_str = col.avg.map(format_number).unwrap_or_else(|| "-".to_string());
-        let min_str = col.min.map(format_number).unwrap_or_else(|| "-".to_string());
-        let max_str = col.max.map(format_number).unwrap_or_else(|| "-".to_string());
+        let sum_str = col
+            .sum
+            .map(format_number)
+            .unwrap_or_else(|| "-".to_string());
+        let avg_str = col
+            .avg
+            .map(format_number)
+            .unwrap_or_else(|| "-".to_string());
+        let min_str = col
+            .min
+            .map(format_number)
+            .unwrap_or_else(|| "-".to_string());
+        let max_str = col
+            .max
+            .map(format_number)
+            .unwrap_or_else(|| "-".to_string());
 
         lines.push(Line::from(format!(
             "{:<20} {:>8} {:>8} {:>12} {:>12} {:>12} {:>12} {:>8}",

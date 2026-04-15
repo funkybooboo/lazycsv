@@ -3,9 +3,14 @@
 //! Maps terminal mouse coordinates to logical cells, file list items,
 //! and scroll actions using layout information captured during rendering.
 
-use crate::app::{App, ContextMenu, ContextMenuItem, Mode, VisualMode, VisualSelection};
+use crate::app::{App, Mode, VisualMode, VisualSelection};
 use crate::domain::position::{ColIndex, RowIndex};
 use crate::input::handler::{enter_insert_mode, CursorPosition, InitialContent};
+use crate::input::mouse_context_menu;
+use crate::input::mouse_coords::{
+    move_insert_cursor, resolve_column_header, resolve_row_gutter, resolve_table_cell,
+};
+use crate::input::mouse_reorder;
 use crate::input::InputResult;
 use crate::ui::ViewportMode;
 use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
@@ -40,7 +45,10 @@ pub fn handle_mouse(app: &mut App, event: MouseEvent) -> (InputResult, bool) {
 
             // If context menu is open, handle click on it or dismiss
             if app.context_menu.is_some() {
-                return (handle_context_menu_click(app, x, y), true);
+                return (
+                    mouse_context_menu::handle_context_menu_click(app, x, y),
+                    true,
+                );
             }
 
             // Check for column resize grab on header row border
@@ -65,9 +73,10 @@ pub fn handle_mouse(app: &mut App, event: MouseEvent) -> (InputResult, bool) {
             };
             (result, true)
         }
-        MouseEventKind::Down(MouseButton::Right) => {
-            (handle_right_click(app, event.column, event.row), true)
-        }
+        MouseEventKind::Down(MouseButton::Right) => (
+            mouse_context_menu::handle_right_click(app, event.column, event.row),
+            true,
+        ),
         MouseEventKind::Drag(MouseButton::Left) => {
             // If a column resize is active, handle it
             if app.view_state.mouse_layout.col_resize.is_some() {
@@ -77,7 +86,10 @@ pub fn handle_mouse(app: &mut App, event: MouseEvent) -> (InputResult, bool) {
             if app.view_state.mouse_layout.col_reorder.is_some()
                 || app.view_state.mouse_layout.row_reorder.is_some()
             {
-                return (handle_reorder_drag(app, event.column, event.row), true);
+                return (
+                    mouse_reorder::handle_reorder_drag(app, event.column, event.row),
+                    true,
+                );
             }
             // Selection drag — only redraw when selected cell actually changes
             let prev_row = app.view_state.table_state.selected();
@@ -95,14 +107,14 @@ pub fn handle_mouse(app: &mut App, event: MouseEvent) -> (InputResult, bool) {
             if let Some((src_col, _)) = app.view_state.mouse_layout.col_reorder.take() {
                 reset_pointer();
                 return (
-                    finalize_column_reorder(app, src_col, event.column, event.row),
+                    mouse_reorder::finalize_column_reorder(app, src_col, event.column, event.row),
                     true,
                 );
             }
             if let Some((src_row, _)) = app.view_state.mouse_layout.row_reorder.take() {
                 reset_pointer();
                 return (
-                    finalize_row_reorder(app, src_row, event.column, event.row),
+                    mouse_reorder::finalize_row_reorder(app, src_row, event.column, event.row),
                     true,
                 );
             }
@@ -340,177 +352,6 @@ fn handle_column_resize_drag(app: &mut App, x: u16) -> InputResult {
 }
 
 /// Resolve a click on the row number gutter to a row index, if any.
-fn resolve_row_gutter(
-    layout: &crate::ui::view_state::MouseLayout,
-    area: ratatui::layout::Rect,
-    x: u16,
-    y: u16,
-) -> Option<usize> {
-    if x < area.x || x >= area.x + area.width || y < area.y || y >= area.y + area.height {
-        return None;
-    }
-
-    let rel_y = (y - area.y) as usize;
-
-    // Must be in the gutter column (before first data column)
-    let gutter_end = layout
-        .col_positions
-        .get(1)
-        .copied()
-        .unwrap_or(area.x + layout.row_num_width);
-    if x >= gutter_end {
-        return None;
-    }
-
-    // Skip column letters row
-    if rel_y == 0 {
-        return None;
-    }
-
-    let frozen_count = layout.frozen_row_indices.len();
-    let data_rel_y = rel_y - 1;
-
-    if data_rel_y < frozen_count {
-        layout.frozen_row_indices.get(data_rel_y).copied()
-    } else {
-        let scroll_rel = data_rel_y - frozen_count;
-        layout.scrollable_indices.get(scroll_rel).copied()
-    }
-}
-
-/// Map an absolute x coordinate to a display column index using resolved col_positions.
-/// Returns None if x falls in the gutter (index 0) or outside all columns.
-fn resolve_x_to_display_col(layout: &crate::ui::view_state::MouseLayout, x: u16) -> Option<usize> {
-    let positions = &layout.col_positions;
-    for i in 0..positions.len().saturating_sub(1) {
-        if x >= positions[i] && x < positions[i + 1] {
-            if i == 0 {
-                return None; // row number gutter
-            }
-            return Some(i - 1); // display_cols index
-        }
-    }
-    None
-}
-
-/// Resolve a click on the column letters row to a column index, if any.
-fn resolve_column_header(
-    layout: &crate::ui::view_state::MouseLayout,
-    area: ratatui::layout::Rect,
-    x: u16,
-    y: u16,
-) -> Option<usize> {
-    if x < area.x || x >= area.x + area.width || y < area.y || y >= area.y + area.height {
-        return None;
-    }
-    if (y - area.y) != 0 {
-        return None;
-    }
-    let idx = resolve_x_to_display_col(layout, x)?;
-    layout.display_cols.get(idx).copied()
-}
-
-/// Resolve terminal coordinates to a (row_index, col_index) table cell, if any.
-fn resolve_table_cell(
-    layout: &crate::ui::view_state::MouseLayout,
-    area: ratatui::layout::Rect,
-    x: u16,
-    y: u16,
-) -> Option<(usize, usize)> {
-    if x < area.x || x >= area.x + area.width || y < area.y || y >= area.y + area.height {
-        return None;
-    }
-    let rel_y = (y - area.y) as usize;
-    if rel_y == 0 {
-        return None;
-    }
-
-    let frozen_count = layout.frozen_row_indices.len();
-    let data_rel_y = rel_y - 1;
-    let target_row = if data_rel_y < frozen_count {
-        layout.frozen_row_indices.get(data_rel_y).copied()?
-    } else {
-        let scroll_rel = data_rel_y - frozen_count;
-        layout.scrollable_indices.get(scroll_rel).copied()?
-    };
-
-    let idx = resolve_x_to_display_col(layout, x)?;
-    let col = *layout.display_cols.get(idx)?;
-    Some((target_row, col))
-}
-
-/// Move the insert-mode edit cursor to the clicked position within the current cell.
-fn move_insert_cursor(
-    app: &mut App,
-    layout: &crate::ui::view_state::MouseLayout,
-    _area: ratatui::layout::Rect,
-    x: u16,
-) {
-    let selected_col = app.view_state.selected_column.get();
-
-    // Find the x start and width of the selected column using col_positions
-    let positions = &layout.col_positions;
-    let mut col_start_x: u16 = 0;
-    let mut col_width: u16 = 0;
-    let mut found = false;
-
-    for (i, &dc) in layout.display_cols.iter().enumerate() {
-        if dc == selected_col {
-            col_start_x = positions.get(i + 1).copied().unwrap_or(0);
-            let col_end_x = positions.get(i + 2).copied().unwrap_or(col_start_x);
-            col_width = col_end_x.saturating_sub(col_start_x).saturating_sub(1);
-            found = true;
-            break;
-        }
-    }
-
-    if !found {
-        return;
-    }
-
-    let char_offset = if x >= col_start_x {
-        (x - col_start_x) as usize
-    } else {
-        0
-    };
-
-    if let Some(ref mut buf) = app.edit_buffer {
-        let content_len = buf.content.chars().count();
-        let max_width = col_width.saturating_sub(1) as usize;
-        let display_len = content_len + 1; // +1 for the cursor '│'
-
-        if display_len <= max_width {
-            // No scrolling — account for the '│' indicator
-            let new_cursor = if char_offset <= buf.cursor {
-                char_offset
-            } else {
-                (char_offset - 1).min(content_len)
-            };
-            buf.cursor = new_cursor;
-        } else {
-            // Scrolled content — compute the visible window
-            let cursor_in_display = buf.cursor;
-            let half = max_width / 2;
-            let window_start = if cursor_in_display <= half {
-                0
-            } else if cursor_in_display + half >= display_len {
-                display_len.saturating_sub(max_width)
-            } else {
-                cursor_in_display - half
-            };
-
-            let pos_in_display = window_start + char_offset;
-            let new_cursor = if pos_in_display <= buf.cursor {
-                pos_in_display
-            } else {
-                (pos_in_display - 1).min(content_len)
-            };
-            buf.cursor = new_cursor;
-        }
-    }
-}
-
-/// Handle mouse scroll (wheel up/down).
 fn handle_scroll(app: &mut App, up: bool) -> InputResult {
     match app.mode {
         Mode::Normal | Mode::VisualBlock | Mode::VisualLine | Mode::VisualColumn => {
@@ -741,442 +582,15 @@ fn handle_file_list_click(app: &mut App, _x: u16, y: u16) -> InputResult {
     InputResult::Continue
 }
 
-/// Handle right-click to open context menu.
-fn handle_right_click(app: &mut App, x: u16, y: u16) -> InputResult {
-    // Dismiss any existing context menu
-    app.context_menu = None;
-
-    if !matches!(
-        app.mode,
-        Mode::Normal | Mode::VisualBlock | Mode::VisualLine | Mode::VisualColumn
-    ) {
-        return InputResult::Continue;
-    }
-
-    let layout = &app.view_state.mouse_layout;
-    let area = layout.table_content_area;
-
-    // Check if right-clicking on the column letters row
-    if let Some(col_idx) = resolve_column_header(layout, area, x, y) {
-        app.view_state.selected_column = ColIndex::new(col_idx);
-        app.context_menu = Some(ContextMenu {
-            x,
-            y,
-            selected: 0,
-            items: vec![
-                ContextMenuItem::ColumnInsertBefore,
-                ContextMenuItem::ColumnInsertAfter,
-                ContextMenuItem::Separator,
-                ContextMenuItem::ColumnDelete,
-            ],
-        });
-        return InputResult::Continue;
-    }
-
-    // Check if right-clicking on the row number gutter
-    if let Some(row_idx) = resolve_row_gutter(layout, area, x, y) {
-        app.view_state.table_state.select(Some(row_idx));
-        app.view_state.viewport_mode = ViewportMode::Auto;
-        app.context_menu = Some(ContextMenu {
-            x,
-            y,
-            selected: 0,
-            items: vec![
-                ContextMenuItem::RowInsertAbove,
-                ContextMenuItem::RowInsertBelow,
-                ContextMenuItem::Separator,
-                ContextMenuItem::RowDelete,
-            ],
-        });
-        return InputResult::Continue;
-    }
-
-    let clicked_cell = resolve_table_cell(layout, area, x, y);
-
-    // In normal mode, navigate to the right-clicked cell
-    if let Some((target_row, target_col)) = clicked_cell {
-        if app.mode == Mode::Normal {
-            app.view_state.table_state.select(Some(target_row));
-            app.view_state.selected_column = ColIndex::new(target_col);
-            app.view_state.viewport_mode = ViewportMode::Auto;
-        }
-    } else if app.mode == Mode::Normal {
-        // Right-clicked outside any cell and no visual selection — nothing to act on
-        return InputResult::Continue;
-    }
-
-    app.context_menu = Some(ContextMenu {
-        x,
-        y,
-        selected: 0,
-        items: vec![
-            ContextMenuItem::Cut,
-            ContextMenuItem::Copy,
-            ContextMenuItem::Paste,
-            ContextMenuItem::Separator,
-            ContextMenuItem::Clear,
-        ],
-    });
-
-    InputResult::Continue
-}
-
-/// Handle a left-click while the context menu is open.
-fn handle_context_menu_click(app: &mut App, x: u16, y: u16) -> InputResult {
-    let menu = match app.context_menu.take() {
-        Some(m) => m,
-        None => return InputResult::Continue,
-    };
-
-    // Check if click is inside the menu popup
-    let item_count = menu.items.len() as u16;
-    let max_label = menu
-        .items
-        .iter()
-        .map(|i| i.label().len())
-        .max()
-        .unwrap_or(4);
-    let popup_width: u16 = (max_label as u16 + 4).max(14);
-    let popup_height = item_count + 2;
-
-    let frame_size = crossterm::terminal::size().unwrap_or((80, 24));
-    let menu_x = menu.x.min(frame_size.0.saturating_sub(popup_width));
-    let menu_y = menu.y.min(frame_size.1.saturating_sub(popup_height));
-
-    // Inner area (inside borders)
-    let inner_x = menu_x + 1;
-    let inner_y = menu_y + 1;
-    let inner_w = popup_width - 2;
-    let inner_h = item_count;
-
-    if x >= inner_x && x < inner_x + inner_w && y >= inner_y && y < inner_y + inner_h {
-        let clicked_idx = (y - inner_y) as usize;
-        if let Some(&item) = menu.items.get(clicked_idx) {
-            if item != ContextMenuItem::Separator {
-                execute_context_action(app, item);
-            }
-        }
-    }
-    // Menu is dismissed whether or not an item was clicked
-
-    InputResult::Continue
-}
-
-/// Handle keyboard navigation within the context menu.
-/// Called from the key handler when a context menu is open.
-pub fn handle_context_menu_key(app: &mut App, key: crossterm::event::KeyEvent) -> InputResult {
-    use crossterm::event::KeyCode;
-
-    let menu = match app.context_menu.as_mut() {
-        Some(m) => m,
-        None => return InputResult::Continue,
-    };
-
-    match key.code {
-        KeyCode::Up | KeyCode::Char('k') => {
-            // Skip separators when navigating up
-            let mut idx = menu.selected;
-            loop {
-                if idx == 0 {
-                    break;
-                }
-                idx -= 1;
-                if menu.items[idx] != ContextMenuItem::Separator {
-                    menu.selected = idx;
-                    break;
-                }
-            }
-        }
-        KeyCode::Down | KeyCode::Char('j') => {
-            let mut idx = menu.selected;
-            loop {
-                if idx + 1 >= menu.items.len() {
-                    break;
-                }
-                idx += 1;
-                if menu.items[idx] != ContextMenuItem::Separator {
-                    menu.selected = idx;
-                    break;
-                }
-            }
-        }
-        KeyCode::Enter => {
-            let item = menu.items[menu.selected];
-            app.context_menu = None;
-            if item != ContextMenuItem::Separator {
-                execute_context_action(app, item);
-            }
-        }
-        KeyCode::Esc | KeyCode::Char('q') => {
-            app.context_menu = None;
-        }
-        _ => {}
-    }
-
-    InputResult::Continue
-}
-
-/// Execute a context menu action.
-fn execute_context_action(app: &mut App, item: ContextMenuItem) {
-    use crate::input::StatusMessage;
-
-    match item {
-        ContextMenuItem::Cut => {
-            // Cut = yank + clear
-            if app.visual_selection.is_some() {
-                // Visual mode: yank then delete (existing logic)
-                let _ = crate::input::visual_mode::handle_visual_delete(app);
-            } else {
-                // Single cell: copy value, then clear
-                if let Some(row_idx) = app.selected_row() {
-                    let col_idx = app.view_state.selected_column;
-                    let value = app.document.cell(row_idx, col_idx).to_string();
-                    app.clipboard.yank_cell(value.clone());
-                    let _ = crate::clipboard::copy_text_to_system_clipboard(&value);
-                    let old_value = value;
-                    app.document.set_cell(row_idx, col_idx, String::new());
-                    app.history.push(crate::history::EditCommand::SetCell {
-                        row: row_idx,
-                        col: col_idx,
-                        old_value,
-                        new_value: String::new(),
-                    });
-                    app.status_message = Some(StatusMessage::from("Cell cut"));
-                }
-            }
-        }
-        ContextMenuItem::Copy => {
-            if app.visual_selection.is_some() {
-                let _ = crate::input::visual_mode::handle_visual_yank(app);
-            } else {
-                // Single cell copy
-                if let Some(row_idx) = app.selected_row() {
-                    let col_idx = app.view_state.selected_column;
-                    let value = app.document.cell(row_idx, col_idx).to_string();
-                    app.clipboard.yank_cell(value.clone());
-                    let _ = crate::clipboard::copy_text_to_system_clipboard(&value);
-                    app.status_message = Some(StatusMessage::from(format!("Copied: {}", value)));
-                }
-            }
-        }
-        ContextMenuItem::Paste => {
-            if app.visual_selection.is_some() {
-                let _ = crate::input::visual_mode::handle_visual_paste(app);
-            } else if let Some(row_idx) = app.selected_row() {
-                let col_idx = app.view_state.selected_column;
-
-                if let Some(value) = app.clipboard.cell().map(|s| s.to_string()) {
-                    // Single cell paste
-                    let old_value = app.document.cell(row_idx, col_idx).to_string();
-                    app.document.set_cell(row_idx, col_idx, value.clone());
-                    app.history.push(crate::history::EditCommand::SetCell {
-                        row: row_idx,
-                        col: col_idx,
-                        old_value,
-                        new_value: value.clone(),
-                    });
-                    app.status_message = Some(StatusMessage::from(format!("Pasted: {}", value)));
-                } else if app.clipboard.region().is_some() {
-                    // Paste region at current cell
-                    app.visual_selection =
-                        Some(VisualSelection::new(row_idx, col_idx, VisualMode::Block));
-                    let _ = crate::input::visual_mode::handle_visual_paste(app);
-                } else if app.clipboard.rows().is_some() {
-                    // Paste rows at current position
-                    crate::input::normal_mode::editing::paste_rows_below(app);
-                } else {
-                    app.status_message = Some(StatusMessage::from("Nothing to paste"));
-                }
-            }
-        }
-        ContextMenuItem::Clear => {
-            if app.visual_selection.is_some() {
-                // Visual delete clears cells (for block mode)
-                let _ = crate::input::visual_mode::handle_visual_delete(app);
-            } else {
-                // Single cell clear
-                if let Some(row_idx) = app.selected_row() {
-                    let col_idx = app.view_state.selected_column;
-                    let old_value = app.document.cell(row_idx, col_idx).to_string();
-                    if !old_value.is_empty() {
-                        app.document.set_cell(row_idx, col_idx, String::new());
-                        app.history.push(crate::history::EditCommand::SetCell {
-                            row: row_idx,
-                            col: col_idx,
-                            old_value,
-                            new_value: String::new(),
-                        });
-                    }
-                    app.status_message = Some(StatusMessage::from("Cell cleared"));
-                }
-            }
-        }
-        ContextMenuItem::ColumnDelete => {
-            crate::input::normal_mode::commands::delete_columns(app);
-        }
-        ContextMenuItem::ColumnInsertBefore => {
-            crate::input::normal_mode::commands::insert_column_before(app);
-        }
-        ContextMenuItem::ColumnInsertAfter => {
-            crate::input::normal_mode::commands::insert_column_after(app);
-        }
-        ContextMenuItem::RowDelete => {
-            crate::input::normal_mode::commands::delete_rows(app);
-        }
-        ContextMenuItem::RowInsertAbove => {
-            // Insert empty row above without entering insert mode
-            if let Some(row_idx) = app.selected_row() {
-                app.document.insert_row(row_idx);
-                app.history
-                    .push(crate::history::EditCommand::InsertRow { at: row_idx });
-                app.status_message = Some(StatusMessage::from("Inserted row above"));
-            }
-        }
-        ContextMenuItem::RowInsertBelow => {
-            // Insert empty row below without entering insert mode
-            if let Some(row_idx) = app.selected_row() {
-                let new_row = RowIndex::new(row_idx.get() + 1);
-                app.document.insert_row(new_row);
-                app.history
-                    .push(crate::history::EditCommand::InsertRow { at: new_row });
-                app.view_state.table_state.select(Some(new_row.get()));
-                app.status_message = Some(StatusMessage::from("Inserted row below"));
-            }
-        }
-        ContextMenuItem::Separator => {}
-    }
-}
-
-/// During a reorder drag, update the drop target for visual feedback.
-fn handle_reorder_drag(app: &mut App, x: u16, y: u16) -> InputResult {
-    let layout = app.view_state.mouse_layout.clone();
-    let area = layout.table_content_area;
-
-    if let Some((src, _)) = app.view_state.mouse_layout.col_reorder {
-        // Update drop target column
-        let target = resolve_column_header(&layout, area, x, y)
-            .or_else(|| resolve_table_cell(&layout, area, x, y).map(|(_, c)| c));
-        if let Some(col_idx) = target {
-            app.view_state.mouse_layout.col_reorder = Some((src, col_idx));
-            app.view_state.selected_column = ColIndex::new(col_idx);
-        }
-    }
-
-    if let Some((src, _)) = app.view_state.mouse_layout.row_reorder {
-        // Update drop target row
-        let target = resolve_row_gutter(&layout, area, x, y)
-            .or_else(|| resolve_table_cell(&layout, area, x, y).map(|(r, _)| r));
-        if let Some(row_idx) = target {
-            app.view_state.mouse_layout.row_reorder = Some((src, row_idx));
-            app.view_state.table_state.select(Some(row_idx));
-            app.view_state.viewport_mode = ViewportMode::Auto;
-        }
-    }
-
-    InputResult::Continue
-}
-
-/// Finalize a column reorder when the mouse is released.
-fn finalize_column_reorder(app: &mut App, src_col: usize, x: u16, y: u16) -> InputResult {
-    use crate::input::StatusMessage;
-
-    let layout = app.view_state.mouse_layout.clone();
-    let area = layout.table_content_area;
-
-    // Resolve the drop target column from the header or any cell
-    let dst_col = resolve_column_header(&layout, area, x, y)
-        .or_else(|| resolve_table_cell(&layout, area, x, y).map(|(_, c)| c));
-
-    let Some(dst_col) = dst_col else {
-        return InputResult::Continue;
-    };
-
-    if src_col == dst_col {
-        return InputResult::Continue;
-    }
-
-    let from_start = ColIndex::new(src_col);
-    let from_end = ColIndex::new(src_col);
-    // Insert before dst_col if moving left, after dst_col if moving right
-    let to_before = if dst_col > src_col {
-        dst_col + 1
-    } else {
-        dst_col
-    };
-
-    let actual_insert = app.document.move_columns(from_start, from_end, to_before);
-
-    app.history.push(crate::history::EditCommand::MoveColumns {
-        from_start,
-        from_end,
-        to_before,
-        actual_insert,
-    });
-
-    app.view_state.selected_column = ColIndex::new(actual_insert);
-    app.status_message = Some(StatusMessage::from(format!(
-        "Moved column {} → {}",
-        crate::ui::utils::column_to_excel_letter(src_col),
-        crate::ui::utils::column_to_excel_letter(actual_insert),
-    )));
-
-    InputResult::Continue
-}
-
-/// Finalize a row reorder when the mouse is released.
-fn finalize_row_reorder(app: &mut App, src_row: usize, x: u16, y: u16) -> InputResult {
-    use crate::input::StatusMessage;
-
-    let layout = app.view_state.mouse_layout.clone();
-    let area = layout.table_content_area;
-
-    // Resolve the drop target row from the gutter or any cell
-    let dst_row = resolve_row_gutter(&layout, area, x, y)
-        .or_else(|| resolve_table_cell(&layout, area, x, y).map(|(r, _)| r));
-
-    let Some(dst_row) = dst_row else {
-        return InputResult::Continue;
-    };
-
-    if src_row == dst_row {
-        return InputResult::Continue;
-    }
-
-    // Move row via sequential swaps
-    let from = src_row;
-    let to = dst_row;
-    if from < to {
-        for i in from..to {
-            app.document
-                .swap_rows(RowIndex::new(i), RowIndex::new(i + 1));
-        }
-    } else {
-        for i in (to..from).rev() {
-            app.document
-                .swap_rows(RowIndex::new(i), RowIndex::new(i + 1));
-        }
-    }
-
-    app.history.push(crate::history::EditCommand::MoveRow {
-        from: RowIndex::new(from),
-        to: RowIndex::new(to),
-    });
-
-    app.view_state.table_state.select(Some(dst_row));
-    app.view_state.viewport_mode = ViewportMode::Auto;
-    app.status_message = Some(StatusMessage::from(format!(
-        "Moved row {} → {}",
-        from + 1,
-        to + 1,
-    )));
-
-    InputResult::Continue
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::{ContextMenu, ContextMenuItem};
     use crate::csv::Document;
+    use crate::input::handler::{enter_insert_mode, CursorPosition, InitialContent};
+    use crate::input::mouse_context_menu::*;
+    use crate::input::mouse_coords::*;
+    use crate::input::mouse_reorder::*;
     use crate::session::FileConfig;
     use crate::ui::view_state::MouseLayout;
     use ratatui::layout::Rect;
@@ -1746,7 +1160,7 @@ mod tests {
         assert_eq!(app.document.header(ColIndex::new(2)), "C");
 
         // Move column A (0) to after column C (2)
-        finalize_column_reorder(&mut app, 0, 26, 2);
+        mouse_reorder::finalize_column_reorder(&mut app, 0, 26, 2);
 
         assert_eq!(app.document.header(ColIndex::new(0)), "B");
         assert_eq!(app.document.header(ColIndex::new(1)), "C");
@@ -1756,7 +1170,7 @@ mod tests {
     #[test]
     fn test_column_reorder_same_noop() {
         let mut app = create_test_app();
-        finalize_column_reorder(&mut app, 0, 5, 2);
+        mouse_reorder::finalize_column_reorder(&mut app, 0, 5, 2);
         assert_eq!(app.document.header(ColIndex::new(0)), "A");
     }
 
@@ -1766,7 +1180,7 @@ mod tests {
     fn test_row_reorder_down() {
         let mut app = create_test_app();
         // Move row 1 (a1) to row 3 position
-        finalize_row_reorder(&mut app, 1, 1, 6);
+        mouse_reorder::finalize_row_reorder(&mut app, 1, 1, 6);
         assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "a2");
         assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(0)), "a3");
         assert_eq!(app.document.cell(RowIndex::new(3), ColIndex::new(0)), "a1");
@@ -1776,7 +1190,7 @@ mod tests {
     fn test_row_reorder_up() {
         let mut app = create_test_app();
         // Move row 3 (a3) to row 1 position
-        finalize_row_reorder(&mut app, 3, 1, 4);
+        mouse_reorder::finalize_row_reorder(&mut app, 3, 1, 4);
         assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "a3");
         assert_eq!(app.document.cell(RowIndex::new(2), ColIndex::new(0)), "a1");
         assert_eq!(app.document.cell(RowIndex::new(3), ColIndex::new(0)), "a2");
@@ -1785,7 +1199,7 @@ mod tests {
     #[test]
     fn test_row_reorder_same_noop() {
         let mut app = create_test_app();
-        finalize_row_reorder(&mut app, 1, 1, 4);
+        mouse_reorder::finalize_row_reorder(&mut app, 1, 1, 4);
         assert_eq!(app.document.cell(RowIndex::new(1), ColIndex::new(0)), "a1");
     }
 

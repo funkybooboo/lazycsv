@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 
-use super::DuckDbCache;
+use super::{App, DuckDbCache, Mode};
 
 use crate::ui::utils::format_number;
 
@@ -300,4 +300,228 @@ pub fn load_session_file<'a>(
         cancelled,
     );
     cancelled_flag
+}
+
+// ============================================================================
+// impl App — SQL execution methods
+// ============================================================================
+
+impl App {
+    /// Execute a SQL query with cancellation support.
+    /// Returns (Some(doc), false) on success, (None, true) if cancelled,
+    /// (None, false) on query error.
+    pub fn execute_sql_query_cancellable(
+        &mut self,
+        query: &str,
+        output_name: &str,
+        cancelled: &AtomicBool,
+        on_progress: &mut dyn FnMut(&str),
+    ) -> (Option<Document>, bool) {
+        let query = crate::query::strip_csv_extensions(query);
+        let query = query.as_str();
+
+        let mut cache = self.duckdb_cache.take().unwrap_or_else(DuckDbCache::new);
+
+        on_progress("Preparing database...");
+        if cleanup_stale_tables(&mut cache, self.session.files(), cancelled) {
+            self.duckdb_cache = Some(cache);
+            return (None, true);
+        }
+
+        let all_files = self.session.files().to_vec();
+        let referenced = crate::query::files_referenced_by_query(query, &all_files);
+        let files: Vec<PathBuf> = referenced.into_iter().cloned().collect();
+        let total_files = files.len();
+        for (i, file_path) in files.into_iter().enumerate() {
+            let file_label = file_path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("file")
+                .to_string();
+            if total_files > 1 {
+                on_progress(&format!(
+                    "Loading {} into database ({}/{})...",
+                    file_label,
+                    i + 1,
+                    total_files
+                ));
+            } else {
+                on_progress(&format!("Loading {} into database...", file_label));
+            }
+            let config = self.session.config();
+            let file_config = FileLoadConfig {
+                delimiter: config.delimiter,
+                no_headers: config.no_headers,
+                encoding: config.encoding.clone(),
+            };
+            let cancelled_flag = load_session_file(
+                &mut cache,
+                &file_path,
+                &self.document,
+                || self.session.cached_document(&file_path),
+                file_config,
+                cancelled,
+            );
+            if cancelled_flag {
+                self.duckdb_cache = Some(cache);
+                return (None, true);
+            }
+        }
+
+        on_progress("Querying...");
+        let (result_doc, cancelled_flag, error_msg) =
+            execute_and_convert_query(&mut cache, query, output_name, cancelled, on_progress);
+
+        self.duckdb_cache = Some(cache);
+
+        if let Some(err) = error_msg {
+            self.sql_error = Some(err);
+            return (None, false);
+        }
+
+        if cancelled_flag {
+            return (None, true);
+        }
+
+        self.sql_error = None;
+        self.mode = Mode::Normal;
+        (result_doc, false)
+    }
+
+    /// Execute a SQL DML statement (INSERT, UPDATE, DELETE, ALTER) against the current document.
+    pub fn execute_sql_dml_cancellable(
+        &mut self,
+        query: &str,
+        cancelled: &AtomicBool,
+        on_progress: &mut dyn FnMut(&str),
+    ) -> (bool, bool) {
+        let query = crate::query::strip_csv_extensions(query);
+        let query = query.as_str();
+
+        let mut cache = self.duckdb_cache.take().unwrap_or_else(DuckDbCache::new);
+
+        let doc_table_name = self
+            .document
+            .filename
+            .strip_suffix(".csv")
+            .or_else(|| self.document.filename.strip_suffix(".tsv"))
+            .or_else(|| self.document.filename.strip_suffix(".txt"))
+            .unwrap_or(&self.document.filename)
+            .to_string();
+        let file_path = self.current_file().clone();
+
+        on_progress("Syncing data to database...");
+        cache.force_reload_generation(&file_path);
+        if self.document.row_count() > 0 && self.document.column_count() > 0 {
+            match cache.reload_table(
+                &file_path,
+                &doc_table_name,
+                &self.document,
+                self.document.generation,
+                cancelled,
+                true,
+            ) {
+                Ok(()) => {}
+                Err(e) => {
+                    if e.downcast_ref::<cancel::CancelledError>().is_some() {
+                        self.duckdb_cache = Some(cache);
+                        return (false, true);
+                    }
+                    self.sql_error = Some(format!("Failed to load data: {}", e));
+                    self.duckdb_cache = Some(cache);
+                    return (false, false);
+                }
+            }
+        }
+
+        on_progress("Executing DML...");
+        let escaped_table = doc_table_name.replace('"', "\"\"");
+        match cache.conn().execute(query, []) {
+            Ok(_) => {}
+            Err(e) => {
+                self.sql_error = Some(format!("SQL error: {}", e));
+                self.duckdb_cache = Some(cache);
+                return (false, false);
+            }
+        }
+
+        on_progress("Exporting modified data...");
+        let dml_unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let temp_path = std::env::temp_dir().join(format!(
+            "lazycsv_dml_{}_{}_{}.csv",
+            doc_table_name,
+            std::process::id(),
+            dml_unique
+        ));
+        let temp_str = temp_path.display().to_string().replace('\'', "''");
+        let copy_sql = format!(
+            "COPY (SELECT * FROM \"{}\") TO '{}' (HEADER, DELIMITER ',')",
+            escaped_table, temp_str
+        );
+
+        if cache.conn().execute_batch(&copy_sql).is_err() {
+            self.sql_error = Some("Failed to export modified data".to_string());
+            self.duckdb_cache = Some(cache);
+            return (false, false);
+        }
+
+        on_progress("Loading modified data...");
+        let storage =
+            match crate::csv::row_storage::RowStorage::lazy_from_file(&temp_path, None, false) {
+                Ok(s) => s,
+                Err(e) => {
+                    self.sql_error = Some(format!("Failed to load modified data: {}", e));
+                    self.duckdb_cache = Some(cache);
+                    return (false, false);
+                }
+            };
+
+        cache.drop_all_tables();
+        self.duckdb_cache = Some(cache);
+
+        {
+            self.document.storage = storage;
+            self.document.is_dirty = true;
+            self.document.generation += 1;
+            self.document.xlsx_formulas = vec![];
+
+            self.view_state.table_state.select(Some(1));
+            self.view_state.column_scroll_offset = 0;
+            self.view_state.selected_column = crate::domain::position::ColIndex::new(0);
+
+            self.sql_error = None;
+            self.mode = Mode::Normal;
+            (true, false)
+        }
+    }
+
+    /// Generate a unique output filename for SQL query results
+    pub fn generate_output_filename(&self) -> String {
+        let existing: std::collections::HashSet<String> = self
+            .session
+            .files()
+            .iter()
+            .filter_map(|p| {
+                p.file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|s| s.to_string())
+            })
+            .collect();
+
+        let base = "result.csv".to_string();
+        if !existing.contains(&base) {
+            return base;
+        }
+        let mut i = 1;
+        loop {
+            let name = format!("result{}.csv", i);
+            if !existing.contains(&name) {
+                return name;
+            }
+            i += 1;
+        }
+    }
 }

@@ -82,7 +82,9 @@ fn build_right_side(app: &App) -> String {
     // In visual mode, show selection statistics instead of position info
     if matches!(
         app.mode,
-        crate::app::Mode::VisualBlock | crate::app::Mode::VisualLine | crate::app::Mode::VisualColumn
+        crate::app::Mode::VisualBlock
+            | crate::app::Mode::VisualLine
+            | crate::app::Mode::VisualColumn
     ) {
         if let Some(ref sel) = app.visual_selection {
             return build_visual_stats(app, sel);

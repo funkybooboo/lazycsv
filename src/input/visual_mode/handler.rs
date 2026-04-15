@@ -154,8 +154,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
 
         // Pending g-command (gs = stats, gg = top)
         KeyCode::Char('g') => {
-            app.input_state
-                .set_pending_command(PendingCommand::G);
+            app.input_state.set_pending_command(PendingCommand::G);
         }
 
         // Go to last row
