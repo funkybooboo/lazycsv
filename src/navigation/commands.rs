@@ -211,9 +211,7 @@ pub fn move_down_by(app: &mut App, count: usize) {
 pub fn move_up_by(app: &mut App, count: usize) {
     let current = app.view_state.table_state.selected().unwrap_or(0);
     let target = current.saturating_sub(count);
-    let final_target = target.max(0);
-
-    app.view_state.table_state.select(Some(final_target));
+    app.view_state.table_state.select(Some(target));
     app.view_state.viewport_mode = ViewportMode::Auto;
 }
 

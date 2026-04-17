@@ -77,11 +77,9 @@ fn build_magnifier_status_bar(
 ) -> String {
     let (cursor_line, cursor_col) = magnifier.cursor();
     let line_count = magnifier.lines().len();
-    let line_percent = if line_count > 0 {
-        ((cursor_line + 1) * 100) / line_count
-    } else {
-        100
-    };
+    let line_percent = ((cursor_line + 1) * 100)
+        .checked_div(line_count)
+        .unwrap_or(100);
 
     // Left side: mode indicator or command buffer
     let left_text = if magnifier.mode() == crate::magnifier::MagnifierMode::Command {

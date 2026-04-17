@@ -149,7 +149,7 @@ impl SqlCompletion {
             .collect();
 
         // Sort by score descending (higher = better match)
-        scored.sort_by(|a, b| b.0.cmp(&a.0));
+        scored.sort_by_key(|b| std::cmp::Reverse(b.0));
         scored.into_iter().map(|(_, item)| item).collect()
     }
 
@@ -220,8 +220,7 @@ fn fuzzy_match_score(name: &str, filter: &str) -> Option<i32> {
 
     for (fi, fc) in filter.chars().enumerate() {
         let mut found = false;
-        let mut pos = last_match_pos;
-        for nc in name_chars.by_ref() {
+        for (pos, nc) in (last_match_pos..).zip(name_chars.by_ref()) {
             if nc == fc {
                 // Bonus for consecutive matches
                 if fi > 0 && pos == last_match_pos {
@@ -235,7 +234,6 @@ fn fuzzy_match_score(name: &str, filter: &str) -> Option<i32> {
                 found = true;
                 break;
             }
-            pos += 1;
         }
         if !found {
             return None;
