@@ -4,9 +4,6 @@ A blazingly fast terminal UI for CSV files. Navigate huge datasets with vim keys
 
 Inspired by [lazygit](https://github.com/jesseduffield/lazygit), [lazydocker](https://github.com/jesseduffield/lazydocker), and [lazysql](https://github.com/jorgerojas26/lazysql).
 
-<!-- Screenshot: Main table view showing CSV data with vim-style navigation -->
-![LazyCSV Main View](screenshots/main-view.png)
-
 ## Why LazyCSV?
 
 - **Fast** - 100K+ rows at 60 FPS (in-memory)
@@ -18,6 +15,60 @@ Inspired by [lazygit](https://github.com/jesseduffield/lazygit), [lazydocker](ht
 **Note:** LazyCSV loads the entire CSV file into memory for maximum performance. This design choice prioritizes speed and simplicity over handling files larger than available RAM.
 
 ## Install
+
+### Pre-built binaries (recommended)
+
+Download the latest release for your platform from [GitHub Releases](https://github.com/funkybooboo/lazycsv/releases/latest).
+
+**macOS (Apple Silicon)**
+```bash
+curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.21.0-aarch64-apple-darwin.tar.gz | tar xz
+sudo mv lazycsv /usr/local/bin/
+```
+
+**macOS (Intel)**
+```bash
+curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.21.0-x86_64-apple-darwin.tar.gz | tar xz
+sudo mv lazycsv /usr/local/bin/
+```
+
+**Linux (x86_64)**
+```bash
+curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.21.0-x86_64-unknown-linux-gnu.tar.gz | tar xz
+sudo mv lazycsv /usr/local/bin/
+```
+
+**Windows**
+
+Download `lazycsv-v0.21.0-x86_64-pc-windows-msvc.zip` from the [releases page](https://github.com/funkybooboo/lazycsv/releases/latest), extract, and add to your PATH.
+
+### Build from source
+
+Requires the [Rust](https://rustup.rs/) toolchain. Install it first if you don't have it:
+
+**macOS**
+```bash
+brew install rust
+```
+or
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+**Linux (Debian/Ubuntu)**
+```bash
+sudo apt install cargo
+```
+or for the latest Rust version:
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+**Windows**
+
+Download and run [rustup-init.exe](https://win.rustup.rs/) from the official site.
+
+Then build lazycsv:
 
 ```bash
 git clone https://github.com/funkybooboo/lazycsv.git
@@ -176,35 +227,6 @@ cargo test
 ```
 
 See [docs/development.md](docs/development.md) for contributing guidelines.
-
-## Screenshots
-
-### Main View
-<!-- Screenshot: Normal mode navigation -->
-![Normal Mode](screenshots/normal-mode.png)
-
-### Insert Mode
-<!-- Screenshot: Quick cell editing in Insert mode -->
-![Insert Mode](screenshots/insert-mode.png)
-
-### Magnifier Mode
-<!-- Screenshot: Full vim editor for multi-line cell content -->
-![Magnifier Mode](screenshots/magnifier-mode.png)
-
-### Visual Selection
-<!-- Screenshot: Visual mode selecting multiple cells/rows -->
-![Visual Selection](screenshots/visual-mode.png)
-
-### SQL Query Mode
-<!-- Screenshot: SQL editor with query -->
-![SQL Query Mode](screenshots/sql-editor.png)
-
-<!-- Screenshot: SQL query results -->
-![SQL Results](screenshots/sql-results.png)
-
-### Search
-<!-- Screenshot: Regex search overlay -->
-![Search](screenshots/search.png)
 
 ## What's New in v0.11.0
 
