@@ -159,6 +159,7 @@ pub fn execute(app: &mut App) -> Result<InputResult> {
         }
         "clearview" => super::colors::execute_clear_view(app),
         "export" => execute_export(app, _arg),
+        "history" => execute_history(app),
         _ => {
             // Unknown command
             app.status_message = Some(StatusMessage::from(format!("Unknown command: :{}", cmd)));
@@ -221,6 +222,25 @@ fn execute_write_quit(app: &mut App) -> Result<InputResult> {
 /// Execute :h/:help command
 fn execute_help(app: &mut App) -> Result<InputResult> {
     app.view_state.toggle_help();
+    Ok(InputResult::Continue)
+}
+
+/// Execute :history — show recent ex-command history in the status bar.
+fn execute_history(app: &mut App) -> Result<InputResult> {
+    if app.command_history.is_empty() {
+        app.status_message = Some(StatusMessage::from("Command history is empty"));
+        return Ok(InputResult::Continue);
+    }
+    // Most recent first; show up to 10, numbered from 1.
+    let entries: Vec<String> = app
+        .command_history
+        .iter()
+        .take(10)
+        .enumerate()
+        .map(|(i, c)| format!("{}: {}", i + 1, c))
+        .collect();
+    let msg = format!("History: {}", entries.join("  |  "));
+    app.status_message = Some(StatusMessage::new_persistent(msg));
     Ok(InputResult::Continue)
 }
 

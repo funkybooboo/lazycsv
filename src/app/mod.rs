@@ -192,6 +192,18 @@ pub struct App {
 
     /// Right-click context menu state
     pub context_menu: Option<ContextMenu>,
+
+    /// Vim-style macro recording/playback state
+    pub macros: crate::macros::MacroState,
+
+    /// Persistent ex-command (`:`) history (most recent first)
+    pub command_history: Vec<String>,
+
+    /// Cursor into `command_history` while navigating with Up/Down (None = at fresh prompt)
+    pub command_history_index: Option<usize>,
+
+    /// Snapshot of `command_buffer` before history navigation began (restored on Down past newest)
+    pub command_history_pending: Option<String>,
 }
 
 impl App {
@@ -271,6 +283,10 @@ impl App {
             formula_store: crate::formula::FormulaStore::new(),
             formula_completion: None,
             context_menu: None,
+            macros: crate::macros::MacroState::new(),
+            command_history: Vec::new(),
+            command_history_index: None,
+            command_history_pending: None,
         };
         let xlsx_formulas = std::mem::take(&mut app.document.xlsx_formulas);
         for ((row, col), raw) in xlsx_formulas {
@@ -294,8 +310,40 @@ impl App {
         app
     }
 
+    /// Replay the macro stored in `register`, feeding each event through `handle_key`.
+    /// Returns `Ok(())` even if the register is empty (no-op).
+    /// Aborts silently if max replay depth is exceeded (prevents `@a` calling itself).
+    pub fn replay_macro(&mut self, register: char) -> Result<()> {
+        let keys: Vec<KeyEvent> = match self.macros.get(register) {
+            Some(slice) => slice.to_vec(),
+            None => return Ok(()),
+        };
+        if !self.macros.begin_replay() {
+            self.status_message = Some(StatusMessage::from(
+                "Macro replay depth exceeded".to_string(),
+            ));
+            return Ok(());
+        }
+        let result = (|| -> Result<()> {
+            for k in keys {
+                self.handle_key(k)?;
+            }
+            Ok(())
+        })();
+        self.macros.end_replay();
+        self.macros.set_last_played(register);
+        result
+    }
+
     /// Handle keyboard input events
     pub fn handle_key(&mut self, key: KeyEvent) -> Result<InputResult> {
+        // Record raw input into the active macro register before dispatch.
+        // The handlers themselves decide which keys start/stop recording — those
+        // keys are filtered out here by checking that recording was already in
+        // progress *before* we look at the key's effect.
+        if self.macros.is_recording() && !self.macros.is_replaying() {
+            self.macros.record_key(key);
+        }
         crate::input::handle_key(self, key)
     }
 

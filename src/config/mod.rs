@@ -12,11 +12,13 @@
 // as unused. Suppressing here rather than marking each individually.
 #![allow(dead_code)]
 
+mod command_history;
 mod sql_history;
 mod toml_parsing;
 pub mod views;
 mod watcher;
 
+pub use command_history::{command_history_path, load_command_history, save_command_history};
 pub use sql_history::{load_sql_history, save_sql_history, sql_history_path};
 #[cfg(test)]
 use std::path::Path;
@@ -45,6 +47,8 @@ pub struct Defaults {
     pub max_column_width: u16,
     pub undo_limit: usize,
     pub show_footer: bool,
+    /// Maximum number of `:` commands kept in history (0 = disabled).
+    pub command_history_limit: usize,
 }
 
 /// Theme/color configuration.
@@ -96,6 +100,7 @@ impl Default for Defaults {
             max_column_width: 100,
             undo_limit: 1000,
             show_footer: false,
+            command_history_limit: 50,
         }
     }
 }

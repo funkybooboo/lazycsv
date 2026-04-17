@@ -20,6 +20,8 @@ pub fn enter_sql_editor(app: &mut App) {
 pub fn enter_command_mode(app: &mut App) {
     app.mode = Mode::Command;
     app.input_state.clear_command_buffer();
+    app.command_history_index = None;
+    app.command_history_pending = None;
 }
 
 /// Enter search mode (/)

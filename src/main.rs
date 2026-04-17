@@ -368,6 +368,7 @@ fn run_main() -> Result<()> {
     let mut app = match app_result {
         Ok(mut app) => {
             app.sql_history = lazycsv::config::load_sql_history();
+            app.command_history = lazycsv::config::load_command_history();
             app
         }
         Err(e) => {
@@ -404,6 +405,12 @@ fn run_main() -> Result<()> {
 
     // Save view settings for all open files before exit
     views::save_current_views(&app);
+
+    // Persist `:` command history before exit
+    lazycsv::config::save_command_history(
+        &app.command_history,
+        app.config.defaults.command_history_limit,
+    );
 
     // Always restore terminal
     restore_terminal(supports_enhancement);
@@ -476,12 +483,10 @@ fn run(terminal: &mut Term, app: &mut App) -> Result<()> {
 
         if event::poll(Duration::from_millis(100)).context("Failed to poll for events")? {
             match event::read().context("Failed to read event")? {
-                Event::Key(key) => {
-                    if key.kind == KeyEventKind::Press {
-                        let result = app.handle_key(key)?;
-                        needs_redraw = true;
-                        handle_input_result(terminal, app, result)?;
-                    }
+                Event::Key(key) if key.kind == KeyEventKind::Press => {
+                    let result = app.handle_key(key)?;
+                    needs_redraw = true;
+                    handle_input_result(terminal, app, result)?;
                 }
                 Event::Mouse(mouse) => {
                     // Skip Moved events — they fire on every pixel of mouse

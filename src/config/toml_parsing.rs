@@ -27,6 +27,7 @@ pub(super) struct TomlDefaults {
     pub(super) max_column_width: Option<u16>,
     pub(super) undo_limit: Option<usize>,
     pub(super) show_footer: Option<bool>,
+    pub(super) command_history_limit: Option<usize>,
 }
 
 #[derive(Deserialize, Default)]
@@ -264,6 +265,9 @@ pub(super) fn apply_toml(
     }
     if let Some(f) = toml.defaults.show_footer {
         config.defaults.show_footer = f;
+    }
+    if let Some(limit) = toml.defaults.command_history_limit {
+        config.defaults.command_history_limit = limit;
     }
 
     // Theme — helper to apply a color field with warning on bad value

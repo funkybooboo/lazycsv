@@ -24,6 +24,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         }
 
         KeyCode::Enter => {
+            let cmd = app.input_state.command_buffer.trim().to_string();
             let result = super::executor::execute(app)?;
             // Only return to Normal if command didn't change mode
             // (Some commands like :files switch to a different mode)
@@ -31,6 +32,9 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                 app.mode = Mode::Normal;
             }
             app.input_state.clear_command_buffer();
+            app.command_history_index = None;
+            app.command_history_pending = None;
+            app.push_command_history(cmd);
             if !matches!(result, InputResult::Continue) {
                 return Ok(result);
             }
@@ -60,7 +64,14 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             app.input_state.command_cursor_end();
         }
 
+        KeyCode::Up => history_prev(app),
+
+        KeyCode::Down => history_next(app),
+
         KeyCode::Char(c) => {
+            // Typing invalidates history navigation — keep current buffer.
+            app.command_history_index = None;
+            app.command_history_pending = None;
             app.input_state.push_command_char(c);
         }
 
@@ -68,4 +79,47 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     }
 
     Ok(InputResult::Continue)
+}
+
+/// Walk older into command history (Up arrow).
+/// Index 0 = most recent. None = at the live prompt.
+fn history_prev(app: &mut App) {
+    if app.command_history.is_empty() {
+        return;
+    }
+    let new_index = match app.command_history_index {
+        None => {
+            // Save what's currently typed so Down can restore it.
+            app.command_history_pending = Some(app.input_state.command_buffer.clone());
+            0
+        }
+        Some(i) if i + 1 < app.command_history.len() => i + 1,
+        Some(i) => i, // already at oldest
+    };
+    let entry = app.command_history[new_index].clone();
+    app.command_history_index = Some(new_index);
+    set_command_buffer(app, entry);
+}
+
+/// Walk newer in command history (Down arrow). Past the newest, restore the live prompt.
+fn history_next(app: &mut App) {
+    let Some(i) = app.command_history_index else {
+        return;
+    };
+    if i == 0 {
+        // Past the most recent — return to whatever the user had typed.
+        let pending = app.command_history_pending.take().unwrap_or_default();
+        app.command_history_index = None;
+        set_command_buffer(app, pending);
+    } else {
+        let new_index = i - 1;
+        let entry = app.command_history[new_index].clone();
+        app.command_history_index = Some(new_index);
+        set_command_buffer(app, entry);
+    }
+}
+
+fn set_command_buffer(app: &mut App, value: String) {
+    app.input_state.command_buffer = value;
+    app.input_state.command_cursor = app.input_state.command_buffer.chars().count();
 }

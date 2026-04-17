@@ -22,25 +22,25 @@ Download the latest release for your platform from [GitHub Releases](https://git
 
 **macOS (Apple Silicon)**
 ```bash
-curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.21.0-aarch64-apple-darwin.tar.gz | tar xz
+curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.22.1-aarch64-apple-darwin.tar.gz | tar xz
 sudo mv lazycsv /usr/local/bin/
 ```
 
 **macOS (Intel)**
 ```bash
-curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.21.0-x86_64-apple-darwin.tar.gz | tar xz
+curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.22.1-x86_64-apple-darwin.tar.gz | tar xz
 sudo mv lazycsv /usr/local/bin/
 ```
 
 **Linux (x86_64)**
 ```bash
-curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.21.0-x86_64-unknown-linux-gnu.tar.gz | tar xz
+curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.22.1-x86_64-unknown-linux-gnu.tar.gz | tar xz
 sudo mv lazycsv /usr/local/bin/
 ```
 
 **Windows**
 
-Download `lazycsv-v0.21.0-x86_64-pc-windows-msvc.zip` from the [releases page](https://github.com/funkybooboo/lazycsv/releases/latest), extract, and add to your PATH.
+Download `lazycsv-v0.22.1-x86_64-pc-windows-msvc.zip` from the [releases page](https://github.com/funkybooboo/lazycsv/releases/latest), extract, and add to your PATH.
 
 ### Build from source
 
@@ -181,7 +181,7 @@ LazyCSV treats CSV files in the same directory like Excel sheets. Open one file,
 
 ## Current Status
 
-**v0.12.0 Complete** (March 2026) - Yazi-inspired 3-column file browser with parent directory preview, current directory navigation, and file/CSV preview.
+**v0.22.1 Complete** (April 2026) - Performance benchmarking suite (criterion benches for navigation, rendering, search, magnifier, SQL). Performance work itself was delivered incrementally across earlier versions: mmap lazy loading, DuckDB migration, parallelized search/substitute, buffered I/O, and parallel sort.
 
 **Completed Features:**
 - Fast CSV viewer/editor with vim navigation
@@ -200,8 +200,8 @@ LazyCSV treats CSV files in the same directory like Excel sheets. Open one file,
 - 700+ tests passing
 
 **Next Up:**
-- **v0.12.1** - UI System Testing
-- **v0.13.0** - Repository Organization & Structure
+- **v0.23.0** - Final Architecture Review
+- **v0.31.0** - Documentation & Maintainability
 - **v1.0.0** - Stable release
 
 See [plans/roadmap.md](plans/roadmap.md) for the complete detailed roadmap.
@@ -228,14 +228,20 @@ cargo test
 
 See [docs/development.md](docs/development.md) for contributing guidelines.
 
-## What's New in v0.11.0
+## What's New in v0.22.1
 
-**Full Vim Modal Editing, Undo/Redo, and Configuration (March 2026):**
-- **SQL Editor:** Full vim modal editing in SQL editor (Normal/Insert/Visual modes)
-- **Undo/Redo:** Complete undo/redo system (`u`, `Ctrl+r`, `.` repeat)
-- **Configuration:** Config file support with themes and customization
-- **Testing:** 700+ total tests passing with comprehensive coverage
-- **Performance:** Maintained 60 FPS with enhanced editing capabilities
+**Performance Benchmarking & Tuning (April 2026):**
+- **Benchmark suite:** Criterion benches for navigation, rendering, search, magnifier, and SQL paths under `benches/` — guards against regressions on the critical paths.
+- **Performance work delivered earlier:** mmap-backed lazy loading for large CSVs, DuckDB-backed query engine, parallelized search and `:s` substitute via rayon, buffered + parallel sort, COPY+mmap fast path, contiguous-byte writes for unedited rows.
+
+## What's New in v0.22.0
+
+**Macros & Command History (April 2026):**
+- **Macro recording:** `qa` to record into register `a`, `q` to stop, `@a` to replay, `@@` to repeat the last macro. 26 registers (a–z), with replay-depth and length guards.
+- **Command history:** Persistent `:` command history at `~/.config/lazycsv/command_history`. Up/Down arrows in command mode walk through past entries; typed text is restored when you pass the newest entry.
+- **`:history`:** Lists the most recent commands in the status bar.
+- **Configurable:** New `[defaults] command_history_limit` (default 50; 0 disables).
+- **Testing:** 30 new integration tests + 9 unit tests, all green.
 
 ## Philosophy
 

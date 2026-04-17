@@ -378,6 +378,33 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             nav::page_up(app);
         }
 
+        // Macro: `q` — toggles recording (stops if active, otherwise prompts for register)
+        KeyCode::Char('q')
+            if help::is_navigation_allowed(app)
+                && !key.modifiers.contains(KeyModifiers::CONTROL) =>
+        {
+            if app.macros.is_recording() {
+                if let Some(reg) = app.macros.stop_recording() {
+                    app.status_message =
+                        Some(StatusMessage::from(format!("Recorded into @{}", reg)));
+                }
+            } else {
+                app.input_state
+                    .set_pending_command(crate::input::PendingCommand::Q);
+                app.status_message = Some(StatusMessage::from(
+                    "Recording... press a-z to choose register",
+                ));
+            }
+            return Ok(InputResult::Continue);
+        }
+
+        // Macro: `@` — replay (waits for register letter or `@` for last)
+        KeyCode::Char('@') if help::is_navigation_allowed(app) => {
+            app.input_state
+                .set_pending_command(crate::input::PendingCommand::At);
+            return Ok(InputResult::Continue);
+        }
+
         // Shift+Arrow: start/extend visual block selection
         KeyCode::Up | KeyCode::Down | KeyCode::Left | KeyCode::Right
             if help::is_navigation_allowed(app) && key.modifiers.contains(KeyModifiers::SHIFT) =>

@@ -12,6 +12,7 @@ pub mod formula;
 pub mod generate;
 pub mod history;
 pub mod input;
+pub mod macros;
 pub mod magnifier;
 pub mod navigation;
 pub mod query;

@@ -239,6 +239,38 @@ pub fn handle(app: &mut App, first: PendingCommand, second: KeyCode) -> Result<I
             super::mode_transitions::enter_magnifier(app);
         }
 
+        // q<reg> - Begin recording into register (a-z)
+        (PendingCommand::Q, KeyCode::Char(c)) if crate::macros::is_valid_register(c) => {
+            app.input_state.clear_pending_command();
+            app.macros.start_recording(c);
+            app.status_message = Some(StatusMessage::from(format!("Recording into @{}", c)));
+        }
+
+        // @<reg> - Replay register (a-z)
+        (PendingCommand::At, KeyCode::Char(c)) if crate::macros::is_valid_register(c) => {
+            app.input_state.clear_pending_command();
+            if app.macros.get(c).is_none() {
+                app.status_message = Some(StatusMessage::from(format!("Register @{} is empty", c)));
+            } else {
+                app.replay_macro(c)?;
+            }
+        }
+
+        // @@ - Replay last-played register
+        (PendingCommand::At, KeyCode::Char('@')) => {
+            app.input_state.clear_pending_command();
+            match app.macros.last_played() {
+                Some(reg) => {
+                    app.replay_macro(reg)?;
+                }
+                None => {
+                    app.status_message = Some(StatusMessage::from(
+                        "No previous macro to replay".to_string(),
+                    ));
+                }
+            }
+        }
+
         _ => {
             app.input_state.clear_pending_command();
             app.status_message = Some(StatusMessage::from(format!(
@@ -288,6 +320,8 @@ fn format_pending_command(cmd: &PendingCommand) -> String {
         PendingCommand::CommaD => ",d".to_string(),
         PendingCommand::CommaY => ",y".to_string(),
         PendingCommand::Space => "Space".to_string(),
+        PendingCommand::Q => "q".to_string(),
+        PendingCommand::At => "@".to_string(),
     }
 }
 

@@ -155,6 +155,8 @@ fn build_pending_indicator(app: &App) -> String {
         Some(crate::input::PendingCommand::CommaD) => ",d".to_string(),
         Some(crate::input::PendingCommand::CommaY) => ",y".to_string(),
         Some(crate::input::PendingCommand::Space) => "Space".to_string(),
+        Some(crate::input::PendingCommand::Q) => "q".to_string(),
+        Some(crate::input::PendingCommand::At) => "@".to_string(),
         None => app
             .input_state
             .command_count

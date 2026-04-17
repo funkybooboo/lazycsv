@@ -112,6 +112,10 @@ pub enum PendingCommand {
     CommaY,
     /// Waiting for key after Space (Space+f, Space+q, Space+m)
     Space,
+    /// Waiting for register letter after `q` (start macro recording)
+    Q,
+    /// Waiting for register letter after `@` (replay macro)
+    At,
 }
 
 impl PendingCommand {

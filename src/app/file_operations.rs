@@ -141,6 +141,18 @@ impl App {
         self.sql_history.truncate(limit);
     }
 
+    /// Add an ex-command to history, deduplicating and capping.
+    /// Does nothing if `command_history_limit` is 0 or `cmd` is empty.
+    pub fn push_command_history(&mut self, cmd: String) {
+        let limit = self.config.defaults.command_history_limit;
+        if limit == 0 || cmd.trim().is_empty() {
+            return;
+        }
+        self.command_history.retain(|c| c != &cmd);
+        self.command_history.insert(0, cmd);
+        self.command_history.truncate(limit);
+    }
+
     /// Check if the current file has been modified externally.
     /// Sets `external_modification_pending` and a status message if so.
     /// Returns true if a modification was detected (triggers redraw).

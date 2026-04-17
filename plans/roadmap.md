@@ -50,8 +50,8 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.30.0 | Yazi-Style File Menu, Column Colors & View Persistence | [x] | - |
 | v0.20.1 | Technical Debt Reduction | [x] | - |
 | v0.21.0 | Multi-Format Export (JSON, TSV, Markdown, XLSX, Parquet) | [x] | 14 |
-| v0.22.0 | Macros & Command Recording | [ ] | TBD |
-| v0.22.1 | Performance Benchmarking & Tuning | [ ] | TBD |
+| v0.22.0 | Macros & Command Recording | [x] | 30 |
+| v0.22.1 | Performance Benchmarking & Tuning | [x] | - |
 | v0.23.0 | Final Architecture Review | [ ] | TBD |
 | v0.23.1 | Final Architecture Polish | [ ] | TBD |
 | v0.31.0 | Documentation & Maintainability | [ ] | TBD |
@@ -209,11 +209,11 @@ Decomposed God objects: `app/mod.rs` 3,289→320 lines (15 sub-modules), `execut
 **[v0.21.0](versions/v0.21.0.md) - Multi-Format Export** ✅ COMPLETE
 `:export` command for JSON, TSV, Markdown, XLSX, and Parquet. Type-preserving JSON (numbers, booleans, nulls). XLSX via `rust_xlsxwriter` with numeric detection. Parquet via DuckDB. Visual selection export. CLI `-o` auto-detects format from extension in query, sort, and dedup modes. 14 tests.  
 
-**[v0.22.0](versions/v0.22.0.md) - Macros & Command Recording**  
-Macro recording and playback with saved macro library.  
+**[v0.22.0](versions/v0.22.0.md) - Macros & Command Recording** ✅ COMPLETE
+Vim-style macro recording (`qa`/`q`/`@a`/`@@`) with 26 registers (a–z), replay-depth guard against runaway loops, and per-key length cap. Persistent ex-command (`:`) history with Up/Down navigation in command mode, `:history` listing, dedup-and-promote semantics, and configurable `command_history_limit` (default 50). 30 integration tests.
 
-**[v0.22.1](versions/v0.22.1.md) - Performance Benchmarking & Tuning**  
-Performance benchmarking suite with optimization targets.  
+**[v0.22.1](versions/v0.22.1.md) - Performance Benchmarking & Tuning** ✅ COMPLETE
+Criterion benchmark suite under `benches/` (navigation, rendering, search, magnifier, sql) protects critical paths against regressions. The performance work itself was delivered incrementally across earlier versions: mmap-backed lazy loading (v0.24.0), DuckDB migration (v0.24.0/v0.26.0), parallelized search and `:s` substitute (v0.29.0), buffered I/O + parallel sort (v0.24.0/v0.29.0), and the writer's contiguous-mmap fast path for unedited rows (v0.29.0).
 
 **[v0.23.0](versions/v0.23.0.md) - Final Architecture Review**  
 Comprehensive architecture review with refactoring for long-term maintainability.  
