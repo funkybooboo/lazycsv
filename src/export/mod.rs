@@ -1,7 +1,8 @@
-//! Multi-format export — JSON, TSV, Markdown, XLSX.
+//! Multi-format export — JSON, TSV, Markdown, XLSX, ODS.
 
 pub mod json;
 pub mod markdown;
+pub mod ods;
 pub mod tsv;
 pub mod xlsx;
 
@@ -15,6 +16,7 @@ pub enum ExportFormat {
     Tsv,
     Markdown,
     Xlsx,
+    Ods,
     Parquet,
     Csv,
 }
@@ -28,6 +30,7 @@ impl ExportFormat {
             "tsv" => Some(Self::Tsv),
             "md" | "markdown" => Some(Self::Markdown),
             "xlsx" => Some(Self::Xlsx),
+            "ods" => Some(Self::Ods),
             "parquet" => Some(Self::Parquet),
             "csv" => Some(Self::Csv),
             _ => None,
@@ -41,6 +44,7 @@ impl ExportFormat {
             "tsv" => Some(Self::Tsv),
             "md" | "markdown" => Some(Self::Markdown),
             "xlsx" => Some(Self::Xlsx),
+            "ods" => Some(Self::Ods),
             "parquet" => Some(Self::Parquet),
             "csv" => Some(Self::Csv),
             _ => None,
@@ -54,6 +58,7 @@ impl ExportFormat {
             Self::Tsv => "tsv",
             Self::Markdown => "md",
             Self::Xlsx => "xlsx",
+            Self::Ods => "ods",
             Self::Parquet => "parquet",
             Self::Csv => "csv",
         }
@@ -84,6 +89,7 @@ pub fn export_to_file(
             markdown::write_markdown(&mut writer, headers, rows)
         }
         ExportFormat::Xlsx => xlsx::write_xlsx(path, headers, rows),
+        ExportFormat::Ods => ods::write_ods(path, headers, rows),
         ExportFormat::Parquet => export_via_duckdb(path, headers, rows, "parquet"),
         ExportFormat::Csv => {
             bail!("Use :w for CSV export")

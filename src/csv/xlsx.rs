@@ -192,7 +192,7 @@ mod tests {
         // Integer-valued floats should display without decimals
         assert_eq!(cell_to_string(&Data::Float(42.0)), "42");
         // Non-integer floats keep decimals
-        assert_eq!(cell_to_string(&Data::Float(3.14)), "3.14");
+        assert_eq!(cell_to_string(&Data::Float(1.25)), "1.25");
     }
 
     #[test]

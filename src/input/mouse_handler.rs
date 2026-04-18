@@ -589,7 +589,6 @@ mod tests {
     use crate::csv::Document;
     use crate::input::handler::{enter_insert_mode, CursorPosition, InitialContent};
     use crate::input::mouse_context_menu::*;
-    use crate::input::mouse_coords::*;
     use crate::input::mouse_reorder::*;
     use crate::session::FileConfig;
     use crate::ui::view_state::MouseLayout;

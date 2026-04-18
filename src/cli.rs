@@ -100,18 +100,17 @@ pub struct CliArgs {
     #[arg(short = 'x', long = "xlsx", help = "Extract Excel/ODS sheets to CSV")]
     pub xlsx: bool,
 
-    /// Output for xlsx conversion (used with --xlsx).
-    /// -o alone: output to stdout (for piping/redirect)
-    /// -o path/: output to directory
-    /// -o file.csv: output to specific file (single sheet only)
-    /// omitted: output to <excel_filename>/ directory
+    /// Output target for non-interactive modes and standalone format conversion.
+    /// Standalone: `lazycsv in.csv -o out.json` converts by output extension
+    /// (csv, tsv, json, md/markdown, xlsx, parquet).
+    /// Also used with -q, -s, -t, -r, -c, -h, -A, -D, -g, -S, -x to redirect output.
+    /// Forms: `-o` (stdout), `-o dir/` (directory, for -x/-S), `-o file.ext` (file).
     #[arg(
         short = 'o',
         long = "output",
         num_args = 0..=1,
         default_missing_value = "-",
-        hide = true,
-        help = "Output target: -o (stdout), -o dir/ (directory), -o file.csv (file)"
+        help = "Output file/dir; with a CSV input and typed extension (json/tsv/md/xlsx/parquet), converts format"
     )]
     pub output: Option<String>,
 

@@ -227,36 +227,62 @@ fn run_main() -> Result<()> {
         return execute_count_mode(&cli_args);
     }
 
-    // Standalone format conversion: lazycsv data.csv -o data.json
+    // Standalone format conversion: lazycsv data.xlsx -o data.parquet
+    // Input is loaded via Document::from_file (CSV/TSV/XLSX/ODS/Parquet/JSON/SQLite),
+    // output format is chosen by the output file's extension.
     if let Some(out) = cli_args.output.as_deref().filter(|o| *o != "-") {
         let out_path = std::path::Path::new(out);
-        if let Some(format) = lazycsv::export::ExportFormat::from_extension(out_path) {
-            if format != lazycsv::export::ExportFormat::Csv {
-                let input_path = cli_args
-                    .file_path()
-                    .ok_or_else(|| anyhow::anyhow!("No input file specified"))?;
-                let config = FileConfig::with_options(
-                    cli_args.delimiter,
-                    cli_args.no_headers,
-                    cli_args.encoding.clone(),
-                );
-                let doc = lazycsv::Document::from_file(
-                    &input_path,
-                    config.delimiter,
-                    config.no_headers,
-                    config.encoding,
-                )?;
-                let (headers, rows) = lazycsv::export::collect_document_data(&doc);
-                lazycsv::export::export_to_file(format, out_path, &headers, &rows)?;
-                eprintln!(
-                    "Converted {} → {} ({} rows)",
-                    input_path.display(),
-                    out_path.display(),
-                    rows.len()
-                );
-                return Ok(());
+        let Some(format) = lazycsv::export::ExportFormat::from_extension(out_path) else {
+            anyhow::bail!(
+                "Unsupported output format for '{}'.\n\
+                 Supported output extensions: .csv, .tsv, .json, .md, .xlsx, .ods, .parquet",
+                out
+            );
+        };
+        let input_path = cli_args
+            .file_path()
+            .ok_or_else(|| anyhow::anyhow!("No input file specified"))?;
+        let config = FileConfig::with_options(
+            cli_args.delimiter,
+            cli_args.no_headers,
+            cli_args.encoding.clone(),
+        );
+        let sheet_name = if lazycsv::csv::xlsx::is_spreadsheet(&input_path) {
+            match cli_args.sheet_from_path() {
+                Some(spec) => {
+                    let sheets = lazycsv::csv::xlsx::get_sheet_names(&input_path)?;
+                    Some(resolve_sheet_spec(spec, &sheets)?)
+                }
+                None => None,
             }
-        }
+        } else {
+            None
+        };
+        let doc = lazycsv::Document::from_file_with_sheet(
+            &input_path,
+            config.delimiter,
+            config.no_headers,
+            config.encoding,
+            sheet_name.as_deref(),
+        )?;
+        let row_count = if format == lazycsv::export::ExportFormat::Csv {
+            if let Some(parent) = out_path.parent().filter(|p| !p.as_os_str().is_empty()) {
+                std::fs::create_dir_all(parent)?;
+            }
+            lazycsv::csv::write_csv_atomic(&doc, out_path, ',')?;
+            doc.row_count().saturating_sub(1)
+        } else {
+            let (headers, rows) = lazycsv::export::collect_document_data(&doc);
+            lazycsv::export::export_to_file(format, out_path, &headers, &rows)?;
+            rows.len()
+        };
+        eprintln!(
+            "Converted {} → {} ({} rows)",
+            input_path.display(),
+            out_path.display(),
+            row_count
+        );
+        return Ok(());
     }
 
     // Piped stdin can't be used with the interactive TUI (stdin is needed for keyboard input)
