@@ -1,6 +1,6 @@
 [package]
 name = "lazycsv"
-version = "0.22.1"
+version = "0.23.0"
 edition = "2021"
 description = "A blazingly fast terminal UI for viewing and editing CSV files"
 authors = ["Nate Stott <nate.stott@pm.me>", "Dana Stott <danastott@gmail.com>"]
