@@ -197,6 +197,51 @@ impl VimEditor {
         self.clamp_cursor();
     }
 
+    /// Set cursor position, clamped to valid range. Clears any visual selection.
+    pub fn set_cursor(&mut self, line: usize, col: usize) {
+        self.cursor = (line, col);
+        self.clamp_cursor();
+        if matches!(self.mode, VimMode::Visual | VimMode::VisualLine) {
+            self.exit_visual_mode();
+        }
+    }
+
+    /// Select the word under the cursor (alphanumeric + underscore run).
+    /// Enters visual mode with the selection spanning the word.
+    /// No-op if the cursor is not on a word character.
+    pub fn select_word_at_cursor(&mut self) {
+        let (line_idx, col) = self.cursor;
+        let line = match self.lines.get(line_idx) {
+            Some(l) => l,
+            None => return,
+        };
+        let chars: Vec<char> = line.chars().collect();
+        if col >= chars.len() {
+            return;
+        }
+        let is_word = |c: char| c.is_alphanumeric() || c == '_';
+        if !is_word(chars[col]) {
+            return;
+        }
+        let mut start = col;
+        while start > 0 && is_word(chars[start - 1]) {
+            start -= 1;
+        }
+        let mut end = col;
+        while end + 1 < chars.len() && is_word(chars[end + 1]) {
+            end += 1;
+        }
+        self.cursor = (line_idx, start);
+        self.enter_visual_mode();
+        self.cursor = (line_idx, end);
+        self.clamp_cursor();
+    }
+
+    /// Select the entire current line (enters visual line mode).
+    pub fn select_current_line(&mut self) {
+        self.enter_visual_line_mode();
+    }
+
     /// Clamp cursor to valid position
     ///
     /// Ensures cursor is within document bounds and respects mode-specific constraints.

@@ -30,8 +30,14 @@ pub struct MouseLayout {
     pub row_num_width: u16,
     /// The file manager current-column area (for file list clicks)
     pub file_list_area: Rect,
-    /// Last left-click position and time for double-click detection
-    pub last_click: Option<(Instant, u16, u16)>,
+    /// The file manager parent-column area (for file list clicks)
+    pub file_list_parent_area: Rect,
+    /// Scroll offset of the current-column list (top-visible index), captured at render time
+    pub file_list_offset: usize,
+    /// Scroll offset of the parent-column list (top-visible index), captured at render time
+    pub file_list_parent_offset: usize,
+    /// Last left-click position, time, and running click count (for single/double/triple detection)
+    pub last_click: Option<(Instant, u16, u16, usize)>,
     /// Drag anchor cell (row, col) set on mouse-down for drag selection
     pub drag_anchor: Option<(usize, usize)>,
     /// Active column resize: (display_col_index, column_index, initial_x)

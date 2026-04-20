@@ -56,20 +56,21 @@ pub fn handle_mouse(app: &mut App, event: MouseEvent) -> (InputResult, bool) {
                 return (InputResult::Continue, false);
             }
 
-            // Check for double-click (same position within time threshold)
-            let is_double =
-                if let Some((prev_time, prev_x, prev_y)) = app.view_state.mouse_layout.last_click {
-                    prev_x == x && prev_y == y && prev_time.elapsed().as_millis() < DOUBLE_CLICK_MS
-                } else {
-                    false
-                };
+            // Multi-click detection: increment count if same spot within threshold.
+            let click_count = match app.view_state.mouse_layout.last_click {
+                Some((t, px, py, c))
+                    if px == x && py == y && t.elapsed().as_millis() < DOUBLE_CLICK_MS =>
+                {
+                    c + 1
+                }
+                _ => 1,
+            };
+            app.view_state.mouse_layout.last_click = Some((Instant::now(), x, y, click_count));
 
-            let result = if is_double {
-                app.view_state.mouse_layout.last_click = None;
-                handle_double_click(app, x, y)
-            } else {
-                app.view_state.mouse_layout.last_click = Some((Instant::now(), x, y));
-                handle_left_click(app, x, y)
+            let result = match click_count {
+                1 => handle_left_click(app, x, y),
+                2 => handle_double_click(app, x, y),
+                _ => handle_triple_click(app, x, y),
             };
             (result, true)
         }
@@ -178,12 +179,32 @@ fn handle_left_click(app: &mut App, x: u16, y: u16) -> InputResult {
             handle_table_click(app, x, y)
         }
         Mode::Insert => handle_insert_click(app, x, y),
+        Mode::SqlEditor => {
+            sql_editor_move_cursor(app, x, y);
+            InputResult::Continue
+        }
         _ => InputResult::Continue,
     }
 }
 
 /// Handle a double-click: navigate to the cell, then enter insert mode.
 fn handle_double_click(app: &mut App, x: u16, y: u16) -> InputResult {
+    // File browser: double-click activates the row (opens file / navigates into dir / `..` goes up).
+    if app.mode == Mode::FileList {
+        handle_file_list_click(app, x, y);
+        return crate::input::file_list_mode::navigate_into_selected(app)
+            .unwrap_or(InputResult::Continue);
+    }
+
+    // SQL editor: double-click selects the word under the cursor.
+    if app.mode == Mode::SqlEditor {
+        sql_editor_move_cursor(app, x, y);
+        if let Some(ed) = app.sql_vim_editor.as_mut() {
+            ed.select_word_at_cursor();
+        }
+        return InputResult::Continue;
+    }
+
     if app.mode != Mode::Normal {
         return InputResult::Continue;
     }
@@ -197,6 +218,57 @@ fn handle_double_click(app: &mut App, x: u16, y: u16) -> InputResult {
     }
 
     InputResult::Continue
+}
+
+/// Handle a triple-click. Currently used only by the SQL editor to select the current line.
+fn handle_triple_click(app: &mut App, x: u16, y: u16) -> InputResult {
+    if app.mode == Mode::SqlEditor {
+        sql_editor_move_cursor(app, x, y);
+        if let Some(ed) = app.sql_vim_editor.as_mut() {
+            ed.select_current_line();
+        }
+    }
+    InputResult::Continue
+}
+
+/// Map a click inside the SQL editor modal to a (line, col) position
+/// and move the vim editor's cursor there. No-op if the click is outside the
+/// editor text area.
+fn sql_editor_move_cursor(app: &mut App, x: u16, y: u16) {
+    let Some(ed) = app.sql_vim_editor.as_mut() else {
+        return;
+    };
+
+    let frame_area = crossterm::terminal::size()
+        .map(|(w, h)| ratatui::layout::Rect::new(0, 0, w, h))
+        .unwrap_or_default();
+    let modal = crate::ui::modal::large_modal_rect(frame_area);
+    // `standard_block` uses Borders::ALL → 1-char inset on each side.
+    if modal.width < 2 || modal.height < 3 {
+        return;
+    }
+    let inner_x = modal.x + 1;
+    let inner_y = modal.y + 1;
+    let inner_height = modal.height - 2;
+    // split_editor_area reserves 1 line for the status bar at the bottom.
+    let query_height = inner_height.saturating_sub(1);
+
+    if x < inner_x || y < inner_y || y >= inner_y + query_height {
+        return;
+    }
+
+    let line_num_width = format!("{}", ed.line_count()).len() as u16 + 1; // +1 trailing space
+    let content_x = inner_x + line_num_width;
+    if x < content_x {
+        // Clicked in the line-number gutter → place cursor at column 0 of that line.
+        let line = (y - inner_y) as usize;
+        ed.set_cursor(line, 0);
+        return;
+    }
+
+    let line = (y - inner_y) as usize;
+    let col = (x - content_x) as usize;
+    ed.set_cursor(line, col);
 }
 
 /// Handle a click while in insert mode: move the edit cursor within the cell,
@@ -541,45 +613,33 @@ fn handle_drag(app: &mut App, x: u16, y: u16) -> InputResult {
 }
 
 /// Handle a click in the file list mode.
-fn handle_file_list_click(app: &mut App, _x: u16, y: u16) -> InputResult {
-    // Compute the file list layout to find the current-column area.
-    // The file manager uses: modal area -> split vertically (header 1, content, status 1)
-    // content -> split horizontally (15% parent, 1 sep, 42% current, 1 sep, 42% preview)
-    let frame_area = crossterm::terminal::size()
-        .map(|(w, h)| ratatui::layout::Rect::new(0, 0, w, h))
-        .unwrap_or_default();
-    let modal_area = crate::ui::modal::large_modal_rect(frame_area);
+/// Uses areas and scroll offsets stashed by the file manager renderer.
+fn handle_file_list_click(app: &mut App, x: u16, y: u16) -> InputResult {
+    let layout = &app.view_state.mouse_layout;
+    let current = layout.file_list_area;
+    let parent = layout.file_list_parent_area;
 
-    use ratatui::layout::{Constraint, Direction, Layout};
-    let vlayout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(1),
-            Constraint::Min(0),
-            Constraint::Length(1),
-        ])
-        .split(modal_area);
-    let content = vlayout[1];
-
-    let hlayout = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(15),
-            Constraint::Length(1),
-            Constraint::Percentage(42),
-            Constraint::Length(1),
-            Constraint::Percentage(42),
-        ])
-        .split(content);
-    let current_area = hlayout[2];
-
-    // Check if click is within the current column area
-    if y >= current_area.y && y < current_area.y + current_area.height {
-        let clicked_idx = (y - current_area.y) as usize;
+    // Click in the current-directory column → move selection to that row.
+    if point_in_rect(x, y, current) {
+        let row = (y - current.y) as usize;
+        let clicked_idx = layout.file_list_offset + row;
         app.view_state.file_list_selected = clicked_idx;
+        return InputResult::Continue;
+    }
+
+    // Click in the parent column → navigate to that sibling directory.
+    if point_in_rect(x, y, parent) {
+        let row = (y - parent.y) as usize;
+        let clicked_idx = layout.file_list_parent_offset + row;
+        crate::input::file_list_mode::navigate_to_parent_column_index(app, clicked_idx);
+        return InputResult::Continue;
     }
 
     InputResult::Continue
+}
+
+fn point_in_rect(x: u16, y: u16, r: ratatui::layout::Rect) -> bool {
+    r.width > 0 && r.height > 0 && x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height
 }
 
 #[cfg(test)]
@@ -628,6 +688,9 @@ mod tests {
             scrollable_indices: vec![0, 1, 2, 3, 4],
             row_num_width: 3,
             file_list_area: Rect::default(),
+            file_list_parent_area: Rect::default(),
+            file_list_offset: 0,
+            file_list_parent_offset: 0,
             last_click: None,
             drag_anchor: None,
             col_resize: None,

@@ -1,5 +1,6 @@
 use crossterm::event::KeyCode;
 use std::borrow::Cow;
+use std::path::PathBuf;
 
 /// Result of processing user input
 #[derive(Debug, Clone, PartialEq)]
@@ -21,6 +22,8 @@ pub enum InputResult {
     },
     /// Execute SQL query (deferred to main loop for UI feedback)
     ExecuteQuery { query: String },
+    /// Open a file from disk (deferred to main loop so a loading screen can be shown).
+    OpenFile(PathBuf),
 }
 
 /// High-level user actions that can be performed

@@ -561,6 +561,7 @@ fn handle_input_result(terminal: &mut Term, app: &mut App, result: InputResult) 
             description,
         } => handle_sort_document(terminal, app, col_indices, ascending, description)?,
         InputResult::ExecuteQuery { query } => handle_execute_query(terminal, app, query)?,
+        InputResult::OpenFile(path) => handle_open_file(terminal, app, path)?,
         InputResult::Continue => {}
     }
     Ok(())
@@ -609,6 +610,91 @@ fn handle_reload_file(terminal: &mut Term, app: &mut App) -> Result<()> {
         }
         Err(e) => return Err(e).context("Failed to reload CSV file"),
     }
+    Ok(())
+}
+
+/// Handle opening a new file from the file browser with a loading screen.
+fn handle_open_file(terminal: &mut Term, app: &mut App, path: std::path::PathBuf) -> Result<()> {
+    let filename = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("file")
+        .to_string();
+
+    terminal.clear().context("Failed to clear terminal")?;
+    terminal
+        .draw(|frame| {
+            ui::render_loading(frame, &format!("Loading {}... (Esc to cancel)", filename))
+        })
+        .context("Failed to render UI")?;
+
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let watcher = lazycsv::cancel::EscWatcher::spawn(&cancelled);
+
+    let config = app.session.config();
+    let load_result = lazycsv::csv::Document::from_file_cancellable(
+        &path,
+        config.delimiter,
+        config.no_headers,
+        config.encoding.clone(),
+        &cancelled,
+    );
+    watcher.stop();
+
+    let document = match load_result {
+        Ok(doc) => doc,
+        Err(err) => {
+            if err
+                .downcast_ref::<lazycsv::cancel::CancelledError>()
+                .is_some()
+            {
+                app.status_message = Some(lazycsv::input::StatusMessage::from(
+                    "Load cancelled".to_string(),
+                ));
+            } else {
+                app.status_message = Some(lazycsv::input::StatusMessage::from(format!(
+                    "Failed to load: {}",
+                    err
+                )));
+            }
+            return Ok(());
+        }
+    };
+
+    // Save current file's history before switching
+    {
+        let current_path = app.current_file().clone();
+        let history = std::mem::replace(
+            &mut app.history,
+            lazycsv::history::History::new(app.config.defaults.undo_limit),
+        );
+        app.session.cache_history(current_path, history);
+    }
+
+    let new_index = app.session.add_file(path.clone());
+    app.session.set_active_file_index(new_index);
+    app.session.record_file_mtime(&path);
+
+    let old_storage = app.document.take_storage();
+    std::thread::spawn(move || drop(old_storage));
+    app.document = document;
+
+    app.view_state = lazycsv::ui::ViewState::default();
+    app.view_state.table_state.select(Some(0));
+
+    {
+        use lazycsv::config::views;
+        let store = views::load_views();
+        let key = views::canonical_key(&path);
+        if let Some(fv) = store.files.get(&key) {
+            views::apply_file_view(&path, fv, &mut app.session, &mut app.view_state);
+        }
+    }
+
+    app.status_message = Some(lazycsv::input::StatusMessage::from(format!(
+        "Loaded: {}",
+        filename
+    )));
     Ok(())
 }
 

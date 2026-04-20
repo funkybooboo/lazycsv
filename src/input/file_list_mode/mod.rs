@@ -240,6 +240,38 @@ fn switch_to_index(app: &mut App, target: usize, current: usize) {
     }
 }
 
+/// Navigate to a clicked entry from the parent-column listing (mouse support).
+/// The parent column shows siblings of the current directory; clicking one
+/// changes the current directory to that sibling. Non-directory entries are ignored.
+pub fn navigate_to_parent_column_index(app: &mut App, idx: usize) {
+    let parent_dir = match app.view_state.current_directory.parent() {
+        Some(p) => p.to_path_buf(),
+        None => return,
+    };
+    let entries = match scan_directory_filtered(&parent_dir, app.view_state.show_hidden_files) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    // Parent column skips the ".." entry.
+    let visible: Vec<&BrowserEntry> = entries
+        .iter()
+        .filter(|e| e.filename().is_some_and(|n| n != ".."))
+        .collect();
+    let Some(entry) = visible.get(idx) else {
+        return;
+    };
+    let BrowserEntry::Directory(path) = entry else {
+        return;
+    };
+    let canonical_path = match path.canonicalize() {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+    app.view_state.current_directory = canonical_path;
+    app.view_state.file_list_selected = 0;
+    app.input_state.clear_file_filter();
+}
+
 /// Navigate to parent directory (h key - yazi-style)
 fn navigate_to_parent(app: &mut App) {
     let current_dir = app.view_state.current_directory.clone();
@@ -262,7 +294,7 @@ fn navigate_to_parent(app: &mut App) {
 }
 
 /// Navigate into selected directory or open file (l key - yazi-style)
-fn navigate_into_selected(app: &mut App) -> Result<InputResult> {
+pub fn navigate_into_selected(app: &mut App) -> Result<InputResult> {
     // Get browser entries for current directory
     let current_dir = app.view_state.current_directory.clone();
     let entries = match scan_directory_filtered(&current_dir, app.view_state.show_hidden_files) {
@@ -353,51 +385,8 @@ fn load_csv_file(app: &mut App, path: std::path::PathBuf) -> Result<InputResult>
         }
     }
 
-    // File not loaded yet - load it and add to session
-    use crate::Document;
-
-    let config = app.session.config();
-    let document = match Document::from_file(
-        &path,
-        config.delimiter,
-        config.no_headers,
-        config.encoding.clone(),
-    ) {
-        Ok(doc) => doc,
-        Err(err) => {
-            app.status_message = Some(StatusMessage::from(format!("Failed to load: {}", err)));
-            cancel(app);
-            return Ok(InputResult::Continue);
-        }
-    };
-
-    // Add file to session and switch to it
-    let new_index = app.session.add_file(path.clone());
-    app.session.set_active_file_index(new_index);
-
-    // Update document
-    app.document = document;
-
-    // Reset view state for new file
-    app.view_state.table_state.select(Some(0));
-    app.view_state.selected_column = crate::domain::position::ColIndex::new(0);
-    app.view_state.column_scroll_offset = 0;
-
-    // Apply saved view settings for this file
-    {
-        use crate::config::views;
-        let store = views::load_views();
-        let key = views::canonical_key(&path);
-        if let Some(fv) = store.files.get(&key) {
-            views::apply_file_view(&path, fv, &mut app.session, &mut app.view_state);
-        }
-    }
-
-    app.status_message = Some(StatusMessage::from(format!(
-        "Loaded: {}",
-        path.file_name().and_then(|n| n.to_str()).unwrap_or("file")
-    )));
-
+    // File not loaded yet — exit file list mode and defer the load to the main
+    // loop so it can render a "Loading…" screen (the handler has no terminal).
     cancel(app);
-    Ok(InputResult::Continue)
+    Ok(InputResult::OpenFile(path))
 }

@@ -31,7 +31,7 @@ fn column_colors(theme: &Theme) -> [Color; 8] {
 }
 
 /// Render the file manager modal
-pub fn render(frame: &mut Frame, app: &App) {
+pub fn render(frame: &mut Frame, app: &mut App) {
     let area = super::modal::large_modal_rect(frame.area());
 
     // Clear background
@@ -47,7 +47,7 @@ pub fn render(frame: &mut Frame, app: &App) {
 }
 
 /// Render the file list with 3-column layout
-fn render_file_list(frame: &mut Frame, app: &App, area: Rect) {
+fn render_file_list(frame: &mut Frame, app: &mut App, area: Rect) {
     use crate::input::file_list_mode::{scan_directory_filtered, BrowserEntry};
 
     // Split area into: header (1 line) + content + status bar (1 line)
@@ -121,6 +121,10 @@ fn render_file_list(frame: &mut Frame, app: &App, area: Rect) {
         })
         .collect();
 
+    // Stash column areas so mouse clicks can be mapped back to list indices.
+    app.view_state.mouse_layout.file_list_parent_area = parent_area;
+    app.view_state.mouse_layout.file_list_area = current_area;
+
     // Render left column - parent directory
     render_parent_column(frame, app, parent_area);
 
@@ -166,7 +170,7 @@ fn render_breadcrumb_header(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 /// Render the left column showing parent directory contents
-fn render_parent_column(frame: &mut Frame, app: &App, area: Rect) {
+fn render_parent_column(frame: &mut Frame, app: &mut App, area: Rect) {
     use crate::input::file_list_mode::{scan_directory_filtered, BrowserEntry};
 
     // Get parent directory
@@ -253,12 +257,13 @@ fn render_parent_column(frame: &mut Frame, app: &App, area: Rect) {
     let list = List::new(items);
     let mut state = ListState::default().with_selected(current_idx);
     frame.render_stateful_widget(list, area, &mut state);
+    app.view_state.mouse_layout.file_list_parent_offset = state.offset();
 }
 
 /// Render the middle column showing current directory contents
 fn render_current_column(
     frame: &mut Frame,
-    app: &App,
+    app: &mut App,
     filtered_entries: &[&crate::input::file_list_mode::BrowserEntry],
     area: Rect,
 ) {
@@ -363,6 +368,7 @@ fn render_current_column(
             .scroll_padding(5);
         let mut state = ListState::default().with_selected(Some(selected_idx));
         frame.render_stateful_widget(list, area, &mut state);
+        app.view_state.mouse_layout.file_list_offset = state.offset();
     }
 }
 

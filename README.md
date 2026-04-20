@@ -22,25 +22,25 @@ Download the latest release for your platform from [GitHub Releases](https://git
 
 **macOS (Apple Silicon)**
 ```bash
-curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.22.1-aarch64-apple-darwin.tar.gz | tar xz
+curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.23.0-aarch64-apple-darwin.tar.gz | tar xz
 sudo mv lazycsv /usr/local/bin/
 ```
 
 **macOS (Intel)**
 ```bash
-curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.22.1-x86_64-apple-darwin.tar.gz | tar xz
+curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.23.0-x86_64-apple-darwin.tar.gz | tar xz
 sudo mv lazycsv /usr/local/bin/
 ```
 
 **Linux (x86_64)**
 ```bash
-curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.22.1-x86_64-unknown-linux-gnu.tar.gz | tar xz
+curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.23.0-x86_64-unknown-linux-gnu.tar.gz | tar xz
 sudo mv lazycsv /usr/local/bin/
 ```
 
 **Windows**
 
-Download `lazycsv-v0.22.1-x86_64-pc-windows-msvc.zip` from the [releases page](https://github.com/funkybooboo/lazycsv/releases/latest), extract, and add to your PATH.
+Download `lazycsv-v0.23.0-x86_64-pc-windows-msvc.zip` from the [releases page](https://github.com/funkybooboo/lazycsv/releases/latest), extract, and add to your PATH.
 
 ### Build from source
 
@@ -181,7 +181,7 @@ LazyCSV treats CSV files in the same directory like Excel sheets. Open one file,
 
 ## Current Status
 
-**v0.22.1 Complete** (April 2026) - Performance benchmarking suite (criterion benches for navigation, rendering, search, magnifier, SQL). Performance work itself was delivered incrementally across earlier versions: mmap lazy loading, DuckDB migration, parallelized search/substitute, buffered I/O, and parallel sort.
+**v0.23.0 Complete** (April 2026) - Performance benchmarking suite (criterion benches for navigation, rendering, search, magnifier, SQL). Performance work itself was delivered incrementally across earlier versions: mmap lazy loading, DuckDB migration, parallelized search/substitute, buffered I/O, and parallel sort.
 
 **Completed Features:**
 - Fast CSV viewer/editor with vim navigation
@@ -228,7 +228,7 @@ cargo test
 
 See [docs/development.md](docs/development.md) for contributing guidelines.
 
-## What's New in v0.22.1
+## What's New in v0.23.0
 
 **Performance Benchmarking & Tuning (April 2026):**
 - **Benchmark suite:** Criterion benches for navigation, rendering, search, magnifier, and SQL paths under `benches/` — guards against regressions on the critical paths.

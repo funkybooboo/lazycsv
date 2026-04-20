@@ -150,17 +150,22 @@ pub fn files_referenced_by_query<'a>(query: &str, files: &'a [PathBuf]) -> Vec<&
     // Extract all identifiers from the query: bare words and "quoted identifiers"
     let identifiers = extract_sql_identifiers(&query_lower);
 
+    let mut seen = std::collections::HashSet::new();
     let mut matched: Vec<&PathBuf> = files
         .iter()
         .filter(|path| {
             let table = table_name_from_path(path).to_lowercase();
-            identifiers.contains(&table)
+            identifiers.contains(&table) && seen.insert(table)
         })
         .collect();
 
     // Fallback: if nothing matched, load everything so the query can still run
     if matched.is_empty() {
-        matched = files.iter().collect();
+        seen.clear();
+        matched = files
+            .iter()
+            .filter(|path| seen.insert(table_name_from_path(path).to_lowercase()))
+            .collect();
     }
 
     matched
@@ -1229,6 +1234,52 @@ mod tests {
     fn test_table_name_preserves_underscores() {
         let path = PathBuf::from("my_data_file.csv");
         assert_eq!(table_name_from_path(&path), "my_data_file");
+    }
+
+    #[test]
+    fn test_files_referenced_dedups_same_table_name() {
+        // Session ends up with two paths that normalize to the same table name
+        // (e.g. relative "result.csv" from a query output plus the absolute path
+        // after the user opens it from the file browser). DuckDB can only hold
+        // one table per name — loading both is pure waste.
+        let files = vec![
+            PathBuf::from("result.csv"),
+            PathBuf::from("/some/abs/path/result.csv"),
+        ];
+        let referenced = files_referenced_by_query("SELECT * FROM result", &files);
+        assert_eq!(referenced.len(), 1);
+        assert_eq!(referenced[0], &PathBuf::from("result.csv"));
+    }
+
+    #[test]
+    fn test_files_referenced_dedups_different_dirs_same_stem() {
+        let files = vec![
+            PathBuf::from("/a/weather250M.csv"),
+            PathBuf::from("/b/weather250M.csv"),
+        ];
+        let referenced = files_referenced_by_query("SELECT * FROM weather250M LIMIT 10", &files);
+        assert_eq!(referenced.len(), 1);
+    }
+
+    #[test]
+    fn test_files_referenced_fallback_also_dedups() {
+        // When the query doesn't reference any table name, the function falls
+        // back to loading everything. That path also needs to dedup.
+        let files = vec![
+            PathBuf::from("result.csv"),
+            PathBuf::from("/abs/result.csv"),
+        ];
+        let referenced = files_referenced_by_query("SELECT 1", &files);
+        assert_eq!(referenced.len(), 1);
+    }
+
+    #[test]
+    fn test_files_referenced_keeps_distinct_tables() {
+        // Sanity: dedup shouldn't collapse genuinely different tables.
+        let files = vec![PathBuf::from("users.csv"), PathBuf::from("orders.csv")];
+        let referenced =
+            files_referenced_by_query("SELECT * FROM users JOIN orders USING (id)", &files);
+        assert_eq!(referenced.len(), 2);
     }
 
     #[test]

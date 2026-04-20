@@ -6,7 +6,7 @@
 use crate::app::{
     DiagnosticSeverity, SqlCompletion, SqlDiagnostic, SqlHistoryPopup, COMPLETION_MAX_VISIBLE,
 };
-use crate::vim_editor::{VimEditor, VimMode};
+use crate::vim_editor::{Selection, VimEditor, VimMode};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -323,58 +323,82 @@ fn build_status_line<'a>(
     }
 }
 
-/// Build display lines from vim editor with line numbers and cursor highlighting
+/// Build display lines from vim editor with line numbers, cursor, and visual-selection highlighting.
 fn build_vim_editor_lines(vim_editor: &VimEditor) -> Vec<Line<'static>> {
-    let (cursor_line, cursor_col) = vim_editor.cursor();
     let line_count = vim_editor.line_count();
     let line_num_width = format!("{}", line_count).len();
+    (0..line_count)
+        .map(|i| build_source_line(vim_editor, i, line_num_width))
+        .collect()
+}
 
-    let mut display_lines = Vec::new();
+/// Build a single rendered source line: line number gutter + per-character spans
+/// that apply cursor style, visual-selection style, or plain style as appropriate.
+fn build_source_line(
+    vim_editor: &VimEditor,
+    line_idx: usize,
+    line_num_width: usize,
+) -> Line<'static> {
+    let (cursor_line, cursor_col) = vim_editor.cursor();
+    let selection = vim_editor.visual_selection();
+    let line_text = vim_editor.line(line_idx).unwrap_or("");
+    let chars: Vec<char> = line_text.chars().collect();
 
-    for (line_idx, line_text) in vim_editor.lines().iter().enumerate() {
-        let line_num = format!("{:>width$} ", line_idx + 1, width = line_num_width);
-        let line_num_span = Span::styled(
-            line_num,
-            Style::default().fg(super::modal::COLOR_LINE_NUMBER),
-        );
+    let line_num = format!("{:>width$} ", line_idx + 1, width = line_num_width);
+    let line_num_span = Span::styled(
+        line_num,
+        Style::default().fg(super::modal::COLOR_LINE_NUMBER),
+    );
+    let mut spans = vec![line_num_span];
 
-        if line_idx == cursor_line {
-            // This line contains the cursor - highlight cursor position
-            let chars: Vec<char> = line_text.chars().collect();
-            let mut spans = vec![line_num_span];
+    // If cursor is past line end, we still need to render a trailing cursor cell.
+    let render_len = if line_idx == cursor_line {
+        chars.len().max(cursor_col + 1)
+    } else {
+        chars.len()
+    };
 
-            // Text before cursor
-            if cursor_col > 0 {
-                let before: String = chars[..cursor_col.min(chars.len())].iter().collect();
-                spans.push(Span::raw(before));
-            }
-
-            // Cursor character (inverted) - use centralized cursor style
-            if cursor_col < chars.len() {
-                let cursor_char = chars[cursor_col].to_string();
-                spans.push(Span::styled(cursor_char, super::modal::cursor_style()));
-            } else {
-                // Cursor at end of line (show as space)
-                spans.push(Span::styled(" ", super::modal::cursor_style()));
-            }
-
-            // Text after cursor
-            if cursor_col + 1 < chars.len() {
-                let after: String = chars[cursor_col + 1..].iter().collect();
-                spans.push(Span::raw(after));
-            }
-
-            display_lines.push(Line::from(spans));
+    for col in 0..render_len {
+        let ch: String = if col < chars.len() {
+            chars[col].to_string()
         } else {
-            // Regular line without cursor
-            display_lines.push(Line::from(vec![
-                line_num_span,
-                Span::raw(line_text.clone()),
-            ]));
+            " ".to_string()
+        };
+        let is_cursor = line_idx == cursor_line && col == cursor_col;
+        let is_selected = is_in_selection(selection, line_idx, col);
+        if is_cursor {
+            spans.push(Span::styled(ch, super::modal::cursor_style()));
+        } else if is_selected {
+            spans.push(Span::styled(ch, super::modal::visual_selection_style()));
+        } else {
+            spans.push(Span::raw(ch));
         }
     }
 
-    display_lines
+    Line::from(spans)
+}
+
+fn is_in_selection(sel: Option<Selection>, line: usize, col: usize) -> bool {
+    match sel {
+        None => false,
+        Some(Selection::CharWise { start, end }) => {
+            if line < start.0 || line > end.0 {
+                false
+            } else if start.0 == end.0 {
+                col >= start.1 && col <= end.1
+            } else if line == start.0 {
+                col >= start.1
+            } else if line == end.0 {
+                col <= end.1
+            } else {
+                true
+            }
+        }
+        Some(Selection::LineWise {
+            start_line,
+            end_line,
+        }) => line >= start_line && line <= end_line,
+    }
 }
 
 /// Build display lines with diagnostic squiggly underlines.
@@ -389,61 +413,15 @@ fn build_vim_editor_lines_with_diagnostics(
         return build_vim_editor_lines(vim_editor);
     }
 
-    let (cursor_line, cursor_col) = vim_editor.cursor();
     let line_count = vim_editor.line_count();
     let line_num_width = format!("{}", line_count).len();
 
     let mut display_lines = Vec::new();
-
     for (line_idx, line_text) in vim_editor.lines().iter().enumerate() {
-        let line_num = format!("{:>width$} ", line_idx + 1, width = line_num_width);
-        let line_num_span = Span::styled(line_num.clone(), Style::default().fg(Color::DarkGray));
+        display_lines.push(build_source_line(vim_editor, line_idx, line_num_width));
 
-        if line_idx == cursor_line {
-            let chars: Vec<char> = line_text.chars().collect();
-            let mut spans = vec![line_num_span];
-
-            if cursor_col > 0 {
-                let before: String = chars[..cursor_col.min(chars.len())].iter().collect();
-                spans.push(Span::raw(before));
-            }
-
-            if cursor_col < chars.len() {
-                let cursor_char = chars[cursor_col].to_string();
-                spans.push(Span::styled(
-                    cursor_char,
-                    Style::default()
-                        .fg(Color::Black)
-                        .bg(Color::White)
-                        .add_modifier(Modifier::BOLD),
-                ));
-            } else {
-                spans.push(Span::styled(
-                    " ",
-                    Style::default()
-                        .fg(Color::Black)
-                        .bg(Color::White)
-                        .add_modifier(Modifier::BOLD),
-                ));
-            }
-
-            if cursor_col + 1 < chars.len() {
-                let after: String = chars[cursor_col + 1..].iter().collect();
-                spans.push(Span::raw(after));
-            }
-
-            display_lines.push(Line::from(spans));
-        } else {
-            display_lines.push(Line::from(vec![
-                line_num_span,
-                Span::raw(line_text.clone()),
-            ]));
-        }
-
-        // Add squiggly underline line for diagnostics on this line
         let line_diags: Vec<&SqlDiagnostic> =
             diagnostics.iter().filter(|d| d.line == line_idx).collect();
-
         if !line_diags.is_empty() {
             let gutter = " ".repeat(line_num_width + 1);
             let squiggles = build_squiggle_line(&line_diags, line_text.len());

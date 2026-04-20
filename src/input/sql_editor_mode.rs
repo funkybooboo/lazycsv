@@ -370,10 +370,13 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                         template_steps: vec![],
                     }]
                 } else {
+                    let mut seen = std::collections::HashSet::new();
                     files
                         .iter()
-                        .map(|p| CompletionItem {
-                            text: crate::query::table_name_from_path(p),
+                        .map(|p| crate::query::table_name_from_path(p))
+                        .filter(|name| seen.insert(name.clone()))
+                        .map(|text| CompletionItem {
+                            text,
                             kind: CompletionKind::Table,
                             template: None,
                             template_steps: vec![],
@@ -630,10 +633,13 @@ fn execute_template_steps(app: &mut App) {
                     }]
                 } else {
                     let files = app.session.files().to_vec();
+                    let mut seen = std::collections::HashSet::new();
                     files
                         .iter()
-                        .map(|p| CompletionItem {
-                            text: crate::query::table_name_from_path(p),
+                        .map(|p| crate::query::table_name_from_path(p))
+                        .filter(|name| seen.insert(name.clone()))
+                        .map(|text| CompletionItem {
+                            text,
                             kind: CompletionKind::Table,
                             template: None,
                             template_steps: vec![],

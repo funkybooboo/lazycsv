@@ -10,7 +10,8 @@ impl App {
     pub fn resolve_files(
         cli_args: &crate::cli::CliArgs,
     ) -> Result<(PathBuf, Vec<PathBuf>, usize, crate::session::FileConfig)> {
-        let path = cli_args.file_path().unwrap_or_else(|| PathBuf::from("."));
+        let explicit_path = cli_args.file_path();
+        let path = explicit_path.clone().unwrap_or_else(|| PathBuf::from("."));
 
         // Determine the CSV file to load and scan directory for others
         let (file_path, csv_files, current_file_index) = if path.is_file() {
@@ -24,6 +25,12 @@ impl App {
         } else if path.is_dir() {
             let csv_files = crate::file_system::scan_directory(&path)?;
             if csv_files.is_empty() {
+                if explicit_path.is_none() {
+                    anyhow::bail!(
+                        "No file provided and no CSV files found in directory: {}",
+                        path.display()
+                    );
+                }
                 anyhow::bail!("{}", messages::no_csv_files_found(&path));
             }
             let file_path = csv_files[0].clone();
