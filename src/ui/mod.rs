@@ -103,6 +103,9 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     // Render file manager modal if active
     if app.mode == crate::app::Mode::FileList {
         file_manager::render(frame, app);
+        if app.input_state.file_list_shell_active {
+            render_shell_prompt(frame, app);
+        }
     }
 
     // Render file operation prompt if active
@@ -126,6 +129,48 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     if let Some(ref menu) = app.context_menu {
         render_context_menu(frame, menu, &app.config.theme);
     }
+
+    // Render the shell-command stderr popup last so it sits above everything.
+    if let Some(ref popup) = app.shell_error_popup {
+        render_shell_error_popup(frame, app, popup);
+    }
+}
+
+/// Render the scrollable popup that surfaces multi-line shell-command stderr.
+fn render_shell_error_popup(
+    frame: &mut ratatui::Frame,
+    app: &crate::app::App,
+    popup: &crate::app::ShellErrorPopup,
+) {
+    use ratatui::{
+        layout::{Constraint, Direction, Layout},
+        text::Line,
+        widgets::{Clear, Paragraph},
+    };
+
+    let area = modal::large_modal_rect(frame.area());
+    frame.render_widget(Clear, area);
+
+    let block = modal::popup_block(&app.config.theme, &popup.title);
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    // Split into content + status bar (1 line at the bottom).
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(0), Constraint::Length(1)])
+        .split(inner);
+
+    let lines: Vec<Line> = popup.body.lines().map(Line::from).collect();
+    let body = Paragraph::new(lines)
+        .scroll((popup.scroll, 0))
+        .style(modal::popup_text_style(&app.config.theme));
+    frame.render_widget(body, chunks[0]);
+
+    let hint = Paragraph::new("j/k: scroll  |  Esc: close").style(
+        modal::popup_text_style(&app.config.theme).add_modifier(ratatui::style::Modifier::DIM),
+    );
+    frame.render_widget(hint, chunks[1]);
 }
 
 /// Render file operation prompt overlay
@@ -171,6 +216,57 @@ fn render_file_operation_prompt(frame: &mut ratatui::Frame, app: &crate::app::Ap
 
     let paragraph = Paragraph::new(text).style(modal::popup_text_style(&app.config.theme));
     frame.render_widget(paragraph, inner);
+}
+
+/// Render the file-menu shell-command prompt ("Shell (block):").
+fn render_shell_prompt(frame: &mut ratatui::Frame, app: &crate::app::App) {
+    use ratatui::{
+        layout::{Constraint, Direction, Layout, Rect},
+        text::{Line, Span},
+        widgets::{Clear, Paragraph},
+    };
+
+    // 45% wide × 3 lines (border + 1 input row + border), centered.
+    let frame_area = frame.area();
+    let popup_width = (frame_area.width as u32 * 45 / 100).max(40) as u16;
+    let popup_width = popup_width.min(frame_area.width.saturating_sub(2));
+    let popup_height: u16 = 3;
+    let x = frame_area.x + frame_area.width.saturating_sub(popup_width) / 2;
+    let y = frame_area.y + frame_area.height.saturating_sub(popup_height) / 2;
+    let area = Rect::new(x, y, popup_width, popup_height);
+
+    frame.render_widget(Clear, area);
+    let block = modal::popup_block(&app.config.theme, "Shell (block):");
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let buffer = &app.input_state.shell_buffer;
+    let cursor = app.input_state.shell_cursor;
+    let style = modal::popup_text_style(&app.config.theme);
+    let cursor_style = modal::cursor_style(&app.config.theme);
+
+    // Render text with an inline cursor block at the cursor position.
+    let mut spans: Vec<Span> = Vec::new();
+    let mut chars = buffer.chars();
+    for _ in 0..cursor {
+        if let Some(c) = chars.next() {
+            spans.push(Span::styled(c.to_string(), style));
+        }
+    }
+    match chars.next() {
+        Some(c) => spans.push(Span::styled(c.to_string(), cursor_style)),
+        None => spans.push(Span::styled(" ", cursor_style)),
+    }
+    for c in chars {
+        spans.push(Span::styled(c.to_string(), style));
+    }
+
+    // Single-row layout inside the bordered block.
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1)])
+        .split(inner);
+    frame.render_widget(Paragraph::new(Line::from(spans)).style(style), rows[0]);
 }
 
 /// Render formula completion popup anchored near the selected cell

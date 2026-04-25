@@ -13,12 +13,14 @@
 #![allow(dead_code)]
 
 mod command_history;
+mod shell_history;
 mod sql_history;
 mod toml_parsing;
 pub mod views;
 mod watcher;
 
 pub use command_history::{command_history_path, load_command_history, save_command_history};
+pub use shell_history::{load_shell_history, save_shell_history, shell_history_path};
 pub use sql_history::{load_sql_history, save_sql_history, sql_history_path};
 #[cfg(test)]
 use std::path::Path;
@@ -49,6 +51,8 @@ pub struct Defaults {
     pub show_footer: bool,
     /// Maximum number of `:` commands kept in history (0 = disabled).
     pub command_history_limit: usize,
+    /// Maximum number of file-menu shell commands kept in history (0 = disabled).
+    pub shell_history_limit: usize,
 }
 
 /// Theme/color configuration, organized by UI surface.
@@ -153,6 +157,7 @@ impl Default for Defaults {
             undo_limit: 1000,
             show_footer: false,
             command_history_limit: 50,
+            shell_history_limit: 50,
         }
     }
 }

@@ -153,6 +153,17 @@ impl App {
         self.command_history.truncate(limit);
     }
 
+    /// Add a file-menu shell command to history (dedup-and-promote, capped).
+    pub fn push_shell_history(&mut self, cmd: String) {
+        let limit = self.config.defaults.shell_history_limit;
+        if limit == 0 || cmd.trim().is_empty() {
+            return;
+        }
+        self.shell_history.retain(|c| c != &cmd);
+        self.shell_history.insert(0, cmd);
+        self.shell_history.truncate(limit);
+    }
+
     /// Check if the current file has been modified externally.
     /// Sets `external_modification_pending` and a status message if so.
     /// Returns true if a modification was detected (triggers redraw).

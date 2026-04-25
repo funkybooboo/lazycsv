@@ -24,6 +24,14 @@ pub enum InputResult {
     ExecuteQuery { query: String },
     /// Open a file from disk (deferred to main loop so a loading screen can be shown).
     OpenFile(PathBuf),
+    /// Run a shell command (deferred to main loop so the TUI can be suspended
+    /// for the duration of the command). Used by the file-menu `:` prompt.
+    RunShell {
+        /// Already-substituted command string to pass to `$SHELL -c`.
+        command: String,
+        /// Working directory to run the command in.
+        cwd: PathBuf,
+    },
 }
 
 /// High-level user actions that can be performed

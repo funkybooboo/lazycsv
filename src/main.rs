@@ -395,6 +395,7 @@ fn run_main() -> Result<()> {
         Ok(mut app) => {
             app.sql_history = lazycsv::config::load_sql_history();
             app.command_history = lazycsv::config::load_command_history();
+            app.shell_history = lazycsv::config::load_shell_history();
             app
         }
         Err(e) => {
@@ -436,6 +437,11 @@ fn run_main() -> Result<()> {
     lazycsv::config::save_command_history(
         &app.command_history,
         app.config.defaults.command_history_limit,
+    );
+    // Persist file-menu shell history before exit
+    lazycsv::config::save_shell_history(
+        &app.shell_history,
+        app.config.defaults.shell_history_limit,
     );
 
     // Always restore terminal
@@ -562,9 +568,130 @@ fn handle_input_result(terminal: &mut Term, app: &mut App, result: InputResult) 
         } => handle_sort_document(terminal, app, col_indices, ascending, description)?,
         InputResult::ExecuteQuery { query } => handle_execute_query(terminal, app, query)?,
         InputResult::OpenFile(path) => handle_open_file(terminal, app, path)?,
+        InputResult::RunShell { command, cwd } => handle_run_shell(terminal, app, command, cwd)?,
         InputResult::Continue => {}
     }
     Ok(())
+}
+
+/// Suspend the TUI, run a shell command via `$SHELL -c` in `cwd`, then
+/// re-init. Stdout is discarded; stderr is captured (≤ 64 KiB). Outcome is
+/// surfaced via `app.status_message` for the file-menu status bar.
+fn handle_run_shell(
+    terminal: &mut Term,
+    app: &mut App,
+    command: String,
+    cwd: std::path::PathBuf,
+) -> Result<()> {
+    use lazycsv::input::StatusMessage;
+    use std::process::{Command, Stdio};
+
+    // Truncate captured stderr to keep memory bounded.
+    const STDERR_CAP: usize = 64 * 1024;
+
+    // Suspend the TUI so the command sees a normal terminal (and its own
+    // output, if it produces any, doesn't corrupt the alternate screen).
+    ratatui::restore();
+
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
+    let output = Command::new(&shell)
+        .arg("-c")
+        .arg(&command)
+        .current_dir(&cwd)
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .output();
+
+    // Re-enter the alternate screen + raw mode so we can render again.
+    *terminal = ratatui::init();
+    // Aggressively clear: ratatui's frame buffer + the terminal's screen
+    // buffer + reset cursor. Without this, some terminals leak the previous
+    // frame's content (stale rows, ghost glyphs) until the next nudge.
+    use crossterm::{cursor, execute, terminal::Clear, terminal::ClearType};
+    let _ = execute!(
+        std::io::stdout(),
+        Clear(ClearType::All),
+        cursor::MoveTo(0, 0)
+    );
+    let _ = terminal.clear();
+    let _ = terminal.autoresize();
+
+    match output {
+        Ok(out) => {
+            let mut stderr = String::from_utf8_lossy(&out.stderr).into_owned();
+            if stderr.len() > STDERR_CAP {
+                stderr.truncate(STDERR_CAP);
+                stderr.push_str("\n…(truncated)");
+            }
+            let stderr_first_line = stderr
+                .lines()
+                .find(|l| !l.trim().is_empty())
+                .unwrap_or("")
+                .to_string();
+            let stderr_is_multiline = stderr.lines().filter(|l| !l.trim().is_empty()).count() > 1;
+            if out.status.success() {
+                if !stderr_first_line.is_empty() {
+                    app.status_message =
+                        Some(StatusMessage::from(format!("Shell: {}", stderr_first_line)));
+                    if stderr_is_multiline {
+                        app.shell_error_popup = Some(lazycsv::app::ShellErrorPopup {
+                            title: format!(" Shell output: {} ", truncate_for_title(&command, 40)),
+                            body: stderr,
+                            scroll: 0,
+                        });
+                    }
+                }
+                // Success — file listing auto-refreshes on next render via
+                // scan_directory_filtered (no explicit invalidation needed).
+            } else {
+                let code = out
+                    .status
+                    .code()
+                    .map(|c| c.to_string())
+                    .unwrap_or_else(|| "?".into());
+                let detail = if stderr_first_line.is_empty() {
+                    String::new()
+                } else {
+                    format!(": {}", stderr_first_line)
+                };
+                app.status_message = Some(StatusMessage::from(format!(
+                    "Shell error (exit {}){}",
+                    code, detail
+                )));
+                if stderr_is_multiline {
+                    app.shell_error_popup = Some(lazycsv::app::ShellErrorPopup {
+                        title: format!(
+                            " Shell error (exit {}): {} ",
+                            code,
+                            truncate_for_title(&command, 40)
+                        ),
+                        body: stderr,
+                        scroll: 0,
+                    });
+                }
+            }
+        }
+        Err(e) => {
+            app.status_message = Some(StatusMessage::from(format!(
+                "Shell error: failed to spawn {}: {}",
+                shell, e
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+/// Trim a command string to a fixed display width with an ellipsis.
+fn truncate_for_title(s: &str, max: usize) -> String {
+    let chars: Vec<char> = s.chars().collect();
+    if chars.len() <= max {
+        s.to_string()
+    } else {
+        let kept: String = chars.iter().take(max.saturating_sub(1)).collect();
+        format!("{}…", kept)
+    }
 }
 
 /// Handle file reload with cancellation support

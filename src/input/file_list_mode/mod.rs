@@ -4,6 +4,7 @@
 
 mod browser;
 mod operations;
+mod shell;
 
 use crate::app::{App, Mode};
 use crate::config::views;
@@ -15,7 +16,10 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// Handle keyboard input in file list mode
 pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
-    // Handle search mode separately
+    // Shell-prompt mode and search mode each handle their own keys.
+    if app.input_state.file_list_shell_active {
+        return handle_shell_mode(app, key);
+    }
     if app.input_state.file_list_search_active {
         return handle_search_mode(app, key);
     }
@@ -35,6 +39,13 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         (KeyCode::Char('/'), KeyModifiers::NONE) => {
             app.input_state.file_list_search_active = true;
             app.input_state.clear_file_filter();
+            Ok(InputResult::Continue)
+        }
+
+        // Enter shell-command prompt
+        (KeyCode::Char(':'), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
+            app.input_state.clear_shell_prompt();
+            app.input_state.file_list_shell_active = true;
             Ok(InputResult::Continue)
         }
 
@@ -113,6 +124,117 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     }
 }
 
+/// Handle keyboard input when the shell-command prompt is active.
+fn handle_shell_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
+    use crossterm::event::KeyCode;
+
+    match (key.code, key.modifiers) {
+        // Cancel
+        (KeyCode::Esc, _) => {
+            app.input_state.clear_shell_prompt();
+            app.shell_history_index = None;
+            app.shell_history_pending = None;
+            Ok(InputResult::Continue)
+        }
+        // Submit
+        (KeyCode::Enter, _) => {
+            let raw = std::mem::take(&mut app.input_state.shell_buffer);
+            app.input_state.clear_shell_prompt();
+            app.shell_history_index = None;
+            app.shell_history_pending = None;
+            if raw.trim().is_empty() {
+                return Ok(InputResult::Continue);
+            }
+            // Record the command (raw, before substitution) for history.
+            app.push_shell_history(raw.clone());
+            let cmd = shell::substitute(&raw, app);
+            let cwd = app.view_state.current_directory.clone();
+            // Clear any prior status message so the post-run outcome is what
+            // the user sees on return.
+            app.status_message = None;
+            Ok(InputResult::RunShell { command: cmd, cwd })
+        }
+        // History navigation
+        (KeyCode::Up, _) => {
+            shell_history_prev(app);
+            Ok(InputResult::Continue)
+        }
+        (KeyCode::Down, _) => {
+            shell_history_next(app);
+            Ok(InputResult::Continue)
+        }
+        (KeyCode::Backspace, _) => {
+            app.input_state.shell_backspace();
+            invalidate_shell_history_nav(app);
+            Ok(InputResult::Continue)
+        }
+        (KeyCode::Left, _) => {
+            app.input_state.shell_cursor_left();
+            Ok(InputResult::Continue)
+        }
+        (KeyCode::Right, _) => {
+            app.input_state.shell_cursor_right();
+            Ok(InputResult::Continue)
+        }
+        (KeyCode::Home, _) => {
+            app.input_state.shell_cursor_home();
+            Ok(InputResult::Continue)
+        }
+        (KeyCode::End, _) => {
+            app.input_state.shell_cursor_end();
+            Ok(InputResult::Continue)
+        }
+        (KeyCode::Char(c), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
+            app.input_state.shell_insert_char(c);
+            invalidate_shell_history_nav(app);
+            Ok(InputResult::Continue)
+        }
+        _ => Ok(InputResult::Continue),
+    }
+}
+
+/// Walk one step back into shell history (older entry).
+fn shell_history_prev(app: &mut App) {
+    if app.shell_history.is_empty() {
+        return;
+    }
+    let next = match app.shell_history_index {
+        None => 0,
+        Some(i) if i + 1 < app.shell_history.len() => i + 1,
+        Some(i) => i, // already at oldest
+    };
+    if app.shell_history_index.is_none() {
+        // Stash whatever the user was typing so Down can restore it.
+        app.shell_history_pending = Some(app.input_state.shell_buffer.clone());
+    }
+    app.shell_history_index = Some(next);
+    app.input_state.shell_buffer = app.shell_history[next].clone();
+    app.input_state.shell_cursor = app.input_state.shell_buffer.chars().count();
+}
+
+/// Walk one step forward in shell history (newer entry, or restore pending).
+fn shell_history_next(app: &mut App) {
+    let Some(idx) = app.shell_history_index else {
+        return;
+    };
+    if idx > 0 {
+        let new_idx = idx - 1;
+        app.shell_history_index = Some(new_idx);
+        app.input_state.shell_buffer = app.shell_history[new_idx].clone();
+    } else {
+        // Past newest — restore the pre-navigation buffer.
+        app.shell_history_index = None;
+        app.input_state.shell_buffer = app.shell_history_pending.take().unwrap_or_default();
+    }
+    app.input_state.shell_cursor = app.input_state.shell_buffer.chars().count();
+}
+
+/// Typing or backspace breaks history navigation (vim-like).
+fn invalidate_shell_history_nav(app: &mut App) {
+    app.shell_history_index = None;
+    app.shell_history_pending = None;
+}
+
 /// Handle keyboard input when in search mode
 fn handle_search_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     match key.code {
@@ -171,6 +293,10 @@ fn cancel(app: &mut App) {
     app.status_message = None;
     app.input_state.clear_file_filter();
     app.input_state.file_list_search_active = false;
+    app.input_state.clear_shell_prompt();
+    app.shell_history_index = None;
+    app.shell_history_pending = None;
+    app.shell_error_popup = None;
     app.view_state.file_list_selected = 0;
 }
 

@@ -681,6 +681,35 @@ fn render_file_manager_status_bar(
 ) {
     use crate::input::file_list_mode::BrowserEntry;
 
+    // Surface any pending status message (e.g. shell-command output / errors)
+    // ahead of the default badges so the user sees it.
+    if let Some(ref msg) = app.status_message {
+        let text = msg.as_str();
+        let is_error = text.starts_with("Shell error") || text.starts_with("Error");
+        let bg = if is_error {
+            app.config.theme.status.error_fg
+        } else {
+            app.config.theme.file_menu.status_bg
+        };
+        let fg = if is_error {
+            Color::Black
+        } else {
+            app.config.theme.ui.fg
+        };
+        let mut chunk = format!(" {} ", text);
+        let visible_len = chunk.chars().count();
+        let pad = (area.width as usize).saturating_sub(visible_len);
+        chunk.push_str(&" ".repeat(pad));
+        let mut style = Style::default().bg(bg).fg(fg);
+        if is_error {
+            style = style.add_modifier(Modifier::BOLD);
+        }
+        let para =
+            Paragraph::new(Line::from(Span::styled(chunk, style))).style(Style::default().bg(bg));
+        frame.render_widget(para, area);
+        return;
+    }
+
     if app.input_state.file_list_search_active {
         // Show filter pattern when searching
         let search_line = Line::from(vec![

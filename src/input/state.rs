@@ -31,6 +31,15 @@ pub struct InputState {
 
     /// Whether file list is in search mode (/ pressed)
     pub file_list_search_active: bool,
+
+    /// Whether file list is in shell-command prompt mode (':' pressed)
+    pub file_list_shell_active: bool,
+
+    /// Buffer for the shell-command prompt
+    pub shell_buffer: String,
+
+    /// Cursor position within shell buffer (char index)
+    pub shell_cursor: usize,
 }
 
 impl InputState {
@@ -176,6 +185,71 @@ impl InputState {
     /// Pop a character from the file filter buffer
     pub fn pop_file_filter_char(&mut self) {
         self.file_filter_buffer.pop();
+    }
+
+    /// Reset the shell prompt to an empty inactive state.
+    pub fn clear_shell_prompt(&mut self) {
+        self.file_list_shell_active = false;
+        self.shell_buffer.clear();
+        self.shell_cursor = 0;
+    }
+
+    /// Insert a char at the shell cursor position.
+    pub fn shell_insert_char(&mut self, c: char) {
+        let byte_idx = self
+            .shell_buffer
+            .char_indices()
+            .nth(self.shell_cursor)
+            .map(|(i, _)| i)
+            .unwrap_or(self.shell_buffer.len());
+        self.shell_buffer.insert(byte_idx, c);
+        self.shell_cursor += 1;
+    }
+
+    /// Delete the char to the left of the shell cursor.
+    pub fn shell_backspace(&mut self) {
+        if self.shell_cursor == 0 {
+            return;
+        }
+        let new_cursor = self.shell_cursor - 1;
+        let start = self
+            .shell_buffer
+            .char_indices()
+            .nth(new_cursor)
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+        let end = self
+            .shell_buffer
+            .char_indices()
+            .nth(self.shell_cursor)
+            .map(|(i, _)| i)
+            .unwrap_or(self.shell_buffer.len());
+        self.shell_buffer.replace_range(start..end, "");
+        self.shell_cursor = new_cursor;
+    }
+
+    /// Move shell cursor left one char.
+    pub fn shell_cursor_left(&mut self) {
+        if self.shell_cursor > 0 {
+            self.shell_cursor -= 1;
+        }
+    }
+
+    /// Move shell cursor right one char.
+    pub fn shell_cursor_right(&mut self) {
+        if self.shell_cursor < self.shell_buffer.chars().count() {
+            self.shell_cursor += 1;
+        }
+    }
+
+    /// Jump shell cursor to start.
+    pub fn shell_cursor_home(&mut self) {
+        self.shell_cursor = 0;
+    }
+
+    /// Jump shell cursor to end.
+    pub fn shell_cursor_end(&mut self) {
+        self.shell_cursor = self.shell_buffer.chars().count();
     }
 }
 

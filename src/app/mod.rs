@@ -204,6 +204,73 @@ pub struct App {
 
     /// Snapshot of `command_buffer` before history navigation began (restored on Down past newest)
     pub command_history_pending: Option<String>,
+
+    /// Persistent file-menu shell-command history (most recent first)
+    pub shell_history: Vec<String>,
+
+    /// Cursor into `shell_history` while Up/Down is walking through it
+    pub shell_history_index: Option<usize>,
+
+    /// Snapshot of `shell_buffer` before history navigation began
+    pub shell_history_pending: Option<String>,
+
+    /// Captured stderr from the last shell command (for the scrollable popup)
+    pub shell_error_popup: Option<ShellErrorPopup>,
+}
+
+/// Scrollable popup state for multi-line shell-command stderr.
+#[derive(Debug, Clone)]
+pub struct ShellErrorPopup {
+    pub title: String,
+    pub body: String,
+    pub scroll: u16,
+}
+
+/// Key handler for the shell-stderr popup overlay. j/k scroll; anything else
+/// dismisses the popup and falls through to normal dispatch on the *next* key.
+fn handle_shell_error_popup_key(app: &mut App, key: KeyEvent) -> InputResult {
+    use crossterm::event::KeyCode;
+    let lines = match app.shell_error_popup.as_ref() {
+        Some(p) => p.body.lines().count() as u16,
+        None => return InputResult::Continue,
+    };
+    match key.code {
+        KeyCode::Char('j') | KeyCode::Down => {
+            if let Some(p) = app.shell_error_popup.as_mut() {
+                p.scroll = p.scroll.saturating_add(1).min(lines.saturating_sub(1));
+            }
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            if let Some(p) = app.shell_error_popup.as_mut() {
+                p.scroll = p.scroll.saturating_sub(1);
+            }
+        }
+        KeyCode::PageDown | KeyCode::Char('d') => {
+            if let Some(p) = app.shell_error_popup.as_mut() {
+                p.scroll = p.scroll.saturating_add(10).min(lines.saturating_sub(1));
+            }
+        }
+        KeyCode::PageUp | KeyCode::Char('u') => {
+            if let Some(p) = app.shell_error_popup.as_mut() {
+                p.scroll = p.scroll.saturating_sub(10);
+            }
+        }
+        KeyCode::Char('g') | KeyCode::Home => {
+            if let Some(p) = app.shell_error_popup.as_mut() {
+                p.scroll = 0;
+            }
+        }
+        KeyCode::Char('G') | KeyCode::End => {
+            if let Some(p) = app.shell_error_popup.as_mut() {
+                p.scroll = lines.saturating_sub(1);
+            }
+        }
+        _ => {
+            // Any other key dismisses.
+            app.shell_error_popup = None;
+        }
+    }
+    InputResult::Continue
 }
 
 impl App {
@@ -287,6 +354,10 @@ impl App {
             command_history: Vec::new(),
             command_history_index: None,
             command_history_pending: None,
+            shell_history: Vec::new(),
+            shell_history_index: None,
+            shell_history_pending: None,
+            shell_error_popup: None,
         };
         let xlsx_formulas = std::mem::take(&mut app.document.xlsx_formulas);
         for ((row, col), raw) in xlsx_formulas {
@@ -337,6 +408,10 @@ impl App {
 
     /// Handle keyboard input events
     pub fn handle_key(&mut self, key: KeyEvent) -> Result<InputResult> {
+        // Shell stderr popup intercepts all keys until dismissed.
+        if self.shell_error_popup.is_some() {
+            return Ok(handle_shell_error_popup_key(self, key));
+        }
         // Record raw input into the active macro register before dispatch.
         // The handlers themselves decide which keys start/stop recording — those
         // keys are filtered out here by checking that recording was already in
