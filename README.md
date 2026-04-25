@@ -22,25 +22,25 @@ Download the latest release for your platform from [GitHub Releases](https://git
 
 **macOS (Apple Silicon)**
 ```bash
-curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.23.0-aarch64-apple-darwin.tar.gz | tar xz
+curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.24.0-aarch64-apple-darwin.tar.gz | tar xz
 sudo mv lazycsv /usr/local/bin/
 ```
 
 **macOS (Intel)**
 ```bash
-curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.23.0-x86_64-apple-darwin.tar.gz | tar xz
+curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.24.0-x86_64-apple-darwin.tar.gz | tar xz
 sudo mv lazycsv /usr/local/bin/
 ```
 
 **Linux (x86_64)**
 ```bash
-curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.23.0-x86_64-unknown-linux-gnu.tar.gz | tar xz
+curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.24.0-x86_64-unknown-linux-gnu.tar.gz | tar xz
 sudo mv lazycsv /usr/local/bin/
 ```
 
 **Windows**
 
-Download `lazycsv-v0.23.0-x86_64-pc-windows-msvc.zip` from the [releases page](https://github.com/funkybooboo/lazycsv/releases/latest), extract, and add to your PATH.
+Download `lazycsv-v0.24.0-x86_64-pc-windows-msvc.zip` from the [releases page](https://github.com/funkybooboo/lazycsv/releases/latest), extract, and add to your PATH.
 
 ### Build from source
 
@@ -181,7 +181,7 @@ LazyCSV treats CSV files in the same directory like Excel sheets. Open one file,
 
 ## Current Status
 
-**v0.23.0 Complete** (April 2026) - Performance benchmarking suite (criterion benches for navigation, rendering, search, magnifier, SQL). Performance work itself was delivered incrementally across earlier versions: mmap lazy loading, DuckDB migration, parallelized search/substitute, buffered I/O, and parallel sort.
+**v0.24.0 Complete** (April 2026) - Full TUI theming. Nested theme schema (`[ui]`/`[table]`/`[popup]`/`[status]`/`[file_menu]`/`[sql]`) replacing the legacy flat `[theme]` block. 11 ready-to-use presets shipped under `themes/` (Gruvbox dark/light, Dracula, Nord, all Catppuccin flavors, Solarized dark/light, Tokyo Night). Hot-reload via the existing config watcher.
 
 **Completed Features:**
 - Fast CSV viewer/editor with vim navigation
@@ -200,7 +200,6 @@ LazyCSV treats CSV files in the same directory like Excel sheets. Open one file,
 - 700+ tests passing
 
 **Next Up:**
-- **v0.23.0** - Final Architecture Review
 - **v0.31.0** - Documentation & Maintainability
 - **v1.0.0** - Stable release
 
@@ -227,6 +226,14 @@ cargo test
 ```
 
 See [docs/development.md](docs/development.md) for contributing guidelines.
+
+## What's New in v0.24.0
+
+**TUI Theming (April 2026):**
+- **Nested theme schema:** `[ui]` / `[table]` / `[popup]` / `[status]` / `[file_menu]` / `[sql]` sections in `~/.config/lazycsv/config.toml` (or per-directory `.lazycsv.toml`). Hard break — the old flat `[theme]` block is gone; see [`docs/themes.md`](docs/themes.md) for the migration map.
+- **11 presets shipped under `themes/`:** Gruvbox dark/light, Dracula, Nord, Catppuccin Mocha/Macchiato/Frappé/Latte, Solarized dark/light, Tokyo Night. Each uses authentic upstream palette hex codes.
+- **Full coverage:** every popup (help, file menu, SQL completion/history, formula completion, file-op prompt, stats overlay, context menu, magnifier), the status bar, title bar, and table chrome are theme-aware. A base-canvas pass paints the entire frame with `[ui].bg` so transparent terminals are fully covered.
+- **Hot-reload:** save your config and changes apply instantly — the existing config watcher detects mtime changes and reloads.
 
 ## What's New in v0.23.0
 

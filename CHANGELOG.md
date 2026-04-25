@@ -2,6 +2,50 @@
 
 All notable changes to LazyCSV will be documented in this file.
 
+## [0.24.0] - 2026-04-24
+
+### Added - TUI Theming
+
+**Nested theme schema** replacing the legacy flat `[theme]` block. New sections in `~/.config/lazycsv/config.toml` (or per-directory `.lazycsv.toml`):
+- `[ui]` — global fg/bg/border (paints the entire frame so terminal transparency is fully covered)
+- `[table]` — header, zebra rows, cursor, selection, search match, dirty indicator
+- `[popup]` — bg/fg/border/title/completion-selected for all modal dialogs
+- `[status]` — fg/bg + mode/error/success badges
+- `[file_menu]` — directory/highlight/separator/status colors + 8-color preview palette
+- `[sql]` — line numbers + diagnostic-error/warning colors
+
+**11 ready-to-use theme presets** shipped under `themes/`:
+- Gruvbox Dark / Light
+- Dracula
+- Nord
+- Catppuccin Mocha / Macchiato / Frappé / Latte
+- Solarized Dark / Light
+- Tokyo Night
+
+**Full UI coverage:**
+- All popups (help, file menu, SQL completion + history, formula completion, file-op prompt, stats overlay, context menu, magnifier) now use the themed `popup_block(theme, …)` helper
+- Title bar, horizontal rule, status bar, and table chrome obey the configured palette
+- Base-canvas pass fills the whole frame with `[ui].bg` before widget rendering so transparent terminals are fully covered
+- Non-zebra rows fall back to `[ui].bg` (was `Style::default()`, which broke light themes)
+
+**Hot-reload:** the existing `ConfigWatcher` (since v0.9.0) picks up mtime changes; the status bar shows "Config reloaded".
+
+### BREAKING CHANGES
+- The flat `[theme]` block is gone. Existing user configs with the old keys (`cursor_bg`, `dirty_indicator_fg`, `file_menu_*`, etc.) are silently ignored — defaults are used instead. See `docs/themes.md` for a key-by-key migration map.
+
+### Changed
+- All hardcoded colors and `COLOR_*` constants removed from `src/ui/modal.rs`; every theme-aware helper now requires `&Theme`.
+- `parse_color` warnings now include section-qualified field names (e.g. `table.cursor_bg`) instead of the bare key.
+- `file_menu.preview_cols` is a single 8-element array (was 8 separate `file_menu_preview_col_N` keys).
+
+### Documentation
+- `docs/themes.md` — full schema reference + example palettes (Gruvbox, Solarized, Nord)
+- `docs/configuration.md` — section-layout updated
+- `themes/README.md` — install instructions + author credits
+
+### Fixed
+- `benches/sql.rs` repaired (pre-existing breakage): `load_csv_into_sqlite` → `load_csv_into_duckdb`, `rusqlite::Connection` → `duckdb::Connection`.
+
 ## [Unreleased] - Header Row Simplification
 
 ### BREAKING CHANGES
