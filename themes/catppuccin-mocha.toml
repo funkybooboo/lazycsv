@@ -1,0 +1,57 @@
+# Catppuccin Mocha — Catppuccin
+# https://catppuccin.com/
+#
+# Soothing pastel theme — Mocha is the darkest of the four flavors.
+
+[ui]
+fg        = "#cdd6f4"
+bg        = "#1e1e2e"
+border_fg = "#585b70"
+
+[table]
+header_fg       = "#cba6f7"
+header_bg       = "#181825"
+header_bold     = true
+zebra_bg        = "#313244"
+cursor_fg       = "#1e1e2e"
+cursor_bg       = "#f5c2e7"
+selection_fg    = "#cdd6f4"
+selection_bg    = "#45475a"
+search_match_fg = "#1e1e2e"
+search_match_bg = "#f9e2af"
+dirty_fg        = "#f38ba8"
+
+[popup]
+bg                = "#313244"
+fg                = "#cdd6f4"
+border_fg         = "#585b70"
+title_fg          = "#cba6f7"
+completion_sel_fg = "#1e1e2e"
+completion_sel_bg = "#89b4fa"
+
+[status]
+fg         = "#cdd6f4"
+bg         = "#181825"
+mode_fg    = "#1e1e2e"
+mode_bg    = "#a6e3a1"
+error_fg   = "#f38ba8"
+success_fg = "#a6e3a1"
+
+[file_menu]
+dir_fg              = "#89b4fa"
+highlight_fg        = "#cdd6f4"
+highlight_bg        = "#45475a"
+separator_fg        = "#585b70"
+status_bg           = "#181825"
+status_mode_bg      = "#89b4fa"
+status_accent_bg    = "#f5c2e7"
+active_indicator_fg = "#a6e3a1"
+preview_cols = [
+  "#89b4fa", "#a6e3a1", "#f9e2af", "#94e2d5",
+  "#cba6f7", "#f38ba8", "#fab387", "#89dceb",
+]
+
+[sql]
+line_number_fg        = "#6c7086"
+diagnostic_error_fg   = "#f38ba8"
+diagnostic_warning_fg = "#f9e2af"

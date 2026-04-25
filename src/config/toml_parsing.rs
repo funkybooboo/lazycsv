@@ -14,7 +14,15 @@ pub(super) struct TomlConfig {
     #[serde(default)]
     pub(super) defaults: TomlDefaults,
     #[serde(default)]
-    pub(super) theme: TomlTheme,
+    pub(super) ui: TomlUi,
+    #[serde(default)]
+    pub(super) table: TomlTable,
+    #[serde(default)]
+    pub(super) popup: TomlPopup,
+    #[serde(default)]
+    pub(super) status: TomlStatus,
+    #[serde(default)]
+    pub(super) file_menu: TomlFileMenu,
     #[serde(default)]
     pub(super) sql: TomlSql,
 }
@@ -31,40 +39,67 @@ pub(super) struct TomlDefaults {
 }
 
 #[derive(Deserialize, Default)]
-pub(super) struct TomlTheme {
-    zebra_bg: Option<String>,
-    cursor_bg: Option<String>,
-    cursor_fg: Option<String>,
-    selection_bg: Option<String>,
-    selection_fg: Option<String>,
-    search_match_bg: Option<String>,
-    search_match_fg: Option<String>,
-    header_bold: Option<bool>,
+pub(super) struct TomlUi {
+    fg: Option<String>,
+    bg: Option<String>,
+    border_fg: Option<String>,
+}
+
+#[derive(Deserialize, Default)]
+pub(super) struct TomlTable {
+    header_fg: Option<String>,
     header_bg: Option<String>,
-    dirty_indicator_fg: Option<String>,
-    // File menu colors
-    file_menu_dir_fg: Option<String>,
-    file_menu_highlight_bg: Option<String>,
-    file_menu_highlight_fg: Option<String>,
-    file_menu_separator_fg: Option<String>,
-    file_menu_status_bg: Option<String>,
-    file_menu_status_mode_bg: Option<String>,
-    file_menu_status_accent_bg: Option<String>,
-    file_menu_active_indicator_fg: Option<String>,
-    file_menu_preview_col_1: Option<String>,
-    file_menu_preview_col_2: Option<String>,
-    file_menu_preview_col_3: Option<String>,
-    file_menu_preview_col_4: Option<String>,
-    file_menu_preview_col_5: Option<String>,
-    file_menu_preview_col_6: Option<String>,
-    file_menu_preview_col_7: Option<String>,
-    file_menu_preview_col_8: Option<String>,
+    header_bold: Option<bool>,
+    zebra_bg: Option<String>,
+    cursor_fg: Option<String>,
+    cursor_bg: Option<String>,
+    selection_fg: Option<String>,
+    selection_bg: Option<String>,
+    search_match_fg: Option<String>,
+    search_match_bg: Option<String>,
+    dirty_fg: Option<String>,
+}
+
+#[derive(Deserialize, Default)]
+pub(super) struct TomlPopup {
+    bg: Option<String>,
+    fg: Option<String>,
+    border_fg: Option<String>,
+    title_fg: Option<String>,
+    completion_sel_fg: Option<String>,
+    completion_sel_bg: Option<String>,
+}
+
+#[derive(Deserialize, Default)]
+pub(super) struct TomlStatus {
+    fg: Option<String>,
+    bg: Option<String>,
+    mode_fg: Option<String>,
+    mode_bg: Option<String>,
+    error_fg: Option<String>,
+    success_fg: Option<String>,
+}
+
+#[derive(Deserialize, Default)]
+pub(super) struct TomlFileMenu {
+    dir_fg: Option<String>,
+    highlight_fg: Option<String>,
+    highlight_bg: Option<String>,
+    separator_fg: Option<String>,
+    status_bg: Option<String>,
+    status_mode_bg: Option<String>,
+    status_accent_bg: Option<String>,
+    active_indicator_fg: Option<String>,
+    preview_cols: Option<Vec<String>>,
 }
 
 #[derive(Deserialize, Default)]
 pub(super) struct TomlSql {
     format_uppercase: Option<bool>,
     sql_history_limit: Option<usize>,
+    line_number_fg: Option<String>,
+    diagnostic_error_fg: Option<String>,
+    diagnostic_warning_fg: Option<String>,
 }
 
 // ── Loading ────────────────────────────────────────────────────
@@ -272,146 +307,250 @@ pub(super) fn apply_toml(
 
     // Theme — helper to apply a color field with warning on bad value
     macro_rules! apply_color {
-        ($field:expr, $toml_field:expr, $name:expr) => {
+        ($field:expr, $toml_field:expr, $section:expr, $name:expr) => {
             if let Some(ref c) = $toml_field {
                 if let Some(color) = parse_color(c) {
                     $field = color;
                 } else {
-                    warnings.push(format!("{}: invalid color for {}: {:?}", file, $name, c));
+                    warnings.push(format!(
+                        "{}: invalid color for {}.{}: {:?}",
+                        file, $section, $name, c
+                    ));
                 }
             }
         };
     }
 
-    apply_color!(config.theme.zebra_bg, toml.theme.zebra_bg, "zebra_bg");
-    apply_color!(config.theme.cursor_bg, toml.theme.cursor_bg, "cursor_bg");
-    apply_color!(config.theme.cursor_fg, toml.theme.cursor_fg, "cursor_fg");
+    // [ui]
+    apply_color!(config.theme.ui.fg, toml.ui.fg, "ui", "fg");
+    apply_color!(config.theme.ui.bg, toml.ui.bg, "ui", "bg");
     apply_color!(
-        config.theme.selection_bg,
-        toml.theme.selection_bg,
-        "selection_bg"
+        config.theme.ui.border_fg,
+        toml.ui.border_fg,
+        "ui",
+        "border_fg"
+    );
+
+    // [table]
+    apply_color!(
+        config.theme.table.header_fg,
+        toml.table.header_fg,
+        "table",
+        "header_fg"
+    );
+    if let Some(ref c) = toml.table.header_bg {
+        if let Some(color) = parse_color(c) {
+            config.theme.table.header_bg = Some(color);
+        } else {
+            warnings.push(format!(
+                "{}: invalid color for table.header_bg: {:?}",
+                file, c
+            ));
+        }
+    }
+    if let Some(b) = toml.table.header_bold {
+        config.theme.table.header_bold = b;
+    }
+    apply_color!(
+        config.theme.table.zebra_bg,
+        toml.table.zebra_bg,
+        "table",
+        "zebra_bg"
     );
     apply_color!(
-        config.theme.selection_fg,
-        toml.theme.selection_fg,
+        config.theme.table.cursor_fg,
+        toml.table.cursor_fg,
+        "table",
+        "cursor_fg"
+    );
+    apply_color!(
+        config.theme.table.cursor_bg,
+        toml.table.cursor_bg,
+        "table",
+        "cursor_bg"
+    );
+    apply_color!(
+        config.theme.table.selection_fg,
+        toml.table.selection_fg,
+        "table",
         "selection_fg"
     );
     apply_color!(
-        config.theme.search_match_bg,
-        toml.theme.search_match_bg,
-        "search_match_bg"
+        config.theme.table.selection_bg,
+        toml.table.selection_bg,
+        "table",
+        "selection_bg"
     );
     apply_color!(
-        config.theme.search_match_fg,
-        toml.theme.search_match_fg,
+        config.theme.table.search_match_fg,
+        toml.table.search_match_fg,
+        "table",
         "search_match_fg"
     );
     apply_color!(
-        config.theme.dirty_indicator_fg,
-        toml.theme.dirty_indicator_fg,
-        "dirty_indicator_fg"
+        config.theme.table.search_match_bg,
+        toml.table.search_match_bg,
+        "table",
+        "search_match_bg"
+    );
+    apply_color!(
+        config.theme.table.dirty_fg,
+        toml.table.dirty_fg,
+        "table",
+        "dirty_fg"
     );
 
-    // File menu colors
+    // [popup]
+    apply_color!(config.theme.popup.bg, toml.popup.bg, "popup", "bg");
+    apply_color!(config.theme.popup.fg, toml.popup.fg, "popup", "fg");
     apply_color!(
-        config.theme.file_menu_dir_fg,
-        toml.theme.file_menu_dir_fg,
-        "file_menu_dir_fg"
+        config.theme.popup.border_fg,
+        toml.popup.border_fg,
+        "popup",
+        "border_fg"
     );
     apply_color!(
-        config.theme.file_menu_highlight_bg,
-        toml.theme.file_menu_highlight_bg,
-        "file_menu_highlight_bg"
+        config.theme.popup.title_fg,
+        toml.popup.title_fg,
+        "popup",
+        "title_fg"
     );
     apply_color!(
-        config.theme.file_menu_highlight_fg,
-        toml.theme.file_menu_highlight_fg,
-        "file_menu_highlight_fg"
+        config.theme.popup.completion_sel_fg,
+        toml.popup.completion_sel_fg,
+        "popup",
+        "completion_sel_fg"
     );
     apply_color!(
-        config.theme.file_menu_separator_fg,
-        toml.theme.file_menu_separator_fg,
-        "file_menu_separator_fg"
-    );
-    apply_color!(
-        config.theme.file_menu_status_bg,
-        toml.theme.file_menu_status_bg,
-        "file_menu_status_bg"
-    );
-    apply_color!(
-        config.theme.file_menu_status_mode_bg,
-        toml.theme.file_menu_status_mode_bg,
-        "file_menu_status_mode_bg"
-    );
-    apply_color!(
-        config.theme.file_menu_status_accent_bg,
-        toml.theme.file_menu_status_accent_bg,
-        "file_menu_status_accent_bg"
-    );
-    apply_color!(
-        config.theme.file_menu_active_indicator_fg,
-        toml.theme.file_menu_active_indicator_fg,
-        "file_menu_active_indicator_fg"
-    );
-    apply_color!(
-        config.theme.file_menu_preview_col_1,
-        toml.theme.file_menu_preview_col_1,
-        "file_menu_preview_col_1"
-    );
-    apply_color!(
-        config.theme.file_menu_preview_col_2,
-        toml.theme.file_menu_preview_col_2,
-        "file_menu_preview_col_2"
-    );
-    apply_color!(
-        config.theme.file_menu_preview_col_3,
-        toml.theme.file_menu_preview_col_3,
-        "file_menu_preview_col_3"
-    );
-    apply_color!(
-        config.theme.file_menu_preview_col_4,
-        toml.theme.file_menu_preview_col_4,
-        "file_menu_preview_col_4"
-    );
-    apply_color!(
-        config.theme.file_menu_preview_col_5,
-        toml.theme.file_menu_preview_col_5,
-        "file_menu_preview_col_5"
-    );
-    apply_color!(
-        config.theme.file_menu_preview_col_6,
-        toml.theme.file_menu_preview_col_6,
-        "file_menu_preview_col_6"
-    );
-    apply_color!(
-        config.theme.file_menu_preview_col_7,
-        toml.theme.file_menu_preview_col_7,
-        "file_menu_preview_col_7"
-    );
-    apply_color!(
-        config.theme.file_menu_preview_col_8,
-        toml.theme.file_menu_preview_col_8,
-        "file_menu_preview_col_8"
+        config.theme.popup.completion_sel_bg,
+        toml.popup.completion_sel_bg,
+        "popup",
+        "completion_sel_bg"
     );
 
-    if let Some(b) = toml.theme.header_bold {
-        config.theme.header_bold = b;
-    }
-    if let Some(ref c) = toml.theme.header_bg {
-        if let Some(color) = parse_color(c) {
-            config.theme.header_bg = Some(color);
+    // [status]
+    apply_color!(config.theme.status.fg, toml.status.fg, "status", "fg");
+    apply_color!(config.theme.status.bg, toml.status.bg, "status", "bg");
+    apply_color!(
+        config.theme.status.mode_fg,
+        toml.status.mode_fg,
+        "status",
+        "mode_fg"
+    );
+    apply_color!(
+        config.theme.status.mode_bg,
+        toml.status.mode_bg,
+        "status",
+        "mode_bg"
+    );
+    apply_color!(
+        config.theme.status.error_fg,
+        toml.status.error_fg,
+        "status",
+        "error_fg"
+    );
+    apply_color!(
+        config.theme.status.success_fg,
+        toml.status.success_fg,
+        "status",
+        "success_fg"
+    );
+
+    // [file_menu]
+    apply_color!(
+        config.theme.file_menu.dir_fg,
+        toml.file_menu.dir_fg,
+        "file_menu",
+        "dir_fg"
+    );
+    apply_color!(
+        config.theme.file_menu.highlight_fg,
+        toml.file_menu.highlight_fg,
+        "file_menu",
+        "highlight_fg"
+    );
+    apply_color!(
+        config.theme.file_menu.highlight_bg,
+        toml.file_menu.highlight_bg,
+        "file_menu",
+        "highlight_bg"
+    );
+    apply_color!(
+        config.theme.file_menu.separator_fg,
+        toml.file_menu.separator_fg,
+        "file_menu",
+        "separator_fg"
+    );
+    apply_color!(
+        config.theme.file_menu.status_bg,
+        toml.file_menu.status_bg,
+        "file_menu",
+        "status_bg"
+    );
+    apply_color!(
+        config.theme.file_menu.status_mode_bg,
+        toml.file_menu.status_mode_bg,
+        "file_menu",
+        "status_mode_bg"
+    );
+    apply_color!(
+        config.theme.file_menu.status_accent_bg,
+        toml.file_menu.status_accent_bg,
+        "file_menu",
+        "status_accent_bg"
+    );
+    apply_color!(
+        config.theme.file_menu.active_indicator_fg,
+        toml.file_menu.active_indicator_fg,
+        "file_menu",
+        "active_indicator_fg"
+    );
+    if let Some(ref cols) = toml.file_menu.preview_cols {
+        if cols.len() != 8 {
+            warnings.push(format!(
+                "{}: file_menu.preview_cols must have exactly 8 entries, got {}",
+                file,
+                cols.len()
+            ));
         } else {
-            warnings.push(format!("{}: invalid color for header_bg: {:?}", file, c));
+            for (i, c) in cols.iter().enumerate() {
+                if let Some(color) = parse_color(c) {
+                    config.theme.file_menu.preview_cols[i] = color;
+                } else {
+                    warnings.push(format!(
+                        "{}: invalid color for file_menu.preview_cols[{}]: {:?}",
+                        file, i, c
+                    ));
+                }
+            }
         }
     }
 
-    // SQL
+    // [sql]
     if let Some(u) = toml.sql.format_uppercase {
         config.sql.format_uppercase = u;
     }
     if let Some(limit) = toml.sql.sql_history_limit {
         config.sql.sql_history_limit = limit;
     }
+    apply_color!(
+        config.theme.sql.line_number_fg,
+        toml.sql.line_number_fg,
+        "sql",
+        "line_number_fg"
+    );
+    apply_color!(
+        config.theme.sql.diagnostic_error_fg,
+        toml.sql.diagnostic_error_fg,
+        "sql",
+        "diagnostic_error_fg"
+    );
+    apply_color!(
+        config.theme.sql.diagnostic_warning_fg,
+        toml.sql.diagnostic_warning_fg,
+        "sql",
+        "diagnostic_warning_fg"
+    );
 }
 
 /// Validate final merged config for logical consistency.

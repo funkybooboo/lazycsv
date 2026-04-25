@@ -1,0 +1,58 @@
+# Solarized Dark — Ethan Schoonover
+# https://ethanschoonover.com/solarized/
+#
+# Precision-engineered theme based on color theory — blue-green background
+# tuned for long-term visual comfort.
+
+[ui]
+fg        = "#839496"
+bg        = "#002b36"
+border_fg = "#586e75"
+
+[table]
+header_fg       = "#b58900"
+header_bg       = "#073642"
+header_bold     = true
+zebra_bg        = "#073642"
+cursor_fg       = "#fdf6e3"
+cursor_bg       = "#268bd2"
+selection_fg    = "#eee8d5"
+selection_bg    = "#586e75"
+search_match_fg = "#002b36"
+search_match_bg = "#b58900"
+dirty_fg        = "#dc322f"
+
+[popup]
+bg                = "#073642"
+fg                = "#eee8d5"
+border_fg         = "#586e75"
+title_fg          = "#b58900"
+completion_sel_fg = "#fdf6e3"
+completion_sel_bg = "#268bd2"
+
+[status]
+fg         = "#839496"
+bg         = "#073642"
+mode_fg    = "#fdf6e3"
+mode_bg    = "#268bd2"
+error_fg   = "#dc322f"
+success_fg = "#859900"
+
+[file_menu]
+dir_fg              = "#268bd2"
+highlight_fg        = "#fdf6e3"
+highlight_bg        = "#268bd2"
+separator_fg        = "#586e75"
+status_bg           = "#073642"
+status_mode_bg      = "#268bd2"
+status_accent_bg    = "#d33682"
+active_indicator_fg = "#859900"
+preview_cols = [
+  "#268bd2", "#859900", "#b58900", "#2aa198",
+  "#d33682", "#dc322f", "#cb4b16", "#6c71c4",
+]
+
+[sql]
+line_number_fg        = "#586e75"
+diagnostic_error_fg   = "#dc322f"
+diagnostic_warning_fg = "#b58900"

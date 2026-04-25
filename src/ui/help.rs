@@ -4,10 +4,11 @@
 //! navigation commands when triggered by '?'. Supports scrolling on small
 //! screens.
 
+use crate::config::Theme;
 use ratatui::{
-    style::{Color, Modifier, Style},
+    style::Modifier,
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Clear, Paragraph},
     Frame,
 };
 
@@ -258,7 +259,12 @@ fn build_help_text() -> Vec<Line<'static>> {
 /// * `frame` - The Ratatui frame to render into
 /// * `scroll_offset` - Vertical scroll offset for content
 /// * `search_query` - Optional search query to display
-pub fn render_help_overlay(frame: &mut Frame, scroll_offset: u16, search_query: Option<&str>) {
+pub fn render_help_overlay(
+    frame: &mut Frame,
+    scroll_offset: u16,
+    search_query: Option<&str>,
+    theme: &Theme,
+) {
     // Create centered area using standard large modal size
     let area = super::modal::large_modal_rect(frame.area());
 
@@ -271,7 +277,7 @@ pub fn render_help_overlay(frame: &mut Frame, scroll_offset: u16, search_query: 
         " Help ".to_string()
     };
 
-    let block = Block::default().borders(Borders::ALL).title(title);
+    let block = super::modal::popup_block(theme, &title);
     let inner = block.inner(area);
 
     // Clear background and render border
@@ -283,26 +289,25 @@ pub fn render_help_overlay(frame: &mut Frame, scroll_offset: u16, search_query: 
 
     // Render help content, highlighting search matches if active
     let display_text = if let Some(query) = search_query.filter(|q| !q.is_empty()) {
-        highlight_matches(help_text, query)
+        highlight_matches(help_text, query, theme)
     } else {
         help_text
     };
-    let paragraph = Paragraph::new(display_text).scroll((scroll_offset, 0));
+    let paragraph = Paragraph::new(display_text)
+        .scroll((scroll_offset, 0))
+        .style(super::modal::popup_text_style(theme));
     frame.render_widget(paragraph, content_area);
 
     // Render status bar with navigation hints
-    render_help_status_bar(frame, search_query, status_area);
+    render_help_status_bar(frame, search_query, status_area, theme);
 }
 
 /// Highlight search query matches within help text lines.
 /// Each line's spans are flattened to a string, then split around
 /// case-insensitive matches with the matched portions highlighted.
-fn highlight_matches<'a>(lines: Vec<Line<'a>>, query: &str) -> Vec<Line<'a>> {
+fn highlight_matches<'a>(lines: Vec<Line<'a>>, query: &str, theme: &Theme) -> Vec<Line<'a>> {
     let query_lower = query.to_lowercase();
-    let highlight_style = Style::default()
-        .fg(Color::Black)
-        .bg(Color::Yellow)
-        .add_modifier(Modifier::BOLD);
+    let highlight_style = super::modal::search_match_style(theme).add_modifier(Modifier::BOLD);
 
     lines
         .into_iter()
@@ -360,6 +365,7 @@ fn render_help_status_bar(
     frame: &mut Frame,
     search_query: Option<&str>,
     area: ratatui::layout::Rect,
+    theme: &Theme,
 ) {
     let status_text = if let Some(pattern) = search_query {
         // TODO: Add match tracking later (e.g., "match 5/12")
@@ -368,7 +374,10 @@ fn render_help_status_bar(
         "j/k: scroll | /: search | Esc: close".to_string()
     };
 
-    frame.render_widget(Paragraph::new(status_text), area);
+    frame.render_widget(
+        Paragraph::new(status_text).style(super::modal::popup_text_style(theme)),
+        area,
+    );
 }
 
 // centered_rect() moved to src/ui/modal.rs

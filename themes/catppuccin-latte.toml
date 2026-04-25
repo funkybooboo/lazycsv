@@ -1,0 +1,57 @@
+# Catppuccin Latte — Catppuccin
+# https://catppuccin.com/
+#
+# Soothing pastel theme — Latte is the only light flavor of Catppuccin.
+
+[ui]
+fg        = "#4c4f69"
+bg        = "#eff1f5"
+border_fg = "#9ca0b0"
+
+[table]
+header_fg       = "#8839ef"
+header_bg       = "#e6e9ef"
+header_bold     = true
+zebra_bg        = "#e6e9ef"
+cursor_fg       = "#eff1f5"
+cursor_bg       = "#ea76cb"
+selection_fg    = "#4c4f69"
+selection_bg    = "#bcc0cc"
+search_match_fg = "#eff1f5"
+search_match_bg = "#df8e1d"
+dirty_fg        = "#d20f39"
+
+[popup]
+bg                = "#ccd0da"
+fg                = "#4c4f69"
+border_fg         = "#9ca0b0"
+title_fg          = "#8839ef"
+completion_sel_fg = "#eff1f5"
+completion_sel_bg = "#1e66f5"
+
+[status]
+fg         = "#4c4f69"
+bg         = "#e6e9ef"
+mode_fg    = "#eff1f5"
+mode_bg    = "#40a02b"
+error_fg   = "#d20f39"
+success_fg = "#40a02b"
+
+[file_menu]
+dir_fg              = "#1e66f5"
+highlight_fg        = "#4c4f69"
+highlight_bg        = "#bcc0cc"
+separator_fg        = "#9ca0b0"
+status_bg           = "#e6e9ef"
+status_mode_bg      = "#1e66f5"
+status_accent_bg    = "#ea76cb"
+active_indicator_fg = "#40a02b"
+preview_cols = [
+  "#1e66f5", "#40a02b", "#df8e1d", "#179299",
+  "#8839ef", "#d20f39", "#fe640b", "#04a5e5",
+]
+
+[sql]
+line_number_fg        = "#9ca0b0"
+diagnostic_error_fg   = "#d20f39"
+diagnostic_warning_fg = "#df8e1d"

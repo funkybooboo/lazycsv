@@ -177,7 +177,7 @@ fn build_file_spans(
                 };
                 spans.push(Span::styled(filename.to_string(), style));
                 if is_dirty {
-                    let dirty_style = Style::default().fg(app.config.theme.dirty_indicator_fg);
+                    let dirty_style = Style::default().fg(app.config.theme.table.dirty_fg);
                     spans.push(Span::styled("*", dirty_style));
                 }
             }

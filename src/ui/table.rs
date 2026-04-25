@@ -55,11 +55,11 @@ fn calculate_cell_style(
 ) -> Style {
     let theme = &app.config.theme;
     if is_selected {
-        return super::modal::cursor_style_from(theme);
+        return super::modal::cursor_style(theme);
     }
 
     let base = if is_in_visual_selection(app, row, col) {
-        let mut style = super::modal::visual_selection_style_from(theme);
+        let mut style = super::modal::visual_selection_style(theme);
         if let Some(sel) = &app.visual_selection {
             let (_, end_row, _, _) = sel.bounds();
             if row == end_row {
@@ -71,13 +71,13 @@ fn calculate_cell_style(
         .map(|s| s.is_current_match(row, col))
         .unwrap_or(false)
     {
-        super::modal::search_match_style_from(theme).add_modifier(Modifier::BOLD)
+        super::modal::search_match_style(theme).add_modifier(Modifier::BOLD)
     } else if search_state.map(|s| s.is_match(row, col)).unwrap_or(false) {
-        super::modal::visual_selection_style_from(theme)
+        super::modal::visual_selection_style(theme)
     } else if app.config.defaults.zebra_striping && row.get().is_multiple_of(2) {
-        super::modal::zebra_stripe_style_from(theme)
+        super::modal::zebra_stripe_style(theme)
     } else {
-        Style::default()
+        Style::default().bg(theme.ui.bg)
     };
 
     // Apply per-row and per-column color rules only to normal/zebra cells
@@ -293,7 +293,7 @@ fn build_column_letters_row_v2<'a>(
     raw_widths: &[u16],
     col_reorder: Option<(usize, usize)>,
 ) -> Row<'a> {
-    let base_style = if let Some(bg) = theme.header_bg {
+    let base_style = if let Some(bg) = theme.table.header_bg {
         Style::default().bg(bg)
     } else {
         Style::default()
@@ -493,9 +493,9 @@ fn build_data_rows_v2(
             } else if is_selected_row {
                 super::modal::row_number_style()
             } else if app.config.defaults.zebra_striping && row_idx.is_multiple_of(2) {
-                super::modal::zebra_stripe_style_from(&app.config.theme)
+                super::modal::zebra_stripe_style(&app.config.theme)
             } else {
-                Style::default()
+                Style::default().bg(app.config.theme.ui.bg)
             };
             if is_pinned {
                 row_num_style = row_num_style
@@ -769,11 +769,20 @@ pub fn render_table(frame: &mut Frame, app: &mut App, area: Rect) {
     };
 
     let title_text = format!(" {}", cell_value);
-    let title_bar = Paragraph::new(title_text).style(Style::default().add_modifier(Modifier::BOLD));
+    let title_bar = Paragraph::new(title_text).style(
+        Style::default()
+            .fg(app.config.theme.ui.fg)
+            .bg(app.config.theme.ui.bg)
+            .add_modifier(Modifier::BOLD),
+    );
     frame.render_widget(title_bar, chunks[0]);
 
     // Horizontal rule
-    let rule = Paragraph::new("─".repeat(area.width as usize));
+    let rule = Paragraph::new("─".repeat(area.width as usize)).style(
+        Style::default()
+            .fg(app.config.theme.ui.border_fg)
+            .bg(app.config.theme.ui.bg),
+    );
     frame.render_widget(rule, chunks[1]);
 
     // Compute column positions deterministically from the resolved widths.

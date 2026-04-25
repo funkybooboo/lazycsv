@@ -1,0 +1,57 @@
+# Catppuccin Frappé — Catppuccin
+# https://catppuccin.com/
+#
+# Soothing pastel theme — Frappé is a softer, lighter dark variant.
+
+[ui]
+fg        = "#c6d0f5"
+bg        = "#303446"
+border_fg = "#626880"
+
+[table]
+header_fg       = "#ca9ee6"
+header_bg       = "#292c3c"
+header_bold     = true
+zebra_bg        = "#414559"
+cursor_fg       = "#303446"
+cursor_bg       = "#f4b8e4"
+selection_fg    = "#c6d0f5"
+selection_bg    = "#51576d"
+search_match_fg = "#303446"
+search_match_bg = "#e5c890"
+dirty_fg        = "#e78284"
+
+[popup]
+bg                = "#414559"
+fg                = "#c6d0f5"
+border_fg         = "#626880"
+title_fg          = "#ca9ee6"
+completion_sel_fg = "#303446"
+completion_sel_bg = "#8caaee"
+
+[status]
+fg         = "#c6d0f5"
+bg         = "#292c3c"
+mode_fg    = "#303446"
+mode_bg    = "#a6d189"
+error_fg   = "#e78284"
+success_fg = "#a6d189"
+
+[file_menu]
+dir_fg              = "#8caaee"
+highlight_fg        = "#c6d0f5"
+highlight_bg        = "#51576d"
+separator_fg        = "#626880"
+status_bg           = "#292c3c"
+status_mode_bg      = "#8caaee"
+status_accent_bg    = "#f4b8e4"
+active_indicator_fg = "#a6d189"
+preview_cols = [
+  "#8caaee", "#a6d189", "#e5c890", "#81c8be",
+  "#ca9ee6", "#e78284", "#ef9f76", "#99d1db",
+]
+
+[sql]
+line_number_fg        = "#737994"
+diagnostic_error_fg   = "#e78284"
+diagnostic_warning_fg = "#e5c890"

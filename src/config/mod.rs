@@ -51,36 +51,88 @@ pub struct Defaults {
     pub command_history_limit: usize,
 }
 
-/// Theme/color configuration.
-#[derive(Debug, Clone)]
+/// Theme/color configuration, organized by UI surface.
+///
+/// Loaded from nested `[ui]`, `[table]`, `[popup]`, `[status]`, `[file_menu]`,
+/// `[sql]` sections in `config.toml`. See `docs/theme.toml.example`.
+#[derive(Debug, Clone, Default)]
 pub struct Theme {
-    pub zebra_bg: Color,
-    pub cursor_bg: Color,
-    pub cursor_fg: Color,
-    pub selection_bg: Color,
-    pub selection_fg: Color,
-    pub search_match_bg: Color,
-    pub search_match_fg: Color,
-    pub header_bold: bool,
+    pub ui: UiTheme,
+    pub table: TableTheme,
+    pub popup: PopupTheme,
+    pub status: StatusTheme,
+    pub file_menu: FileMenuTheme,
+    pub sql: SqlTheme,
+}
+
+/// Global surfaces — base foreground/background and frame borders shared
+/// across the whole TUI.
+#[derive(Debug, Clone)]
+pub struct UiTheme {
+    pub fg: Color,
+    pub bg: Color,
+    pub border_fg: Color,
+}
+
+/// Main spreadsheet table.
+#[derive(Debug, Clone)]
+pub struct TableTheme {
+    pub header_fg: Color,
     pub header_bg: Option<Color>,
-    pub dirty_indicator_fg: Color,
-    // File menu colors
-    pub file_menu_dir_fg: Color,
-    pub file_menu_highlight_bg: Color,
-    pub file_menu_highlight_fg: Color,
-    pub file_menu_separator_fg: Color,
-    pub file_menu_status_bg: Color,
-    pub file_menu_status_mode_bg: Color,
-    pub file_menu_status_accent_bg: Color,
-    pub file_menu_active_indicator_fg: Color,
-    pub file_menu_preview_col_1: Color,
-    pub file_menu_preview_col_2: Color,
-    pub file_menu_preview_col_3: Color,
-    pub file_menu_preview_col_4: Color,
-    pub file_menu_preview_col_5: Color,
-    pub file_menu_preview_col_6: Color,
-    pub file_menu_preview_col_7: Color,
-    pub file_menu_preview_col_8: Color,
+    pub header_bold: bool,
+    pub zebra_bg: Color,
+    pub cursor_fg: Color,
+    pub cursor_bg: Color,
+    pub selection_fg: Color,
+    pub selection_bg: Color,
+    pub search_match_fg: Color,
+    pub search_match_bg: Color,
+    pub dirty_fg: Color,
+}
+
+/// Popup / modal dialogs (help, SQL editor frame, magnifier, file prompts,
+/// completion menus).
+#[derive(Debug, Clone)]
+pub struct PopupTheme {
+    pub bg: Color,
+    pub fg: Color,
+    pub border_fg: Color,
+    pub title_fg: Color,
+    pub completion_sel_fg: Color,
+    pub completion_sel_bg: Color,
+}
+
+/// Bottom status bar.
+#[derive(Debug, Clone)]
+pub struct StatusTheme {
+    pub fg: Color,
+    pub bg: Color,
+    pub mode_fg: Color,
+    pub mode_bg: Color,
+    pub error_fg: Color,
+    pub success_fg: Color,
+}
+
+/// File browser side panel.
+#[derive(Debug, Clone)]
+pub struct FileMenuTheme {
+    pub dir_fg: Color,
+    pub highlight_fg: Color,
+    pub highlight_bg: Color,
+    pub separator_fg: Color,
+    pub status_bg: Color,
+    pub status_mode_bg: Color,
+    pub status_accent_bg: Color,
+    pub active_indicator_fg: Color,
+    pub preview_cols: [Color; 8],
+}
+
+/// SQL editor specifics.
+#[derive(Debug, Clone)]
+pub struct SqlTheme {
+    pub line_number_fg: Color,
+    pub diagnostic_error_fg: Color,
+    pub diagnostic_warning_fg: Color,
 }
 
 /// SQL editor configuration.
@@ -105,36 +157,91 @@ impl Default for Defaults {
     }
 }
 
-impl Default for Theme {
+impl Default for UiTheme {
     fn default() -> Self {
-        Theme {
-            zebra_bg: Color::Rgb(30, 30, 30),
-            cursor_bg: Color::White,
-            cursor_fg: Color::Black,
-            selection_bg: Color::DarkGray,
-            selection_fg: Color::Yellow,
-            search_match_bg: Color::Yellow,
-            search_match_fg: Color::Black,
-            header_bold: true,
+        UiTheme {
+            fg: Color::Reset,
+            bg: Color::Reset,
+            border_fg: Color::Gray,
+        }
+    }
+}
+
+impl Default for TableTheme {
+    fn default() -> Self {
+        TableTheme {
+            header_fg: Color::Reset,
             header_bg: None,
-            dirty_indicator_fg: Color::Red,
-            // File menu defaults
-            file_menu_dir_fg: Color::Blue,
-            file_menu_highlight_bg: Color::White,
-            file_menu_highlight_fg: Color::Black,
-            file_menu_separator_fg: Color::Gray,
-            file_menu_status_bg: Color::DarkGray,
-            file_menu_status_mode_bg: Color::Blue,
-            file_menu_status_accent_bg: Color::Magenta,
-            file_menu_active_indicator_fg: Color::Green,
-            file_menu_preview_col_1: Color::Blue,
-            file_menu_preview_col_2: Color::Green,
-            file_menu_preview_col_3: Color::Yellow,
-            file_menu_preview_col_4: Color::Cyan,
-            file_menu_preview_col_5: Color::Magenta,
-            file_menu_preview_col_6: Color::Red,
-            file_menu_preview_col_7: Color::LightBlue,
-            file_menu_preview_col_8: Color::LightGreen,
+            header_bold: true,
+            zebra_bg: Color::Rgb(30, 30, 30),
+            cursor_fg: Color::Black,
+            cursor_bg: Color::White,
+            selection_fg: Color::Yellow,
+            selection_bg: Color::DarkGray,
+            search_match_fg: Color::Black,
+            search_match_bg: Color::Yellow,
+            dirty_fg: Color::Red,
+        }
+    }
+}
+
+impl Default for PopupTheme {
+    fn default() -> Self {
+        PopupTheme {
+            bg: Color::DarkGray,
+            fg: Color::White,
+            border_fg: Color::Gray,
+            title_fg: Color::White,
+            completion_sel_fg: Color::White,
+            completion_sel_bg: Color::Blue,
+        }
+    }
+}
+
+impl Default for StatusTheme {
+    fn default() -> Self {
+        StatusTheme {
+            fg: Color::Reset,
+            bg: Color::Reset,
+            mode_fg: Color::Black,
+            mode_bg: Color::Green,
+            error_fg: Color::Red,
+            success_fg: Color::Green,
+        }
+    }
+}
+
+impl Default for FileMenuTheme {
+    fn default() -> Self {
+        FileMenuTheme {
+            dir_fg: Color::Blue,
+            highlight_fg: Color::Black,
+            highlight_bg: Color::White,
+            separator_fg: Color::Gray,
+            status_bg: Color::DarkGray,
+            status_mode_bg: Color::Blue,
+            status_accent_bg: Color::Magenta,
+            active_indicator_fg: Color::Green,
+            preview_cols: [
+                Color::Blue,
+                Color::Green,
+                Color::Yellow,
+                Color::Cyan,
+                Color::Magenta,
+                Color::Red,
+                Color::LightBlue,
+                Color::LightGreen,
+            ],
+        }
+    }
+}
+
+impl Default for SqlTheme {
+    fn default() -> Self {
+        SqlTheme {
+            line_number_fg: Color::DarkGray,
+            diagnostic_error_fg: Color::Red,
+            diagnostic_warning_fg: Color::Yellow,
         }
     }
 }
@@ -232,10 +339,12 @@ mod tests {
         assert!(config.defaults.zebra_striping);
         assert_eq!(config.defaults.max_column_width, 100);
         assert_eq!(config.defaults.undo_limit, 1000);
-        assert_eq!(config.theme.cursor_bg, Color::White);
-        assert_eq!(config.theme.cursor_fg, Color::Black);
-        assert_eq!(config.theme.dirty_indicator_fg, Color::Red);
-        assert!(config.theme.header_bg.is_none());
+        assert_eq!(config.theme.table.cursor_bg, Color::White);
+        assert_eq!(config.theme.table.cursor_fg, Color::Black);
+        assert_eq!(config.theme.table.dirty_fg, Color::Red);
+        assert!(config.theme.table.header_bg.is_none());
+        assert_eq!(config.theme.popup.bg, Color::DarkGray);
+        assert_eq!(config.theme.ui.border_fg, Color::Gray);
         assert!(config.sql.format_uppercase);
     }
 
@@ -270,7 +379,7 @@ mod tests {
             zebra_striping = false
             max_column_width = 50
 
-            [theme]
+            [table]
             cursor_bg = "#ff0000"
             "##,
         )
@@ -279,9 +388,9 @@ mod tests {
         toml_parsing::apply_toml(&mut config, &toml, Path::new("test"), &mut Vec::new());
         assert!(!config.defaults.zebra_striping);
         assert_eq!(config.defaults.max_column_width, 50);
-        assert_eq!(config.theme.cursor_bg, Color::Rgb(255, 0, 0));
+        assert_eq!(config.theme.table.cursor_bg, Color::Rgb(255, 0, 0));
         // Unspecified values remain default
-        assert_eq!(config.theme.cursor_fg, Color::Black);
+        assert_eq!(config.theme.table.cursor_fg, Color::Black);
     }
 
     #[test]
@@ -314,7 +423,7 @@ mod tests {
         toml_parsing::apply_toml(&mut config, &toml, Path::new("test"), &mut Vec::new());
         // Everything should remain default
         assert!(config.defaults.zebra_striping);
-        assert_eq!(config.theme.cursor_bg, Color::White);
+        assert_eq!(config.theme.table.cursor_bg, Color::White);
     }
 
     #[test]
@@ -337,16 +446,16 @@ mod tests {
         let mut config = Config::default();
         let toml: TomlConfig = toml::from_str(
             r##"
-            [theme]
+            [table]
             header_bg = "#333333"
-            dirty_indicator_fg = "yellow"
+            dirty_fg = "yellow"
             "##,
         )
         .unwrap();
 
         toml_parsing::apply_toml(&mut config, &toml, Path::new("test"), &mut Vec::new());
-        assert_eq!(config.theme.header_bg, Some(Color::Rgb(51, 51, 51)));
-        assert_eq!(config.theme.dirty_indicator_fg, Color::Yellow);
+        assert_eq!(config.theme.table.header_bg, Some(Color::Rgb(51, 51, 51)));
+        assert_eq!(config.theme.table.dirty_fg, Color::Yellow);
     }
 
     // ── Validation & Warning Tests ────────────────────────────────
@@ -417,12 +526,12 @@ mod tests {
     fn test_warning_invalid_color() {
         let (config, warnings) = apply_with_warnings(
             r##"
-            [theme]
+            [table]
             cursor_bg = "notacolor"
             "##,
         );
         // Should keep default
-        assert_eq!(config.theme.cursor_bg, Color::White);
+        assert_eq!(config.theme.table.cursor_bg, Color::White);
         assert_eq!(warnings.len(), 1);
         assert!(warnings[0].contains("invalid color"));
         assert!(warnings[0].contains("cursor_bg"));
@@ -432,7 +541,7 @@ mod tests {
     fn test_warning_invalid_header_bg() {
         let (_, warnings) = apply_with_warnings(
             r##"
-            [theme]
+            [table]
             header_bg = "xyz"
             "##,
         );
@@ -444,7 +553,7 @@ mod tests {
     fn test_warning_multiple_invalid_colors() {
         let (_, warnings) = apply_with_warnings(
             r##"
-            [theme]
+            [table]
             cursor_bg = "bad1"
             cursor_fg = "bad2"
             selection_bg = "bad3"
@@ -463,11 +572,18 @@ mod tests {
             max_column_width = 50
             undo_limit = 500
 
-            [theme]
+            [ui]
+            border_fg = "gray"
+
+            [table]
             cursor_bg = "#ff0000"
             cursor_fg = "white"
             header_bg = "darkgray"
-            dirty_indicator_fg = "yellow"
+            dirty_fg = "yellow"
+
+            [popup]
+            bg = "darkgray"
+            border_fg = "gray"
 
             [sql]
             format_uppercase = false
@@ -653,7 +769,7 @@ mod tests {
 
         let global: TomlConfig = toml::from_str(
             r##"
-            [theme]
+            [table]
             cursor_bg = "#ff0000"
             cursor_fg = "#00ff00"
             "##,
@@ -663,15 +779,15 @@ mod tests {
 
         let local: TomlConfig = toml::from_str(
             r##"
-            [theme]
+            [table]
             cursor_fg = "#0000ff"
             "##,
         )
         .unwrap();
         toml_parsing::apply_toml(&mut config, &local, path, &mut warnings);
 
-        assert_eq!(config.theme.cursor_bg, Color::Rgb(255, 0, 0)); // from global
-        assert_eq!(config.theme.cursor_fg, Color::Rgb(0, 0, 255)); // overridden by local
+        assert_eq!(config.theme.table.cursor_bg, Color::Rgb(255, 0, 0)); // from global
+        assert_eq!(config.theme.table.cursor_fg, Color::Rgb(0, 0, 255)); // overridden by local
     }
 
     // ── Full config with all fields ───────────────────────────────
@@ -687,7 +803,10 @@ mod tests {
             max_column_width = 200
             undo_limit = 5000
 
-            [theme]
+            [ui]
+            border_fg = "#777777"
+
+            [table]
             zebra_bg = "#222222"
             cursor_bg = "#ffffff"
             cursor_fg = "#000000"
@@ -697,10 +816,22 @@ mod tests {
             search_match_fg = "white"
             header_bold = false
             header_bg = "#444444"
-            dirty_indicator_fg = "green"
+            dirty_fg = "green"
+
+            [popup]
+            bg = "#1a1a1a"
+            fg = "white"
+            border_fg = "gray"
+
+            [status]
+            mode_bg = "blue"
+            mode_fg = "white"
 
             [sql]
             format_uppercase = false
+            line_number_fg = "darkgray"
+            diagnostic_error_fg = "red"
+            diagnostic_warning_fg = "yellow"
             "##,
         );
 
@@ -710,16 +841,20 @@ mod tests {
         assert!(!config.defaults.zebra_striping);
         assert_eq!(config.defaults.max_column_width, 200);
         assert_eq!(config.defaults.undo_limit, 5000);
-        assert_eq!(config.theme.zebra_bg, Color::Rgb(34, 34, 34));
-        assert_eq!(config.theme.cursor_bg, Color::Rgb(255, 255, 255));
-        assert_eq!(config.theme.cursor_fg, Color::Rgb(0, 0, 0));
-        assert_eq!(config.theme.selection_bg, Color::Blue);
-        assert_eq!(config.theme.selection_fg, Color::White);
-        assert_eq!(config.theme.search_match_bg, Color::Red);
-        assert_eq!(config.theme.search_match_fg, Color::White);
-        assert!(!config.theme.header_bold);
-        assert_eq!(config.theme.header_bg, Some(Color::Rgb(68, 68, 68)));
-        assert_eq!(config.theme.dirty_indicator_fg, Color::Green);
+        assert_eq!(config.theme.ui.border_fg, Color::Rgb(119, 119, 119));
+        assert_eq!(config.theme.table.zebra_bg, Color::Rgb(34, 34, 34));
+        assert_eq!(config.theme.table.cursor_bg, Color::Rgb(255, 255, 255));
+        assert_eq!(config.theme.table.cursor_fg, Color::Rgb(0, 0, 0));
+        assert_eq!(config.theme.table.selection_bg, Color::Blue);
+        assert_eq!(config.theme.table.selection_fg, Color::White);
+        assert_eq!(config.theme.table.search_match_bg, Color::Red);
+        assert_eq!(config.theme.table.search_match_fg, Color::White);
+        assert!(!config.theme.table.header_bold);
+        assert_eq!(config.theme.table.header_bg, Some(Color::Rgb(68, 68, 68)));
+        assert_eq!(config.theme.table.dirty_fg, Color::Green);
+        assert_eq!(config.theme.popup.bg, Color::Rgb(26, 26, 26));
+        assert_eq!(config.theme.popup.fg, Color::White);
+        assert_eq!(config.theme.status.mode_bg, Color::Blue);
         assert!(!config.sql.format_uppercase);
     }
 
@@ -842,9 +977,10 @@ mod tests {
 
     #[test]
     fn test_empty_theme_section() {
-        let (config, warnings) = apply_with_warnings("[theme]\n");
+        let (config, warnings) = apply_with_warnings("[table]\n[ui]\n[popup]\n[status]\n");
         assert!(warnings.is_empty());
-        assert_eq!(config.theme.cursor_bg, Color::White);
+        assert_eq!(config.theme.table.cursor_bg, Color::White);
+        assert_eq!(config.theme.popup.bg, Color::DarkGray);
     }
 
     #[test]
@@ -866,7 +1002,7 @@ mod tests {
         assert!(!config.sql.format_uppercase);
         // Everything else is default
         assert!(config.defaults.zebra_striping);
-        assert_eq!(config.theme.cursor_bg, Color::White);
+        assert_eq!(config.theme.table.cursor_bg, Color::White);
     }
 
     // ── ConfigWatcher tests ───────────────────────────────────────

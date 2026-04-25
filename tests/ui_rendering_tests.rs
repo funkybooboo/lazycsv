@@ -3,6 +3,7 @@
 //! Tests for the main UI rendering functions including table, status bar,
 //! file switcher, and overlay components.
 
+use lazycsv::config::{TableTheme, Theme};
 use lazycsv::session::FileConfig;
 use lazycsv::{App, Document};
 use ratatui::{backend::TestBackend, Terminal};
@@ -920,12 +921,15 @@ fn test_ui_very_long_cell_truncation() {
 #[test]
 fn test_cursor_style_from_uses_theme_colors() {
     use ratatui::style::Color;
-    let theme = lazycsv::config::Theme {
-        cursor_bg: Color::Cyan,
-        cursor_fg: Color::Magenta,
+    let theme = Theme {
+        table: TableTheme {
+            cursor_bg: Color::Cyan,
+            cursor_fg: Color::Magenta,
+            ..Default::default()
+        },
         ..Default::default()
     };
-    let style = lazycsv::ui::modal::cursor_style_from(&theme);
+    let style = lazycsv::ui::modal::cursor_style(&theme);
     assert_eq!(style.bg, Some(Color::Cyan));
     assert_eq!(style.fg, Some(Color::Magenta));
     // Must be bold
@@ -935,12 +939,15 @@ fn test_cursor_style_from_uses_theme_colors() {
 #[test]
 fn test_search_match_style_from_uses_theme_colors() {
     use ratatui::style::Color;
-    let theme = lazycsv::config::Theme {
-        search_match_bg: Color::Blue,
-        search_match_fg: Color::White,
+    let theme = Theme {
+        table: TableTheme {
+            search_match_bg: Color::Blue,
+            search_match_fg: Color::White,
+            ..Default::default()
+        },
         ..Default::default()
     };
-    let style = lazycsv::ui::modal::search_match_style_from(&theme);
+    let style = lazycsv::ui::modal::search_match_style(&theme);
     assert_eq!(style.bg, Some(Color::Blue));
     assert_eq!(style.fg, Some(Color::White));
 }
@@ -948,12 +955,15 @@ fn test_search_match_style_from_uses_theme_colors() {
 #[test]
 fn test_visual_selection_style_from_uses_theme_colors() {
     use ratatui::style::Color;
-    let theme = lazycsv::config::Theme {
-        selection_bg: Color::Green,
-        selection_fg: Color::Red,
+    let theme = Theme {
+        table: TableTheme {
+            selection_bg: Color::Green,
+            selection_fg: Color::Red,
+            ..Default::default()
+        },
         ..Default::default()
     };
-    let style = lazycsv::ui::modal::visual_selection_style_from(&theme);
+    let style = lazycsv::ui::modal::visual_selection_style(&theme);
     assert_eq!(style.bg, Some(Color::Green));
     assert_eq!(style.fg, Some(Color::Red));
 }
@@ -961,11 +971,14 @@ fn test_visual_selection_style_from_uses_theme_colors() {
 #[test]
 fn test_zebra_stripe_style_from_uses_theme_color() {
     use ratatui::style::Color;
-    let theme = lazycsv::config::Theme {
-        zebra_bg: Color::Rgb(10, 20, 30),
+    let theme = Theme {
+        table: TableTheme {
+            zebra_bg: Color::Rgb(10, 20, 30),
+            ..Default::default()
+        },
         ..Default::default()
     };
-    let style = lazycsv::ui::modal::zebra_stripe_style_from(&theme);
+    let style = lazycsv::ui::modal::zebra_stripe_style(&theme);
     assert_eq!(style.bg, Some(Color::Rgb(10, 20, 30)));
 }
 
@@ -980,8 +993,8 @@ fn test_theme_cursor_color_applied_to_selected_cell() {
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
     // Set a distinctive cursor color
-    app.config.theme.cursor_bg = Color::Cyan;
-    app.config.theme.cursor_fg = Color::Magenta;
+    app.config.theme.table.cursor_bg = Color::Cyan;
+    app.config.theme.table.cursor_fg = Color::Magenta;
 
     // Select row 0 (default)
     app.view_state.table_state.select(Some(0));
@@ -1022,10 +1035,10 @@ fn test_theme_cursor_style_changes_with_custom_config() {
             lazycsv::ui::render(frame, &mut app);
         })
         .unwrap();
-    let default_cursor_bg = app.config.theme.cursor_bg; // Color::White
+    let default_cursor_bg = app.config.theme.table.cursor_bg; // Color::White
 
     // Change cursor color
-    app.config.theme.cursor_bg = Color::LightBlue;
+    app.config.theme.table.cursor_bg = Color::LightBlue;
 
     let backend2 = TestBackend::new(80, 24);
     let mut terminal2 = Terminal::new(backend2).unwrap();
@@ -1063,7 +1076,7 @@ fn test_theme_selection_color_applied_to_visual_selection() {
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
     // Distinctive selection background
-    app.config.theme.selection_bg = Color::Rgb(0, 128, 0);
+    app.config.theme.table.selection_bg = Color::Rgb(0, 128, 0);
 
     // Enter visual block covering row 0-1, col 0
     let start_row = RowIndex::new(0);
@@ -1104,7 +1117,7 @@ fn test_theme_search_match_color_applied_to_matched_cells() {
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
     // Distinctive search match background
-    app.config.theme.search_match_bg = Color::Rgb(200, 100, 0);
+    app.config.theme.table.search_match_bg = Color::Rgb(200, 100, 0);
 
     // Simulate a search state with a match at row 1, col 1
     let mut state = SearchState::new(
@@ -1149,7 +1162,7 @@ fn test_theme_zebra_stripe_color_applied_to_even_rows() {
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
     // Distinctive zebra color
-    app.config.theme.zebra_bg = Color::Rgb(50, 0, 50);
+    app.config.theme.table.zebra_bg = Color::Rgb(50, 0, 50);
     app.config.defaults.zebra_striping = true;
 
     // Move cursor off row 0 so the zebra row is not overridden by cursor style
@@ -1180,7 +1193,7 @@ fn test_zebra_striping_disabled_produces_no_stripe_color() {
     let csv_files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
-    app.config.theme.zebra_bg = Color::Rgb(99, 0, 99);
+    app.config.theme.table.zebra_bg = Color::Rgb(99, 0, 99);
     app.config.defaults.zebra_striping = false; // disabled
 
     let backend = TestBackend::new(80, 24);
@@ -1211,7 +1224,7 @@ fn test_theme_header_bold_true_applies_bold_modifier_in_header_row() {
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
     // Ensure header_bold is true (default, but set explicitly)
-    app.config.theme.header_bold = true;
+    app.config.theme.table.header_bold = true;
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
@@ -1243,7 +1256,7 @@ fn test_theme_header_bg_applied_when_set() {
     let csv_files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
-    app.config.theme.header_bg = Some(Color::Rgb(30, 60, 90));
+    app.config.theme.table.header_bg = Some(Color::Rgb(30, 60, 90));
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
@@ -1278,7 +1291,7 @@ fn test_theme_dirty_indicator_fg_applied_to_asterisk_in_file_switcher() {
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
     // Distinctive dirty indicator color
-    app.config.theme.dirty_indicator_fg = Color::Rgb(255, 80, 0);
+    app.config.theme.table.dirty_fg = Color::Rgb(255, 80, 0);
 
     // Mark the first file dirty using the exact path the session holds
     let dirty_path = app.session.files()[0].clone();
@@ -1316,7 +1329,7 @@ fn test_theme_dirty_indicator_fg_not_present_when_clean() {
     let csv_files = vec![PathBuf::from("first.csv"), PathBuf::from("second.csv")];
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
-    app.config.theme.dirty_indicator_fg = Color::Rgb(255, 80, 0);
+    app.config.theme.table.dirty_fg = Color::Rgb(255, 80, 0);
     // Do NOT mark any file dirty
 
     let backend = TestBackend::new(80, 4);
@@ -1370,7 +1383,7 @@ fn test_theme_all_16_ansi_named_colors_cursor_bg() {
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
-        app.config.theme.cursor_bg = color;
+        app.config.theme.table.cursor_bg = color;
         app.view_state.table_state.select(Some(0));
 
         let backend = TestBackend::new(80, 24);
@@ -1383,7 +1396,7 @@ fn test_theme_all_16_ansi_named_colors_cursor_bg() {
             .unwrap();
 
         // Just verify rendering does not panic; style helper should return correct bg
-        let style = lazycsv::ui::modal::cursor_style_from(&app.config.theme);
+        let style = lazycsv::ui::modal::cursor_style(&app.config.theme);
         assert_eq!(
             style.bg,
             Some(color),
@@ -1417,11 +1430,14 @@ fn test_theme_all_16_ansi_named_colors_zebra_bg() {
     ];
 
     for color in named_colors {
-        let theme = lazycsv::config::Theme {
-            zebra_bg: color,
+        let theme = Theme {
+            table: TableTheme {
+                zebra_bg: color,
+                ..Default::default()
+            },
             ..Default::default()
         };
-        let style = lazycsv::ui::modal::zebra_stripe_style_from(&theme);
+        let style = lazycsv::ui::modal::zebra_stripe_style(&theme);
         assert_eq!(
             style.bg,
             Some(color),
@@ -1460,14 +1476,14 @@ fn test_theme_all_16_ansi_named_colors_render_without_panic() {
         let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
         // Apply color to all theme fields that accept it
-        app.config.theme.cursor_bg = color;
-        app.config.theme.cursor_fg = color;
-        app.config.theme.selection_bg = color;
-        app.config.theme.selection_fg = color;
-        app.config.theme.search_match_bg = color;
-        app.config.theme.search_match_fg = color;
-        app.config.theme.zebra_bg = color;
-        app.config.theme.dirty_indicator_fg = color;
+        app.config.theme.table.cursor_bg = color;
+        app.config.theme.table.cursor_fg = color;
+        app.config.theme.table.selection_bg = color;
+        app.config.theme.table.selection_fg = color;
+        app.config.theme.table.search_match_bg = color;
+        app.config.theme.table.search_match_fg = color;
+        app.config.theme.table.zebra_bg = color;
+        app.config.theme.table.dirty_fg = color;
 
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -1495,7 +1511,7 @@ fn test_theme_rgb_hex_color_cursor_bg_renders_correctly() {
     let csv_files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
-    app.config.theme.cursor_bg = rgb_color;
+    app.config.theme.table.cursor_bg = rgb_color;
     app.view_state.table_state.select(Some(0));
 
     let backend = TestBackend::new(80, 24);
@@ -1525,7 +1541,7 @@ fn test_theme_rgb_hex_color_zebra_bg_renders_correctly() {
     let csv_files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
-    app.config.theme.zebra_bg = rgb_color;
+    app.config.theme.table.zebra_bg = rgb_color;
     app.config.defaults.zebra_striping = true;
     // Cursor on an odd row so even row (zebra row) is not overridden by cursor
     app.view_state.table_state.select(Some(1));
@@ -1559,7 +1575,7 @@ fn test_theme_rgb_hex_color_search_match_bg_renders_correctly() {
     let csv_files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
-    app.config.theme.search_match_bg = rgb_color;
+    app.config.theme.table.search_match_bg = rgb_color;
 
     let mut state = SearchState::new(
         "Alice".to_string(),
@@ -1604,14 +1620,14 @@ fn test_theme_rgb_colors_all_fields_render_without_panic() {
         let csv_files = vec![PathBuf::from("test.csv")];
         let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
-        app.config.theme.cursor_bg = bg;
-        app.config.theme.cursor_fg = fg;
-        app.config.theme.selection_bg = bg;
-        app.config.theme.selection_fg = fg;
-        app.config.theme.search_match_bg = bg;
-        app.config.theme.search_match_fg = fg;
-        app.config.theme.zebra_bg = bg;
-        app.config.theme.dirty_indicator_fg = fg;
+        app.config.theme.table.cursor_bg = bg;
+        app.config.theme.table.cursor_fg = fg;
+        app.config.theme.table.selection_bg = bg;
+        app.config.theme.table.selection_fg = fg;
+        app.config.theme.table.search_match_bg = bg;
+        app.config.theme.table.search_match_fg = fg;
+        app.config.theme.table.zebra_bg = bg;
+        app.config.theme.table.dirty_fg = fg;
 
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -1640,29 +1656,32 @@ fn test_theme_rgb_color_style_helpers_return_correct_values() {
     let sel_fg = Color::Rgb(200, 160, 120);
     let zebra = Color::Rgb(5, 10, 15);
 
-    let theme = lazycsv::config::Theme {
-        cursor_bg,
-        cursor_fg,
-        search_match_bg: search_bg,
-        search_match_fg: search_fg,
-        selection_bg: sel_bg,
-        selection_fg: sel_fg,
-        zebra_bg: zebra,
+    let theme = Theme {
+        table: TableTheme {
+            cursor_bg,
+            cursor_fg,
+            search_match_bg: search_bg,
+            search_match_fg: search_fg,
+            selection_bg: sel_bg,
+            selection_fg: sel_fg,
+            zebra_bg: zebra,
+            ..Default::default()
+        },
         ..Default::default()
     };
 
-    let cs = lazycsv::ui::modal::cursor_style_from(&theme);
+    let cs = lazycsv::ui::modal::cursor_style(&theme);
     assert_eq!(cs.bg, Some(cursor_bg));
     assert_eq!(cs.fg, Some(cursor_fg));
 
-    let ss = lazycsv::ui::modal::search_match_style_from(&theme);
+    let ss = lazycsv::ui::modal::search_match_style(&theme);
     assert_eq!(ss.bg, Some(search_bg));
     assert_eq!(ss.fg, Some(search_fg));
 
-    let vs = lazycsv::ui::modal::visual_selection_style_from(&theme);
+    let vs = lazycsv::ui::modal::visual_selection_style(&theme);
     assert_eq!(vs.bg, Some(sel_bg));
     assert_eq!(vs.fg, Some(sel_fg));
 
-    let zs = lazycsv::ui::modal::zebra_stripe_style_from(&theme);
+    let zs = lazycsv::ui::modal::zebra_stripe_style(&theme);
     assert_eq!(zs.bg, Some(zebra));
 }

@@ -19,14 +19,14 @@ use ratatui::{
 /// Get the 8 preview column colors from the theme
 fn column_colors(theme: &Theme) -> [Color; 8] {
     [
-        theme.file_menu_preview_col_1,
-        theme.file_menu_preview_col_2,
-        theme.file_menu_preview_col_3,
-        theme.file_menu_preview_col_4,
-        theme.file_menu_preview_col_5,
-        theme.file_menu_preview_col_6,
-        theme.file_menu_preview_col_7,
-        theme.file_menu_preview_col_8,
+        theme.file_menu.preview_cols[0],
+        theme.file_menu.preview_cols[1],
+        theme.file_menu.preview_cols[2],
+        theme.file_menu.preview_cols[3],
+        theme.file_menu.preview_cols[4],
+        theme.file_menu.preview_cols[5],
+        theme.file_menu.preview_cols[6],
+        theme.file_menu.preview_cols[7],
     ]
 }
 
@@ -34,8 +34,12 @@ fn column_colors(theme: &Theme) -> [Color; 8] {
 pub fn render(frame: &mut Frame, app: &mut App) {
     let area = super::modal::large_modal_rect(frame.area());
 
-    // Clear background
+    // Clear and paint background with the popup theme color
     frame.render_widget(Clear, area);
+    frame.render_widget(
+        Block::default().style(super::modal::popup_bg_style(&app.config.theme)),
+        area,
+    );
 
     // Just render the file list - no extra sections
     render_file_list(frame, app, area);
@@ -86,7 +90,7 @@ fn render_file_list(frame: &mut Frame, app: &mut App, area: Rect) {
     let preview_area = columns[4];
 
     // Render vertical separators
-    let sep_style = Style::default().fg(app.config.theme.file_menu_separator_fg);
+    let sep_style = Style::default().fg(app.config.theme.file_menu.separator_fg);
     let sep_block = Block::default()
         .borders(Borders::LEFT)
         .border_style(sep_style);
@@ -214,18 +218,18 @@ fn render_parent_column(frame: &mut Frame, app: &mut App, area: Rect) {
                 BrowserEntry::Directory(_) => {
                     if is_current {
                         Style::default()
-                            .fg(app.config.theme.file_menu_highlight_fg)
-                            .bg(app.config.theme.file_menu_highlight_bg)
+                            .fg(app.config.theme.file_menu.highlight_fg)
+                            .bg(app.config.theme.file_menu.highlight_bg)
                             .add_modifier(Modifier::BOLD)
                     } else {
-                        Style::default().fg(app.config.theme.file_menu_dir_fg)
+                        Style::default().fg(app.config.theme.file_menu.dir_fg)
                     }
                 }
                 BrowserEntry::CsvFile(_) => {
                     if is_current {
                         Style::default()
-                            .fg(app.config.theme.file_menu_highlight_fg)
-                            .bg(app.config.theme.file_menu_highlight_bg)
+                            .fg(app.config.theme.file_menu.highlight_fg)
+                            .bg(app.config.theme.file_menu.highlight_bg)
                             .add_modifier(Modifier::BOLD)
                     } else {
                         Style::default().add_modifier(Modifier::DIM)
@@ -289,10 +293,10 @@ fn render_current_column(
 
                     let style = if is_selected {
                         Style::default()
-                            .fg(app.config.theme.file_menu_highlight_fg)
+                            .fg(app.config.theme.file_menu.highlight_fg)
                             .add_modifier(Modifier::BOLD)
                     } else {
-                        Style::default().fg(app.config.theme.file_menu_dir_fg)
+                        Style::default().fg(app.config.theme.file_menu.dir_fg)
                     };
 
                     // Use "/" suffix for directories, "../" for parent
@@ -308,9 +312,9 @@ fn render_current_column(
                     // Active file indicator
                     if is_active {
                         let bullet_style = if is_selected {
-                            Style::default().fg(app.config.theme.file_menu_highlight_fg)
+                            Style::default().fg(app.config.theme.file_menu.highlight_fg)
                         } else {
-                            Style::default().fg(app.config.theme.file_menu_active_indicator_fg)
+                            Style::default().fg(app.config.theme.file_menu.active_indicator_fg)
                         };
                         spans.push(Span::styled("● ", bullet_style));
                     }
@@ -321,7 +325,7 @@ fn render_current_column(
 
                     let style = if is_selected {
                         Style::default()
-                            .fg(app.config.theme.file_menu_highlight_fg)
+                            .fg(app.config.theme.file_menu.highlight_fg)
                             .add_modifier(Modifier::BOLD)
                     } else {
                         Style::default()
@@ -330,9 +334,9 @@ fn render_current_column(
                     spans.push(Span::styled(filename.to_string(), style));
                     if is_dirty {
                         let dirty_style = if is_selected {
-                            Style::default().fg(app.config.theme.file_menu_highlight_fg)
+                            Style::default().fg(app.config.theme.file_menu.highlight_fg)
                         } else {
-                            Style::default().fg(app.config.theme.dirty_indicator_fg)
+                            Style::default().fg(app.config.theme.table.dirty_fg)
                         };
                         spans.push(Span::styled("*", dirty_style));
                     }
@@ -343,8 +347,8 @@ fn render_current_column(
             if is_selected {
                 ListItem::new(line).style(
                     Style::default()
-                        .bg(app.config.theme.file_menu_highlight_bg)
-                        .fg(app.config.theme.file_menu_highlight_fg),
+                        .bg(app.config.theme.file_menu.highlight_bg)
+                        .fg(app.config.theme.file_menu.highlight_fg),
                 )
             } else {
                 ListItem::new(line)
@@ -416,7 +420,7 @@ fn render_preview_column(
                             (
                                 dn,
                                 Style::default()
-                                    .fg(app.config.theme.file_menu_dir_fg)
+                                    .fg(app.config.theme.file_menu.dir_fg)
                                     .add_modifier(Modifier::DIM),
                             )
                         }
@@ -691,7 +695,7 @@ fn render_file_manager_status_bar(
             Span::raw(&app.input_state.file_filter_buffer),
         ]);
         let para = Paragraph::new(search_line)
-            .style(Style::default().bg(app.config.theme.file_menu_status_bg));
+            .style(Style::default().bg(app.config.theme.file_menu.status_bg));
         frame.render_widget(para, area);
         return;
     }
@@ -734,7 +738,7 @@ fn render_file_manager_status_bar(
     let mode_span = Span::styled(
         " NOR ",
         Style::default()
-            .bg(app.config.theme.file_menu_status_mode_bg)
+            .bg(app.config.theme.file_menu.status_mode_bg)
             .fg(Color::Black)
             .add_modifier(Modifier::BOLD),
     );
@@ -742,14 +746,14 @@ fn render_file_manager_status_bar(
     let size_span = Span::styled(
         format!(" {} ", size_str),
         Style::default()
-            .bg(app.config.theme.file_menu_status_accent_bg)
+            .bg(app.config.theme.file_menu.status_accent_bg)
             .fg(Color::Black)
             .add_modifier(Modifier::BOLD),
     );
 
     let filename_span = Span::styled(
         format!("  {} ", filename),
-        Style::default().bg(app.config.theme.file_menu_status_bg),
+        Style::default().bg(app.config.theme.file_menu.status_bg),
     );
 
     // Right side: position
@@ -759,13 +763,13 @@ fn render_file_manager_status_bar(
 
     let pad_span = Span::styled(
         " ".repeat(padding),
-        Style::default().bg(app.config.theme.file_menu_status_bg),
+        Style::default().bg(app.config.theme.file_menu.status_bg),
     );
 
     let position_span = Span::styled(
         right_text,
         Style::default()
-            .bg(app.config.theme.file_menu_status_accent_bg)
+            .bg(app.config.theme.file_menu.status_accent_bg)
             .fg(Color::Black)
             .add_modifier(Modifier::BOLD),
     );

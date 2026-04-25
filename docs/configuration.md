@@ -31,28 +31,27 @@ Per-directory settings override global settings. Only specified fields are overr
 | `max_column_width` | integer (>= 4) | `100` | Maximum column width in characters |
 | `undo_limit` | integer (>= 1) | `1000` | Maximum number of undo steps in the SQL editor |
 
-### `[theme]`
+### Theme sections
 
-Colors accept named colors or hex RGB values.
+LazyCSV's theme is split across nested sections by UI surface. See [`themes.md`](themes.md) for a complete reference and example palettes.
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `zebra_bg` | color | `"#1e1e1e"` | Background for alternating (even) rows |
-| `cursor_bg` | color | `"white"` | Background of the selected cell |
-| `cursor_fg` | color | `"black"` | Foreground of the selected cell |
-| `selection_bg` | color | `"darkgray"` | Background for visual selections |
-| `selection_fg` | color | `"yellow"` | Foreground for visual selections |
-| `search_match_bg` | color | `"yellow"` | Background for search matches |
-| `search_match_fg` | color | `"black"` | Foreground for search matches |
-| `header_bold` | bool | `true` | Bold text in column headers |
-| `header_bg` | color | none | Background for the column letters row (A, B, C...) |
-| `dirty_indicator_fg` | color | `"red"` | Color of the `*` dirty file indicator |
+| Section | Purpose |
+|---------|---------|
+| `[ui]` | Global foreground/background and frame border |
+| `[table]` | The main spreadsheet (cursor, selection, search, headers, zebra rows, dirty marker) |
+| `[popup]` | All popup/modal dialogs (help, SQL editor frame, magnifier, file prompts, completion menu) |
+| `[status]` | Bottom status bar (mode badge, error/success messages) |
+| `[file_menu]` | The file browser side panel |
+| `[sql]` | SQL editor specifics (line numbers, diagnostic colors) |
 
 ### `[sql]`
+
+The `[sql]` section also holds SQL-editor behaviour settings:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `format_uppercase` | bool | `true` | Uppercase SQL keywords when formatting (Ctrl+F) |
+| `sql_history_limit` | integer | `15` | Maximum SQL queries kept in history (0 disables) |
 
 ## Color Values
 
@@ -75,15 +74,26 @@ zebra_striping = true
 max_column_width = 120
 undo_limit = 2000
 
-[theme]
-cursor_bg = "#4488ff"
-cursor_fg = "white"
-selection_bg = "#555555"
-selection_fg = "yellow"
+[ui]
+border_fg = "gray"
+
+[table]
+cursor_bg       = "#4488ff"
+cursor_fg       = "white"
+selection_bg    = "#555555"
+selection_fg    = "yellow"
 search_match_bg = "#ffaa00"
 search_match_fg = "black"
-header_bg = "#333333"
-dirty_indicator_fg = "red"
+header_bg       = "#333333"
+dirty_fg        = "red"
+
+[popup]
+bg        = "#222222"
+border_fg = "gray"
+
+[status]
+mode_fg = "black"
+mode_bg = "green"
 
 [sql]
 format_uppercase = true

@@ -1,0 +1,57 @@
+# Dracula — Zeno Rocha
+# https://draculatheme.com/
+#
+# Vibrant, high-contrast dark theme with deep purple background and neon accents.
+
+[ui]
+fg        = "#f8f8f2"
+bg        = "#282a36"
+border_fg = "#6272a4"
+
+[table]
+header_fg       = "#bd93f9"
+header_bg       = "#21222c"
+header_bold     = true
+zebra_bg        = "#343746"
+cursor_fg       = "#282a36"
+cursor_bg       = "#f1fa8c"
+selection_fg    = "#f8f8f2"
+selection_bg    = "#44475a"
+search_match_fg = "#282a36"
+search_match_bg = "#50fa7b"
+dirty_fg        = "#ff5555"
+
+[popup]
+bg                = "#44475a"
+fg                = "#f8f8f2"
+border_fg         = "#6272a4"
+title_fg          = "#ff79c6"
+completion_sel_fg = "#282a36"
+completion_sel_bg = "#bd93f9"
+
+[status]
+fg         = "#f8f8f2"
+bg         = "#21222c"
+mode_fg    = "#282a36"
+mode_bg    = "#50fa7b"
+error_fg   = "#ff5555"
+success_fg = "#50fa7b"
+
+[file_menu]
+dir_fg              = "#8be9fd"
+highlight_fg        = "#f8f8f2"
+highlight_bg        = "#44475a"
+separator_fg        = "#6272a4"
+status_bg           = "#21222c"
+status_mode_bg      = "#bd93f9"
+status_accent_bg    = "#ff79c6"
+active_indicator_fg = "#50fa7b"
+preview_cols = [
+  "#8be9fd", "#50fa7b", "#f1fa8c", "#ff79c6",
+  "#bd93f9", "#ff5555", "#ffb86c", "#6272a4",
+]
+
+[sql]
+line_number_fg        = "#6272a4"
+diagnostic_error_fg   = "#ff5555"
+diagnostic_warning_fg = "#f1fa8c"

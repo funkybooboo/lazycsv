@@ -1,7 +1,7 @@
 //! Benchmark SQL query performance
 //!
 //! Tests performance of SQL-related operations:
-//! - CSV loading into SQLite (single and multi-table)
+//! - CSV loading into DuckDB (single and multi-table)
 //! - Query operations: SELECT, WHERE, ORDER BY, JOIN, GROUP BY
 //! - Result conversion back to Document
 //! - Dataset sizes: 1K, 10K, 100K rows
@@ -11,11 +11,11 @@
 //! - JOIN <200ms for 10K rows
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use duckdb::Connection;
 use lazycsv::csv::Document;
 use lazycsv::query::{
-    execute_query_to_document_cancellable, load_csv_into_sqlite, table_name_from_path,
+    execute_query_to_document_cancellable, load_csv_into_duckdb, table_name_from_path,
 };
-use rusqlite::Connection;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 
@@ -107,7 +107,7 @@ fn bench_csv_load_single(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, _| {
             b.iter(|| {
                 let conn = Connection::open_in_memory().unwrap();
-                load_csv_into_sqlite(black_box(&conn), black_box(&doc), black_box("test")).unwrap();
+                load_csv_into_duckdb(black_box(&conn), black_box(&doc), black_box("test")).unwrap();
                 black_box(conn);
             });
         });
@@ -128,9 +128,9 @@ fn bench_csv_load_multiple(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, _| {
             b.iter(|| {
                 let conn = Connection::open_in_memory().unwrap();
-                load_csv_into_sqlite(&conn, black_box(&sales), "sales").unwrap();
-                load_csv_into_sqlite(&conn, black_box(&customers), "customers").unwrap();
-                load_csv_into_sqlite(&conn, black_box(&products), "products").unwrap();
+                load_csv_into_duckdb(&conn, black_box(&sales), "sales").unwrap();
+                load_csv_into_duckdb(&conn, black_box(&customers), "customers").unwrap();
+                load_csv_into_duckdb(&conn, black_box(&products), "products").unwrap();
                 black_box(conn);
             });
         });
@@ -147,7 +147,7 @@ fn bench_query_select(c: &mut Criterion) {
     for &size in &[1_000, 10_000, 100_000] {
         let doc = create_test_document(size, 10, "test.csv");
         let conn = Connection::open_in_memory().unwrap();
-        load_csv_into_sqlite(&conn, &doc, "test").unwrap();
+        load_csv_into_duckdb(&conn, &doc, "test").unwrap();
 
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, _| {
             b.iter(|| {
@@ -174,7 +174,7 @@ fn bench_query_where(c: &mut Criterion) {
     for &size in &[1_000, 10_000, 100_000] {
         let doc = create_test_document(size, 10, "test.csv");
         let conn = Connection::open_in_memory().unwrap();
-        load_csv_into_sqlite(&conn, &doc, "test").unwrap();
+        load_csv_into_duckdb(&conn, &doc, "test").unwrap();
 
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, _| {
             b.iter(|| {
@@ -201,7 +201,7 @@ fn bench_query_order_by(c: &mut Criterion) {
     for &size in &[1_000, 10_000, 100_000] {
         let doc = create_test_document(size, 10, "test.csv");
         let conn = Connection::open_in_memory().unwrap();
-        load_csv_into_sqlite(&conn, &doc, "test").unwrap();
+        load_csv_into_duckdb(&conn, &doc, "test").unwrap();
 
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, _| {
             b.iter(|| {
@@ -230,8 +230,8 @@ fn bench_query_join_2way(c: &mut Criterion) {
         let sales = create_sales_document(size, "sales.csv");
         let customers = create_customers_document(size / 10, "customers.csv");
         let conn = Connection::open_in_memory().unwrap();
-        load_csv_into_sqlite(&conn, &sales, "sales").unwrap();
-        load_csv_into_sqlite(&conn, &customers, "customers").unwrap();
+        load_csv_into_duckdb(&conn, &sales, "sales").unwrap();
+        load_csv_into_duckdb(&conn, &customers, "customers").unwrap();
 
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, _| {
             b.iter(|| {
@@ -265,9 +265,9 @@ fn bench_query_join_3way(c: &mut Criterion) {
         let customers = create_customers_document(size / 10, "customers.csv");
         let products = create_products_document(100, "products.csv");
         let conn = Connection::open_in_memory().unwrap();
-        load_csv_into_sqlite(&conn, &sales, "sales").unwrap();
-        load_csv_into_sqlite(&conn, &customers, "customers").unwrap();
-        load_csv_into_sqlite(&conn, &products, "products").unwrap();
+        load_csv_into_duckdb(&conn, &sales, "sales").unwrap();
+        load_csv_into_duckdb(&conn, &customers, "customers").unwrap();
+        load_csv_into_duckdb(&conn, &products, "products").unwrap();
 
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, _| {
             b.iter(|| {
@@ -300,7 +300,7 @@ fn bench_query_group_by(c: &mut Criterion) {
     for &size in &[1_000, 10_000, 100_000] {
         let sales = create_sales_document(size, "sales.csv");
         let conn = Connection::open_in_memory().unwrap();
-        load_csv_into_sqlite(&conn, &sales, "sales").unwrap();
+        load_csv_into_duckdb(&conn, &sales, "sales").unwrap();
 
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, _| {
             b.iter(|| {
@@ -333,7 +333,7 @@ fn bench_query_result_small(c: &mut Criterion) {
     for &size in &[1_000, 10_000, 100_000] {
         let doc = create_test_document(size, 10, "test.csv");
         let conn = Connection::open_in_memory().unwrap();
-        load_csv_into_sqlite(&conn, &doc, "test").unwrap();
+        load_csv_into_duckdb(&conn, &doc, "test").unwrap();
 
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, _| {
             b.iter(|| {
@@ -360,7 +360,7 @@ fn bench_query_result_medium(c: &mut Criterion) {
     for &size in &[1_000, 10_000, 100_000] {
         let doc = create_test_document(size, 10, "test.csv");
         let conn = Connection::open_in_memory().unwrap();
-        load_csv_into_sqlite(&conn, &doc, "test").unwrap();
+        load_csv_into_duckdb(&conn, &doc, "test").unwrap();
 
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, _| {
             b.iter(|| {
@@ -387,7 +387,7 @@ fn bench_query_result_large(c: &mut Criterion) {
     for &size in &[10_000, 100_000] {
         let doc = create_test_document(size, 10, "test.csv");
         let conn = Connection::open_in_memory().unwrap();
-        load_csv_into_sqlite(&conn, &doc, "test").unwrap();
+        load_csv_into_duckdb(&conn, &doc, "test").unwrap();
 
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, _| {
             b.iter(|| {
@@ -416,9 +416,9 @@ fn bench_query_complex(c: &mut Criterion) {
         let customers = create_customers_document(size / 10, "customers.csv");
         let products = create_products_document(100, "products.csv");
         let conn = Connection::open_in_memory().unwrap();
-        load_csv_into_sqlite(&conn, &sales, "sales").unwrap();
-        load_csv_into_sqlite(&conn, &customers, "customers").unwrap();
-        load_csv_into_sqlite(&conn, &products, "products").unwrap();
+        load_csv_into_duckdb(&conn, &sales, "sales").unwrap();
+        load_csv_into_duckdb(&conn, &customers, "customers").unwrap();
+        load_csv_into_duckdb(&conn, &products, "products").unwrap();
 
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, _| {
             b.iter(|| {

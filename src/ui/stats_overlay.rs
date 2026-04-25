@@ -4,22 +4,22 @@
 //! in a scrollable modal overlay. Triggered by `gs` in visual mode or
 //! `:stats` with no argument while in visual mode.
 
+use crate::config::Theme;
 use crate::input::command_mode::stats::format_number;
 use crate::ui::view_state::StatsOverlayData;
 use ratatui::{
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Clear, Paragraph},
     Frame,
 };
 
 /// Render the statistics overlay popup.
-pub fn render(frame: &mut Frame, data: &StatsOverlayData) {
+pub fn render(frame: &mut Frame, data: &StatsOverlayData, theme: &Theme) {
     let area = super::modal::large_modal_rect(frame.area());
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(format!(" {} ", data.title));
+    let title = format!(" {} ", data.title);
+    let block = super::modal::popup_block(theme, &title);
     let inner = block.inner(area);
 
     frame.render_widget(Clear, area);
@@ -77,12 +77,14 @@ pub fn render(frame: &mut Frame, data: &StatsOverlayData) {
         )));
     }
 
-    let paragraph = Paragraph::new(lines).scroll((data.scroll_offset, 0));
+    let paragraph = Paragraph::new(lines)
+        .scroll((data.scroll_offset, 0))
+        .style(super::modal::popup_text_style(theme));
     frame.render_widget(paragraph, content_area);
 
     // Status bar
     let status = Paragraph::new(" j/k: scroll | Esc: close ")
-        .style(Style::default().add_modifier(Modifier::DIM));
+        .style(super::modal::popup_text_style(theme).add_modifier(Modifier::DIM));
     frame.render_widget(status, status_area);
 }
 

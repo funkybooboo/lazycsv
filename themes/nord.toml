@@ -1,0 +1,57 @@
+# Nord — Arctic Ice Studio
+# https://www.nordtheme.com/
+#
+# Arctic, north-bluish theme with a cold, clean palette of slate grays and frosty blues.
+
+[ui]
+fg        = "#d8dee9"
+bg        = "#2e3440"
+border_fg = "#4c566a"
+
+[table]
+header_fg       = "#88c0d0"
+header_bg       = "#3b4252"
+header_bold     = true
+zebra_bg        = "#3b4252"
+cursor_fg       = "#2e3440"
+cursor_bg       = "#88c0d0"
+selection_fg    = "#eceff4"
+selection_bg    = "#4c566a"
+search_match_fg = "#2e3440"
+search_match_bg = "#ebcb8b"
+dirty_fg        = "#bf616a"
+
+[popup]
+bg                = "#3b4252"
+fg                = "#eceff4"
+border_fg         = "#4c566a"
+title_fg          = "#88c0d0"
+completion_sel_fg = "#2e3440"
+completion_sel_bg = "#81a1c1"
+
+[status]
+fg         = "#d8dee9"
+bg         = "#3b4252"
+mode_fg    = "#2e3440"
+mode_bg    = "#a3be8c"
+error_fg   = "#bf616a"
+success_fg = "#a3be8c"
+
+[file_menu]
+dir_fg              = "#81a1c1"
+highlight_fg        = "#2e3440"
+highlight_bg        = "#88c0d0"
+separator_fg        = "#4c566a"
+status_bg           = "#3b4252"
+status_mode_bg      = "#5e81ac"
+status_accent_bg    = "#b48ead"
+active_indicator_fg = "#a3be8c"
+preview_cols = [
+  "#81a1c1", "#a3be8c", "#ebcb8b", "#8fbcbb",
+  "#b48ead", "#bf616a", "#d08770", "#88c0d0",
+]
+
+[sql]
+line_number_fg        = "#4c566a"
+diagnostic_error_fg   = "#bf616a"
+diagnostic_warning_fg = "#ebcb8b"

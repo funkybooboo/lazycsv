@@ -41,13 +41,13 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.18.1 | SQL IntelliSense Polish & Testing | [x] | 606 |
 | v0.19.0 | Column Resize & Advanced Column Operations | [x] | 60+ |
 | v0.20.0 | Data Analysis, Statistics & Cell Formulas | [x] | 88 |
-| v0.24.0 | Performance, CLI Pipeline & SQL Type Intelligence | [x] | TBD |
+| v0.24.0 | TUI Theming | [x] | 50 |
 | v0.25.0 | Spreadsheet Support & CLI Tools | [x] | 13 |
 | v0.26.0 | SQL History, DuckDB VIEW Optimization & CLI Output Flag | [x] | - |
 | v0.27.0 | CLI Data Tools, Per-Command Help, TUI Editing & File Save Fix | [x] | - |
 | v0.28.0 | Multi-Format Support (Parquet, JSON, SQLite) | [x] | 70 |
 | v0.29.0 | CSV Generation, Parallel Performance & File Manager UX | [x] | 45+ |
-| v0.30.0 | Yazi-Style File Menu, Column Colors & View Persistence | [x] | - |
+| v0.30.0 | 3-Column File Menu, Column Colors & View Persistence | [x] | - |
 | v0.20.1 | Technical Debt Reduction | [x] | - |
 | v0.21.0 | Multi-Format Export (JSON, TSV, Markdown, XLSX, Parquet) | [x] | 14 |
 | v0.22.0 | Macros & Command Recording | [x] | 30 |
@@ -124,10 +124,10 @@ Full vim modal editing in SQL editor with reusable vim_editor module (700+ tests
 Refactored vim_editor with command pattern, removed code duplication, reorganized normal_mode into 11 modules, split UI modules, added unit tests, zero clippy warnings (1,251 tests total).  
 
 **[v0.12.0](versions/v0.12.0.md) - UI Consistency & Standardization** ✅ COMPLETE
-Yazi-inspired 3-column file explorer (30%:40%:30%) with parent directory preview, current directory navigation, and file/CSV preview. Bug fixes for navigation scroll, ASCII-only rendering (no emojis), and consistent error messages. All 524 tests passing.
+3-column file explorer (30%:40%:30%) with parent directory preview, current directory navigation, and file/CSV preview. Bug fixes for navigation scroll, ASCII-only rendering (no emojis), and consistent error messages. All 524 tests passing.
 
-**[v0.24.0](versions/v0.24.0.md) - Performance, CLI Pipeline & SQL Type Intelligence**
-Lazy loading with memory-mapped files for large CSVs, CLI sort mode, piped stdin support for all non-interactive modes, and automatic column type detection for correct numeric/date ordering in SQL queries. Buffered I/O indexing (7x faster on macOS), parallel sort with rayon, fast memchr row counting, and raw-byte CSV write for sorted lazy files.
+**[v0.24.0](versions/v0.24.0.md) - TUI Theming** ✅ COMPLETE
+Nested theme schema (`[ui]`/`[table]`/`[popup]`/`[status]`/`[file_menu]`/`[sql]`) replacing the legacy flat `[theme]` block. All hardcoded colors and `COLOR_*` constants removed from the renderer; every helper now requires `&Theme`. Base-canvas pass paints the entire frame so terminal transparency is fully covered. 11 ready-to-use theme presets ship under `themes/` (Gruvbox dark/light, Dracula, Nord, Catppuccin Mocha/Macchiato/Frappé/Latte, Solarized dark/light, Tokyo Night). Hot-reload via existing `ConfigWatcher`. Help, file menu, SQL editor, magnifier, formula completion, file-op prompt, stats overlay, and context menu all theme-aware. Hard break on the old schema. Incidental fix: `benches/sql.rs` updated for the DuckDB API rename.
 
 **[v0.25.0](versions/v0.25.0.md) - Spreadsheet Support, CLI Tools & SQL DML**
 Native spreadsheet file support (xlsx/xls/ods) via calamine. Formula preservation in formula bar. CLI extraction (`-x`), clipboard copy (`-C`), clipboard paste (`-P` with auto delimiter detection), file splitting (`-S`), and SQL queries (`-q`) all work across CSV and spreadsheet formats. SQL DML (INSERT/UPDATE/DELETE/ALTER) with DML-aware IntelliSense and templates. TUI `:copy`/`:paste` commands with auto delimiter detection. SQL formatting via Ctrl+F. Streaming I/O for large files. Zebra striping. Terminal robustness fixes.
@@ -171,8 +171,8 @@ New `-g` CLI command generates synthetic CSV files with typed data schemas (cust
 **[v0.19.0](versions/v0.19.0.md) - Column Resize & Advanced Column Operations**
 Column width already complete from prior work. Column/row pinning: `:pin A,B` pins columns always-visible on left, `:pin 1,2` pins rows always-visible at top, `:unpin` clears both. Visual indicator: cyan + underline. Column type system: `:type A number/date/boolean/text` with validation on cell edit (rejects invalid values), type-aware sorting, and type indicators (#, D, ?) in column headers. Per-file state for all pin/type settings. 60+ tests.
 
-**[v0.30.0] - Yazi-Style File Menu, Column Colors & View Persistence**
-Complete yazi-inspired file menu overhaul: borderless layout with breadcrumb path header (`~/projects/lazycsv/test_data`), blue-colored directories, inverted white-on-black selection highlight bar, vertical separator bars between panes (parent 15% | current 42% | preview 42%), full-height CSV preview with alternating 8-color column coloring, scroll padding (5-item lookahead), wrap-around navigation (j/k at boundaries), hidden file toggle (`.` key), and yazi-style status bar with mode/size/filename/position badges. File details popup (`Tab` key) showing created/modified dates, mimetype, and comma-formatted row count. Per-column styling: `:bgcolor C red` and `:fgcolor C #ff0000` commands with 35+ named CSS colors (crimson, teal, gold, indigo, etc.) plus hex `#rrggbb`. View persistence to `~/.config/lazycsv/views.json`: column widths, bg/fg colors, column types, and frozen columns/rows saved immediately on change with canonical absolute-path keys; auto-loaded on file open from CLI or File Menu. `:clearview` command to reset saved settings. All file menu colors configurable via `config.toml` (`file_menu_dir_fg`, `file_menu_highlight_bg`, `file_menu_preview_col_1` through `_col_8`, etc.). Clean terminal exit (no zsh `%` indicator).
+**[v0.30.0] - 3-Column File Menu, Column Colors & View Persistence**
+Complete file menu overhaul: borderless layout with breadcrumb path header (`~/projects/lazycsv/test_data`), blue-colored directories, inverted white-on-black selection highlight bar, vertical separator bars between panes (parent 15% | current 42% | preview 42%), full-height CSV preview with alternating 8-color column coloring, scroll padding (5-item lookahead), wrap-around navigation (j/k at boundaries), hidden file toggle (`.` key), and a status bar with mode/size/filename/position badges. File details popup (`Tab` key) showing created/modified dates, mimetype, and comma-formatted row count. Per-column styling: `:bgcolor C red` and `:fgcolor C #ff0000` commands with 35+ named CSS colors (crimson, teal, gold, indigo, etc.) plus hex `#rrggbb`. View persistence to `~/.config/lazycsv/views.json`: column widths, bg/fg colors, column types, and frozen columns/rows saved immediately on change with canonical absolute-path keys; auto-loaded on file open from CLI or File Menu. `:clearview` command to reset saved settings. All file menu colors configurable via `config.toml` (`file_menu_dir_fg`, `file_menu_highlight_bg`, `file_menu_preview_col_1` through `_col_8`, etc.). Clean terminal exit (no zsh `%` indicator).
 
 **[v0.17.0] - Conditional Formatting**
 Conditional formatting via `:bgcolor`/`:fgcolor` commands: `:bgcolor C red > 100` applies color only to cells matching a condition. Supports `=`/`==`, `!=`, `>`, `<`, `>=`, `<=`, `~` (regex) operators. Compound conditions with `&&` (AND) and `||` (OR) (e.g., `:fgcolor C red > 32 && < 35`, `:bgcolor C blue = 25 || = 15`). Multiple rules per column with first-match-wins semantics. Rule management: `:bgcolor C list` shows numbered rules, `:bgcolor C remove 2` deletes a specific rule, `:bgcolor C clear` removes all rules. Numeric comparisons auto-strip `$` and commas. Conditional rules persisted in `views.json` alongside unconditional color rules and restored on file open.
@@ -213,7 +213,7 @@ Decomposed God objects: `app/mod.rs` 3,289→320 lines (15 sub-modules), `execut
 Vim-style macro recording (`qa`/`q`/`@a`/`@@`) with 26 registers (a–z), replay-depth guard against runaway loops, and per-key length cap. Persistent ex-command (`:`) history with Up/Down navigation in command mode, `:history` listing, dedup-and-promote semantics, and configurable `command_history_limit` (default 50). 30 integration tests.
 
 **[v0.22.1](versions/v0.22.1.md) - Performance Benchmarking & Tuning** ✅ COMPLETE
-Criterion benchmark suite under `benches/` (navigation, rendering, search, magnifier, sql) protects critical paths against regressions. The performance work itself was delivered incrementally across earlier versions: mmap-backed lazy loading (v0.24.0), DuckDB migration (v0.24.0/v0.26.0), parallelized search and `:s` substitute (v0.29.0), buffered I/O + parallel sort (v0.24.0/v0.29.0), and the writer's contiguous-mmap fast path for unedited rows (v0.29.0).
+Criterion benchmark suite under `benches/` (navigation, rendering, search, magnifier, sql) protects critical paths against regressions. The performance work itself was delivered incrementally across earlier versions: mmap-backed lazy loading, DuckDB migration (v0.26.0), parallelized search and `:s` substitute (v0.29.0), buffered I/O + parallel sort (v0.29.0), and the writer's contiguous-mmap fast path for unedited rows (v0.29.0).
 
 **[v0.23.0](versions/v0.23.0.md) - Final Architecture Review**  
 Comprehensive architecture review with refactoring for long-term maintainability.  

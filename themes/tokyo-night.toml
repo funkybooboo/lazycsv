@@ -1,0 +1,57 @@
+# Tokyo Night — Enkia
+# https://github.com/enkia/tokyo-night-vscode-theme
+#
+# Modern dark theme inspired by Tokyo at night — deep blues with neon highlights.
+
+[ui]
+fg        = "#c0caf5"
+bg        = "#1a1b26"
+border_fg = "#3b4261"
+
+[table]
+header_fg       = "#7aa2f7"
+header_bg       = "#16161e"
+header_bold     = true
+zebra_bg        = "#1f2335"
+cursor_fg       = "#1a1b26"
+cursor_bg       = "#7aa2f7"
+selection_fg    = "#c0caf5"
+selection_bg    = "#33467c"
+search_match_fg = "#1a1b26"
+search_match_bg = "#e0af68"
+dirty_fg        = "#f7768e"
+
+[popup]
+bg                = "#24283b"
+fg                = "#c0caf5"
+border_fg         = "#3b4261"
+title_fg          = "#bb9af7"
+completion_sel_fg = "#1a1b26"
+completion_sel_bg = "#7aa2f7"
+
+[status]
+fg         = "#c0caf5"
+bg         = "#16161e"
+mode_fg    = "#1a1b26"
+mode_bg    = "#9ece6a"
+error_fg   = "#f7768e"
+success_fg = "#9ece6a"
+
+[file_menu]
+dir_fg              = "#7aa2f7"
+highlight_fg        = "#c0caf5"
+highlight_bg        = "#33467c"
+separator_fg        = "#3b4261"
+status_bg           = "#16161e"
+status_mode_bg      = "#7aa2f7"
+status_accent_bg    = "#bb9af7"
+active_indicator_fg = "#9ece6a"
+preview_cols = [
+  "#7aa2f7", "#9ece6a", "#e0af68", "#7dcfff",
+  "#bb9af7", "#f7768e", "#ff9e64", "#1abc9c",
+]
+
+[sql]
+line_number_fg        = "#3b4261"
+diagnostic_error_fg   = "#f7768e"
+diagnostic_warning_fg = "#e0af68"

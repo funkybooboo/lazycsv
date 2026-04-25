@@ -15,6 +15,7 @@ pub mod view_state;
 use crate::App;
 use ratatui::{
     layout::{Constraint, Direction, Layout},
+    style::Style,
     Frame,
 };
 
@@ -38,6 +39,16 @@ pub fn render_loading(frame: &mut Frame, message: &str) {
 
 /// Main UI rendering function
 pub fn render(frame: &mut Frame, app: &mut App) {
+    // Paint a theme-colored base layer over the entire frame so any
+    // un-painted gaps (right of last column, below the data, etc.)
+    // pick up the configured ui background instead of the terminal default.
+    let base = ratatui::widgets::Block::default().style(
+        Style::default()
+            .fg(app.config.theme.ui.fg)
+            .bg(app.config.theme.ui.bg),
+    );
+    frame.render_widget(base, frame.area());
+
     // Split terminal into main area + status bar
     // Minimal layout: no heavy borders, just horizontal rules as separators
     let chunks = Layout::default()
@@ -57,7 +68,12 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     // Render help overlay if active
     if app.view_state.help_overlay_visible {
         let search_query = app.view_state.help_search_query.as_deref();
-        help::render_help_overlay(frame, app.view_state.help_scroll_offset, search_query);
+        help::render_help_overlay(
+            frame,
+            app.view_state.help_scroll_offset,
+            search_query,
+            &app.config.theme,
+        );
     }
 
     // Render SQL editor overlay if active
@@ -74,6 +90,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
                 app.sql_completion.as_ref(),
                 &app.sql_diagnostics,
                 history_popup,
+                &app.config.theme,
             );
         }
     }
@@ -101,13 +118,13 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     // Render statistics overlay if active
     if app.view_state.stats_overlay_visible {
         if let Some(ref data) = app.view_state.stats_overlay_data {
-            stats_overlay::render(frame, data);
+            stats_overlay::render(frame, data, &app.config.theme);
         }
     }
 
     // Render context menu if active
     if let Some(ref menu) = app.context_menu {
-        render_context_menu(frame, menu);
+        render_context_menu(frame, menu, &app.config.theme);
     }
 }
 
@@ -140,7 +157,7 @@ fn render_file_operation_prompt(frame: &mut ratatui::Frame, app: &crate::app::Ap
         None => (" File Operation ".to_string(), ""),
     };
 
-    let block = modal::standard_block(&title);
+    let block = modal::popup_block(&app.config.theme, &title);
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -152,7 +169,7 @@ fn render_file_operation_prompt(frame: &mut ratatui::Frame, app: &crate::app::Ap
         Line::from("Enter: confirm | Esc: cancel"),
     ];
 
-    let paragraph = Paragraph::new(text);
+    let paragraph = Paragraph::new(text).style(modal::popup_text_style(&app.config.theme));
     frame.render_widget(paragraph, inner);
 }
 
@@ -163,7 +180,7 @@ fn render_formula_completion(frame: &mut ratatui::Frame, app: &crate::app::App) 
         layout::Rect,
         style::{Color, Modifier, Style},
         text::{Line, Span},
-        widgets::{Block, Borders, Clear, Paragraph},
+        widgets::{Clear, Paragraph},
     };
 
     let completion = match &app.formula_completion {
@@ -215,14 +232,14 @@ fn render_formula_completion(frame: &mut ratatui::Frame, app: &crate::app::App) 
         .map(|(idx, item)| {
             let is_selected = idx == completion.selected;
             let base_style = if is_selected {
-                modal::completion_selected_style()
+                modal::completion_selected_style(&app.config.theme)
             } else {
-                modal::completion_unselected_style()
+                modal::completion_unselected_style(&app.config.theme)
             };
             let bg = if is_selected {
                 Color::Blue
             } else {
-                modal::COLOR_POPUP_BG
+                app.config.theme.popup.bg
             };
             let tag_style = Style::default().fg(item.kind.color()).bg(bg);
             let highlight_style = base_style.add_modifier(Modifier::BOLD | Modifier::UNDERLINED);
@@ -265,27 +282,30 @@ fn render_formula_completion(frame: &mut ratatui::Frame, app: &crate::app::App) 
         .collect();
 
     frame.render_widget(Clear, popup_rect);
-    let mut popup_block = Block::default()
-        .borders(Borders::ALL)
-        .title(" Formulas ")
-        .style(Style::default().bg(modal::COLOR_POPUP_BG));
-    if !completion.filter.is_empty() {
-        popup_block = popup_block.title(format!(" /{} ", completion.filter));
-    }
+    let title = if !completion.filter.is_empty() {
+        format!(" /{} ", completion.filter)
+    } else {
+        " Formulas ".to_string()
+    };
+    let popup_block = modal::popup_block(&app.config.theme, &title);
     let popup_inner = popup_block.inner(popup_rect);
     frame.render_widget(popup_block, popup_rect);
 
-    let paragraph = Paragraph::new(lines);
+    let paragraph = Paragraph::new(lines).style(modal::popup_text_style(&app.config.theme));
     frame.render_widget(paragraph, popup_inner);
 }
 
 /// Render right-click context menu popup
-fn render_context_menu(frame: &mut ratatui::Frame, menu: &crate::app::ContextMenu) {
+fn render_context_menu(
+    frame: &mut ratatui::Frame,
+    menu: &crate::app::ContextMenu,
+    theme: &crate::config::Theme,
+) {
     use ratatui::{
         layout::Rect,
         style::{Color, Modifier, Style},
         text::{Line, Span},
-        widgets::{Block, Borders, Clear},
+        widgets::Clear,
     };
 
     let item_count = menu.items.len() as u16;
@@ -308,9 +328,7 @@ fn render_context_menu(frame: &mut ratatui::Frame, menu: &crate::app::ContextMen
 
     frame.render_widget(Clear, popup_rect);
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .style(Style::default().bg(modal::COLOR_POPUP_BG));
+    let block = modal::popup_block(theme, "");
     let inner = block.inner(popup_rect);
     frame.render_widget(block, popup_rect);
 
@@ -324,9 +342,7 @@ fn render_context_menu(frame: &mut ratatui::Frame, menu: &crate::app::ContextMen
                 let sep = "─".repeat(inner_width);
                 return Line::from(Span::styled(
                     sep,
-                    Style::default()
-                        .bg(modal::COLOR_POPUP_BG)
-                        .fg(Color::DarkGray),
+                    Style::default().bg(theme.popup.bg).fg(Color::DarkGray),
                 ));
             }
             let is_selected = i == menu.selected;
@@ -337,7 +353,7 @@ fn render_context_menu(frame: &mut ratatui::Frame, menu: &crate::app::ContextMen
                     .fg(Color::White)
                     .add_modifier(Modifier::BOLD)
             } else {
-                Style::default().bg(modal::COLOR_POPUP_BG).fg(Color::White)
+                Style::default().bg(theme.popup.bg).fg(Color::White)
             };
             Line::from(Span::styled(label, style))
         })

@@ -1,0 +1,58 @@
+# Gruvbox Dark — Pavel Pertsev
+# https://github.com/morhetz/gruvbox
+#
+# Warm, retro-style palette with muted earth tones.
+# Drop into ~/.config/lazycsv/config.toml (or merge with your existing config).
+
+[ui]
+fg        = "#ebdbb2"
+bg        = "#282828"
+border_fg = "#7c6f64"
+
+[table]
+header_fg       = "#fabd2f"
+header_bg       = "#3c3836"
+header_bold     = true
+zebra_bg        = "#32302f"
+cursor_fg       = "#282828"
+cursor_bg       = "#d79921"
+selection_fg    = "#ebdbb2"
+selection_bg    = "#504945"
+search_match_fg = "#fbf1c7"
+search_match_bg = "#b57614"
+dirty_fg        = "#fb4934"
+
+[popup]
+bg                = "#3c3836"
+fg                = "#ebdbb2"
+border_fg         = "#7c6f64"
+title_fg          = "#fabd2f"
+completion_sel_fg = "#fbf1c7"
+completion_sel_bg = "#458588"
+
+[status]
+fg         = "#ebdbb2"
+bg         = "#3c3836"
+mode_fg    = "#282828"
+mode_bg    = "#b8bb26"
+error_fg   = "#fb4934"
+success_fg = "#b8bb26"
+
+[file_menu]
+dir_fg              = "#83a598"
+highlight_fg        = "#282828"
+highlight_bg        = "#fabd2f"
+separator_fg        = "#665c54"
+status_bg           = "#3c3836"
+status_mode_bg      = "#458588"
+status_accent_bg    = "#b16286"
+active_indicator_fg = "#b8bb26"
+preview_cols = [
+  "#83a598", "#b8bb26", "#fabd2f", "#8ec07c",
+  "#d3869b", "#fb4934", "#458588", "#689d6a",
+]
+
+[sql]
+line_number_fg        = "#665c54"
+diagnostic_error_fg   = "#fb4934"
+diagnostic_warning_fg = "#fabd2f"

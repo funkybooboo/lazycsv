@@ -351,9 +351,11 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
     let status_text = build_status_text(app, &right_side, &pending_indicator, area.width as usize);
 
     let style = if app.external_modification_pending {
-        super::modal::mode_indicator_style()
+        super::modal::mode_indicator_style(&app.config.theme)
     } else {
         Style::default()
+            .fg(app.config.theme.status.fg)
+            .bg(app.config.theme.status.bg)
     };
 
     let status = Paragraph::new(status_text).style(style);

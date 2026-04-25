@@ -31,13 +31,15 @@ pub fn render_magnifier(frame: &mut Frame, app: &App, area: Rect) {
         None => return,
     };
 
+    let theme = &app.config.theme;
+
     // Create centered popup using standard large modal size
     let popup_area = super::modal::large_modal_rect(area);
     frame.render_widget(Clear, popup_area);
 
     // Build and render main block with title
     let title = build_magnifier_title(magnifier);
-    let main_block = super::modal::standard_block(&title);
+    let main_block = super::modal::popup_block(theme, &title);
 
     let inner = main_block.inner(popup_area);
     frame.render_widget(main_block, popup_area);
@@ -46,7 +48,7 @@ pub fn render_magnifier(frame: &mut Frame, app: &App, area: Rect) {
     let (content, status) = super::modal::split_with_status_bar(inner);
 
     // Render content area
-    render_content(frame, magnifier, content);
+    render_content(frame, magnifier, theme, content);
 
     // Render status bar
     let status_text = build_magnifier_status_bar(magnifier, status.width as usize);
@@ -139,7 +141,12 @@ fn build_magnifier_status_bar(
 }
 
 /// Render content area with line numbers and text
-fn render_content(frame: &mut Frame, magnifier: &crate::magnifier::MagnifierState, area: Rect) {
+fn render_content(
+    frame: &mut Frame,
+    magnifier: &crate::magnifier::MagnifierState,
+    theme: &crate::config::Theme,
+    area: Rect,
+) {
     let line_count = magnifier.lines().len();
     let line_num_width = if line_count == 0 {
         MIN_LINE_NUMBER_WIDTH
@@ -156,7 +163,7 @@ fn render_content(frame: &mut Frame, magnifier: &crate::magnifier::MagnifierStat
         .split(area);
 
     render_line_numbers(frame, magnifier, chunks[0], line_num_width);
-    render_text_content(frame, magnifier, chunks[1]);
+    render_text_content(frame, magnifier, theme, chunks[1]);
 }
 
 /// Render line numbers
@@ -198,6 +205,7 @@ fn render_line_numbers(
 fn render_text_content(
     frame: &mut Frame,
     magnifier: &crate::magnifier::MagnifierState,
+    theme: &crate::config::Theme,
     area: Rect,
 ) {
     let line_count = magnifier.lines().len();
@@ -241,12 +249,13 @@ fn render_text_content(
             search_matches,
             current_match,
             magnifier.mode(),
+            theme,
         );
         lines.push(styled_line);
     }
 
     if line_count == 0 {
-        let cursor_span = Span::styled(" ", super::modal::cursor_style());
+        let cursor_span = Span::styled(" ", super::modal::cursor_style(theme));
         lines.push(Line::from(vec![cursor_span]));
     }
 
@@ -266,6 +275,7 @@ fn render_line_with_highlights(
     search_matches: &[(usize, usize)],
     current_match: Option<usize>,
     _mode: crate::magnifier::MagnifierMode,
+    theme: &crate::config::Theme,
 ) -> Line<'static> {
     let chars: Vec<char> = line_text.chars().collect();
     let mut spans: Vec<Span> = Vec::new();
@@ -291,6 +301,7 @@ fn render_line_with_highlights(
             selection,
             search_matches,
             current_match,
+            theme,
         );
         let display_char = if ch == '\t' { ' ' } else { ch };
         spans.push(Span::styled(display_char.to_string(), style));
@@ -305,7 +316,7 @@ fn render_line_with_highlights(
         start_col,
         end_col,
     ) {
-        spans.push(Span::styled(" ", super::modal::cursor_style()));
+        spans.push(Span::styled(" ", super::modal::cursor_style(theme)));
     }
 
     // Add right scroll indicator if needed
@@ -332,6 +343,7 @@ fn calculate_visible_range(
 }
 
 /// Get the appropriate style for a character based on cursor, selection, and search
+#[allow(clippy::too_many_arguments)]
 fn get_char_style(
     line_idx: usize,
     col: usize,
@@ -340,6 +352,7 @@ fn get_char_style(
     selection: &Option<crate::magnifier::Selection>,
     search_matches: &[(usize, usize)],
     current_match: Option<usize>,
+    theme: &crate::config::Theme,
 ) -> Style {
     let is_cursor = line_idx == cursor_line && col == cursor_col;
     let is_selected = is_position_selected(line_idx, col, selection);
@@ -347,7 +360,7 @@ fn get_char_style(
 
     if is_cursor || is_selected {
         // Cursor and selection take priority - use centralized cursor style
-        super::modal::cursor_style()
+        super::modal::cursor_style(theme)
     } else {
         // Search match or normal text
         search_highlight.unwrap_or_default()

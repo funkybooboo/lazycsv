@@ -1,0 +1,57 @@
+# Gruvbox Light — Pavel Pertsev
+# https://github.com/morhetz/gruvbox
+#
+# Light variant of Gruvbox — cream background with muted accents.
+
+[ui]
+fg        = "#3c3836"
+bg        = "#fbf1c7"
+border_fg = "#928374"
+
+[table]
+header_fg       = "#b57614"
+header_bg       = "#ebdbb2"
+header_bold     = true
+zebra_bg        = "#f2e5bc"
+cursor_fg       = "#fbf1c7"
+cursor_bg       = "#b57614"
+selection_fg    = "#3c3836"
+selection_bg    = "#d5c4a1"
+search_match_fg = "#fbf1c7"
+search_match_bg = "#af3a03"
+dirty_fg        = "#9d0006"
+
+[popup]
+bg                = "#ebdbb2"
+fg                = "#3c3836"
+border_fg         = "#928374"
+title_fg          = "#9d0006"
+completion_sel_fg = "#fbf1c7"
+completion_sel_bg = "#076678"
+
+[status]
+fg         = "#3c3836"
+bg         = "#ebdbb2"
+mode_fg    = "#fbf1c7"
+mode_bg    = "#79740e"
+error_fg   = "#9d0006"
+success_fg = "#79740e"
+
+[file_menu]
+dir_fg              = "#076678"
+highlight_fg        = "#fbf1c7"
+highlight_bg        = "#b57614"
+separator_fg        = "#bdae93"
+status_bg           = "#ebdbb2"
+status_mode_bg      = "#076678"
+status_accent_bg    = "#8f3f71"
+active_indicator_fg = "#79740e"
+preview_cols = [
+  "#076678", "#79740e", "#b57614", "#427b58",
+  "#8f3f71", "#9d0006", "#076678", "#79740e",
+]
+
+[sql]
+line_number_fg        = "#bdae93"
+diagnostic_error_fg   = "#9d0006"
+diagnostic_warning_fg = "#b57614"

@@ -6,12 +6,13 @@
 use crate::app::{
     DiagnosticSeverity, SqlCompletion, SqlDiagnostic, SqlHistoryPopup, COMPLETION_MAX_VISIBLE,
 };
+use crate::config::Theme;
 use crate::vim_editor::{Selection, VimEditor, VimMode};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Clear, Paragraph},
     Frame,
 };
 
@@ -29,6 +30,7 @@ pub fn render_sql_editor_vim(
     completion: Option<&SqlCompletion>,
     diagnostics: &[SqlDiagnostic],
     history_popup: Option<(&SqlHistoryPopup, &[String])>,
+    theme: &Theme,
 ) {
     let area = super::modal::large_modal_rect(frame.area());
 
@@ -37,7 +39,7 @@ pub fn render_sql_editor_vim(
 
     // Title without mode (mode shown in status bar instead)
     let title = " SQL Query ";
-    let block = super::modal::standard_block(title);
+    let block = super::modal::popup_block(theme, title);
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -45,28 +47,28 @@ pub fn render_sql_editor_vim(
     let (query_area, status_area) = split_editor_area(inner);
 
     // Render query text with line numbers, cursor, and diagnostic squiggles
-    let lines = build_vim_editor_lines_with_diagnostics(vim_editor, diagnostics);
+    let lines = build_vim_editor_lines_with_diagnostics(vim_editor, diagnostics, theme);
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, query_area);
 
     // Build status line - show first diagnostic message if any, otherwise normal status
     let first_diag_at_cursor = find_diagnostic_at_cursor(vim_editor, diagnostics);
     let status_line = if let Some(diag) = first_diag_at_cursor {
-        build_diagnostic_status_line(diag, status_area.width as usize)
+        build_diagnostic_status_line(diag, status_area.width as usize, theme)
     } else {
-        build_status_line(vim_editor, sql_error, status_area.width as usize)
+        build_status_line(vim_editor, sql_error, status_area.width as usize, theme)
     };
     let status_paragraph = Paragraph::new(vec![status_line]);
     frame.render_widget(status_paragraph, status_area);
 
     // Render completion popup if active
     if let Some(comp) = completion {
-        render_completion_popup(frame, vim_editor, comp, query_area);
+        render_completion_popup(frame, vim_editor, comp, query_area, theme);
     }
 
     // Render history popup if active (overlays the editor)
     if let Some((popup, history)) = history_popup {
-        render_history_popup(frame, popup, history, area);
+        render_history_popup(frame, popup, history, area, theme);
     }
 }
 
@@ -76,6 +78,7 @@ fn render_completion_popup(
     vim_editor: &VimEditor,
     completion: &SqlCompletion,
     query_area: Rect,
+    theme: &Theme,
 ) {
     use crate::app::CompletionItem;
 
@@ -123,14 +126,14 @@ fn render_completion_popup(
         .map(|(idx, item)| {
             let is_selected = idx == completion.selected;
             let base_style = if is_selected {
-                super::modal::completion_selected_style()
+                super::modal::completion_selected_style(theme)
             } else {
-                super::modal::completion_unselected_style()
+                super::modal::completion_unselected_style(theme)
             };
             let bg = if is_selected {
                 Color::Blue
             } else {
-                super::modal::COLOR_POPUP_BG
+                theme.popup.bg
             };
             let tag_style = Style::default().fg(item.kind.color()).bg(bg);
             let highlight_style = base_style.add_modifier(Modifier::BOLD | Modifier::UNDERLINED);
@@ -175,16 +178,16 @@ fn render_completion_popup(
         .collect();
 
     frame.render_widget(Clear, popup_rect);
-    let mut popup_block = Block::default()
-        .borders(Borders::ALL)
-        .style(Style::default().bg(super::modal::COLOR_POPUP_BG));
-    if !completion.filter.is_empty() {
-        popup_block = popup_block.title(format!(" /{} ", completion.filter));
-    }
+    let title = if !completion.filter.is_empty() {
+        format!(" /{} ", completion.filter)
+    } else {
+        String::new()
+    };
+    let popup_block = super::modal::popup_block(theme, &title);
     let popup_inner = popup_block.inner(popup_rect);
     frame.render_widget(popup_block, popup_rect);
 
-    let paragraph = Paragraph::new(lines);
+    let paragraph = Paragraph::new(lines).style(super::modal::popup_text_style(theme));
     frame.render_widget(paragraph, popup_inner);
 
     // Scroll indicators: render on the right border of the popup
@@ -192,9 +195,7 @@ fn render_completion_popup(
     if total > visible_count {
         let has_above = scroll_offset > 0;
         let has_below = scroll_offset + visible_count < total;
-        let border_style = Style::default()
-            .fg(Color::White)
-            .bg(super::modal::COLOR_POPUP_BG);
+        let border_style = Style::default().fg(Color::White).bg(theme.popup.bg);
 
         // Place arrows on the right border column (popup_rect edge)
         let border_x = popup_rect.right().saturating_sub(1);
@@ -217,6 +218,7 @@ fn render_history_popup(
     popup: &SqlHistoryPopup,
     history: &[String],
     editor_area: Rect,
+    theme: &Theme,
 ) {
     if history.is_empty() {
         return;
@@ -235,10 +237,7 @@ fn render_history_popup(
     } else {
         " SQL History  (↑↓/jk · Enter select · dd delete · Esc close) ".to_string()
     };
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(title)
-        .style(Style::default().bg(super::modal::COLOR_POPUP_BG));
+    let block = super::modal::popup_block(theme, &title);
     let inner = block.inner(popup_rect);
     frame.render_widget(block, popup_rect);
 
@@ -254,9 +253,9 @@ fn render_history_popup(
             let style = if is_selected && popup.pending_d {
                 Style::default().fg(Color::White).bg(Color::Red)
             } else if is_selected {
-                super::modal::completion_selected_style()
+                super::modal::completion_selected_style(theme)
             } else {
-                super::modal::completion_unselected_style()
+                super::modal::completion_unselected_style(theme)
             };
             // Collapse multi-line queries to a single display line
             let one_line: String = query
@@ -290,6 +289,7 @@ fn build_status_line<'a>(
     vim_editor: &VimEditor,
     sql_error: Option<&str>,
     width: usize,
+    theme: &Theme,
 ) -> Line<'a> {
     let help_text = "Ctrl+Enter: execute | Ctrl+F: format | Ctrl+H: history | Ctrl+N: complete | Ctrl+/: help | Esc: exit";
 
@@ -309,7 +309,7 @@ fn build_status_line<'a>(
     if sql_error.is_some() {
         // Error in red - use centralized error style
         Line::from(vec![
-            Span::styled(left, super::modal::error_style()),
+            Span::styled(left, super::modal::error_style(theme)),
             Span::raw(" ".repeat(padding)),
             Span::raw(help_text),
         ])
@@ -324,11 +324,11 @@ fn build_status_line<'a>(
 }
 
 /// Build display lines from vim editor with line numbers, cursor, and visual-selection highlighting.
-fn build_vim_editor_lines(vim_editor: &VimEditor) -> Vec<Line<'static>> {
+fn build_vim_editor_lines(vim_editor: &VimEditor, theme: &Theme) -> Vec<Line<'static>> {
     let line_count = vim_editor.line_count();
     let line_num_width = format!("{}", line_count).len();
     (0..line_count)
-        .map(|i| build_source_line(vim_editor, i, line_num_width))
+        .map(|i| build_source_line(vim_editor, i, line_num_width, theme))
         .collect()
 }
 
@@ -338,6 +338,7 @@ fn build_source_line(
     vim_editor: &VimEditor,
     line_idx: usize,
     line_num_width: usize,
+    theme: &Theme,
 ) -> Line<'static> {
     let (cursor_line, cursor_col) = vim_editor.cursor();
     let selection = vim_editor.visual_selection();
@@ -345,10 +346,7 @@ fn build_source_line(
     let chars: Vec<char> = line_text.chars().collect();
 
     let line_num = format!("{:>width$} ", line_idx + 1, width = line_num_width);
-    let line_num_span = Span::styled(
-        line_num,
-        Style::default().fg(super::modal::COLOR_LINE_NUMBER),
-    );
+    let line_num_span = Span::styled(line_num, Style::default().fg(theme.sql.line_number_fg));
     let mut spans = vec![line_num_span];
 
     // If cursor is past line end, we still need to render a trailing cursor cell.
@@ -367,9 +365,12 @@ fn build_source_line(
         let is_cursor = line_idx == cursor_line && col == cursor_col;
         let is_selected = is_in_selection(selection, line_idx, col);
         if is_cursor {
-            spans.push(Span::styled(ch, super::modal::cursor_style()));
+            spans.push(Span::styled(ch, super::modal::cursor_style(theme)));
         } else if is_selected {
-            spans.push(Span::styled(ch, super::modal::visual_selection_style()));
+            spans.push(Span::styled(
+                ch,
+                super::modal::visual_selection_style(theme),
+            ));
         } else {
             spans.push(Span::raw(ch));
         }
@@ -408,9 +409,10 @@ fn is_in_selection(sel: Option<Selection>, line: usize, col: usize) -> bool {
 fn build_vim_editor_lines_with_diagnostics(
     vim_editor: &VimEditor,
     diagnostics: &[SqlDiagnostic],
+    theme: &Theme,
 ) -> Vec<Line<'static>> {
     if diagnostics.is_empty() {
-        return build_vim_editor_lines(vim_editor);
+        return build_vim_editor_lines(vim_editor, theme);
     }
 
     let line_count = vim_editor.line_count();
@@ -418,13 +420,18 @@ fn build_vim_editor_lines_with_diagnostics(
 
     let mut display_lines = Vec::new();
     for (line_idx, line_text) in vim_editor.lines().iter().enumerate() {
-        display_lines.push(build_source_line(vim_editor, line_idx, line_num_width));
+        display_lines.push(build_source_line(
+            vim_editor,
+            line_idx,
+            line_num_width,
+            theme,
+        ));
 
         let line_diags: Vec<&SqlDiagnostic> =
             diagnostics.iter().filter(|d| d.line == line_idx).collect();
         if !line_diags.is_empty() {
             let gutter = " ".repeat(line_num_width + 1);
-            let squiggles = build_squiggle_line(&line_diags, line_text.len());
+            let squiggles = build_squiggle_line(&line_diags, line_text.len(), theme);
             let mut spans = vec![Span::raw(gutter)];
             spans.extend(squiggles);
             display_lines.push(Line::from(spans));
@@ -438,7 +445,11 @@ fn build_vim_editor_lines_with_diagnostics(
 ///
 /// Produces spans of spaces (for gaps) and `~` characters (for diagnostics)
 /// colored by severity: red for errors, yellow for warnings.
-fn build_squiggle_line(diagnostics: &[&SqlDiagnostic], _line_len: usize) -> Vec<Span<'static>> {
+fn build_squiggle_line(
+    diagnostics: &[&SqlDiagnostic],
+    _line_len: usize,
+    theme: &Theme,
+) -> Vec<Span<'static>> {
     // Sort diagnostics by column start
     let mut sorted: Vec<&&SqlDiagnostic> = diagnostics.iter().collect();
     sorted.sort_by_key(|d| d.col_start);
@@ -452,8 +463,8 @@ fn build_squiggle_line(diagnostics: &[&SqlDiagnostic], _line_len: usize) -> Vec<
         }
         let len = diag.col_end.saturating_sub(diag.col_start).max(1);
         let color = match diag.severity {
-            DiagnosticSeverity::Error => Color::Red,
-            DiagnosticSeverity::Warning => Color::Yellow,
+            DiagnosticSeverity::Error => theme.sql.diagnostic_error_fg,
+            DiagnosticSeverity::Warning => theme.sql.diagnostic_warning_fg,
         };
         spans.push(Span::styled("~".repeat(len), Style::default().fg(color)));
         pos = diag.col_end;
@@ -474,10 +485,14 @@ fn find_diagnostic_at_cursor<'a>(
 }
 
 /// Build a status line showing a diagnostic message.
-fn build_diagnostic_status_line(diag: &SqlDiagnostic, width: usize) -> Line<'static> {
+fn build_diagnostic_status_line(
+    diag: &SqlDiagnostic,
+    width: usize,
+    theme: &Theme,
+) -> Line<'static> {
     let (prefix, color) = match diag.severity {
-        DiagnosticSeverity::Error => ("Error: ", Color::Red),
-        DiagnosticSeverity::Warning => ("Warning: ", Color::Yellow),
+        DiagnosticSeverity::Error => ("Error: ", theme.sql.diagnostic_error_fg),
+        DiagnosticSeverity::Warning => ("Warning: ", theme.sql.diagnostic_warning_fg),
     };
     let msg = format!("{}{}", prefix, diag.message);
     let help_text = "? for help";

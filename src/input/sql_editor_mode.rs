@@ -370,18 +370,7 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
                         template_steps: vec![],
                     }]
                 } else {
-                    let mut seen = std::collections::HashSet::new();
-                    files
-                        .iter()
-                        .map(|p| crate::query::table_name_from_path(p))
-                        .filter(|name| seen.insert(name.clone()))
-                        .map(|text| CompletionItem {
-                            text,
-                            kind: CompletionKind::Table,
-                            template: None,
-                            template_steps: vec![],
-                        })
-                        .collect()
+                    sorted_table_items(&files)
                 }
             }
             CompletionContext::AliasPrefix(alias) => {
@@ -572,11 +561,29 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     if let Some(ref ed) = app.sql_vim_editor {
         let sql_text = ed.content();
         let files = app.session.files().to_vec();
-        // Build schema from cache for validator
-        let schema: std::collections::HashMap<std::path::PathBuf, Vec<String>> = files
+        // Build schema from on-disk headers via the cache...
+        let mut schema: std::collections::HashMap<std::path::PathBuf, Vec<String>> = files
             .iter()
             .filter_map(|p| app.schema_cache.get_or_read(p).map(|h| (p.clone(), h)))
             .collect();
+        // ...then fill in any in-memory files the cache couldn't read from disk
+        // (query-output tables like result1.csv live only as cached documents).
+        let current_path = app.current_file().clone();
+        for p in &files {
+            if schema.contains_key(p) {
+                continue;
+            }
+            let headers = if p == &current_path {
+                Some(app.document.storage.header_row().to_vec())
+            } else {
+                app.session
+                    .cached_document(p)
+                    .map(|doc| doc.storage.header_row().to_vec())
+            };
+            if let Some(h) = headers {
+                schema.insert(p.clone(), h);
+            }
+        }
         app.sql_diagnostics = crate::query::sql_validator::validate(&sql_text, &files, &schema);
     }
 
@@ -633,18 +640,7 @@ fn execute_template_steps(app: &mut App) {
                     }]
                 } else {
                     let files = app.session.files().to_vec();
-                    let mut seen = std::collections::HashSet::new();
-                    files
-                        .iter()
-                        .map(|p| crate::query::table_name_from_path(p))
-                        .filter(|name| seen.insert(name.clone()))
-                        .map(|text| CompletionItem {
-                            text,
-                            kind: CompletionKind::Table,
-                            template: None,
-                            template_steps: vec![],
-                        })
-                        .collect()
+                    sorted_table_items(&files)
                 };
                 if !items.is_empty() {
                     app.sql_completion = Some(SqlCompletion::new(items, ""));
@@ -838,6 +834,26 @@ fn detect_completion_context(text_before_cursor: &str) -> CompletionContext {
     }
 
     best_ctx.unwrap_or(CompletionContext::General)
+}
+
+/// Build deduped, alphabetically-sorted Table CompletionItems from the session files.
+/// Case-insensitive sort so e.g. `Result` sorts among `r*` names, not after `Z*`.
+fn sorted_table_items(files: &[PathBuf]) -> Vec<CompletionItem> {
+    let mut names: Vec<String> = files
+        .iter()
+        .map(|p| crate::query::table_name_from_path(p))
+        .collect();
+    names.sort_by_key(|n| n.to_lowercase());
+    names.dedup();
+    names
+        .into_iter()
+        .map(|text| CompletionItem {
+            text,
+            kind: CompletionKind::Table,
+            template: None,
+            template_steps: vec![],
+        })
+        .collect()
 }
 
 /// Build CompletionItems for SQL functions
