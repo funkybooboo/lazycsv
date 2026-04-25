@@ -42,6 +42,8 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.19.0 | Column Resize & Advanced Column Operations | [x] | 60+ |
 | v0.20.0 | Data Analysis, Statistics & Cell Formulas | [x] | 88 |
 | v0.24.0 | TUI Theming | [x] | 50 |
+| v0.24.1 | Customizable Keybindings | [ ] | TBD |
+| v0.24.2 | Shell Command in File Browser | [ ] | TBD |
 | v0.25.0 | Spreadsheet Support & CLI Tools | [x] | 13 |
 | v0.26.0 | SQL History, DuckDB VIEW Optimization & CLI Output Flag | [x] | - |
 | v0.27.0 | CLI Data Tools, Per-Command Help, TUI Editing & File Save Fix | [x] | - |
@@ -220,6 +222,12 @@ Comprehensive architecture review with refactoring for long-term maintainability
 
 **[v0.23.1](versions/v0.23.1.md) - Final Architecture Polish**  
 Final architecture cleanup with documentation and code quality improvements.  
+
+**[v0.24.1](versions/v0.24.1.md) - Customizable Keybindings**  
+User-remappable keybindings via `~/.config/lazycsv/keys.toml` (or per-directory `.lazycsv.toml`). Default profile stays vim — no behavioural change for existing users — but the binding table is now data, not hardcoded. Ships example presets under `keymaps/`: vim (default), emacs (Ctrl-based readline-style), excel (arrow-keys / F2-edit / Tab navigation), and a minimal "modeless" preset for users who want no modes. Hot-reload via the existing config watcher.  
+
+**[v0.24.2](versions/v0.24.2.md) - Shell Command in File Browser**  
+Press `:` inside the file menu (`<space>f`) to open a "Shell (block):" input dialog. Whatever the user types is executed as a shell command in the current directory; stdout is discarded, stderr / non-zero exits are surfaced as a status-bar error toast (and optionally a scrollable error popup for long output). Cell highlights ($CWD, $SELECTED, $FILE) are substituted before exec so commands can act on the highlighted entry. Themed prompt that obeys the active `[popup]` colors. Pure synchronous "block" semantics for v0.24.2 — async/orphan modes deferred.  
 
 **[v0.31.0](versions/v0.31.0.md) - Documentation & Maintainability**  
 Documentation improvements with examples, troubleshooting guides, and API docs.  
