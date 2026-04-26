@@ -22,25 +22,25 @@ Download the latest release for your platform from [GitHub Releases](https://git
 
 **macOS (Apple Silicon)**
 ```bash
-curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.24.0-aarch64-apple-darwin.tar.gz | tar xz
+curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.24.2-aarch64-apple-darwin.tar.gz | tar xz
 sudo mv lazycsv /usr/local/bin/
 ```
 
 **macOS (Intel)**
 ```bash
-curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.24.0-x86_64-apple-darwin.tar.gz | tar xz
+curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.24.2-x86_64-apple-darwin.tar.gz | tar xz
 sudo mv lazycsv /usr/local/bin/
 ```
 
 **Linux (x86_64)**
 ```bash
-curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.24.0-x86_64-unknown-linux-gnu.tar.gz | tar xz
+curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.24.2-x86_64-unknown-linux-gnu.tar.gz | tar xz
 sudo mv lazycsv /usr/local/bin/
 ```
 
 **Windows**
 
-Download `lazycsv-v0.24.0-x86_64-pc-windows-msvc.zip` from the [releases page](https://github.com/funkybooboo/lazycsv/releases/latest), extract, and add to your PATH.
+Download `lazycsv-v0.24.2-x86_64-pc-windows-msvc.zip` from the [releases page](https://github.com/funkybooboo/lazycsv/releases/latest), extract, and add to your PATH.
 
 ### Build from source
 
@@ -181,7 +181,7 @@ LazyCSV treats CSV files in the same directory like Excel sheets. Open one file,
 
 ## Current Status
 
-**v0.24.0 Complete** (April 2026) - Full TUI theming. Nested theme schema (`[ui]`/`[table]`/`[popup]`/`[status]`/`[file_menu]`/`[sql]`) replacing the legacy flat `[theme]` block. 11 ready-to-use presets shipped under `themes/` (Gruvbox dark/light, Dracula, Nord, all Catppuccin flavors, Solarized dark/light, Tokyo Night). Hot-reload via the existing config watcher.
+**v0.24.2 Complete** (April 2026) - Customizable keybindings + shell command in file browser. Data-driven keymaps via `~/.config/lazycsv/keys.toml` with three shipped presets (vim default, emacs, excel). `:` inside the file menu (`<space>f`) now opens a "Shell (block):" prompt that runs commands in the current directory with `$CWD` / `$FILE` / `$NAME` / `$EXT` substitution. Builds on v0.24.0's TUI theming foundation.
 
 **Completed Features:**
 - Fast CSV viewer/editor with vim navigation
@@ -226,6 +226,23 @@ cargo test
 ```
 
 See [docs/development.md](docs/development.md) for contributing guidelines.
+
+## What's New in v0.24.2
+
+**Customizable keybindings (April 2026):**
+- **Data-driven keymap** at `~/.config/lazycsv/keys.toml` (or per-directory `.lazycsv.toml`). Schema sections: `[normal]`, `[insert]`, `[visual]`, `[command]`, `[search]`, `[magnifier]`, `[file_list]`, `[sql_editor]`, `[file_operation]`, `[global]`. `[meta] inherit = "vim"` layers your overrides on top of the default; `inherit = "none"` starts from a blank slate.
+- **3 presets ship under `keymaps/`:** `vim.toml` (default, baked into the binary), `emacs.toml` (readline-style: `Ctrl-f/b/n/p`, `Ctrl-a/e`, `Alt-x`, …), `excel.toml` (arrow-key navigation, `F2` to edit, `Ctrl-S/Z/Y`, `Tab/Enter` for data entry).
+- **199 named actions** in the `Action` registry; every user-facing behaviour has a stable `snake_case` ID. Run `:keys` to see how many bindings are active.
+- **Multi-key chords** (vim's `gg`, `dd`, `,yy`, `<space>q`) flow through the keymap. Parametric chords (`g{letter}` for column jump, `q{a-z}` for macro registers) still work — when the keymap can't resolve a chord, buffered keys are replayed through the legacy path.
+- **Explicit unbinds** with `"i" = ""` actually silence a key (no fall-through to legacy hardcoded behaviour). Used in `excel.toml` so `i`/`a`/`v` can be typed as cell content.
+- **Hot-reload** via the existing config watcher — edit `keys.toml` and the new bindings apply on save.
+
+**Shell command in file browser (April 2026):**
+- Press `:` inside the file menu (`<space>f`) to open a themed "Shell (block):" prompt. Whatever you type is executed via `$SHELL -c` in the file menu's current directory.
+- **Variable substitution** before exec: `$CWD`, `$FILE`, `$NAME`, `$EXT` (all shell-quoted). Literal `$` escapable as `\$`; unknown `$<name>` tokens pass through.
+- **TUI suspended** for the duration; aggressive screen clear on resume so terminal state never leaks into the table view.
+- **Stdout discarded; stderr captured** (≤ 64 KiB). Exit-code outcomes: silent success / cream toast for warnings / red error toast on non-zero. Multi-line stderr opens a scrollable popup (`j/k` to scroll, `Esc` to dismiss).
+- **Persistent shell history** at `~/.config/lazycsv/shell_history`. Up/Down walks past entries; configurable `[defaults] shell_history_limit` (default 50, 0 disables).
 
 ## What's New in v0.24.0
 

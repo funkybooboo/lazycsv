@@ -384,6 +384,13 @@ pub fn execute(app: &mut App, action: Action) -> Result<Option<InputResult>> {
         FileListShellPrompt => syn_file_list(app, KeyCode::Char(':'), KeyModifiers::NONE)?,
         FileListUp => syn_file_list(app, KeyCode::Char('k'), KeyModifiers::NONE)?,
         FileListDown => syn_file_list(app, KeyCode::Char('j'), KeyModifiers::NONE)?,
+        FileListGotoTop => {
+            // Replay `gg` through the legacy handler so its PendingCommand
+            // state machine resolves it.
+            let g = KeyEvent::new(KeyCode::Char('g'), KeyModifiers::NONE);
+            crate::input::file_list_mode::handle_raw(app, g)?;
+            crate::input::file_list_mode::handle_raw(app, g)?;
+        }
         FileListGotoBottom => syn_file_list(app, KeyCode::Char('G'), KeyModifiers::SHIFT)?,
         FileListOpen => syn_file_list(app, KeyCode::Enter, KeyModifiers::NONE)?,
         FileListParent => syn_file_list(app, KeyCode::Char('h'), KeyModifiers::NONE)?,

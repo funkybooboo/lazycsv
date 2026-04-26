@@ -2,6 +2,61 @@
 
 All notable changes to LazyCSV will be documented in this file.
 
+## [0.24.2] - 2026-04-26
+
+### Added - Customizable Keybindings
+
+**Data-driven keymap** at `~/.config/lazycsv/keys.toml` (or per-directory `.lazycsv.toml`). The `Action` enum in `src/input/keymap_actions.rs` catalogs 199 named user actions; any of them can be bound to any key sequence in any of the 10 mode-scoped sections (`[normal]`, `[insert]`, `[visual]`, `[command]`, `[search]`, `[magnifier]`, `[file_list]`, `[sql_editor]`, `[file_operation]`, `[global]`).
+
+**3 shipped presets under `keymaps/`:**
+- `vim.toml` — current behaviour, baked into the binary as the default
+- `emacs.toml` — readline-style: `Ctrl-f/b/n/p`, `Ctrl-a/e`, `Alt-f/b`, `Alt-x` for command mode, etc.
+- `excel.toml` — arrow-key navigation, `F2` to edit, `Tab`/`Enter` for data entry, `Ctrl-S/Z/Y/C/V/X` for clipboard ops, `Ctrl-Home/End` for first/last row
+
+**Sequence syntax:**
+```
+"j"             single keypress
+"J"             Shift-J (uppercase auto-lifts Shift)
+"gg"            chord: g then g
+",dd"           chord with leader
+"ctrl+s"        modifier prefix (ctrl, shift, alt, super)
+"<esc>"         reserved key (esc, enter, tab, bs, space, del, up,
+                down, left, right, home, end, pgup, pgdn, f1..f12)
+"ctrl+<enter>"  modifier on reserved key
+"ctrl+x ctrl+s" multi-atom chord (whitespace separates atoms)
+""              (empty value) explicit unbind — suppresses legacy fallback
+```
+
+**Inheritance:** `[meta] inherit = "vim"` (default) layers user overrides on top of the baked-in vim profile. `inherit = "none"` starts from a blank slate.
+
+**Multi-key chords** route through the keymap; partial chords are buffered until they resolve to an action. Parametric chords (vim's `g{letter}` column jump, `q{a-z}` macro registers) — which the keymap can't represent statically — still work: when the keymap gives up on a buffered chord, the keys are replayed through the legacy handler so its existing `PendingCommand` state machine takes over.
+
+**Hot-reload** via the existing `ConfigWatcher`. Save `keys.toml` and the new bindings apply on the next keypress; warnings (unknown actions, malformed key strings) surface in the status bar without breaking the previous keymap.
+
+**`:keys`** ex command shows the active binding count and the path to your `keys.toml`.
+
+### Added - Shell Command in File Browser
+
+Press `:` inside the file menu (`<space>f`) to open a themed "Shell (block):" prompt. Whatever you type is executed via `$SHELL -c` in the file menu's current directory.
+
+- **Variable substitution before exec:** `$CWD`, `$FILE`, `$NAME`, `$EXT` (all shell-quoted). Literal `$` escapable as `\$`; unknown `$<name>` tokens pass through to the user's shell.
+- **TUI suspended** for the duration of the command; aggressive screen clear on resume (`Clear(ClearType::All)` + `MoveTo(0,0)` + `terminal.clear()`) so terminal state never leaks into the table view.
+- **Stdout discarded** (`Stdio::null()`); redirections like `> out.txt` still work.
+- **Stderr captured** (≤ 64 KiB; longer output is truncated with a `…(truncated)` marker).
+- **Exit-code outcomes:**
+  - `0` and stderr empty → silent success; file listing auto-refreshes
+  - `0` with stderr → cream toast `Shell: <first line>`
+  - non-zero exit → red toast `Shell error (exit <n>): <first line>`
+  - multi-line stderr → scrollable popup auto-opens with `j/k`/`d/u`/`g/G`/`Home/End`/`PgUp/PgDn` navigation
+- **Persistent shell history** at `~/.config/lazycsv/shell_history`. Up/Down walks past entries (most-recent-first); configurable `[defaults] shell_history_limit` (default 50, 0 disables).
+
+### Tests
+- `tests/keymap_preset_smoke_test.rs` — 16 end-to-end tests verifying vim/emacs/excel presets each dispatch correctly via the real `App` (not just the parser)
+- `src/config/keys.rs` — 36 tests covering the `KeySequence` parser + `Keymap` loader + preset round-trips
+- `src/input/keymap_actions.rs` — 6 round-trip tests on the action ↔ name registry
+- `src/input/keymap_dispatch.rs` — 16 dispatcher tests including parametric-chord-replay verification
+- 1146 total tests passing across the workspace, 0 failures
+
 ## [0.24.0] - 2026-04-24
 
 ### Added - TUI Theming

@@ -515,13 +515,20 @@ fn test_comma_dd_stores_in_column_buffer_not_row() {
 fn test_comma_cancelled_with_esc() {
     let mut app = create_test_app();
 
+    // `,` is a chord prefix in the keymap (`,dd`/`,yy`/`,p`/etc.) so the
+    // keymap holds it in `chord_buffer` rather than the legacy
+    // `pending_command`. Either state means "chord in progress".
     app.handle_key(key(KeyCode::Char(','))).unwrap();
-    assert!(app.input_state.pending_command.is_some());
+    assert!(
+        app.input_state.pending_command.is_some() || !app.input_state.chord_buffer.is_empty(),
+        "either pending_command or chord_buffer should be set after `,`"
+    );
 
     app.handle_key(key(KeyCode::Esc)).unwrap();
 
-    // Pending command cleared
+    // Both states cleared.
     assert!(app.input_state.pending_command.is_none());
+    assert!(app.input_state.chord_buffer.is_empty());
 }
 
 #[test]
@@ -900,13 +907,18 @@ fn test_cc_preserves_row_count() {
 fn test_pending_c_cancelled_with_esc() {
     let mut app = create_test_app();
 
-    // c then Esc
+    // `c` is a chord prefix in the keymap (`cc`/`cw`); the keymap
+    // buffers it. Either pending_command or chord_buffer means
+    // "chord in progress".
     app.handle_key(key(KeyCode::Char('c'))).unwrap();
-    assert!(app.input_state.pending_command.is_some());
+    assert!(
+        app.input_state.pending_command.is_some() || !app.input_state.chord_buffer.is_empty(),
+        "either pending_command or chord_buffer should be set after `c`"
+    );
 
     app.handle_key(key(KeyCode::Esc)).unwrap();
     assert!(app.input_state.pending_command.is_none());
-    // Should still be in Normal mode
+    assert!(app.input_state.chord_buffer.is_empty());
     assert_eq!(app.mode, Mode::Normal);
 }
 
