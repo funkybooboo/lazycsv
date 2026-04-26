@@ -6,8 +6,21 @@ use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 use std::path::PathBuf;
 
-/// Handle keyboard input in file operation prompt mode
+/// Handle keyboard input in file operation prompt mode (with keymap pre-pass).
 pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
+    if let Some(result) = crate::input::keymap_dispatch::try_keymap(
+        app,
+        key,
+        crate::config::keys::KeymapScope::FileOperation,
+        handle_raw,
+    )? {
+        return Ok(result);
+    }
+    handle_raw(app, key)
+}
+
+/// Legacy match-based file-operation-prompt handler.
+pub fn handle_raw(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     match key.code {
         // Cancel operation
         KeyCode::Esc => {

@@ -32,6 +32,11 @@ pub struct InputState {
     /// Whether file list is in search mode (/ pressed)
     pub file_list_search_active: bool,
 
+    /// Accumulating chord buffer for keymap dispatch (e.g. after `g` while
+    /// waiting for the second key of `gg`). Cleared on Action match,
+    /// dropped on Unbound. Empty means "no chord in progress".
+    pub chord_buffer: Vec<crate::config::keys::KeyAtom>,
+
     /// Whether file list is in shell-command prompt mode (':' pressed)
     pub file_list_shell_active: bool,
 

@@ -30,8 +30,8 @@
 //! - `range_commands`: Range-based operations (delete, yank, etc.)
 
 mod colors;
-mod executor;
-mod handler;
+pub(crate) mod executor;
+pub mod handler;
 mod range_commands;
 pub mod stats;
 mod substitute;

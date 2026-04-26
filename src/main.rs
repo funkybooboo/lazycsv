@@ -396,6 +396,29 @@ fn run_main() -> Result<()> {
             app.sql_history = lazycsv::config::load_sql_history();
             app.command_history = lazycsv::config::load_command_history();
             app.shell_history = lazycsv::config::load_shell_history();
+            // Layer the user's keys.toml (if present) on top of the baked
+            // vim default. Warnings on bad bindings surface in the status
+            // bar at startup.
+            if let Some(keymap_path) = lazycsv::config::dirs_path().map(|p| p.join("keys.toml")) {
+                match lazycsv::config::keys::load_toml_file(&keymap_path) {
+                    Ok(Some(toml)) => {
+                        let mut warnings = Vec::new();
+                        app.keymap = lazycsv::config::keys::Keymap::from_toml(&toml, &mut warnings);
+                        if !warnings.is_empty() {
+                            app.status_message = Some(lazycsv::input::StatusMessage::from(
+                                format!("keys.toml: {}", warnings.join("; ")),
+                            ));
+                        }
+                    }
+                    Ok(None) => {} // user has no keys.toml — keep vim default
+                    Err(e) => {
+                        app.status_message = Some(lazycsv::input::StatusMessage::from(format!(
+                            "keys.toml: {}",
+                            e
+                        )));
+                    }
+                }
+            }
             app
         }
         Err(e) => {

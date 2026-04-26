@@ -14,7 +14,11 @@ use super::{editing, help, mode_transitions, navigation as nav, search, visual_m
 /// Maximum command count to prevent overflow
 const MAX_COMMAND_COUNT: usize = 100000;
 
-/// Handle keyboard input in Normal mode
+/// Handle keyboard input in Normal mode.
+///
+/// Does the keymap pre-pass first (so user-defined bindings in
+/// `keys.toml` win), then falls through to the legacy match-based handler
+/// for chords and anything not bound in the keymap.
 pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     // Clear transient messages on keypress
     if let Some(ref msg) = app.status_message {
@@ -23,6 +27,32 @@ pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         }
     }
 
+    // Try the keymap before running any of the legacy match arms — but
+    // skip it when we're already in the middle of something that needs
+    // priority routing (pending chord, count prefix, external-mod prompt,
+    // help overlay blocking).
+    if !app.external_modification_pending
+        && app.input_state.pending_command.is_none()
+        && app.input_state.command_count.is_none()
+        && super::help::is_navigation_allowed(app)
+    {
+        if let Some(result) = crate::input::keymap_dispatch::try_keymap(
+            app,
+            key,
+            crate::config::keys::KeymapScope::Normal,
+            handle_raw,
+        )? {
+            return Ok(result);
+        }
+    }
+
+    handle_raw(app, key)
+}
+
+/// The legacy match-based normal-mode handler. Called by [`handle`] after
+/// the keymap pre-pass, and re-entered by `keymap_dispatch::execute` when
+/// it synthesizes a key for an action.
+pub fn handle_raw(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     // Handle external modification prompt — intercept keys before normal processing
     if app.external_modification_pending {
         match key.code {

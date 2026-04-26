@@ -160,6 +160,7 @@ pub fn execute(app: &mut App) -> Result<InputResult> {
         "clearview" => super::colors::execute_clear_view(app),
         "export" => execute_export(app, _arg),
         "history" => execute_history(app),
+        "keys" => execute_keys(app),
         _ => {
             // Unknown command
             app.status_message = Some(StatusMessage::from(format!("Unknown command: :{}", cmd)));
@@ -169,7 +170,7 @@ pub fn execute(app: &mut App) -> Result<InputResult> {
 }
 
 /// Execute :q (quit) command
-fn execute_quit(app: &mut App) -> Result<InputResult> {
+pub(crate) fn execute_quit(app: &mut App) -> Result<InputResult> {
     if app.document.is_dirty {
         app.status_message = Some(StatusMessage::from(
             "No write since last change (add ! to override)",
@@ -181,7 +182,7 @@ fn execute_quit(app: &mut App) -> Result<InputResult> {
 }
 
 /// Execute :q! (force quit) command
-fn execute_force_quit(app: &mut App) -> Result<InputResult> {
+pub(crate) fn execute_force_quit(app: &mut App) -> Result<InputResult> {
     // Force quit - clear cache and quit
     app.session.clear_cache();
     app.should_quit = true;
@@ -189,7 +190,7 @@ fn execute_force_quit(app: &mut App) -> Result<InputResult> {
 }
 
 /// Execute :w (write) command
-fn execute_write(app: &mut App) -> Result<InputResult> {
+pub(crate) fn execute_write(app: &mut App) -> Result<InputResult> {
     // Save current file only
     match app.save_current_file() {
         Ok(path) => {
@@ -206,7 +207,7 @@ fn execute_write(app: &mut App) -> Result<InputResult> {
 }
 
 /// Execute :wq/:x (write and quit) command
-fn execute_write_quit(app: &mut App) -> Result<InputResult> {
+pub(crate) fn execute_write_quit(app: &mut App) -> Result<InputResult> {
     // Save current file and quit
     match app.save_current_file() {
         Ok(_) => {
@@ -222,6 +223,23 @@ fn execute_write_quit(app: &mut App) -> Result<InputResult> {
 /// Execute :h/:help command
 fn execute_help(app: &mut App) -> Result<InputResult> {
     app.view_state.toggle_help();
+    Ok(InputResult::Continue)
+}
+
+/// Execute :keys — show every active keybinding in the status bar (or a
+/// scrollable popup if we ever add a "list" widget for it).
+///
+/// For now: surface a single status-bar line listing the binding count and
+/// the source preset, with the user pointed at `keys.toml` for the full
+/// list. The action ↔ key catalog itself is far too long to inline.
+fn execute_keys(app: &mut App) -> Result<InputResult> {
+    let count = app.keymap.iter().count();
+    let path = match crate::config::keys::shell_keys_hint() {
+        Some(p) => p,
+        None => "<no config dir>".to_string(),
+    };
+    let msg = format!("{} bindings active. Edit at {} to customize.", count, path);
+    app.status_message = Some(StatusMessage::new_persistent(msg));
     Ok(InputResult::Continue)
 }
 

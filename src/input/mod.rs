@@ -10,6 +10,8 @@ pub mod file_operation_mode;
 pub mod handler;
 pub mod insert_mode;
 pub mod keybindings;
+pub mod keymap_actions;
+pub mod keymap_dispatch;
 pub mod magnifier_mode;
 pub(crate) mod mouse_context_menu;
 pub(crate) mod mouse_coords;

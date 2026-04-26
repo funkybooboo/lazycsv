@@ -14,16 +14,35 @@ use anyhow::Result;
 pub use browser::{scan_directory, scan_directory_filtered, BrowserEntry};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-/// Handle keyboard input in file list mode
+/// Handle keyboard input in file list mode (with keymap pre-pass).
 pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
-    // Shell-prompt mode and search mode each handle their own keys.
+    // Shell-prompt mode and search mode each handle their own keys —
+    // the keymap doesn't apply while either of those sub-prompts is open.
     if app.input_state.file_list_shell_active {
         return handle_shell_mode(app, key);
     }
     if app.input_state.file_list_search_active {
         return handle_search_mode(app, key);
     }
+    if let Some(result) = crate::input::keymap_dispatch::try_keymap(
+        app,
+        key,
+        crate::config::keys::KeymapScope::FileList,
+        handle_raw,
+    )? {
+        return Ok(result);
+    }
+    handle_raw(app, key)
+}
 
+/// Legacy match-based file-list handler.
+pub fn handle_raw(app: &mut App, key: KeyEvent) -> Result<InputResult> {
+    if app.input_state.file_list_shell_active {
+        return handle_shell_mode(app, key);
+    }
+    if app.input_state.file_list_search_active {
+        return handle_search_mode(app, key);
+    }
     match (key.code, key.modifiers) {
         // Exit file manager (or close spot popup first)
         (KeyCode::Esc, _) | (KeyCode::Char('q'), KeyModifiers::NONE) => {

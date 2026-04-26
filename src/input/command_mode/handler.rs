@@ -7,15 +7,29 @@ use crate::input::{InputResult, StatusMessage};
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 
-/// Handle keyboard input in Command mode
+/// Handle keyboard input in Command mode.
+///
+/// Tries the keymap pre-pass first; falls through to the legacy line
+/// editor for character input and unbound keys.
 pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
-    // Clear transient messages on keypress
     if let Some(ref msg) = app.status_message {
         if msg.should_clear_on_keypress() {
             app.status_message = None;
         }
     }
+    if let Some(result) = crate::input::keymap_dispatch::try_keymap(
+        app,
+        key,
+        crate::config::keys::KeymapScope::Command,
+        handle_raw,
+    )? {
+        return Ok(result);
+    }
+    handle_raw(app, key)
+}
 
+/// Legacy match-based command-mode handler.
+pub fn handle_raw(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     match key.code {
         KeyCode::Esc => {
             app.mode = Mode::Normal;

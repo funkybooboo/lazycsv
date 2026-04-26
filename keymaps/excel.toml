@@ -1,0 +1,68 @@
+# LazyCSV — Microsoft Excel keymap
+#
+# Drop this file at `~/.config/lazycsv/keys.toml` (or `.lazycsv.toml` in the
+# project root) to use these bindings instead of vim. Inherits from the
+# vim default; anything not redefined here keeps its vim behavior.
+#
+# This preset uses **Ctrl** for the clipboard family (Windows / Linux Excel
+# convention). For macOS Excel, copy `excel-mac.toml` instead.
+#
+# Coverage notes:
+# - Arrow keys, Tab/Enter/F2/Esc, and the Ctrl-clipboard family are all
+#   single-key actions and work today (Phase 1).
+# - Excel's "fill down" (Ctrl-D) and "fill right" (Ctrl-R) collide with vim
+#   chord prefixes (`d`, `r`); they're left at vim defaults until Phase 2.
+# - Multi-key combinations like `Ctrl+Shift+End` (extend selection to last
+#   cell) are deferred to Phase 2 chord support.
+
+[meta]
+inherit = "vim"
+
+# ─── Normal mode ─────────────────────────────────────────────────────────
+[normal]
+# Arrow-only navigation (already in vim.toml, listed here for clarity).
+"<up>"       = "cursor_up"
+"<down>"     = "cursor_down"
+"<left>"     = "cursor_left"
+"<right>"    = "cursor_right"
+
+# Excel-flavored row-jumps. `Home` and `End` are the natural left/right
+# extremes; `Ctrl+Home` / `Ctrl+End` jump to the first/last row.
+"<home>"     = "goto_first_column"
+"<end>"      = "goto_last_column"
+"ctrl+<home>" = "goto_first_row"
+"ctrl+<end>"  = "goto_last_row"
+
+# Editing entry — F2 is *the* Excel edit key, Enter / Tab are pure data
+# entry (commit + move). Spreadsheet users expect typing letters to also
+# enter edit mode; that's a Phase 2 behavior change (currently you'd press
+# F2 first, or rebind the letter keys to `cell_edit_at_end`).
+"<f2>"       = "cell_replace_f2"
+"<enter>"    = "cell_edit_at_end"     # Excel's Enter dives into edit mode
+"<del>"      = "cell_clear"
+
+# Clipboard family (Windows/Linux Excel)
+"ctrl+s"     = "save"
+"ctrl+z"     = "undo"
+"ctrl+y"     = "redo"
+"ctrl+c"     = "row_yank"             # closest available — yanks current row
+"ctrl+v"     = "row_paste_below"      # closest available
+"ctrl+x"     = "row_delete"           # cut row (closest available)
+
+# Disable a couple of vim-isms that conflict with typing letters into cells.
+# (The chord ones — `dd`, `yy`, `gg` — still work via the legacy path.)
+"i"          = ""
+"a"          = ""
+"v"          = ""
+
+# Help — `?` is also bound by vim default.
+"<f1>"       = "toggle_help"
+
+# ─── Insert mode ─────────────────────────────────────────────────────────
+[insert]
+"<enter>"        = "insert_commit_down"     # commit + move down
+"shift+<enter>"  = "insert_commit_up"       # commit + move up
+"<tab>"          = "insert_commit_tab"      # commit + move right
+"shift+<tab>"    = "insert_commit_back_tab" # commit + move left
+"<esc>"          = "insert_cancel"          # discard edit
+"ctrl+<enter>"   = "insert_commit_down"     # alt: explicit commit

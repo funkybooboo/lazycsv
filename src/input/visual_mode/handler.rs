@@ -10,9 +10,33 @@ use crate::input::{InputResult, PendingCommand, StatusMessage};
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 
-/// Handle keyboard input in Visual mode (Block, Line, Column)
+/// Handle keyboard input in Visual mode (Block, Line, Column).
+///
+/// Tries the keymap first so user-defined bindings can override the
+/// hardcoded behavior, then falls through to the legacy match.
 pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
-    // If stats overlay is visible, handle overlay navigation first
+    // Stats-overlay routing happens before keymap because the overlay's
+    // j/k scrolling is contextual to the overlay, not a general action.
+    if app.view_state.stats_overlay_visible {
+        return handle_raw(app, key);
+    }
+
+    if app.input_state.pending_command.is_none() {
+        if let Some(result) = crate::input::keymap_dispatch::try_keymap(
+            app,
+            key,
+            crate::config::keys::KeymapScope::Visual,
+            handle_raw,
+        )? {
+            return Ok(result);
+        }
+    }
+    handle_raw(app, key)
+}
+
+/// Legacy match-based visual-mode handler. Called by [`handle`] after the
+/// keymap pre-pass.
+pub fn handle_raw(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     if app.view_state.stats_overlay_visible {
         match key.code {
             KeyCode::Char('j') | KeyCode::Down => {

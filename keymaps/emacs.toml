@@ -1,0 +1,58 @@
+# LazyCSV — emacs (readline-style) keymap
+#
+# Drop this file at `~/.config/lazycsv/keys.toml` (or `.lazycsv.toml` in the
+# project root) to use these bindings instead of vim. Inherits from the
+# vim default, so anything not redefined here keeps its vim behavior.
+#
+# Coverage notes:
+# - Single-key actions (Phase 1) work today.
+# - Multi-key chords are inherited from vim.toml (e.g. `gg`, `dd`, `,yy`)
+#   and continue to work via the legacy chord path until Phase 2.
+# - emacs `C-x …` style chord prefixes (e.g. `C-x C-s` for save) need
+#   chord support and will land in Phase 2.
+
+[meta]
+inherit = "vim"
+
+# ─── Normal mode ─────────────────────────────────────────────────────────
+[normal]
+# readline navigation
+"ctrl+f"     = "cursor_right"
+"ctrl+b"     = "cursor_left"
+"ctrl+n"     = "cursor_down"
+"ctrl+p"     = "cursor_up"
+"ctrl+a"     = "goto_first_column"   # beginning of line
+"ctrl+e"     = "goto_last_column"    # end of line
+"alt+f"      = "cursor_word_forward"
+"alt+b"      = "cursor_word_backward"
+"alt+<"      = "goto_first_row"      # M-< → first row (chord/Phase 2 will polish this)
+"alt+>"      = "goto_last_row"       # M-> → last row
+
+# editing
+"ctrl+_"     = "undo"
+"ctrl+/"     = "undo"
+"ctrl+s"     = "save"                # write current file
+"ctrl+x"     = "cell_clear"          # destructive but matches readline `kill`
+"alt+x"      = "enter_command_mode"  # M-x opens command palette
+"<f2>"       = "cell_replace_f2"
+
+# search
+"ctrl+r"     = "search_enter"        # incremental search; lazycsv uses `/`-style buffer
+"ctrl+g"     = "clear_search"        # cancel/abort
+
+# help
+"<f1>"       = "toggle_help"
+
+# ─── Insert mode ─────────────────────────────────────────────────────────
+[insert]
+"ctrl+f"     = "insert_cursor_right"
+"ctrl+b"     = "insert_cursor_left"
+"ctrl+a"     = "insert_cursor_home"
+"ctrl+e"     = "insert_cursor_end"
+"ctrl+d"     = "insert_delete_forward"
+"ctrl+h"     = "insert_delete_backward"
+"ctrl+w"     = "insert_delete_word"
+"ctrl+u"     = "insert_delete_line"
+"ctrl+g"     = "insert_cancel"
+# Inheriting vim's <enter> = insert_commit_down which matches Emacs's
+# "newline-and-indent in cell context" — leave as-is.

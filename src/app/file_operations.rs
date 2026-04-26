@@ -192,8 +192,10 @@ impl App {
     }
 
     /// Check if config files have changed and reload if so.
-    /// Returns true if config was reloaded (triggers redraw).
+    /// Returns true if anything was reloaded (triggers redraw).
     pub fn check_config_reload(&mut self) -> bool {
+        let mut reloaded = false;
+
         if self.config_watcher.has_changed() {
             let result = crate::config::load_config_with_warnings();
             self.config = result.config;
@@ -205,10 +207,40 @@ impl App {
                     result.warnings.join("; ")
                 )));
             }
-            true
-        } else {
-            false
+            reloaded = true;
         }
+
+        if self.config_watcher.keymap_changed() {
+            // Rebuild the keymap. If the file is gone (user deleted it),
+            // fall back to the baked-in vim default.
+            let keys_path = self.config_watcher.keys_path().cloned();
+            match keys_path
+                .as_ref()
+                .map(|p| crate::config::keys::load_toml_file(p))
+            {
+                Some(Ok(Some(toml))) => {
+                    let mut warnings = Vec::new();
+                    self.keymap = crate::config::keys::Keymap::from_toml(&toml, &mut warnings);
+                    self.status_message = Some(if warnings.is_empty() {
+                        StatusMessage::from("Keymap reloaded".to_string())
+                    } else {
+                        StatusMessage::from(format!("Keymap reloaded: {}", warnings.join("; ")))
+                    });
+                }
+                Some(Ok(None)) | None => {
+                    self.keymap = crate::config::keys::Keymap::vim_default();
+                    self.status_message = Some(StatusMessage::from(
+                        "Keymap reset to vim default".to_string(),
+                    ));
+                }
+                Some(Err(e)) => {
+                    self.status_message = Some(StatusMessage::from(format!("keys.toml: {}", e)));
+                }
+            }
+            reloaded = true;
+        }
+
+        reloaded
     }
 
     /// Load a CSV or XLSX file with cancellation support.

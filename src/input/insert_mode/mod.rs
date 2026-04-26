@@ -31,18 +31,21 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crate::app::App;
 use crate::input::InputResult;
 
-mod commit_cancel;
-mod cursor_movement;
+pub(crate) mod commit_cancel;
+pub(crate) mod cursor_movement;
 pub mod formula_completion;
-mod text_editing;
-mod vim_commands;
+pub(crate) mod text_editing;
+pub(crate) mod vim_commands;
 
 use commit_cancel::handle_commit_cancel;
 use cursor_movement::handle_cursor_movement;
 use text_editing::handle_text_editing;
 use vim_commands::handle_vim_commands;
 
-/// Handle keyboard input in Insert mode
+/// Handle keyboard input in Insert mode.
+///
+/// Does the keymap pre-pass first, then falls through to the legacy
+/// match-based handler.
 pub fn handle_insert_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     // If no edit buffer, return to Normal mode (shouldn't happen)
     if app.edit_buffer.is_none() {
@@ -50,7 +53,32 @@ pub fn handle_insert_mode(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         return Ok(InputResult::Continue);
     }
 
-    // If formula completion popup is active, handle it first
+    // The formula completion popup has its own routing; it intercepts
+    // arrows / enter / esc / typing and never wants the keymap to fire.
+    if app.formula_completion.is_some() {
+        return handle_formula_completion_key(app, key);
+    }
+
+    if let Some(result) = crate::input::keymap_dispatch::try_keymap(
+        app,
+        key,
+        crate::config::keys::KeymapScope::Insert,
+        handle_raw,
+    )? {
+        return Ok(result);
+    }
+
+    handle_raw(app, key)
+}
+
+/// The legacy match-based insert-mode handler. Called by
+/// [`handle_insert_mode`] after the keymap pre-pass, and re-entered by
+/// `keymap_dispatch::execute` when synthesizing an action's key.
+pub fn handle_raw(app: &mut App, key: KeyEvent) -> Result<InputResult> {
+    if app.edit_buffer.is_none() {
+        app.mode = crate::app::Mode::Normal;
+        return Ok(InputResult::Continue);
+    }
     if app.formula_completion.is_some() {
         return handle_formula_completion_key(app, key);
     }

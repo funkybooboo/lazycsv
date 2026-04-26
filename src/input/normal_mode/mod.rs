@@ -27,11 +27,11 @@
 pub(crate) mod commands;
 pub(crate) mod editing;
 mod handler;
-mod help;
-mod mode_transitions;
+pub(crate) mod help;
+pub(crate) mod mode_transitions;
 mod multi_key;
-mod navigation;
-mod search;
-mod visual_mode;
+pub(crate) mod navigation;
+pub(crate) mod search;
+pub(crate) mod visual_mode;
 
-pub use handler::handle;
+pub use handler::{handle, handle_raw};

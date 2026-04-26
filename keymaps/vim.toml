@@ -1,0 +1,231 @@
+# LazyCSV — vim keymap (default)
+#
+# This is the keymap LazyCSV ships with. Drop your own
+# ~/.config/lazycsv/keys.toml to override individual entries; set
+# `[meta] inherit = "vim"` (the default) to layer on top of these bindings,
+# or `inherit = "none"` to start from a blank slate.
+#
+# Sequence syntax (see docs/keybindings.md for the full reference):
+#   "j"            — single keypress
+#   "J"            — Shift+J (uppercase auto-lifts Shift)
+#   "gg"           — chord: g then g
+#   ",dd"          — chord: comma, d, d
+#   "ctrl+s"       — Ctrl-s (modifiers: ctrl, shift, alt, super)
+#   "<esc>"        — reserved key (esc, enter, tab, bs, space, del, up,
+#                                  down, left, right, home, end, pgup,
+#                                  pgdn, f1..f12)
+#   "ctrl+<enter>" — Ctrl-Enter
+#   ""             — (empty value) unbind the key
+#
+# Action IDs are listed in `:keys` (in-app) and in src/input/keymap_actions.rs.
+
+[meta]
+# Set inherit = "none" if you want to fully replace the default keymap.
+# Anything you don't bind will then be unmapped instead of falling back.
+inherit = "none"
+
+# ─── Normal mode ─────────────────────────────────────────────────────────
+[normal]
+"h"          = "cursor_left"
+"<left>"     = "cursor_left"
+"l"          = "cursor_right"
+"<right>"    = "cursor_right"
+"j"          = "cursor_down"
+"<down>"     = "cursor_down"
+"<enter>"    = "cursor_down"
+"k"          = "cursor_up"
+"<up>"       = "cursor_up"
+"w"          = "cursor_word_forward"
+"b"          = "cursor_word_backward"
+"e"          = "cursor_word_end"
+"gg"         = "goto_first_row"
+"G"          = "goto_last_row"
+"0"          = "goto_first_column"
+"$"          = "goto_last_column"
+"ctrl+d"     = "page_down"
+"ctrl+u"     = "page_up"
+"zt"         = "viewport_top"
+"zz"         = "viewport_center"
+"zb"         = "viewport_bottom"
+
+# Cell editing
+"i"          = "cell_edit_at_end"
+"a"          = "cell_edit_at_end"
+"I"          = "cell_edit_at_start"
+"A"          = "cell_edit_at_line_end"
+"s"          = "cell_replace"
+"r"          = "cell_replace"
+"<f2>"       = "cell_replace_f2"
+"<del>"      = "cell_clear"
+"x"          = "cell_clear"
+"~"          = "toggle_case"
+"g~"         = "title_case"
+"g."         = "toggle_boolean"
+"u"          = "undo"
+"ctrl+r"     = "redo"
+"."          = "repeat_last_edit"
+
+# Row operations
+"o"          = "row_insert_below"
+"O"          = "row_insert_above"
+"dd"         = "row_delete"
+"yy"         = "row_yank"
+"cw"         = "row_yank_cell_word"
+"cc"         = "row_change"
+"p"          = "row_paste_below"
+"P"          = "row_paste_above"
+"gj"         = "row_swap_down"
+"gk"         = "row_swap_up"
+
+# Column operations (comma leader)
+",dd"        = "col_delete"
+",yy"        = "col_yank"
+",p"         = "col_paste_right"
+",P"         = "col_paste_left"
+",o"         = "col_insert_right"
+",O"         = "col_insert_left"
+"+"          = "col_width_increase"
+"-"          = "col_width_decrease"
+
+# Search
+"/"          = "search_enter"
+"n"          = "search_next"
+"N"          = "search_prev"
+"*"          = "search_current_cell"
+
+# Mode entry
+":"          = "enter_command_mode"
+"v"          = "enter_visual_block"
+"V"          = "enter_visual_line"
+",v"         = "enter_visual_column"
+"<space>q"   = "enter_sql_editor"
+"<space>m"   = "enter_magnifier"
+"<space>f"   = "enter_file_list"
+"gv"         = "reselect_visual"
+
+# Macros
+"q"          = "macro_record_toggle"
+"@"          = "macro_replay_prompt"
+
+# Help
+"?"          = "toggle_help"
+
+# ─── Insert mode ─────────────────────────────────────────────────────────
+[insert]
+"<enter>"        = "insert_commit_down"
+"<down>"         = "insert_commit_down"
+"shift+<up>"     = "insert_commit_up"
+"shift+<left>"   = "insert_commit_left"
+"shift+<right>"  = "insert_commit_right"
+"<tab>"          = "insert_commit_tab"
+"shift+<tab>"    = "insert_commit_back_tab"
+"<esc>"          = "insert_cancel"
+"<left>"         = "insert_cursor_left"
+"<right>"        = "insert_cursor_right"
+"<home>"         = "insert_cursor_home"
+"<end>"          = "insert_cursor_end"
+"<bs>"           = "insert_delete_backward"
+"<del>"          = "insert_delete_forward"
+"ctrl+w"         = "insert_delete_word"
+"ctrl+u"         = "insert_delete_line"
+"ctrl+h"         = "insert_delete_char_before"
+
+# ─── Visual modes (block / line / column share these) ────────────────────
+[visual]
+"<esc>"      = "visual_exit"
+"h"          = "visual_cursor_left"
+"<left>"     = "visual_cursor_left"
+"l"          = "visual_cursor_right"
+"<right>"    = "visual_cursor_right"
+"j"          = "visual_cursor_down"
+"<down>"     = "visual_cursor_down"
+"k"          = "visual_cursor_up"
+"<up>"       = "visual_cursor_up"
+"gg"         = "visual_goto_first_row"
+"G"          = "visual_goto_last_row"
+"d"          = "visual_delete"
+"y"          = "visual_yank"
+"Y"          = "visual_yank_system"
+"p"          = "visual_paste"
+"gs"         = "visual_stats"
+
+# ─── Command mode (`:` line) ─────────────────────────────────────────────
+[command]
+"<enter>"    = "cmd_execute"
+"<esc>"      = "cmd_cancel"
+"<bs>"       = "cmd_delete_char_back"
+"<del>"      = "cmd_delete_char_forward"
+"<left>"     = "cmd_cursor_left"
+"<right>"    = "cmd_cursor_right"
+"<home>"     = "cmd_cursor_home"
+"<end>"      = "cmd_cursor_end"
+"<up>"       = "cmd_history_prev"
+"<down>"     = "cmd_history_next"
+
+# ─── Search mode (`/` line) ──────────────────────────────────────────────
+[search]
+"<enter>"    = "search_submit"
+"<esc>"      = "search_cancel"
+"<bs>"       = "search_delete_char"
+
+# ─── File list mode (`<space>f`) ─────────────────────────────────────────
+[file_list]
+"<esc>"      = "file_list_exit"
+"q"          = "file_list_exit"
+"/"          = "file_list_search_enter"
+":"          = "file_list_shell_prompt"
+"j"          = "file_list_down"
+"<down>"     = "file_list_down"
+"k"          = "file_list_up"
+"<up>"       = "file_list_up"
+"gg"         = "file_list_goto_top"
+"G"          = "file_list_goto_bottom"
+"<enter>"    = "file_list_open"
+"l"          = "file_list_open"
+"<right>"    = "file_list_open"
+"h"          = "file_list_parent"
+"<left>"     = "file_list_parent"
+"."          = "file_list_toggle_hidden"
+"<tab>"      = "file_list_toggle_spot"
+"r"          = "file_list_rename"
+"d"          = "file_list_delete"
+"m"          = "file_list_move"
+"y"          = "file_list_copy"
+"n"          = "file_list_create"
+
+# ─── Magnifier mode ──────────────────────────────────────────────────────
+[magnifier]
+"<esc>"          = "mag_exit"
+"alt+h"          = "mag_navigate_left"
+"alt+<left>"     = "mag_navigate_left"
+"alt+l"          = "mag_navigate_right"
+"alt+<right>"    = "mag_navigate_right"
+"alt+k"          = "mag_navigate_up"
+"alt+<up>"       = "mag_navigate_up"
+"alt+j"          = "mag_navigate_down"
+"alt+<down>"     = "mag_navigate_down"
+"ctrl+r"         = "mag_redo"
+"gg"             = "mag_goto_first_line"
+"dd"             = "mag_delete_line"
+"yy"             = "mag_yank_line"
+"cc"             = "mag_change_line"
+"ZZ"             = "mag_save_and_close"
+">>"             = "mag_indent_right"
+"<<"             = "mag_indent_left"
+":"              = "mag_enter_command"
+"v"              = "mag_enter_visual"
+"/"              = "mag_search"
+
+# ─── SQL editor ──────────────────────────────────────────────────────────
+[sql_editor]
+"<esc>"          = "sql_exit"
+"ctrl+<enter>"   = "sql_execute"
+"ctrl+f"         = "sql_format"
+"ctrl+n"         = "sql_context_completion"
+"ctrl+h"         = "sql_history_popup_open"
+
+# ─── File operation prompts (rename/delete/etc.) ─────────────────────────
+[file_operation]
+"<enter>"    = "file_op_execute"
+"<esc>"      = "file_op_cancel"
+"<bs>"       = "file_op_backspace"

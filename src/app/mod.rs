@@ -196,6 +196,10 @@ pub struct App {
     /// Vim-style macro recording/playback state
     pub macros: crate::macros::MacroState,
 
+    /// Compiled keymap (vim default + user overrides). Loaded at startup
+    /// and reloaded by the file watcher on `keys.toml` changes.
+    pub keymap: crate::config::keys::Keymap,
+
     /// Persistent ex-command (`:`) history (most recent first)
     pub command_history: Vec<String>,
 
@@ -351,6 +355,7 @@ impl App {
             formula_completion: None,
             context_menu: None,
             macros: crate::macros::MacroState::new(),
+            keymap: crate::config::keys::Keymap::vim_default(),
             command_history: Vec::new(),
             command_history_index: None,
             command_history_pending: None,

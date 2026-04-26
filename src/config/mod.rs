@@ -13,6 +13,7 @@
 #![allow(dead_code)]
 
 mod command_history;
+pub mod keys;
 mod shell_history;
 mod sql_history;
 mod toml_parsing;
@@ -1028,8 +1029,10 @@ mod tests {
         let mut watcher = ConfigWatcher {
             global_path: None,
             local_path: path.clone(),
+            keys_path: None,
             global_mtime: None,
             local_mtime: None,
+            keys_mtime: None,
         };
 
         assert!(!watcher.has_changed()); // no file yet, no change
@@ -1050,10 +1053,12 @@ mod tests {
         let mut watcher = ConfigWatcher {
             global_path: Some(path.clone()),
             local_path: PathBuf::from("/nonexistent/.lazycsv.toml"),
+            keys_path: None,
             global_mtime: std::fs::metadata(&path)
                 .ok()
                 .and_then(|m| m.modified().ok()),
             local_mtime: None,
+            keys_mtime: None,
         };
 
         assert!(!watcher.has_changed()); // no change yet
@@ -1075,10 +1080,12 @@ mod tests {
         let mut watcher = ConfigWatcher {
             global_path: Some(path.clone()),
             local_path: PathBuf::from("/nonexistent/.lazycsv.toml"),
+            keys_path: None,
             global_mtime: std::fs::metadata(&path)
                 .ok()
                 .and_then(|m| m.modified().ok()),
             local_mtime: None,
+            keys_mtime: None,
         };
 
         assert!(!watcher.has_changed());

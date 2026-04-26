@@ -480,14 +480,20 @@ fn test_esc_cancels_multi_key_command() {
     let csv_files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-    // Start multi-key by pressing 'g'
+    // Start multi-key by pressing 'g'. With the keymap path, `g` goes
+    // into `chord_buffer` (since `gg`/`gj`/etc. are bound). The legacy
+    // `pending_command` is no longer set in this case.
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-    assert!(app.input_state.pending_command.is_some());
+    assert!(
+        !app.input_state.chord_buffer.is_empty() || app.input_state.pending_command.is_some(),
+        "either chord buffer or pending_command should be set after `g`"
+    );
 
     // Press ESC to cancel
     app.handle_key(key_event(KeyCode::Esc)).unwrap();
 
-    // Pending key should be cleared
+    // Both should be cleared after Esc.
+    assert!(app.input_state.chord_buffer.is_empty());
     assert!(app.input_state.pending_command.is_none());
 }
 
@@ -884,15 +890,17 @@ fn test_pending_key_cleared_on_esc() {
     let csv_files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-    // Start a multi-key command
+    // Start a multi-key command. With the keymap path the chord state
+    // lives in `chord_buffer` rather than `pending_command`.
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-    assert_eq!(app.input_state.pending_command, Some(PendingCommand::G));
+    assert!(!app.input_state.chord_buffer.is_empty() || app.input_state.pending_command.is_some());
 
     // Press ESC to cancel
     app.handle_key(key_event(KeyCode::Esc)).unwrap();
 
-    // Pending key should be cleared
+    // Both should be cleared.
     assert_eq!(app.input_state.pending_command, None);
+    assert!(app.input_state.chord_buffer.is_empty());
 }
 
 #[test]
@@ -901,14 +909,16 @@ fn test_pending_key_cleared_on_valid_command() {
     let csv_files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(csv_data, csv_files, 0, crate::session::FileConfig::new());
 
-    // Execute gg command
+    // Execute gg command — chord state lives in `chord_buffer` now.
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-    assert_eq!(app.input_state.pending_command, Some(PendingCommand::G));
+    assert!(!app.input_state.chord_buffer.is_empty() || app.input_state.pending_command.is_some());
 
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
 
-    // Pending key should be cleared after command completes
+    // Both pending_command and chord_buffer should be cleared after
+    // the command completes.
     assert_eq!(app.input_state.pending_command, None);
+    assert!(app.input_state.chord_buffer.is_empty());
 }
 
 #[test]
@@ -980,14 +990,17 @@ fn test_state_after_invalid_g_sequence() {
 
     let initial_row = app.selected_row();
 
-    // Start g command
+    // Start g command — keymap holds it in chord_buffer.
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-    assert_eq!(app.input_state.pending_command, Some(PendingCommand::G));
+    assert!(!app.input_state.chord_buffer.is_empty() || app.input_state.pending_command.is_some());
 
-    // Send letter (now starts column jump sequence)
+    // Send letter (parametric `g{letter}` column jump). The keymap can't
+    // express this so it gives up and replays both keys through the
+    // legacy handler, which transitions to `GotoColumn` state.
     app.handle_key(key_event(KeyCode::Char('x'))).unwrap();
 
-    // Should transition to GotoColumn state (x is a valid letter)
+    // After replay, the legacy parametric chord state machinery is in
+    // play.
     assert!(matches!(
         app.input_state.pending_command,
         Some(PendingCommand::GotoColumn(_))

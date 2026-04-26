@@ -16,10 +16,10 @@
 //! - Line mode → Row buffer (rows with all columns)
 //! - Column mode → Column buffer (columns with all rows including header)
 
-mod delete;
-mod handler;
-mod paste;
-mod yank;
+pub mod delete;
+pub mod handler;
+pub mod paste;
+pub mod yank;
 
 pub use delete::handle_visual_delete;
 pub use handler::handle;
