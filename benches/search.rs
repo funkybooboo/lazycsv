@@ -8,10 +8,11 @@
 //!
 //! Target: <100ms for 100K rows (from roadmap v0.7.1)
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use lazycsv::csv::Document;
 use lazycsv::search::{find_matches, SearchState};
 use lazycsv::{ColIndex, RowIndex};
+use std::hint::black_box;
 
 /// Create test document with specified row/column count
 fn create_test_document(rows: usize, cols: usize) -> Document {

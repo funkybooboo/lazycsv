@@ -10,12 +10,13 @@
 //! - Simple SELECT <50ms for 100K rows
 //! - JOIN <200ms for 10K rows
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use duckdb::Connection;
 use lazycsv::csv::Document;
 use lazycsv::query::{
     execute_query_to_document_cancellable, load_csv_into_duckdb, table_name_from_path,
 };
+use std::hint::black_box;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 

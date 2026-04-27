@@ -14,9 +14,10 @@
 //! - Undo/redo: <5ms per operation
 //! - Rendering: <16.67ms per frame (60 FPS)
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use lazycsv::domain::position::{ColIndex, RowIndex};
 use lazycsv::magnifier::MagnifierState;
+use std::hint::black_box;
 
 /// Create test magnifier with specified line count
 fn create_test_magnifier(lines: usize, line_length: usize) -> MagnifierState {

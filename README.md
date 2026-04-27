@@ -22,25 +22,25 @@ Download the latest release for your platform from [GitHub Releases](https://git
 
 **macOS (Apple Silicon)**
 ```bash
-curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.24.2-aarch64-apple-darwin.tar.gz | tar xz
+curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.24.3-aarch64-apple-darwin.tar.gz | tar xz
 sudo mv lazycsv /usr/local/bin/
 ```
 
 **macOS (Intel)**
 ```bash
-curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.24.2-x86_64-apple-darwin.tar.gz | tar xz
+curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.24.3-x86_64-apple-darwin.tar.gz | tar xz
 sudo mv lazycsv /usr/local/bin/
 ```
 
 **Linux (x86_64)**
 ```bash
-curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.24.2-x86_64-unknown-linux-gnu.tar.gz | tar xz
+curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.24.3-x86_64-unknown-linux-gnu.tar.gz | tar xz
 sudo mv lazycsv /usr/local/bin/
 ```
 
 **Windows**
 
-Download `lazycsv-v0.24.2-x86_64-pc-windows-msvc.zip` from the [releases page](https://github.com/funkybooboo/lazycsv/releases/latest), extract, and add to your PATH.
+Download `lazycsv-v0.24.3-x86_64-pc-windows-msvc.zip` from the [releases page](https://github.com/funkybooboo/lazycsv/releases/latest), extract, and add to your PATH.
 
 ### Build from source
 
@@ -181,7 +181,9 @@ LazyCSV treats CSV files in the same directory like Excel sheets. Open one file,
 
 ## Current Status
 
-**v0.24.2 Complete** (April 2026) - Customizable keybindings + shell command in file browser. Data-driven keymaps via `~/.config/lazycsv/keys.toml` with three shipped presets (vim default, emacs, excel). `:` inside the file menu (`<space>f`) now opens a "Shell (block):" prompt that runs commands in the current directory with `$CWD` / `$FILE` / `$NAME` / `$EXT` substitution. Builds on v0.24.0's TUI theming foundation.
+**v0.24.3 Complete** (April 2026) - Polish on v0.24.2: popup defaults are now `Color::Reset` so the no-config look is uniformly transparent (popups don't paint a contrasting bg over the table view). Dependency bumps: lru, criterion, comfy-table.
+
+**v0.24.2** - Customizable keybindings + shell command in file browser. Data-driven keymaps via `~/.config/lazycsv/keys.toml` with three shipped presets (vim default, emacs, excel). `:` inside the file menu (`<space>f`) opens a "Shell (block):" prompt that runs commands in the current directory with `$CWD` / `$FILE` / `$NAME` / `$EXT` substitution. Builds on v0.24.0's TUI theming foundation.
 
 **Completed Features:**
 - Fast CSV viewer/editor with vim navigation
@@ -226,6 +228,14 @@ cargo test
 ```
 
 See [docs/development.md](docs/development.md) for contributing guidelines.
+
+## What's New in v0.24.3
+
+**Default-theme consistency + dep bumps (April 2026):**
+- **Popup defaults are now `Color::Reset`** instead of `DarkGray`. With no config file, the SQL editor, help overlay, file menu, etc. inherit the terminal default rather than painting a hardcoded gray panel over an otherwise-transparent table. The 11 shipped theme presets still set their own popup colors explicitly, so users with a theme installed see no change.
+- **`ui.border_fg` default also `Color::Reset`** — same rationale.
+- **Dependency upgrades:** `lru` 0.17 → 0.18, `criterion` 0.5 → 0.8 (dev), `comfy-table` 7.1.4 → 7.2.2 (transitive). The criterion bump required swapping every `criterion::black_box` import for `std::hint::black_box` across the bench files (criterion deprecated its own version in favour of the std one).
+- **CI test fixes:** `:sort`, `:wq`, and other ex-commands no longer get their `InputResult` swallowed by the keymap dispatcher. `gg` in the file menu jumps to the top again.
 
 ## What's New in v0.24.2
 

@@ -2,6 +2,50 @@
 
 All notable changes to LazyCSV will be documented in this file.
 
+## [0.24.3] - 2026-04-27
+
+### Changed
+- **Popup defaults are now `Color::Reset`** instead of hardcoded values.
+  With no config file installed, popups (SQL editor, help overlay,
+  file menu, completion menus, etc.) now inherit the terminal default
+  background instead of painting a `DarkGray` panel over an otherwise-
+  transparent table. Specifically:
+  - `popup.bg` / `popup.fg` / `popup.border_fg` / `popup.title_fg`
+    default to `Reset`
+  - `ui.border_fg` also defaults to `Reset`
+  - `popup.completion_sel_fg` / `popup.completion_sel_bg` keep their
+    `White` / `Blue` defaults so the completion menu's selected entry
+    stays visible even with no theme
+  - All 11 shipped theme presets explicitly set their popup colors,
+    so users with a theme installed see no change.
+
+### Fixed
+- The keymap dispatcher was discarding the `InputResult` returned by
+  `:sort`, `:wq`, `:sql`, `:files`, etc. — pressing Enter at the
+  command prompt would commit the buffer but nothing further would
+  happen. `CmdExecute` and `FileListOpen` now forward the result
+  directly so deferred operations (`SortDocument`, `ExecuteQuery`,
+  `OpenFile`, `Quit`) propagate to the main loop.
+- `FileListGotoTop` was an unwired arm in `Action::execute`, so `gg`
+  in the file menu was a no-op. Now replays `gg` through the legacy
+  handler so `PendingCommand` resolves it.
+- Lingering `pending_command.is_some()` test assertions across
+  `tests/{insert_mode,integration_workflows,v0_3_2_features,
+  dual_clipboard}_test.rs` updated to also accept the new
+  `chord_buffer` state for chord-prefix keys (`g`, `z`, `d`, `y`,
+  `c`, `,`).
+
+### Dependency Upgrades
+- `lru` 0.17 → 0.18 (direct)
+- `criterion` 0.5 → 0.8 (dev) — migrated all benchmarks from
+  `criterion::black_box` (deprecated in 0.8) to `std::hint::black_box`
+- `comfy-table` 7.1.4 → 7.2.2 (transitive, via `cargo update`)
+
+### CI
+- Set `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` in `.github/workflows/
+  ci.yml` and `release.yml` to silence the GitHub Actions Node 20
+  deprecation warnings.
+
 ## [0.24.2] - 2026-04-26
 
 ### Added - Customizable Keybindings

@@ -304,6 +304,6 @@ mod tests {
         assert_eq!(mode_indicator_style(&theme).bg, Some(Color::Green));
         assert_eq!(mode_indicator_style(&theme).fg, Some(Color::Black));
         assert_eq!(error_style(&theme).fg, Some(Color::Red));
-        assert_eq!(popup_bg_style(&theme).bg, Some(Color::DarkGray));
+        assert_eq!(popup_bg_style(&theme).bg, Some(Color::Reset));
     }
 }

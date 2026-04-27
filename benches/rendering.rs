@@ -7,12 +7,13 @@
 //!
 //! Target: <16.67ms per frame (60 FPS) for 100K rows
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use lazycsv::csv::Document;
 use lazycsv::session::FileConfig;
 use lazycsv::ui;
 use lazycsv::App;
 use ratatui::{backend::TestBackend, Terminal};
+use std::hint::black_box;
 use std::path::PathBuf;
 
 /// Create test app with specified row/column count

@@ -6,11 +6,12 @@
 //! - Page navigation (PageUp, PageDown)
 //! - Word motion (w, b, e)
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use lazycsv::csv::Document;
 use lazycsv::navigation::commands::*;
 use lazycsv::session::FileConfig;
 use lazycsv::App;
+use std::hint::black_box;
 use std::path::PathBuf;
 
 /// Create test app with specified row/column count

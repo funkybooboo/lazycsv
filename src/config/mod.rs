@@ -165,10 +165,12 @@ impl Default for Defaults {
 
 impl Default for UiTheme {
     fn default() -> Self {
+        // Reset = inherit terminal default. With no config file in place
+        // the whole UI stays consistent with the terminal palette.
         UiTheme {
             fg: Color::Reset,
             bg: Color::Reset,
-            border_fg: Color::Gray,
+            border_fg: Color::Reset,
         }
     }
 }
@@ -193,11 +195,17 @@ impl Default for TableTheme {
 
 impl Default for PopupTheme {
     fn default() -> Self {
+        // Reset = "use the terminal's default" — keeps the no-config look
+        // consistent: popups don't paint a contrasting bg over the
+        // otherwise-transparent table view. The 11 shipped theme files
+        // override these with their own popup palettes.
         PopupTheme {
-            bg: Color::DarkGray,
-            fg: Color::White,
-            border_fg: Color::Gray,
-            title_fg: Color::White,
+            bg: Color::Reset,
+            fg: Color::Reset,
+            border_fg: Color::Reset,
+            title_fg: Color::Reset,
+            // Completion menu still needs a visible distinct selection
+            // even with no theme — leave these contrasted.
             completion_sel_fg: Color::White,
             completion_sel_bg: Color::Blue,
         }
@@ -349,8 +357,12 @@ mod tests {
         assert_eq!(config.theme.table.cursor_fg, Color::Black);
         assert_eq!(config.theme.table.dirty_fg, Color::Red);
         assert!(config.theme.table.header_bg.is_none());
-        assert_eq!(config.theme.popup.bg, Color::DarkGray);
-        assert_eq!(config.theme.ui.border_fg, Color::Gray);
+        // Default popup bg is `Reset` so the no-config look is uniformly
+        // transparent — popups don't paint over the table.
+        assert_eq!(config.theme.popup.bg, Color::Reset);
+        // Default ui.border_fg is `Reset` for the same reason — terminal
+        // defaults dictate the look until a theme overrides.
+        assert_eq!(config.theme.ui.border_fg, Color::Reset);
         assert!(config.sql.format_uppercase);
     }
 
@@ -986,7 +998,9 @@ mod tests {
         let (config, warnings) = apply_with_warnings("[table]\n[ui]\n[popup]\n[status]\n");
         assert!(warnings.is_empty());
         assert_eq!(config.theme.table.cursor_bg, Color::White);
-        assert_eq!(config.theme.popup.bg, Color::DarkGray);
+        // Empty popup section keeps the default — `Reset` so the
+        // no-config look is uniformly transparent.
+        assert_eq!(config.theme.popup.bg, Color::Reset);
     }
 
     #[test]

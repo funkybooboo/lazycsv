@@ -1,6 +1,6 @@
 [package]
 name = "lazycsv"
-version = "0.24.2"
+version = "0.24.3"
 edition = "2021"
 description = "A blazingly fast terminal UI for viewing and editing CSV files"
 authors = ["Nate Stott <nate.stott@pm.me>", "Dana Stott <danastott@gmail.com>"]
@@ -22,7 +22,7 @@ duckdb = { version = "1.2", features = ["bundled"] }
 libc = "0.2"
 regex = "1"
 memmap2 = "0.9"
-lru = "0.17"
+lru = "0.18"
 memchr = "2"
 chrono = "0.4"
 rayon = "1.10"
@@ -43,7 +43,11 @@ codegen-units = 1
 [dev-dependencies]
 tempfile = "3.10.1"
 proptest = "1.4"
-criterion = "0.5"
+criterion = "0.8"
+
+[[bench]]
+name = "magnifier"
+harness = false
 
 [[bench]]
 name = "navigation"
