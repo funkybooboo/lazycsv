@@ -352,9 +352,13 @@ fn test_help_during_multi_key_command() {
     let csv_files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
-    // Start a multi-key command (g for goto)
+    // Start a multi-key command (g for goto). The keymap holds `g` in
+    // `chord_buffer`; the legacy `pending_command` is no longer set.
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-    assert!(app.input_state.pending_command.is_some());
+    assert!(
+        app.input_state.pending_command.is_some() || !app.input_state.chord_buffer.is_empty(),
+        "chord state should be set after `g`"
+    );
 
     // Try to open help with '?'
     // Note: This may complete the command as 'g?' or may open help depending on implementation

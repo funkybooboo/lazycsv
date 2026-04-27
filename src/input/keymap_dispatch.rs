@@ -357,7 +357,17 @@ pub fn execute(app: &mut App, action: Action) -> Result<Option<InputResult>> {
         )?,
 
         // ── Command-mode line editor ─────────────────────────────────
-        CmdExecute => syn_command(app, KeyCode::Enter, KeyModifiers::NONE)?,
+        // CmdExecute is the gateway for `:sort`, `:q`, `:sql`, `:wq`, etc.
+        // The executor returns specialised InputResults (SortDocument /
+        // ExecuteQuery / OpenFile / Quit / …) that MUST propagate back to
+        // main.rs — calling syn_command would discard them, so inline the
+        // handler call and forward the result directly.
+        CmdExecute => {
+            let ev = KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE);
+            return Ok(Some(crate::input::command_mode::handler::handle_raw(
+                app, ev,
+            )?));
+        }
         CmdCancel => syn_command(app, KeyCode::Esc, KeyModifiers::NONE)?,
         CmdDeleteCharBack => syn_command(app, KeyCode::Backspace, KeyModifiers::NONE)?,
         CmdDeleteCharForward => syn_command(app, KeyCode::Delete, KeyModifiers::NONE)?,
@@ -392,7 +402,12 @@ pub fn execute(app: &mut App, action: Action) -> Result<Option<InputResult>> {
             crate::input::file_list_mode::handle_raw(app, g)?;
         }
         FileListGotoBottom => syn_file_list(app, KeyCode::Char('G'), KeyModifiers::SHIFT)?,
-        FileListOpen => syn_file_list(app, KeyCode::Enter, KeyModifiers::NONE)?,
+        // FileListOpen returns InputResult::OpenFile when a CSV is selected;
+        // forward the result so main.rs can run the loading screen.
+        FileListOpen => {
+            let ev = KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE);
+            return Ok(Some(crate::input::file_list_mode::handle_raw(app, ev)?));
+        }
         FileListParent => syn_file_list(app, KeyCode::Char('h'), KeyModifiers::NONE)?,
         FileListToggleHidden => syn_file_list(app, KeyCode::Char('.'), KeyModifiers::NONE)?,
         FileListToggleSpot => syn_file_list(app, KeyCode::Tab, KeyModifiers::NONE)?,

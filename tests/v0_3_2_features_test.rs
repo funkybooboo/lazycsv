@@ -10,7 +10,6 @@ mod common;
 
 use clap::Parser;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use lazycsv::input::PendingCommand;
 use lazycsv::{cli::CliArgs, App, ColIndex, Document, FileConfig, RowIndex};
 use std::fs::write;
 use std::path::PathBuf;
@@ -252,24 +251,21 @@ fn test_pending_g_command_no_timeout() {
     let csv_files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
-    // Press 'g' to start pending command
+    // Press 'g' to start pending command. With the keymap path, `g` goes
+    // into `chord_buffer` rather than `pending_command`. Either state
+    // means "chord in progress".
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-
-    // Should be in pending state
-    assert!(matches!(
-        app.input_state.pending_command,
-        Some(PendingCommand::G)
-    ));
-
-    // The pending command should remain until next key
-    // (no timeout in v0.3.2)
-    assert!(app.input_state.pending_command.is_some());
+    assert!(
+        !app.input_state.chord_buffer.is_empty() || app.input_state.pending_command.is_some(),
+        "either chord_buffer or pending_command should be set after `g`"
+    );
 
     // Complete with 'g' -> gg
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
 
-    // Should have executed and cleared pending state
+    // Both states cleared after the chord resolves.
     assert_eq!(app.input_state.pending_command, None);
+    assert!(app.input_state.chord_buffer.is_empty());
     // gg goes to first row (row 0)
     assert_eq!(app.selected_row(), Some(RowIndex::new(0)));
 }
@@ -280,20 +276,19 @@ fn test_pending_z_command_no_timeout() {
     let csv_files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
-    // Press 'z' to start pending command
+    // Press 'z' — keymap holds it in `chord_buffer` (zz/zt/zb prefixes).
     app.handle_key(key_event(KeyCode::Char('z'))).unwrap();
-
-    // Should be in pending state
-    assert!(matches!(
-        app.input_state.pending_command,
-        Some(PendingCommand::Z)
-    ));
+    assert!(
+        !app.input_state.chord_buffer.is_empty() || app.input_state.pending_command.is_some(),
+        "chord state should be set after `z`"
+    );
 
     // Complete with 'z' -> zz (center viewport)
     app.handle_key(key_event(KeyCode::Char('z'))).unwrap();
 
-    // Should have executed and cleared pending state
+    // Both states cleared after the chord resolves.
     assert_eq!(app.input_state.pending_command, None);
+    assert!(app.input_state.chord_buffer.is_empty());
 }
 
 #[test]
@@ -363,14 +358,12 @@ fn test_pending_command_in_status() {
     let csv_files = vec![PathBuf::from("test.csv")];
     let mut app = App::new(csv_data, csv_files, 0, FileConfig::new());
 
-    // Press 'g' to start pending command
+    // Press 'g' — keymap holds it in chord_buffer.
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
-
-    // The pending command should be visible in input state
-    assert!(matches!(
-        app.input_state.pending_command,
-        Some(PendingCommand::G)
-    ));
+    assert!(
+        !app.input_state.chord_buffer.is_empty() || app.input_state.pending_command.is_some(),
+        "chord state should be set after `g`"
+    );
 }
 
 // ===== Edge Case Tests =====
@@ -400,17 +393,15 @@ fn test_multiple_pending_commands_cancel_each_other() {
     // Press 'g' then 'z' - different pending commands
     app.handle_key(key_event(KeyCode::Char('g'))).unwrap();
 
-    // State should be G
-    assert!(matches!(
-        app.input_state.pending_command,
-        Some(PendingCommand::G)
-    ));
+    // Chord state set (keymap chord_buffer or legacy pending_command).
+    assert!(!app.input_state.chord_buffer.is_empty() || app.input_state.pending_command.is_some());
 
-    // Pressing 'z' should handle the gz sequence
+    // Pressing 'z' — `gz` is unbound in the keymap, so the buffer drops
+    // and `z` runs through the legacy path (which sets PendingCommand::Z).
     app.handle_key(key_event(KeyCode::Char('z'))).unwrap();
 
-    // Depending on implementation, 'gz' might be invalid or have special meaning
-    // Just verify the app is in a stable state
+    // Just verify the app is in a stable state — gz isn't bound, so
+    // exact pending_command state is implementation-dependent.
     assert!(!app.should_quit);
 }
 

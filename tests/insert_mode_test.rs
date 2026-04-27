@@ -621,22 +621,28 @@ fn test_dd_on_last_row_adjusts_selection() {
 fn test_pending_d_can_be_cancelled() {
     let mut app = create_test_app();
 
+    // `d` is a chord prefix (`dd`); the keymap holds it in `chord_buffer`
+    // rather than the legacy `pending_command`. Either state means
+    // "chord in progress".
     app.handle_key(key_event(KeyCode::Char('d'))).unwrap();
-    assert!(app.input_state.pending_command.is_some());
+    assert!(app.input_state.pending_command.is_some() || !app.input_state.chord_buffer.is_empty());
 
     app.handle_key(key_event(KeyCode::Esc)).unwrap();
     assert!(app.input_state.pending_command.is_none());
+    assert!(app.input_state.chord_buffer.is_empty());
 }
 
 #[test]
 fn test_pending_y_can_be_cancelled() {
     let mut app = create_test_app();
 
+    // Same pattern as `d` — `y` is a chord prefix for `yy`.
     app.handle_key(key_event(KeyCode::Char('y'))).unwrap();
-    assert!(app.input_state.pending_command.is_some());
+    assert!(app.input_state.pending_command.is_some() || !app.input_state.chord_buffer.is_empty());
 
     app.handle_key(key_event(KeyCode::Esc)).unwrap();
     assert!(app.input_state.pending_command.is_none());
+    assert!(app.input_state.chord_buffer.is_empty());
 }
 
 #[test]
