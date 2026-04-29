@@ -239,9 +239,16 @@ fn run_main() -> Result<()> {
                 out
             );
         };
-        let input_path = cli_args
-            .file_path()
-            .ok_or_else(|| anyhow::anyhow!("No input file specified"))?;
+        let (input_path, _stdin_cleanup) = if let Some(path) = cli_args.file_path() {
+            (path, None)
+        } else if stdin_is_piped() {
+            let temp_path = save_stdin_to_tempfile()?;
+            (temp_path.clone(), Some(temp_path))
+        } else {
+            anyhow::bail!(
+                "No input file specified. Provide a file path or pipe data via stdin."
+            );
+        };
         let config = FileConfig::with_options(
             cli_args.delimiter,
             cli_args.no_headers,

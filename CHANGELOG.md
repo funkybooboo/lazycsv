@@ -2,6 +2,15 @@
 
 All notable changes to LazyCSV will be documented in this file.
 
+## [0.24.4] - 2026-04-28
+
+### Fixed
+- Standalone format conversion mode (`lazycsv -o out.ext`) now reads
+  piped stdin when no input file is given, matching the behavior of
+  `-q`, `--sort`, `--rows`, and other non-interactive modes.
+  Previously `cat data.csv | lazycsv -o out.xlsx` failed with
+  "No input file specified".
+
 ## [0.24.3] - 2026-04-27
 
 ### Changed
