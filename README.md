@@ -1,18 +1,236 @@
 # lazycsv
 
-A blazingly fast terminal UI for CSV files. Navigate huge datasets with vim keys, switch between files instantly, and never touch your mouse.
+A blazingly fast terminal UI for CSV files. Open a 10GB file instantly. Query it with SQL. Convert between any format. Edit cells with a full vim editor inside. All from your terminal, zero config needed.
 
 Inspired by [lazygit](https://github.com/jesseduffield/lazygit), [lazydocker](https://github.com/jesseduffield/lazydocker), and [lazysql](https://github.com/jorgerojas26/lazysql).
 
 ## Why LazyCSV?
 
-- **Fast** - 100K+ rows at 60 FPS (in-memory)
-- **Vim keys** - hjkl your way through data, full vim emulation planned
-- **Multi-file** - switch between CSVs like Excel sheets (press `[` `]`)
-- **Simple** - no config needed, just works
-- **Clean** - minimal vim-like UI, zero clutter
+- **Billions of rows, instant open** - memory-mapped lazy loading. No loading screen, no waiting. Scroll through files larger than RAM like they're empty
+- **SQL on CSV** - `:sql` opens a full query editor backed by DuckDB. JOIN across files, aggregate, filter, INSERT, UPDATE, DELETE — your data, your queries
+- **Edit like vim** - insert mode for quick fixes, magnifier mode for a full vim editor inside any cell. Macros, visual mode, undo/redo. It's vim, in your data
+- **Your keys, your way** - ships with vim, emacs, and excel presets. Customize every binding to match your workflow
+- **File explorer** - browse all CSVs in a directory with a 3-column file picker. Switch files like Excel sheets, no `cd` required
+- **Multi-format powerhouse** - open CSV, TSV, XLSX, ODS, JSON, Parquet. Export to any of them. Convert from the CLI: `lazycsv data.xlsx -o out.json`
+- **CLI superpowers** - sort, dedup, generate synthetic data, query non-interactively, grab stats — all without opening the TUI
+- **Highly configurable, great defaults** - works out of the box. 11 theme presets (Gruvbox, Dracula, Nord, Catppuccin, Tokyo Night...), 3 keybinding presets, and deep config when you want control. If you don't — it just works
 
-**Note:** LazyCSV loads the entire CSV file into memory for maximum performance. This design choice prioritizes speed and simplicity over handling files larger than available RAM.
+## Features
+
+### Performance
+
+- **Lazy loading** - files under 10MB load into memory for instant access. Larger files use memory-mapped I/O with an LRU row cache, so you can open files bigger than your RAM
+- **60 FPS rendering** - virtual scrolling only draws visible cells (O(1) per frame). Files with 100K+ rows render at 2500+ FPS
+- **Parallel search** - regex search across 100K rows in ~20ms using rayon multi-core
+- **DuckDB-backed queries** - SELECT on 100K rows in under 50ms, JOINs in under 200ms
+
+### SQL Query Mode
+
+Open a full SQL editor inside the TUI with `:sql`:
+
+- **Full DuckDB SQL** - SELECT, WHERE, ORDER BY, GROUP BY, HAVING, JOINs, aggregates, string functions, math operators
+- **DML support** - INSERT, UPDATE, DELETE, ALTER, DROP, CREATE
+- **Multi-file JOINs** - all supported files in the same directory are auto-loaded as tables
+- **SQL IntelliSense** - context-aware auto-completion for table names, column names, and SQL keywords
+- **Fuzzy error suggestions** - mistyped column name? Levenshtein distance suggests the right one
+- **Query history** - persisted to `~/.config/lazycsv/sql_history`, browse with Up/Down
+- **Cancellable** - hit Esc to kill long-running queries
+- **Results as virtual table** - query output appears as a new tab in the file switcher
+
+### Editing
+
+**Insert mode** (`i`, `a`, `s`) - quick single-line cell editing for fixes and updates:
+- `Tab` saves and moves right, `Enter` saves and moves down, `Esc` cancels
+- `Ctrl+w` deletes word, `Ctrl+u` deletes to start, `Ctrl+h` backspaces
+
+**Magnifier mode** (`Enter`) - a full vim editor embedded inside any cell:
+- All vim motions: `hjkl`, `w/b/e`, `0/$`, `gg/G`, `f/F/t/T`
+- All vim operators: `d`, `c`, `y`, `p`, `r`, `x`, `J`, `>>/<<`
+- Visual mode, search (`/`, `n`, `N`), undo/redo (`u`, `Ctrl+r`)
+- `Alt+hjkl` to navigate to adjacent cells without closing
+- Perfect for JSON, multi-line text, or any cell that needs real editing power
+
+**Row and column operations:**
+- `dd` delete row, `yy` yank row, `p`/`P` paste row, `5dd` delete 5 rows
+- `,dd` delete column, `,yy` yank column, `,p`/`,P` paste column
+- `o`/`O` insert row below/above, `,o`/`,O` insert column right/left
+- `cc` clear row, `gj`/`gk` swap rows, drag with mouse to reorder
+
+**Cell transforms:**
+- `~` toggle case, `gU` uppercase, `gu` lowercase, `g~` title case
+- `g.` toggle boolean values (yes/no, true/false, 1/0, on/off)
+- `s/old/new/g` find and replace — in a cell, a range, or across all data
+
+### Visual Mode
+
+- `v` cell-by-cell selection, `V` row selection, `,v` column selection
+- `d` delete, `y` yank, `c` change, `p` paste
+- `o` toggle selection corner, `gv` re-select last visual range
+- `gs` show statistics for selected cells
+
+### Search
+
+- `/` opens regex search with live results as you type
+- `n`/`N` next/previous match, `*` search for current cell value
+- Match counter shows `[current/total]` in status bar
+- Case-insensitive by default with automatic regex fallback
+
+### Undo, Redo, and Macros
+
+- `u` undo, `Ctrl+r` redo — up to 1000 steps, configurable
+- `.` repeats the last edit operation
+- `qa`...`q` records a macro into register a-z, `@a` replays, `@@` repeats last
+- Per-file undo history preserved across file switches
+
+### File Explorer
+
+`:files` opens a yazi-inspired 3-column file browser:
+
+- **Parent | Current | Preview** layout
+- Type to filter, `j/k` to navigate, `Enter` to open
+- File operations: rename (`r`), delete (`d`), copy (`y`), move (`m`), new file (`n`)
+- `:` opens a shell prompt with `$CWD`, `$FILE`, `$NAME`, `$EXT` variable substitution
+- Navigate directories, spot-preview files before opening
+- Quick switching between files with `[` and `]`
+
+### Multi-Format Support
+
+**Read:** CSV, TSV, CSV.GZ, TSV.GZ, XLSX, XLS, ODS, JSON, NDJSON/JSONL, Parquet, SQLite
+
+**Write/Export:** CSV, TSV, JSON, Markdown, XLSX, ODS, Parquet
+
+**From the TUI:** `:export json` or `:export data.xlsx`
+
+**From the CLI:** `lazycsv data.xlsx -o out.json`, `lazycsv data.csv -o out.parquet`
+
+**Pipe support:** `cat data.csv | lazycsv` or `lazycsv -q "SELECT * FROM stdin"`
+
+### CLI Superpowers
+
+Everything the TUI can do, you can do from the command line:
+
+```bash
+# SQL query non-interactively
+lazycsv data.csv -q "SELECT * FROM data WHERE amount > 100"
+
+# Sort by column
+lazycsv data.csv --sort Name
+
+# Print stats (type, min, max, mean, stddev, median, mode, cardinality)
+lazycsv data.csv --stats
+
+# Print headers, row count, or column count
+lazycsv data.csv --headers
+lazycsv data.csv --rows
+lazycsv data.csv --columns
+
+# Deduplicate with primary key support
+lazycsv data.csv --dedup --keep-first
+
+# Split a large file into smaller ones
+lazycsv data.csv --split 10000
+
+# Generate realistic synthetic data
+lazycsv --generate customer --rows 10000 -o customers.csv
+
+# Convert formats
+lazycsv spreadsheet.xlsx -o data.json
+lazycsv data.csv -o out.parquet
+
+# Extract Excel sheets
+lazycsv spreadsheet.xlsx -x
+
+# Add headers to a headerless file
+lazycsv data.csv --add-header "Name,Age,City"
+
+# Clipboard integration
+lazycsv data.csv -C          # copy output to clipboard
+lazycsv -P                    # paste from clipboard into lazycsv
+
+# Locale-aware number formatting
+lazycsv data.csv --format
+```
+
+### Formulas
+
+Excel-compatible formula engine for spreadsheet power users:
+
+- **Aggregates:** `=SUM(A1:A5)`, `=AVERAGE(A1:A5)`, `=MIN(...)`, `=MAX(...)`, `=COUNT(...)`
+- **Math:** `=POWER()`, `=CEILING()`, `=FLOOR()`
+- **Text:** `=CONCAT()`, `=TRIM()`, `=UPPER()`, `=LOWER()`, `=PROPER()`, `=LEFT()`, `=RIGHT()`, `=MID()`, `=SUBSTITUTE()`
+- **Logic:** `=IF(condition, true_val, false_val)` with comparison operators
+- **Lookup:** `=VLOOKUP()`, `=HLOOKUP()`
+- **Date:** `=NOW()`, `=TODAY()`, `=DATEDIF()`
+- Formula bar displays the formula when cursor is on a formula cell
+- Auto-completion popup for function names and cell references
+- Imports formulas from XLSX spreadsheets
+
+### Conditional Formatting
+
+Color columns based on conditions:
+
+```
+:bgcolor Amount red ">1000"       # red background where Amount > 1000
+:bgcolor Status green "=active"    # green where Status equals "active"
+:fgcolor Name blue "~^admin"      # blue text where Name matches regex
+:bgcolor # green "and(>0,<=100)"   # compound conditions
+:clearview                         # remove all custom colors
+```
+
+Colors persist across sessions in `~/.config/lazycsv/views.json`.
+
+### Sort, Stats, and Substitute
+
+- `:sort Name` sort ascending by column, `:sort! Name` descending, multi-column: `:sort Dept,Name`
+- `:stats` show column statistics overlay (count, sum, avg, min, max, distinct), `:stats A` for one column
+- `:sum`, `:avg`, `:count`, `:distinct` for quick single-stat lookups
+- `s/old/new/` replace in current cell, `%s/old/new/g` replace everywhere, `5,10s/old/new/g` in a row range, `B,Ds/old/new/g` in a column range
+
+### Session and Persistence
+
+- `:w` save, `:W` save all, `:wq` save and quit, `:q!` force quit
+- Dirty file indicator (`*` after filename)
+- External modification detection — polls every 2 seconds, prompts to reload
+- View state (column widths, types, colors, frozen columns) saved per file across sessions
+- `:freeze A,B` pin columns, `:freeze 1,3` pin rows, `:unfreeze` to remove
+- `:type A number` annotate column types for proper formatting
+
+### Configuration
+
+**Default config location:** `~/.config/lazycsv/config.toml`  
+**Per-directory overrides:** `.lazycsv.toml` in any directory
+
+```toml
+[defaults]
+delimiter = ","
+encoding = "utf-8"
+zebra_striping = true
+max_column_width = 50
+undo_limit = 1000
+
+# Full theme customization with 11 presets
+[ui]
+bg = "#282c34"
+fg = "#abb2bf"
+
+# Every keybinding remappable, 199 named actions
+# Three presets: vim (default), emacs, excel
+```
+
+**Hot-reload** — save your config and changes apply instantly. No restart needed.
+
+**11 built-in themes:** Gruvbox (dark/light), Dracula, Nord, Catppuccin (Mocha/Macchiato/Frappe/Latte), Solarized (dark/light), Tokyo Night
+
+**3 keybinding presets:** `inherit = "vim"` (default), `inherit = "emacs"`, `inherit = "excel"`, or `inherit = "none"` for a blank slate. Every key in every mode is remappable.
+
+### Mouse Support
+
+- Click to select cells, click headers to select columns, click row gutters to select rows
+- Double-click enters insert mode
+- Right-click context menu (cut, copy, paste, clear, insert, delete)
+- Drag column headers to reorder columns
+- Drag row gutters to reorder rows
+- Mouse wheel for scrolling
 
 ## Install
 
@@ -96,116 +314,43 @@ lazycsv data.csv --query "SELECT * FROM data WHERE amount > 100"
 
 # Locale-aware number formatting
 lazycsv data.csv --format
-
-# In the app:
-# hjkl or arrows  -> navigate
-# [ or ]          -> switch between CSV files
-# gg or G         -> jump to top/bottom
-# :B or :5        -> jump to column B or row 5
-# i or Enter      -> edit cell (quick or magnifier)
-# /               -> search
-# :sql            -> SQL query mode
-# :files          -> file picker (same as [ and ])
-# Esc             -> cancel loading/queries
-# ?               -> show help
-# :q              -> quit
 ```
-
-That's it! Press `?` in the app for full keybindings.
 
 ## Essential Keys
 
 | Key | Action |
 |-----|--------|
 | `hjkl` or arrows | Move around (with count: `5j`, `10h`) |
-| `gg` | Jump to first row (row 0) |
-| `G` / `5G` | Jump to last row / row 5 |
+| `gg` / `G` | Jump to first / last row |
+| `5G` / `:5` | Jump to row 5 |
 | `:B` / `:A5` | Jump to column B or cell A5 |
 | `w` / `b` / `e` | Next/prev/last non-empty cell |
 | `i` / `a` / `s` | Quick edit cell (Insert mode) |
-| `Enter` | Magnifier mode (full vim editor for multi-line) |
+| `Enter` | Magnifier — full vim editor inside the cell |
 | `o` / `O` | Insert row below/above |
 | `dd` / `yy` / `p` | Delete/yank/paste row |
 | `,dd` / `,yy` / `,p` | Delete/yank/paste column |
-| `v` / `V` | Visual selection (cell/row) |
-| `/` | Search (regex) |
-| `:sql` | SQL query mode |
-| `:files` | File picker dialog |
-
+| `v` / `V` / `,v` | Visual select (cell/row/column) |
+| `/` | Search (regex, live results) |
+| `n` / `N` | Next/previous match |
+| `u` / `Ctrl+r` | Undo / Redo |
+| `.` | Repeat last edit |
+| `~` / `gU` / `gu` / `g~` | Toggle/upper/lower/title case |
+| `g.` | Toggle boolean (yes/no, true/false) |
+| `gj` / `gk` | Swap row down/up |
+| `:sql` | SQL query mode (DuckDB-backed) |
+| `:sort` / `:sort!` | Sort ascending/descending |
+| `:stats` | Column statistics overlay |
+| `:files` | File explorer (browse, open, manage files) |
+| `:export` | Export to JSON, TSV, Markdown, XLSX, ODS, Parquet |
+| `s/old/new/g` | Find and replace in cells |
+| `qa`...`q` / `@a` | Record / replay macro (26 registers) |
 | `Esc` | Cancel loading/queries |
-| `zt` / `zz` / `zb` | Position row at top/center/bottom |
-| `[` / `]` | Switch CSV files |
+| `zt` / `zz` / `zb` | Scroll row to top/center/bottom |
 | `?` | Show help |
 | `:w` / `:q` | Save / Quit |
 
-**Vim users:** All your favorite motions work (`0`, `$`, count prefixes, etc.)
-
-## Editing Modes
-
-### Insert Mode (Quick Edits)
-Press `i`, `a`, or `s` for quick single-line cell editing. Perfect for fixing typos or updating values.
-
-```
-i     -> Edit cell (cursor at end)
-a     -> Edit cell (cursor at end)
-I     -> Edit cell (cursor at start)
-s     -> Replace cell (clear + edit)
-```
-
-Exit with `Enter` (save + move down), `Tab` (save + move right), or `Esc` (cancel).
-
-### Magnifier Mode (Complex Edits)
-Press `Enter` to open a full vim editor for complex multi-line cell editing. Perfect for JSON, descriptions, or any content that needs vim power.
-
-```
-Enter              -> Open magnifier on current cell
-hjkl / w/b/e       -> Vim motions
-i/a/o/O            -> Enter insert mode
-dd / yy / p        -> Delete/yank/paste lines
-x / s              -> Delete/substitute character
-:wq or ZZ          -> Save and close
-:q!                -> Close without saving
-Alt+hjkl/arrows    -> Navigate to adjacent cells
-```
-
-**Features:**
-- Full vim editing (motions, operators, count prefixes)
-- Multi-line content with proper CSV escaping
-- Line numbers and mode indicators
-- Centered popup overlay
-- Dirty tracking with save prompts
-
-## Innovation: Multi-File Navigation
-
-LazyCSV treats CSV files in the same directory like Excel sheets. Open one file, instantly switch between all of them with `[` and `]` keys. No more `cd` and reopening!
-
-## Current Status
-
-**v0.24.3 Complete** (April 2026) - Polish on v0.24.2: popup defaults are now `Color::Reset` so the no-config look is uniformly transparent (popups don't paint a contrasting bg over the table view). Dependency bumps: lru, criterion, comfy-table.
-
-**v0.24.2** - Customizable keybindings + shell command in file browser. Data-driven keymaps via `~/.config/lazycsv/keys.toml` with three shipped presets (vim default, emacs, excel). `:` inside the file menu (`<space>f`) opens a "Shell (block):" prompt that runs commands in the current directory with `$CWD` / `$FILE` / `$NAME` / `$EXT` substitution. Builds on v0.24.0's TUI theming foundation.
-
-**Completed Features:**
-- Fast CSV viewer/editor with vim navigation
-- Multi-file switching (`[` `]` or `:files`)
-- Full vim editing (Insert mode + Magnifier mode)
-- Row operations (`o`, `O`, `dd`, `yy`, `p`)
-- Column operations (`,dd`, `,yy`, `,p`, `,o`)
-- Visual mode (`v`, `V`, `,v`)
-- Search (`/`, `n`, `N`) with regex support
-- SQL query mode (`:sql` with full SELECT/WHERE/JOIN/GROUP BY)
-- Non-interactive query mode (`--query` flag)
-- Locale-aware formatting (`--format` flag)
-- External file modification detection
-- Cancellable operations (`Esc` during loading/queries)
-- File persistence (`:w`, `:wq`, `:q`)
-- 700+ tests passing
-
-**Next Up:**
-- **v0.31.0** - Documentation & Maintainability
-- **v1.0.0** - Stable release
-
-See [plans/roadmap.md](plans/roadmap.md) for the complete detailed roadmap.
+Press `?` in the app for the full keybinding reference.
 
 ## Documentation
 
@@ -229,61 +374,14 @@ cargo test
 
 See [docs/development.md](docs/development.md) for contributing guidelines.
 
-## What's New in v0.24.3
-
-**Default-theme consistency + dep bumps (April 2026):**
-- **Popup defaults are now `Color::Reset`** instead of `DarkGray`. With no config file, the SQL editor, help overlay, file menu, etc. inherit the terminal default rather than painting a hardcoded gray panel over an otherwise-transparent table. The 11 shipped theme presets still set their own popup colors explicitly, so users with a theme installed see no change.
-- **`ui.border_fg` default also `Color::Reset`** — same rationale.
-- **Dependency upgrades:** `lru` 0.17 → 0.18, `criterion` 0.5 → 0.8 (dev), `comfy-table` 7.1.4 → 7.2.2 (transitive). The criterion bump required swapping every `criterion::black_box` import for `std::hint::black_box` across the bench files (criterion deprecated its own version in favour of the std one).
-- **CI test fixes:** `:sort`, `:wq`, and other ex-commands no longer get their `InputResult` swallowed by the keymap dispatcher. `gg` in the file menu jumps to the top again.
-
-## What's New in v0.24.2
-
-**Customizable keybindings (April 2026):**
-- **Data-driven keymap** at `~/.config/lazycsv/keys.toml` (or per-directory `.lazycsv.toml`). Schema sections: `[normal]`, `[insert]`, `[visual]`, `[command]`, `[search]`, `[magnifier]`, `[file_list]`, `[sql_editor]`, `[file_operation]`, `[global]`. `[meta] inherit = "vim"` layers your overrides on top of the default; `inherit = "none"` starts from a blank slate.
-- **3 presets ship under `keymaps/`:** `vim.toml` (default, baked into the binary), `emacs.toml` (readline-style: `Ctrl-f/b/n/p`, `Ctrl-a/e`, `Alt-x`, …), `excel.toml` (arrow-key navigation, `F2` to edit, `Ctrl-S/Z/Y`, `Tab/Enter` for data entry).
-- **199 named actions** in the `Action` registry; every user-facing behaviour has a stable `snake_case` ID. Run `:keys` to see how many bindings are active.
-- **Multi-key chords** (vim's `gg`, `dd`, `,yy`, `<space>q`) flow through the keymap. Parametric chords (`g{letter}` for column jump, `q{a-z}` for macro registers) still work — when the keymap can't resolve a chord, buffered keys are replayed through the legacy path.
-- **Explicit unbinds** with `"i" = ""` actually silence a key (no fall-through to legacy hardcoded behaviour). Used in `excel.toml` so `i`/`a`/`v` can be typed as cell content.
-- **Hot-reload** via the existing config watcher — edit `keys.toml` and the new bindings apply on save.
-
-**Shell command in file browser (April 2026):**
-- Press `:` inside the file menu (`<space>f`) to open a themed "Shell (block):" prompt. Whatever you type is executed via `$SHELL -c` in the file menu's current directory.
-- **Variable substitution** before exec: `$CWD`, `$FILE`, `$NAME`, `$EXT` (all shell-quoted). Literal `$` escapable as `\$`; unknown `$<name>` tokens pass through.
-- **TUI suspended** for the duration; aggressive screen clear on resume so terminal state never leaks into the table view.
-- **Stdout discarded; stderr captured** (≤ 64 KiB). Exit-code outcomes: silent success / cream toast for warnings / red error toast on non-zero. Multi-line stderr opens a scrollable popup (`j/k` to scroll, `Esc` to dismiss).
-- **Persistent shell history** at `~/.config/lazycsv/shell_history`. Up/Down walks past entries; configurable `[defaults] shell_history_limit` (default 50, 0 disables).
-
-## What's New in v0.24.0
-
-**TUI Theming (April 2026):**
-- **Nested theme schema:** `[ui]` / `[table]` / `[popup]` / `[status]` / `[file_menu]` / `[sql]` sections in `~/.config/lazycsv/config.toml` (or per-directory `.lazycsv.toml`). Hard break — the old flat `[theme]` block is gone; see [`docs/themes.md`](docs/themes.md) for the migration map.
-- **11 presets shipped under `themes/`:** Gruvbox dark/light, Dracula, Nord, Catppuccin Mocha/Macchiato/Frappé/Latte, Solarized dark/light, Tokyo Night. Each uses authentic upstream palette hex codes.
-- **Full coverage:** every popup (help, file menu, SQL completion/history, formula completion, file-op prompt, stats overlay, context menu, magnifier), the status bar, title bar, and table chrome are theme-aware. A base-canvas pass paints the entire frame with `[ui].bg` so transparent terminals are fully covered.
-- **Hot-reload:** save your config and changes apply instantly — the existing config watcher detects mtime changes and reloads.
-
-## What's New in v0.23.0
-
-**Performance Benchmarking & Tuning (April 2026):**
-- **Benchmark suite:** Criterion benches for navigation, rendering, search, magnifier, and SQL paths under `benches/` — guards against regressions on the critical paths.
-- **Performance work delivered earlier:** mmap-backed lazy loading for large CSVs, DuckDB-backed query engine, parallelized search and `:s` substitute via rayon, buffered + parallel sort, COPY+mmap fast path, contiguous-byte writes for unedited rows.
-
-## What's New in v0.22.0
-
-**Macros & Command History (April 2026):**
-- **Macro recording:** `qa` to record into register `a`, `q` to stop, `@a` to replay, `@@` to repeat the last macro. 26 registers (a–z), with replay-depth and length guards.
-- **Command history:** Persistent `:` command history at `~/.config/lazycsv/command_history`. Up/Down arrows in command mode walk through past entries; typed text is restored when you pass the newest entry.
-- **`:history`:** Lists the most recent commands in the status bar.
-- **Configurable:** New `[defaults] command_history_limit` (default 50; 0 disables).
-- **Testing:** 30 new integration tests + 9 unit tests, all green.
-
 ## Philosophy
 
 LazyCSV follows the "lazy tools" design:
-1. **Keyboard first** - mouse optional
-2. **Fast** - instant response, in-memory for speed
-3. **Simple** - no configuration required
-4. **Powerful** - vim-style efficiency
+
+1. **Keyboard first** - mouse optional, every action has a key
+2. **Fast** - instant response, lazy-loaded for infinite scale
+3. **Simple** - no configuration required, sensible defaults
+4. **Powerful** - vim-style efficiency, SQL queries, format conversion
 5. **Vim-first** - if it works in vim, it should work here
 
 ## License
@@ -294,6 +392,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 Built with:
 - [ratatui](https://ratatui.rs/) - TUI framework
+- [DuckDB](https://duckdb.org/) - SQL query engine
 - [csv](https://docs.rs/csv/) - CSV parsing by BurntSushi
 - Rust
 
