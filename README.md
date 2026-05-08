@@ -288,7 +288,7 @@ LazyCSV follows the "lazy tools" design:
 
 ## License
 
-GPL License - see [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Credits
 
