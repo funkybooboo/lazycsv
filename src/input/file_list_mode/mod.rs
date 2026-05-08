@@ -14,6 +14,33 @@ use anyhow::Result;
 pub use browser::{scan_directory, scan_directory_filtered, BrowserEntry};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
+/// Clamp `file_list_selected` to the valid range for the current directory,
+/// respecting any active file-name filter. Called after navigation changes
+/// the directory or after the filter changes.
+fn clamp_selected_to_filtered(app: &mut App) {
+    if let Ok(entries) = scan_directory_filtered(
+        &app.view_state.current_directory,
+        app.view_state.show_hidden_files,
+    ) {
+        let filter = app.input_state.file_filter_buffer.to_lowercase();
+        let count = entries
+            .iter()
+            .filter(|e| {
+                if filter.is_empty() {
+                    true
+                } else if let Some(name) = e.filename() {
+                    name.to_lowercase().contains(&filter)
+                } else {
+                    false
+                }
+            })
+            .count();
+        if count > 0 {
+            app.view_state.file_list_selected = app.view_state.file_list_selected.min(count - 1);
+        }
+    }
+}
+
 /// Handle keyboard input in file list mode (with keymap pre-pass).
 pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     // Shell-prompt mode and search mode each handle their own keys —
@@ -412,9 +439,26 @@ pub fn navigate_to_parent_column_index(app: &mut App, idx: usize) {
         Ok(p) => p,
         Err(_) => return,
     };
-    app.view_state.current_directory = canonical_path;
-    app.view_state.file_list_selected = 0;
+
+    // Save current directory selection (yazi-style memory)
+    app.view_state.directory_selected.insert(
+        app.view_state.current_directory.clone(),
+        app.view_state.file_list_selected,
+    );
+
     app.input_state.clear_file_filter();
+
+    app.view_state.current_directory = canonical_path.clone();
+
+    // Restore saved selection for this directory (or 0 if first visit)
+    let saved = app
+        .view_state
+        .directory_selected
+        .get(&app.view_state.current_directory)
+        .copied();
+    app.view_state.file_list_selected = saved.unwrap_or(0);
+
+    clamp_selected_to_filtered(app);
 }
 
 /// Navigate to parent directory (h key - yazi-style)
@@ -422,8 +466,27 @@ fn navigate_to_parent(app: &mut App) {
     let current_dir = app.view_state.current_directory.clone();
     if let Some(parent) = current_dir.parent() {
         let parent_buf = parent.to_path_buf();
-        // Find the index of the directory we just came from in the parent listing
-        let selected = scan_directory_filtered(&parent_buf, app.view_state.show_hidden_files)
+
+        app.view_state
+            .directory_selected
+            .insert(current_dir.clone(), app.view_state.file_list_selected);
+
+        app.input_state.clear_file_filter();
+
+        app.view_state.current_directory = parent_buf;
+
+        let saved = app
+            .view_state
+            .directory_selected
+            .get(&app.view_state.current_directory)
+            .copied();
+        app.view_state.file_list_selected = if let Some(s) = saved {
+            s
+        } else {
+            scan_directory_filtered(
+                &app.view_state.current_directory,
+                app.view_state.show_hidden_files,
+            )
             .ok()
             .and_then(|entries| {
                 let dir_name = current_dir.file_name()?;
@@ -431,10 +494,10 @@ fn navigate_to_parent(app: &mut App) {
                     .iter()
                     .position(|e| e.filename() == dir_name.to_str())
             })
-            .unwrap_or(0);
-        app.view_state.current_directory = parent_buf;
-        app.view_state.file_list_selected = selected;
-        app.input_state.clear_file_filter();
+            .unwrap_or(0)
+        };
+
+        clamp_selected_to_filtered(app);
     }
 }
 
@@ -481,6 +544,11 @@ pub fn navigate_into_selected(app: &mut App) -> Result<InputResult> {
 
     match selected_entry {
         BrowserEntry::Directory(path) => {
+            // Save current directory selection (yazi-style memory)
+            app.view_state
+                .directory_selected
+                .insert(current_dir, app.view_state.file_list_selected);
+
             // Navigate into directory
             let canonical_path = match path.canonicalize() {
                 Ok(p) => p,
@@ -492,8 +560,18 @@ pub fn navigate_into_selected(app: &mut App) -> Result<InputResult> {
                     return Ok(InputResult::Continue);
                 }
             };
-            app.view_state.current_directory = canonical_path;
-            app.view_state.file_list_selected = 0;
+            app.view_state.current_directory = canonical_path.clone();
+
+            // Restore saved selection for this directory (or 0 if first visit)
+            let saved = app
+                .view_state
+                .directory_selected
+                .get(&app.view_state.current_directory)
+                .copied();
+            app.view_state.file_list_selected = saved.unwrap_or(0);
+
+            clamp_selected_to_filtered(app);
+
             app.input_state.clear_file_filter();
             Ok(InputResult::Continue)
         }

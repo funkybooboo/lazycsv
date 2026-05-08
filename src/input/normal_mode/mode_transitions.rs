@@ -35,17 +35,17 @@ pub fn insert_at_end(app: &mut App) {
     enter_insert_mode(app, CursorPosition::End, InitialContent::Keep);
 }
 
-/// Enter insert mode: 'a' - edit cell, cursor at end (same as 'i' for cells)
+/// Enter insert mode: 'a' - edit cell, cursor at end
 pub fn append_at_end(app: &mut App) {
     enter_insert_mode(app, CursorPosition::End, InitialContent::Keep);
 }
 
-/// Enter insert mode: 'I' - edit cell, cursor at start
+/// Enter insert mode: 'I' - edit cell, cursor at start (same as 'i')
 pub fn insert_at_start(app: &mut App) {
     enter_insert_mode(app, CursorPosition::Start, InitialContent::Keep);
 }
 
-/// Enter insert mode: 'A' - edit cell, cursor at end (same as 'i')
+/// Enter insert mode: 'A' - edit cell, cursor at end (same as 'a')
 pub fn append_at_line_end(app: &mut App) {
     enter_insert_mode(app, CursorPosition::End, InitialContent::Keep);
 }
@@ -57,7 +57,7 @@ pub fn substitute_cell(app: &mut App) {
 
 /// Enter insert mode: F2 - edit cell (same as 'i')
 pub fn edit_with_f2(app: &mut App) {
-    enter_insert_mode(app, CursorPosition::End, InitialContent::Keep);
+    enter_insert_mode(app, CursorPosition::Start, InitialContent::Keep);
 }
 
 /// Enter magnifier mode: 'm' - open magnifier for complex cell editing

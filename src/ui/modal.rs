@@ -63,6 +63,15 @@ pub fn cursor_style(theme: &Theme) -> Style {
         .add_modifier(Modifier::BOLD)
 }
 
+/// Insert-mode cursor style — inverted cursor colors so the cursor
+/// character stands out against the bright selected-cell background.
+pub fn insert_cursor_style(theme: &Theme) -> Style {
+    Style::default()
+        .bg(theme.table.cursor_fg)
+        .fg(theme.table.cursor_bg)
+        .add_modifier(Modifier::BOLD)
+}
+
 /// Visual-mode (multi-cell) selection style.
 pub fn visual_selection_style(theme: &Theme) -> Style {
     Style::default()
@@ -301,6 +310,8 @@ mod tests {
         let theme = Theme::default();
         assert_eq!(cursor_style(&theme).bg, Some(Color::White));
         assert_eq!(cursor_style(&theme).fg, Some(Color::Black));
+        assert_eq!(insert_cursor_style(&theme).bg, Some(Color::Black));
+        assert_eq!(insert_cursor_style(&theme).fg, Some(Color::White));
         assert_eq!(mode_indicator_style(&theme).bg, Some(Color::Green));
         assert_eq!(mode_indicator_style(&theme).fg, Some(Color::Black));
         assert_eq!(error_style(&theme).fg, Some(Color::Red));

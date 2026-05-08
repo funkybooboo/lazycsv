@@ -214,12 +214,12 @@ pub fn handle_raw(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             return Ok(InputResult::Continue);
         }
 
-        // Insert mode: 'i' - edit cell, cursor at end
+        // Insert mode: 'i' - edit cell, cursor at start
         KeyCode::Char('i') if help::is_navigation_allowed(app) => {
             mode_transitions::insert_at_end(app);
         }
 
-        // Insert mode: 'a' - edit cell, cursor at end (same as 'i' for cells)
+        // Insert mode: 'a' - edit cell, cursor at end
         KeyCode::Char('a') if help::is_navigation_allowed(app) => {
             mode_transitions::append_at_end(app);
         }
@@ -229,7 +229,7 @@ pub fn handle_raw(app: &mut App, key: KeyEvent) -> Result<InputResult> {
             mode_transitions::insert_at_start(app);
         }
 
-        // Insert mode: 'A' - edit cell, cursor at end (same as 'i')
+        // Insert mode: 'A' - edit cell, cursor at end (same as 'a')
         KeyCode::Char('A') if help::is_navigation_allowed(app) => {
             mode_transitions::append_at_line_end(app);
         }

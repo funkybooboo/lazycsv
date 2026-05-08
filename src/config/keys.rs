@@ -45,6 +45,7 @@
 //! assert_eq!(chord.len(), 2);
 //! ```
 
+use crate::app::Mode;
 use crate::input::keymap_actions::Action;
 use crossterm::event::{KeyCode, KeyModifiers};
 use serde::Deserialize;
@@ -86,6 +87,7 @@ impl KeymapScope {
             FileList => Self::FileList,
             SqlEditor => Self::SqlEditor,
             FileOperationPrompt => Self::FileOperation,
+            Mode::ThemeSelector => Self::Normal,
         }
     }
 

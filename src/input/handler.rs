@@ -34,6 +34,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent) -> Result<InputResult> {
         Mode::VisualBlock | Mode::VisualLine | Mode::VisualColumn => {
             super::visual_mode::handle(app, key)
         }
+        Mode::ThemeSelector => Ok(crate::input::theme_selector_mode::handle(app, key)),
     }
 }
 

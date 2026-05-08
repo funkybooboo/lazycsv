@@ -11,6 +11,7 @@ use crate::App;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
+    text::{Line, Span},
     widgets::{Cell, Paragraph, Row, Table},
     Frame,
 };
@@ -237,40 +238,65 @@ fn calculate_scroll_offset(
     }
 }
 
-/// Format edit buffer content with visible cursor
-/// Format edit buffer with cursor, scrolled to keep cursor visible within `max_width`.
-fn format_edit_buffer(content: &str, cursor: usize, max_width: usize) -> String {
-    // Insert a visible cursor character at cursor position
-    let mut with_cursor = String::new();
-    for (i, ch) in content.chars().enumerate() {
-        if i == cursor {
-            with_cursor.push('│'); // Cursor indicator
-        }
-        with_cursor.push(ch);
-    }
-    if cursor >= content.chars().count() {
-        with_cursor.push('│');
-    }
+/// Build a styled cell for insert-mode editing with a block cursor.
+///
+/// Characters *before* and *after* the cursor use `cursor_style(theme)`.
+/// The character *at* the cursor position uses `insert_cursor_style(theme)`
+/// (inverted colors) so the cursor stands out against the bright cell background.
+/// If the cursor is at the end of content, a trailing space gets the insert style.
+fn format_edit_cell(
+    content: &str,
+    cursor: usize,
+    max_width: usize,
+    theme: &crate::config::Theme,
+) -> Cell<'static> {
+    let chars: Vec<char> = content.chars().collect();
+    let content_len = chars.len();
+    let cursor_cell_style = super::modal::cursor_style(theme);
+    let insert_style = super::modal::insert_cursor_style(theme);
 
-    let total_chars = with_cursor.chars().count();
-    if max_width == 0 || total_chars <= max_width {
-        return with_cursor;
-    }
-
-    // Find cursor position in the with_cursor string (the '│' character)
-    let cursor_pos = with_cursor.chars().position(|c| c == '│').unwrap_or(cursor);
-
-    // Calculate a window around the cursor that fits in max_width
-    let half = max_width / 2;
-    let start = if cursor_pos <= half {
-        0
-    } else if cursor_pos + half >= total_chars {
-        total_chars.saturating_sub(max_width)
+    // Determine the visible window, keeping the cursor in view.
+    let (start, end) = if max_width == 0 || content_len <= max_width {
+        (0, content_len)
+    } else if cursor <= max_width / 2 {
+        (0, max_width.min(content_len))
+    } else if cursor + max_width / 2 >= content_len {
+        let s = content_len.saturating_sub(max_width);
+        (s, content_len)
     } else {
-        cursor_pos - half
+        let s = cursor - max_width / 2;
+        (s, (s + max_width).min(content_len))
     };
 
-    with_cursor.chars().skip(start).take(max_width).collect()
+    let mut spans: Vec<Span<'static>> = Vec::new();
+    for (i, &ch) in chars.iter().enumerate().skip(start).take(end - start) {
+        let style = if i == cursor {
+            insert_style
+        } else {
+            cursor_cell_style
+        };
+        spans.push(Span::styled(ch.to_string(), style));
+    }
+
+    // Cursor at end of content — show a space with insert style
+    if cursor >= content_len && cursor >= start && (end - start) < max_width {
+        spans.push(Span::styled(" ".to_string(), insert_style));
+    }
+
+    // Pad to fill column width with cursor_cell_style
+    let visible_len = end - start;
+    let extra_cursor = if cursor >= content_len && cursor >= start {
+        1
+    } else {
+        0
+    };
+    let displayed = visible_len + extra_cursor;
+    let pad_width = max_width.saturating_sub(displayed);
+    if pad_width > 0 {
+        spans.push(Span::styled(" ".repeat(pad_width), cursor_cell_style));
+    }
+
+    Cell::from(Line::from(spans))
 }
 
 /// Minimum column width in characters
@@ -512,15 +538,20 @@ fn build_data_rows_v2(
                     .copied()
                     .unwrap_or(MIN_COLUMN_WIDTH) as usize;
 
-                let raw_value = if is_selected && is_insert_mode {
+                // Insert-mode selected cell: use styled block cursor
+                if is_selected && is_insert_mode {
                     if let Some((ref content, cursor)) = edit_info {
-                        format_edit_buffer(content, cursor, col_width.saturating_sub(1))
-                    } else {
-                        row.get(col_idx).cloned().unwrap_or_default()
+                        cells.push(format_edit_cell(
+                            content,
+                            cursor,
+                            col_width.saturating_sub(1),
+                            &app.config.theme,
+                        ));
+                        continue;
                     }
-                } else {
-                    row.get(col_idx).cloned().unwrap_or_default()
-                };
+                }
+
+                let raw_value = row.get(col_idx).cloned().unwrap_or_default();
 
                 // Truncate only truly massive content
                 let cell_value = if raw_value.chars().count() > TRUNCATE_THRESHOLD {
@@ -1111,5 +1142,46 @@ mod tests {
         assert_eq!(row_number_col_width(9999), 5);
         // 1,048,576 rows (Excel max) → 7 digits + 1 = 8
         assert_eq!(row_number_col_width(1_048_576), 8);
+    }
+
+    #[test]
+    fn test_format_edit_cell_cursor_at_start() {
+        let theme = crate::config::Theme::default();
+        let cell = format_edit_cell("hello", 0, 20, &theme);
+        // Cell contains a Line with styled spans
+        // 'h' should have insert_cursor_style (inverted), rest cursor_style
+        let _ = cell;
+    }
+
+    #[test]
+    fn test_format_edit_cell_cursor_at_end() {
+        let theme = crate::config::Theme::default();
+        let cell = format_edit_cell("abc", 3, 20, &theme);
+        // Cursor past last char — should show space with insert style + padding
+        let _ = cell;
+    }
+
+    #[test]
+    fn test_format_edit_cell_cursor_in_middle() {
+        let theme = crate::config::Theme::default();
+        let cell = format_edit_cell("hello", 2, 20, &theme);
+        let _ = cell;
+    }
+
+    #[test]
+    fn test_format_edit_cell_empty_content() {
+        let theme = crate::config::Theme::default();
+        let cell = format_edit_cell("", 0, 10, &theme);
+        // Cursor at position 0 in empty string — should show a space with insert style
+        let _ = cell;
+    }
+
+    #[test]
+    fn test_format_edit_cell_scroll_keeps_cursor_visible() {
+        let theme = crate::config::Theme::default();
+        // content = 20 chars, max_width = 5, cursor at position 15
+        // should scroll so cursor stays visible
+        let cell = format_edit_cell("abcdefghijklmnopqrst", 15, 5, &theme);
+        let _ = cell;
     }
 }

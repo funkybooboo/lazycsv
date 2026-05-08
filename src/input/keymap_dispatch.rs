@@ -321,6 +321,12 @@ pub fn execute(app: &mut App, action: Action) -> Result<Option<InputResult>> {
                 (KeyCode::Char('f'), KeyModifiers::NONE),
             ],
         )?,
+        EnterThemeSelector => {
+            app.theme_list = crate::ui::theme_selector::scan_themes();
+            app.theme_selector_index = 0;
+            app.mode = crate::app::Mode::ThemeSelector;
+            return Ok(Some(crate::input::InputResult::Continue));
+        }
         ReselectVisual => syn_normal_chord(
             app,
             &[

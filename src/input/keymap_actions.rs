@@ -116,6 +116,7 @@ pub enum Action {
     EnterSqlEditor,
     EnterMagnifier,
     EnterFileList,
+    EnterThemeSelector,
     ReselectVisual,
 
     // ── Normal mode: macros ──────────────────────────────────────────
@@ -385,6 +386,7 @@ action_table! {
     (EnterSqlEditor, "enter_sql_editor"),
     (EnterMagnifier, "enter_magnifier"),
     (EnterFileList, "enter_file_list"),
+    (EnterThemeSelector, "enter_theme_selector"),
     (ReselectVisual, "reselect_visual"),
 
     (MacroRecordToggle, "macro_record_toggle"),

@@ -220,6 +220,11 @@ pub struct App {
 
     /// Captured stderr from the last shell command (for the scrollable popup)
     pub shell_error_popup: Option<ShellErrorPopup>,
+
+    /// Available themes for the theme selector (path, display_name)
+    pub theme_list: Vec<(String, std::path::PathBuf)>,
+    /// Currently selected theme index in the theme selector
+    pub theme_selector_index: usize,
 }
 
 /// Scrollable popup state for multi-line shell-command stderr.
@@ -363,6 +368,8 @@ impl App {
             shell_history_index: None,
             shell_history_pending: None,
             shell_error_popup: None,
+            theme_list: Vec::new(),
+            theme_selector_index: 0,
         };
         let xlsx_formulas = std::mem::take(&mut app.document.xlsx_formulas);
         for ((row, col), raw) in xlsx_formulas {

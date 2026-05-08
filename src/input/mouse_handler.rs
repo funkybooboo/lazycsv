@@ -183,6 +183,10 @@ fn handle_left_click(app: &mut App, x: u16, y: u16) -> InputResult {
             sql_editor_move_cursor(app, x, y);
             InputResult::Continue
         }
+        Mode::ThemeSelector => {
+            crate::ui::theme_selector::handle_click(app, x, y);
+            InputResult::Continue
+        }
         _ => InputResult::Continue,
     }
 }
@@ -202,6 +206,14 @@ fn handle_double_click(app: &mut App, x: u16, y: u16) -> InputResult {
         if let Some(ed) = app.sql_vim_editor.as_mut() {
             ed.select_word_at_cursor();
         }
+        return InputResult::Continue;
+    }
+
+    // Theme selector: double-click applies the theme
+    if app.mode == Mode::ThemeSelector {
+        crate::ui::theme_selector::handle_click(app, x, y);
+        crate::input::theme_selector_mode::apply_selected_theme(app);
+        app.mode = Mode::Normal;
         return InputResult::Continue;
     }
 
@@ -444,6 +456,10 @@ fn handle_scroll(app: &mut App, up: bool) -> InputResult {
                 app.view_state.file_list_selected += 3;
                 // Clamping will be handled by the file list rendering
             }
+            InputResult::Continue
+        }
+        Mode::ThemeSelector => {
+            crate::input::theme_selector_mode::scroll_selection(app, if up { -1 } else { 1 });
             InputResult::Continue
         }
         _ => InputResult::Continue,

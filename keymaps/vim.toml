@@ -101,6 +101,7 @@ inherit = "none"
 "<space>q"   = "enter_sql_editor"
 "<space>m"   = "enter_magnifier"
 "<space>f"   = "enter_file_list"
+"<space>t"   = "enter_theme_selector"
 "gv"         = "reselect_visual"
 
 # Macros

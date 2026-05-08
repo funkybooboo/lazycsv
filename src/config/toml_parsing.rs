@@ -1,7 +1,7 @@
 //! TOML deserialization and config application.
 
 use ratatui::style::Color;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -9,7 +9,7 @@ use super::Config;
 
 // ── TOML deserialization types ─────────────────────────────────
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Serialize, Default)]
 pub(super) struct TomlConfig {
     #[serde(default)]
     pub(super) defaults: TomlDefaults,
@@ -27,7 +27,7 @@ pub(super) struct TomlConfig {
     pub(super) sql: TomlSql,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Serialize, Default)]
 pub(super) struct TomlDefaults {
     pub(super) delimiter: Option<String>,
     pub(super) encoding: Option<String>,
@@ -39,14 +39,14 @@ pub(super) struct TomlDefaults {
     pub(super) shell_history_limit: Option<usize>,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Serialize, Default)]
 pub(super) struct TomlUi {
     fg: Option<String>,
     bg: Option<String>,
     border_fg: Option<String>,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Serialize, Default)]
 pub(super) struct TomlTable {
     header_fg: Option<String>,
     header_bg: Option<String>,
@@ -61,7 +61,7 @@ pub(super) struct TomlTable {
     dirty_fg: Option<String>,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Serialize, Default)]
 pub(super) struct TomlPopup {
     bg: Option<String>,
     fg: Option<String>,
@@ -71,7 +71,7 @@ pub(super) struct TomlPopup {
     completion_sel_bg: Option<String>,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Serialize, Default)]
 pub(super) struct TomlStatus {
     fg: Option<String>,
     bg: Option<String>,
@@ -81,7 +81,7 @@ pub(super) struct TomlStatus {
     success_fg: Option<String>,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Serialize, Default)]
 pub(super) struct TomlFileMenu {
     dir_fg: Option<String>,
     highlight_fg: Option<String>,
@@ -94,7 +94,7 @@ pub(super) struct TomlFileMenu {
     preview_cols: Option<Vec<String>>,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Serialize, Default)]
 pub(super) struct TomlSql {
     format_uppercase: Option<bool>,
     sql_history_limit: Option<usize>,
@@ -243,7 +243,7 @@ pub fn dirs_path() -> Option<PathBuf> {
 
 /// Load and parse a TOML file.
 /// Returns Ok(None) if file doesn't exist, Ok(Some) on success, Err on parse failure.
-pub(super) fn load_toml_file(path: &Path) -> Result<Option<TomlConfig>, String> {
+pub(crate) fn load_toml_file(path: &Path) -> Result<Option<TomlConfig>, String> {
     let content = match std::fs::read_to_string(path) {
         Ok(c) => c,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -257,7 +257,7 @@ pub(super) fn load_toml_file(path: &Path) -> Result<Option<TomlConfig>, String> 
 
 /// Apply TOML values to a Config, overriding only specified fields.
 /// Collects warnings for invalid values (e.g. bad color strings, multi-char delimiters).
-pub(super) fn apply_toml(
+pub(crate) fn apply_toml(
     config: &mut Config,
     toml: &TomlConfig,
     path: &Path,
@@ -575,7 +575,7 @@ pub(super) fn validate_config(config: &Config, warnings: &mut Vec<String>) {
 ///   "gray", "darkgray", "lightred", "lightgreen", "lightyellow", "lightblue",
 ///   "lightmagenta", "lightcyan"
 /// - Hex RGB: "#1e1e1e", "#ff0000"
-pub(crate) fn parse_color(s: &str) -> Option<Color> {
+pub fn parse_color(s: &str) -> Option<Color> {
     let s = s.trim().to_lowercase();
 
     // Hex color
@@ -636,6 +636,143 @@ pub(crate) fn parse_color(s: &str) -> Option<Color> {
         "sandybrown" => Some(Color::Rgb(244, 164, 96)),
         "beige" => Some(Color::Rgb(245, 245, 220)),
         "antiquewhite" => Some(Color::Rgb(250, 235, 215)),
+        "reset" => Some(Color::Reset),
         _ => None,
     }
+}
+
+/// Convert a ratatui Color back to a config-file string.
+///
+/// Mirrors `parse_color` — every named color and hex RGB form round-trips.
+pub fn color_to_config_string(color: &Color) -> String {
+    match color {
+        Color::Reset => "reset".to_string(),
+        Color::Black => "black".to_string(),
+        Color::Red => "red".to_string(),
+        Color::Green => "green".to_string(),
+        Color::Yellow => "yellow".to_string(),
+        Color::Blue => "blue".to_string(),
+        Color::Magenta => "magenta".to_string(),
+        Color::Cyan => "cyan".to_string(),
+        Color::Gray => "gray".to_string(),
+        Color::DarkGray => "darkgray".to_string(),
+        Color::LightRed => "lightred".to_string(),
+        Color::LightGreen => "lightgreen".to_string(),
+        Color::LightYellow => "lightyellow".to_string(),
+        Color::LightBlue => "lightblue".to_string(),
+        Color::LightMagenta => "lightmagenta".to_string(),
+        Color::LightCyan => "lightcyan".to_string(),
+        Color::White => "white".to_string(),
+        Color::Rgb(r, g, b) => format!("#{:02x}{:02x}{:02x}", r, g, b),
+        Color::Indexed(i) => format!("indexed({})", i),
+    }
+}
+
+/// Build a `TomlConfig` from a runtime `Config`, converting colors back to
+/// their string representations. Used by the theme selector when persisting
+/// the active theme to `config.toml`.
+impl From<&Config> for TomlConfig {
+    fn from(cfg: &Config) -> Self {
+        let c = |color: &Color| color_to_config_string(color);
+        let maybe_c = |opt: &Option<Color>| opt.as_ref().map(color_to_config_string);
+
+        TomlConfig {
+            defaults: TomlDefaults {
+                delimiter: cfg.defaults.delimiter.map(|d| d.to_string()),
+                encoding: cfg.defaults.encoding.clone(),
+                zebra_striping: Some(cfg.defaults.zebra_striping),
+                max_column_width: Some(cfg.defaults.max_column_width),
+                undo_limit: Some(cfg.defaults.undo_limit),
+                show_footer: Some(cfg.defaults.show_footer),
+                command_history_limit: Some(cfg.defaults.command_history_limit),
+                shell_history_limit: Some(cfg.defaults.shell_history_limit),
+            },
+            ui: TomlUi {
+                fg: Some(c(&cfg.theme.ui.fg)),
+                bg: Some(c(&cfg.theme.ui.bg)),
+                border_fg: Some(c(&cfg.theme.ui.border_fg)),
+            },
+            table: TomlTable {
+                header_fg: Some(c(&cfg.theme.table.header_fg)),
+                header_bg: maybe_c(&cfg.theme.table.header_bg),
+                header_bold: Some(cfg.theme.table.header_bold),
+                zebra_bg: Some(c(&cfg.theme.table.zebra_bg)),
+                cursor_fg: Some(c(&cfg.theme.table.cursor_fg)),
+                cursor_bg: Some(c(&cfg.theme.table.cursor_bg)),
+                selection_fg: Some(c(&cfg.theme.table.selection_fg)),
+                selection_bg: Some(c(&cfg.theme.table.selection_bg)),
+                search_match_fg: Some(c(&cfg.theme.table.search_match_fg)),
+                search_match_bg: Some(c(&cfg.theme.table.search_match_bg)),
+                dirty_fg: Some(c(&cfg.theme.table.dirty_fg)),
+            },
+            popup: TomlPopup {
+                bg: Some(c(&cfg.theme.popup.bg)),
+                fg: Some(c(&cfg.theme.popup.fg)),
+                border_fg: Some(c(&cfg.theme.popup.border_fg)),
+                title_fg: Some(c(&cfg.theme.popup.title_fg)),
+                completion_sel_fg: Some(c(&cfg.theme.popup.completion_sel_fg)),
+                completion_sel_bg: Some(c(&cfg.theme.popup.completion_sel_bg)),
+            },
+            status: TomlStatus {
+                fg: Some(c(&cfg.theme.status.fg)),
+                bg: Some(c(&cfg.theme.status.bg)),
+                mode_fg: Some(c(&cfg.theme.status.mode_fg)),
+                mode_bg: Some(c(&cfg.theme.status.mode_bg)),
+                error_fg: Some(c(&cfg.theme.status.error_fg)),
+                success_fg: Some(c(&cfg.theme.status.success_fg)),
+            },
+            file_menu: TomlFileMenu {
+                dir_fg: Some(c(&cfg.theme.file_menu.dir_fg)),
+                highlight_fg: Some(c(&cfg.theme.file_menu.highlight_fg)),
+                highlight_bg: Some(c(&cfg.theme.file_menu.highlight_bg)),
+                separator_fg: Some(c(&cfg.theme.file_menu.separator_fg)),
+                status_bg: Some(c(&cfg.theme.file_menu.status_bg)),
+                status_mode_bg: Some(c(&cfg.theme.file_menu.status_mode_bg)),
+                status_accent_bg: Some(c(&cfg.theme.file_menu.status_accent_bg)),
+                active_indicator_fg: Some(c(&cfg.theme.file_menu.active_indicator_fg)),
+                preview_cols: Some(
+                    cfg.theme
+                        .file_menu
+                        .preview_cols
+                        .iter()
+                        .map(color_to_config_string)
+                        .collect(),
+                ),
+            },
+            sql: TomlSql {
+                format_uppercase: Some(cfg.sql.format_uppercase),
+                sql_history_limit: Some(cfg.sql.sql_history_limit),
+                line_number_fg: Some(c(&cfg.theme.sql.line_number_fg)),
+                diagnostic_error_fg: Some(c(&cfg.theme.sql.diagnostic_error_fg)),
+                diagnostic_warning_fg: Some(c(&cfg.theme.sql.diagnostic_warning_fg)),
+            },
+        }
+    }
+}
+
+/// Load a theme TOML file and apply it to a Config, returning any warnings.
+///
+/// This is the narrow public API for the theme selector — callers should not
+/// need to reach into `toml_parsing` internals.
+pub fn apply_theme_from_file(
+    config: &mut Config,
+    path: &Path,
+    warnings: &mut Vec<String>,
+) -> Result<Option<()>, String> {
+    match load_toml_file(path)? {
+        Some(toml) => {
+            apply_toml(config, &toml, path, warnings);
+            Ok(Some(()))
+        }
+        None => Ok(None),
+    }
+}
+
+/// Serialize a `Config` to a TOML string.
+///
+/// Uses `TomlConfig::from` to convert the runtime config back to its
+/// serializable form, then serializes with `toml::to_string_pretty`.
+pub fn config_to_toml_string(config: &Config) -> Result<String, toml::ser::Error> {
+    let toml_config = TomlConfig::from(config);
+    toml::to_string_pretty(&toml_config)
 }

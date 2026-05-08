@@ -358,7 +358,7 @@ pub const KEYBINDINGS: &[Keybinding] = &[
         modifiers: KeyModifiers::NONE,
         action: InputAction::EnterInsertMode,
         modes: &[Mode::Normal],
-        description: "Enter insert mode",
+        description: "Enter insert mode (cursor at start)",
     },
     Keybinding {
         key: KeyCode::Char('a'),

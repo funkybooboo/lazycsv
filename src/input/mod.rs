@@ -21,6 +21,7 @@ pub mod normal_mode;
 pub mod search_mode;
 pub mod sql_editor_mode;
 pub mod state;
+pub mod theme_selector_mode;
 pub mod visual_mode;
 
 pub use actions::{

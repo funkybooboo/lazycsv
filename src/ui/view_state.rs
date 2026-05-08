@@ -125,6 +125,10 @@ pub struct ViewState {
     /// Current directory for file browser (yazi-style navigation)
     pub current_directory: std::path::PathBuf,
 
+    /// Per-directory selected index (yazi-style memory: remembers which file
+    /// was selected when you return to a directory).
+    pub directory_selected: HashMap<std::path::PathBuf, usize>,
+
     /// Whether to show hidden files (dotfiles) in the file browser
     pub show_hidden_files: bool,
 
@@ -189,6 +193,7 @@ impl Default for ViewState {
             row_cond_fg: Vec::new(),
             current_directory: std::env::current_dir()
                 .unwrap_or_else(|_| std::path::PathBuf::from(".")),
+            directory_selected: HashMap::new(),
             visible_cols_count: 10, // default, updated each render frame
             show_footer_row: false,
             stats_overlay_visible: false,

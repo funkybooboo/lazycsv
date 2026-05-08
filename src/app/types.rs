@@ -27,6 +27,8 @@ pub enum Mode {
     Search,
     /// Prompt for file operations (rename, move, copy, create)
     FileOperationPrompt,
+    /// Theme selector modal (entered via :theme or T)
+    ThemeSelector,
 }
 
 /// Edit buffer for cell editing

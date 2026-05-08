@@ -333,6 +333,12 @@ fn build_status_text(app: &App, right_side: &str, pending_indicator: &str, width
             let right = "Enter: confirm | Esc: cancel ";
             build_three_part_status_line(&left, &center, right, width)
         }
+        crate::app::Mode::ThemeSelector => {
+            let left = " THEME SELECTOR".to_string();
+            let center = app.document.filename.clone();
+            let right = "Enter: apply | Esc: cancel | j/k: navigate ";
+            build_three_part_status_line(&left, &center, right, width)
+        }
     }
 }
 

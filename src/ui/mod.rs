@@ -9,6 +9,7 @@ pub mod sql_editor;
 pub mod stats_overlay;
 pub mod status_bar;
 pub mod table;
+pub mod theme_selector;
 pub mod utils;
 pub mod view_state;
 
@@ -128,6 +129,11 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     // Render context menu if active
     if let Some(ref menu) = app.context_menu {
         render_context_menu(frame, menu, &app.config.theme);
+    }
+
+    // Render theme selector modal if active
+    if app.mode == crate::app::Mode::ThemeSelector {
+        theme_selector::render(frame, app);
     }
 
     // Render the shell-command stderr popup last so it sits above everything.

@@ -245,9 +245,7 @@ fn run_main() -> Result<()> {
             let temp_path = save_stdin_to_tempfile()?;
             (temp_path.clone(), Some(temp_path))
         } else {
-            anyhow::bail!(
-                "No input file specified. Provide a file path or pipe data via stdin."
-            );
+            anyhow::bail!("No input file specified. Provide a file path or pipe data via stdin.");
         };
         let config = FileConfig::with_options(
             cli_args.delimiter,
