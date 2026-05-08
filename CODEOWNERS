@@ -1,0 +1,17 @@
+# CODEOWNERS
+
+# Default owners for everything
+*       @danastott @funkybooboo
+
+# Source code
+/src/    @danastott @funkybooboo
+
+# Documentation
+/docs/   @danastott @funkybooboo
+
+# Configuration
+/themes/ @danastott @funkybooboo
+/keymaps/ @danastott @funkybooboo
+
+# CI and release
+/.github/ @funkybooboo
