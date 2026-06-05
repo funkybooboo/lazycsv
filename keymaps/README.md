@@ -11,6 +11,7 @@ save — LazyCSV hot-reloads).
 | `vim.toml` | The default — vim-style modal editing. Built into the binary. |
 | `emacs.toml` | Readline-style: `Ctrl-f/b/n/p`, `Ctrl-a/e`, `Ctrl-w/u`, `Alt-x`, … |
 | `excel.toml` | Arrow-key navigation, `F2` to edit, `Ctrl-S/Z/Y`, `Tab`/`Enter` for data entry. |
+| `modeless.toml` | Minimal bindings for plain typing and arrow navigation. No command mode. |
 
 ## How to install
 

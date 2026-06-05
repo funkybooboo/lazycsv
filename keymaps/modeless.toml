@@ -1,0 +1,59 @@
+# LazyCSV — Modeless keymap
+#
+# Drop this file at `~/.config/lazycsv/keys.toml` (or `.lazycsv.toml` in the
+# project root) for a simplified, non-vim experience.
+#
+# This preset disables almost all vim-style letter bindings in Normal mode.
+# Use arrow keys to navigate and Enter / Tab / F2 to edit cells.
+
+[meta]
+inherit = "vim"
+
+# ─── Normal mode ─────────────────────────────────────────────────────────
+[normal]
+# Arrow-only navigation
+"h"          = ""
+"j"          = ""
+"k"          = ""
+"l"          = ""
+"w"          = ""
+"b"          = ""
+"e"          = ""
+"gg"         = ""
+"G"          = ""
+"0"          = ""
+"$"          = ""
+
+# Editing
+"<enter>"    = "cell_edit_at_end"
+"<f2>"       = "cell_replace_f2"
+"<del>"      = "cell_clear"
+
+# Clipboard & History
+"ctrl+s"     = "save"
+"ctrl+z"     = "undo"
+"ctrl+y"     = "redo"
+
+# Disable vim-isms
+"i"          = ""
+"a"          = ""
+"I"          = ""
+"A"          = ""
+"s"          = ""
+"r"          = ""
+"v"          = ""
+"V"          = ""
+"x"          = ""
+"u"          = ""
+"q"          = ""
+"@"          = ""
+":"          = ""
+"/"          = ""
+
+# ─── Insert mode ─────────────────────────────────────────────────────────
+[insert]
+"<enter>"        = "insert_commit_down"
+"shift+<enter>"  = "insert_commit_up"
+"<tab>"          = "insert_commit_tab"
+"shift+<tab>"    = "insert_commit_back_tab"
+"<esc>"          = "insert_cancel"
