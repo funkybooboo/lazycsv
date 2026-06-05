@@ -200,6 +200,14 @@ pub struct CliArgs {
     )]
     pub report_only: bool,
 
+    /// Output only the duplicate (redundant) rows.
+    #[arg(
+        long = "duplicates",
+        hide = true,
+        help = "Output only the redundant rows"
+    )]
+    pub duplicates: bool,
+
     /// Generate a CSV file with synthetic data (non-interactive mode).
     /// Requires -r <rows> and -c <columns>. Optionally -t <type> (default: random).
     /// Types: customer, sales, marketing, weather, scientific, random.
@@ -528,6 +536,8 @@ Examples:
   lazycsv data.csv -D=1,3                     Dedup by column indexes
   lazycsv data.csv -D=Name --keep-first       Keep first occurrence
   lazycsv data.csv -D=Name --report-only      Report duplicates only
+  lazycsv data.csv -D=Name --duplicates       Output redundant rows only
+  lazycsv data.csv -D=Name --duplicates -r    Count redundant rows
   lazycsv data.csv -D=Name -o out.csv         Write to file
 
 Options:
@@ -536,6 +546,8 @@ Options:
       --ignore-case    Case-insensitive comparison for VARCHAR values
       --report-only    Report duplicate rows instead of removing them
                        Output includes: row_number, original columns, dup_count
+      --duplicates     Output only the redundant rows (that would be removed)
+  -r, --rows           Print count of rows in the result instead of data
   -o, --output <FILE>  Write output to a file instead of stdout
 ";
 
@@ -810,5 +822,14 @@ mod tests {
         assert!(args.generate);
         assert!(!args.is_stats_flag()); // -g overrides stats meaning
         assert_eq!(args.gen_type(), "weather");
+    }
+
+    #[test]
+    fn test_cli_with_dedup_duplicates() {
+        let args = CliArgs::try_parse_from(["lazycsv", "data.csv", "-D", "--duplicates"]);
+        assert!(args.is_ok());
+        let args = args.unwrap();
+        assert!(args.dedup.is_some());
+        assert!(args.duplicates);
     }
 }

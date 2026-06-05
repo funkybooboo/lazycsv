@@ -42,7 +42,7 @@ A versioned checklist for building the LazyCSV TUI. Each version represents a de
 | v0.19.0 | Column Resize & Advanced Column Operations | [x] | 60+ |
 | v0.20.0 | Data Analysis, Statistics & Cell Formulas | [x] | 88 |
 | v0.24.0 | TUI Theming | [x] | 50 |
-| v0.24.1 | Customizable Keybindings | [ ] | TBD |
+| v0.24.1 | Customizable Keybindings | [x] | 68 |
 | v0.24.2 | Shell Command in File Browser | [x] | TBD |
 | v0.25.0 | Spreadsheet Support & CLI Tools | [x] | 13 |
 | v0.26.0 | SQL History, DuckDB VIEW Optimization & CLI Output Flag | [x] | - |

@@ -107,6 +107,20 @@ enum CompletionContext {
 
 /// Handle keyboard input in SQL editor mode
 pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
+    if let Some(result) = crate::input::keymap_dispatch::try_keymap(
+        app,
+        key,
+        crate::config::keys::KeymapScope::SqlEditor,
+        handle_raw,
+    )? {
+        return Ok(result);
+    }
+
+    handle_raw(app, key)
+}
+
+/// The legacy match-based SQL-editor handler.
+pub fn handle_raw(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     let editor = match app.sql_vim_editor.as_mut() {
         Some(e) => e,
         None => {

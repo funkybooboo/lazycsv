@@ -10,6 +10,20 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// Main entry point for magnifier mode input handling
 pub fn handle(app: &mut App, key: KeyEvent) -> Result<InputResult> {
+    if let Some(result) = crate::input::keymap_dispatch::try_keymap(
+        app,
+        key,
+        crate::config::keys::KeymapScope::Magnifier,
+        handle_raw,
+    )? {
+        return Ok(result);
+    }
+
+    handle_raw(app, key)
+}
+
+/// The legacy match-based magnifier-mode handler.
+pub fn handle_raw(app: &mut App, key: KeyEvent) -> Result<InputResult> {
     use crate::magnifier::MagnifierMode;
 
     let mag = match app.magnifier_state.as_mut() {

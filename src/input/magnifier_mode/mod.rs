@@ -13,7 +13,7 @@
 //! - `search`: Search within magnifier content (/, n, N)
 //! - `pending`: Pending operator state management
 
-mod handler;
+pub mod handler;
 mod mode_changes;
 mod motions;
 mod operators;

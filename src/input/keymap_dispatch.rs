@@ -423,9 +423,106 @@ pub fn execute(app: &mut App, action: Action) -> Result<Option<InputResult>> {
         FileListCopy => syn_file_list(app, KeyCode::Char('y'), KeyModifiers::NONE)?,
         FileListCreate => syn_file_list(app, KeyCode::Char('n'), KeyModifiers::NONE)?,
 
-        // ── Phase 2 stretch: deeper SQL / magnifier / file-list-shell
-        //    actions still fall through to the legacy match arms. They're
-        //    reachable; remapping them is queued for a follow-up.
+        // ── Magnifier mode ───────────────────────────────────────────
+        MagExit => syn_magnifier(app, KeyCode::Esc, KeyModifiers::NONE)?,
+        MagNavigateLeft => syn_magnifier(app, KeyCode::Char('h'), KeyModifiers::ALT)?,
+        MagNavigateRight => syn_magnifier(app, KeyCode::Char('l'), KeyModifiers::ALT)?,
+        MagNavigateUp => syn_magnifier(app, KeyCode::Char('k'), KeyModifiers::ALT)?,
+        MagNavigateDown => syn_magnifier(app, KeyCode::Char('j'), KeyModifiers::ALT)?,
+        MagRedo => syn_magnifier(app, KeyCode::Char('r'), KeyModifiers::CONTROL)?,
+        MagGotoFirstLine => syn_magnifier_chord(
+            app,
+            &[
+                (KeyCode::Char('g'), KeyModifiers::NONE),
+                (KeyCode::Char('g'), KeyModifiers::NONE),
+            ],
+        )?,
+        MagDeleteLine => syn_magnifier_chord(
+            app,
+            &[
+                (KeyCode::Char('d'), KeyModifiers::NONE),
+                (KeyCode::Char('d'), KeyModifiers::NONE),
+            ],
+        )?,
+        MagYankLine => syn_magnifier_chord(
+            app,
+            &[
+                (KeyCode::Char('y'), KeyModifiers::NONE),
+                (KeyCode::Char('y'), KeyModifiers::NONE),
+            ],
+        )?,
+        MagChangeLine => syn_magnifier_chord(
+            app,
+            &[
+                (KeyCode::Char('c'), KeyModifiers::NONE),
+                (KeyCode::Char('c'), KeyModifiers::NONE),
+            ],
+        )?,
+        MagSaveAndClose => syn_magnifier_chord(
+            app,
+            &[
+                (KeyCode::Char('Z'), KeyModifiers::SHIFT),
+                (KeyCode::Char('Z'), KeyModifiers::SHIFT),
+            ],
+        )?,
+        MagIndentRight => syn_magnifier_chord(
+            app,
+            &[
+                (KeyCode::Char('>'), KeyModifiers::NONE),
+                (KeyCode::Char('>'), KeyModifiers::NONE),
+            ],
+        )?,
+        MagIndentLeft => syn_magnifier_chord(
+            app,
+            &[
+                (KeyCode::Char('<'), KeyModifiers::NONE),
+                (KeyCode::Char('<'), KeyModifiers::NONE),
+            ],
+        )?,
+        MagFindForward => syn_magnifier(app, KeyCode::Char('f'), KeyModifiers::NONE)?,
+        MagFindBackward => syn_magnifier(app, KeyCode::Char('F'), KeyModifiers::SHIFT)?,
+        MagTillForward => syn_magnifier(app, KeyCode::Char('t'), KeyModifiers::NONE)?,
+        MagTillBackward => syn_magnifier(app, KeyCode::Char('T'), KeyModifiers::SHIFT)?,
+        MagReplaceChar => syn_magnifier(app, KeyCode::Char('r'), KeyModifiers::NONE)?,
+        MagEnterInsert => syn_magnifier(app, KeyCode::Char('i'), KeyModifiers::NONE)?,
+        MagEnterCommand => syn_magnifier(app, KeyCode::Char(':'), KeyModifiers::NONE)?,
+        MagEnterVisual => syn_magnifier(app, KeyCode::Char('v'), KeyModifiers::NONE)?,
+        MagSearch => syn_magnifier(app, KeyCode::Char('/'), KeyModifiers::NONE)?,
+        MagInsertExit => syn_magnifier(app, KeyCode::Esc, KeyModifiers::NONE)?,
+        MagInsertBackspace => syn_magnifier(app, KeyCode::Backspace, KeyModifiers::NONE)?,
+        MagInsertDelete => syn_magnifier(app, KeyCode::Delete, KeyModifiers::NONE)?,
+        MagInsertNewline => syn_magnifier(app, KeyCode::Enter, KeyModifiers::NONE)?,
+        MagInsertCursorLeft => syn_magnifier(app, KeyCode::Left, KeyModifiers::NONE)?,
+        MagInsertCursorRight => syn_magnifier(app, KeyCode::Right, KeyModifiers::NONE)?,
+        MagInsertCursorUp => syn_magnifier(app, KeyCode::Up, KeyModifiers::NONE)?,
+        MagInsertCursorDown => syn_magnifier(app, KeyCode::Down, KeyModifiers::NONE)?,
+        MagInsertCursorHome => syn_magnifier(app, KeyCode::Home, KeyModifiers::NONE)?,
+        MagInsertCursorEnd => syn_magnifier(app, KeyCode::End, KeyModifiers::NONE)?,
+        MagCmdExit => syn_magnifier(app, KeyCode::Esc, KeyModifiers::NONE)?,
+        MagCmdExecute => syn_magnifier(app, KeyCode::Enter, KeyModifiers::NONE)?,
+        MagVisualExit => syn_magnifier(app, KeyCode::Esc, KeyModifiers::NONE)?,
+        MagVisualMoveLeft => syn_magnifier(app, KeyCode::Char('h'), KeyModifiers::NONE)?,
+        MagVisualMoveRight => syn_magnifier(app, KeyCode::Char('l'), KeyModifiers::NONE)?,
+        MagVisualMoveUp => syn_magnifier(app, KeyCode::Char('k'), KeyModifiers::NONE)?,
+        MagVisualMoveDown => syn_magnifier(app, KeyCode::Char('j'), KeyModifiers::NONE)?,
+
+        // ── SQL Editor mode ──────────────────────────────────────────
+        SqlExit => syn_sql_editor(app, KeyCode::Esc, KeyModifiers::NONE)?,
+        SqlExecute => syn_sql_editor(app, KeyCode::Enter, KeyModifiers::CONTROL)?,
+        SqlFormat => syn_sql_editor(app, KeyCode::Char('f'), KeyModifiers::CONTROL)?,
+        SqlContextCompletion => syn_sql_editor(app, KeyCode::Tab, KeyModifiers::NONE)?,
+        SqlHistoryPopupOpen => syn_sql_editor(app, KeyCode::Char('h'), KeyModifiers::CONTROL)?,
+        SqlHistoryPopupUp => syn_sql_editor(app, KeyCode::Up, KeyModifiers::NONE)?,
+        SqlHistoryPopupDown => syn_sql_editor(app, KeyCode::Down, KeyModifiers::NONE)?,
+        SqlHistoryPopupSelect => syn_sql_editor(app, KeyCode::Enter, KeyModifiers::NONE)?,
+        SqlHistoryPopupDelete => syn_sql_editor(app, KeyCode::Char('d'), KeyModifiers::NONE)?,
+        SqlHistoryPopupClose => syn_sql_editor(app, KeyCode::Esc, KeyModifiers::NONE)?,
+        SqlCompletionNext => syn_sql_editor(app, KeyCode::Down, KeyModifiers::NONE)?,
+        SqlCompletionPrev => syn_sql_editor(app, KeyCode::Up, KeyModifiers::NONE)?,
+        SqlCompletionAccept => syn_sql_editor(app, KeyCode::Enter, KeyModifiers::NONE)?,
+        SqlCompletionDismiss => syn_sql_editor(app, KeyCode::Esc, KeyModifiers::NONE)?,
+        SqlHelp => syn_sql_editor(app, KeyCode::Char('?'), KeyModifiers::CONTROL)?,
+
         _ => return Ok(None),
     }
 
@@ -440,6 +537,26 @@ fn syn_normal_chord(app: &mut App, keys: &[(KeyCode, KeyModifiers)]) -> Result<(
         let ev = KeyEvent::new(code, mods);
         let _ = crate::input::normal_mode::handle_raw(app, ev)?;
     }
+    Ok(())
+}
+
+fn syn_magnifier(app: &mut App, code: KeyCode, modifiers: KeyModifiers) -> Result<()> {
+    let ev = KeyEvent::new(code, modifiers);
+    let _ = crate::input::magnifier_mode::handler::handle_raw(app, ev)?;
+    Ok(())
+}
+
+fn syn_magnifier_chord(app: &mut App, keys: &[(KeyCode, KeyModifiers)]) -> Result<()> {
+    for &(code, mods) in keys {
+        let ev = KeyEvent::new(code, mods);
+        let _ = crate::input::magnifier_mode::handler::handle_raw(app, ev)?;
+    }
+    Ok(())
+}
+
+fn syn_sql_editor(app: &mut App, code: KeyCode, modifiers: KeyModifiers) -> Result<()> {
+    let ev = KeyEvent::new(code, modifiers);
+    let _ = crate::input::sql_editor_mode::handle_raw(app, ev)?;
     Ok(())
 }
 
@@ -582,11 +699,9 @@ mod tests {
     #[test]
     fn unwired_action_returns_none() {
         let mut app = make_test_app();
-        // Pick an action that's intentionally still unwired in this phase
-        // (deep magnifier internals — not reachable from any preset's
-        // single-key bindings). Updating this list is fine if/when an
-        // action gets wired.
-        let result = execute(&mut app, Action::SqlHistoryPopupSelect).unwrap();
+        // Pick an action that's intentionally still unwired in this phase.
+        // Updating this list is fine if/when an action gets wired.
+        let result = execute(&mut app, Action::ShellExecute).unwrap();
         assert!(result.is_none());
     }
 

@@ -2206,18 +2206,24 @@ fn execute_dedup(dedup_spec: &str, cli_args: &cli::CliArgs) -> Result<()> {
         wtr.flush()?;
         report_output_file(cli_args, "Duplicate report");
     } else {
-        // Dedup mode: remove duplicates
+        // Dedup mode: remove duplicates (or show only duplicates if --duplicates is set)
+        let filter = if cli_args.duplicates {
+            "_rn > 1"
+        } else {
+            "_rn = 1"
+        };
         let dedup_sql = format!(
             "SELECT {cols} FROM (\
                 SELECT *, ROW_NUMBER() OVER (PARTITION BY {pk} ORDER BY _rownum {order}) AS _rn \
                 FROM (\
                     SELECT *, ROW_NUMBER() OVER () AS _rownum FROM \"{table}\"\
                 )\
-            ) WHERE _rn = 1 ORDER BY _rownum",
+            ) WHERE {filter} ORDER BY _rownum",
             cols = all_cols.join(", "),
             pk = partition_cols.join(", "),
             order = order,
-            table = escaped
+            table = escaped,
+            filter = filter
         );
 
         let col_count = all_columns.len();
@@ -2230,6 +2236,20 @@ fn execute_dedup(dedup_spec: &str, cli_args: &cli::CliArgs) -> Result<()> {
                 Ok(values)
             })
             .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+        let label = if cli_args.duplicates {
+            "Duplicate rows"
+        } else {
+            "Deduplicated output"
+        };
+
+        if cli_args.is_rows_flag() {
+            let count = rows.count();
+            let separator = detect_thousands_separator();
+            let mut writer = output_writer(cli_args)?;
+            writeln!(writer, "{}", format_number(count, separator))?;
+            return Ok(());
+        }
 
         // Write output — detect format from -o extension
         if let Some(out_path) = cli_args.output.as_deref().filter(|o| *o != "-") {
@@ -2248,7 +2268,7 @@ fn execute_dedup(dedup_spec: &str, cli_args: &cli::CliArgs) -> Result<()> {
                     .collect::<std::result::Result<Vec<_>, _>>()
                     .context("Failed to read dedup result")?;
                 lazycsv::export::export_to_file(format.unwrap(), path, &all_columns, &collected)?;
-                eprintln!("Deduplicated output exported to {}", path.display());
+                eprintln!("{} exported to {}", label, path.display());
             } else {
                 let mut wtr = csv::Writer::from_writer(output_writer(cli_args)?);
                 wtr.write_record(&all_columns)?;
@@ -2257,7 +2277,7 @@ fn execute_dedup(dedup_spec: &str, cli_args: &cli::CliArgs) -> Result<()> {
                     wtr.write_record(&values)?;
                 }
                 wtr.flush()?;
-                report_output_file(cli_args, "Deduplicated output");
+                report_output_file(cli_args, label);
             }
         } else {
             let mut wtr = csv::Writer::from_writer(output_writer(cli_args)?);

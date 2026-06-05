@@ -6,20 +6,52 @@ LazyCSV supports optional configuration via TOML files. It works great out of th
 
 LazyCSV loads configuration from two locations, merged in order:
 
-1. **Global config:** `~/.config/lazycsv/config.toml`
-2. **Per-directory config:** `.lazycsv.toml` in the current working directory
+1. **Global config:** `~/.config/lazycsv/config.toml` (defaults and themes)
+2. **Global keymap:** `~/.config/lazycsv/keys.toml` (custom keybindings)
+3. **Per-directory config:** `.lazycsv.toml` (overrides for both)
 
 Per-directory settings override global settings. Only specified fields are overridden — omitted fields keep their previous value.
 
 ### Platform-specific paths
 
-| Platform | Global config path |
-|----------|-------------------|
-| macOS | `~/.config/lazycsv/config.toml` |
-| Linux | `$XDG_CONFIG_HOME/lazycsv/config.toml` (or `~/.config/lazycsv/config.toml`) |
-| Windows | `%APPDATA%\lazycsv\config.toml` |
+| Platform | Config Directory |
+|----------|------------------|
+| macOS | `~/.config/lazycsv/` |
+| Linux | `$XDG_CONFIG_HOME/lazycsv/` (or `~/.config/lazycsv/`) |
+| Windows | `%APPDATA%\lazycsv\` |
 
-## All Config Options
+## Customizable Keybindings (`keys.toml`)
+
+LazyCSV's keybindings are data-driven. You can fully remap any action to any key sequence by creating a `keys.toml` file.
+
+### Keymap Schema
+
+The keymap is split into mode-scoped sections: `[normal]`, `[insert]`, `[visual]`, `[command]`, `[search]`, `[magnifier]`, `[file_list]`, `[sql_editor]`, and `[global]`.
+
+```toml
+[meta]
+# Options: "vim" (default), "none" (start blank)
+inherit = "vim"
+
+[normal]
+# Bind single keys
+"ctrl+s" = "save"
+# Bind multi-key chords
+"gg" = "goto_first_row"
+# Unbind a key
+"i" = ""
+
+[insert]
+"<enter>" = "insert_commit_down"
+```
+
+### Action Catalog
+
+Run the `:keys` command in-app to see a full list of every dispatchable action and its current binding.
+
+See [`keybindings.md`](keybindings.md) for a complete reference of the key sequence syntax and action IDs.
+
+## All Config Options (`config.toml`)
 
 ### `[defaults]`
 
