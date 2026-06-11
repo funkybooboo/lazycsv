@@ -541,6 +541,7 @@ pub fn load_csv_file_into_duckdb(
     file_path: &Path,
     table_name: &str,
     config: &FileConfig,
+    all_varchar: bool,
 ) -> Result<()> {
     let escaped_table = table_name.replace('"', "\"\"");
 
@@ -579,9 +580,14 @@ pub fn load_csv_file_into_duckdb(
 
     // Use a VIEW so DuckDB scans the CSV at query time with column/predicate pushdown.
     // No data is materialized into memory upfront.
+    let all_varchar_opt = if all_varchar {
+        ", all_varchar = true"
+    } else {
+        ""
+    };
     let sql = format!(
-        "CREATE VIEW \"{}\" AS SELECT * FROM read_csv('{}'{}{})",
-        escaped_table, path_str, header, delim
+        "CREATE VIEW \"{}\" AS SELECT * FROM read_csv('{}'{}{}{})",
+        escaped_table, path_str, header, delim, all_varchar_opt
     );
 
     conn.execute_batch(&sql).context(format!(
@@ -1081,7 +1087,7 @@ pub fn execute_query(
 
     for file_path in &referenced {
         let table_name = table_name_from_path(file_path);
-        if load_csv_file_into_duckdb(&conn, file_path, &table_name, config).is_err() {
+        if load_csv_file_into_duckdb(&conn, file_path, &table_name, config, false).is_err() {
             continue;
         }
     }
@@ -1147,7 +1153,7 @@ pub fn execute_query_to_file(
 
     for file_path in &referenced {
         let table_name = table_name_from_path(file_path);
-        if load_csv_file_into_duckdb(&conn, file_path, &table_name, config).is_err() {
+        if load_csv_file_into_duckdb(&conn, file_path, &table_name, config, false).is_err() {
             continue;
         }
     }
@@ -1189,7 +1195,7 @@ pub fn execute_query_to_doc_from_path(
 
     for file_path in &referenced {
         let table_name = table_name_from_path(file_path);
-        if load_csv_file_into_duckdb(&conn, file_path, &table_name, config).is_err() {
+        if load_csv_file_into_duckdb(&conn, file_path, &table_name, config, false).is_err() {
             continue;
         }
     }

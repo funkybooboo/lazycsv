@@ -296,7 +296,7 @@ fn parse_delimiter(s: &str) -> Result<u8, String> {
 ///
 /// Exits the program if invalid arguments are provided (handled by clap)
 pub fn parse_args() -> CliArgs {
-    match CliArgs::try_parse() {
+    let mut args = match CliArgs::try_parse() {
         Ok(args) => args,
         Err(e) => {
             // If --help is in the args and clap failed (e.g. missing value for -q),
@@ -310,7 +310,24 @@ pub fn parse_args() -> CliArgs {
             }
             e.exit();
         }
+    };
+
+    // clap's num_args=0..=1 greedily consumes the next positional arg as the flag's
+    // value when the flag appears before the filename (e.g. `lazycsv -r file.csv`).
+    // Detect this: a non-numeric value in -r/-c that looks like a filepath, and move
+    // it to `path` so both `lazycsv -r file.csv` and `lazycsv file.csv -r` work.
+    let is_filepath = |v: &str| !v.is_empty() && v.parse::<usize>().is_err();
+    if args.path.is_empty() {
+        if let Some(val) = args.rows.as_deref().filter(|v| is_filepath(v)) {
+            args.path.push(val.to_string());
+            args.rows = Some(String::new());
+        } else if let Some(val) = args.columns.as_deref().filter(|v| is_filepath(v)) {
+            args.path.push(val.to_string());
+            args.columns = Some(String::new());
+        }
     }
+
+    args
 }
 
 /// Detect which command flag is present in args for --help routing.

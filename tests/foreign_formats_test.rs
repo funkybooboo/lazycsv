@@ -342,7 +342,7 @@ fn test_query_parquet_via_duckdb() {
 
     let conn = duckdb::Connection::open_in_memory().unwrap();
     let config = lazycsv::session::FileConfig::default();
-    lazycsv::query::load_csv_file_into_duckdb(&conn, &path, "test", &config).unwrap();
+    lazycsv::query::load_csv_file_into_duckdb(&conn, &path, "test", &config, false).unwrap();
 
     let mut stmt = conn.prepare("SELECT count(*) FROM test").unwrap();
     let count: i64 = stmt.query_row([], |row| row.get(0)).unwrap();
@@ -356,7 +356,7 @@ fn test_query_json_via_duckdb() {
 
     let conn = duckdb::Connection::open_in_memory().unwrap();
     let config = lazycsv::session::FileConfig::default();
-    lazycsv::query::load_csv_file_into_duckdb(&conn, &path, "test", &config).unwrap();
+    lazycsv::query::load_csv_file_into_duckdb(&conn, &path, "test", &config, false).unwrap();
 
     let mut stmt = conn.prepare("SELECT count(*) FROM test").unwrap();
     let count: i64 = stmt.query_row([], |row| row.get(0)).unwrap();
@@ -370,7 +370,7 @@ fn test_query_ndjson_via_duckdb() {
 
     let conn = duckdb::Connection::open_in_memory().unwrap();
     let config = lazycsv::session::FileConfig::default();
-    lazycsv::query::load_csv_file_into_duckdb(&conn, &path, "test", &config).unwrap();
+    lazycsv::query::load_csv_file_into_duckdb(&conn, &path, "test", &config, false).unwrap();
 
     let mut stmt = conn.prepare("SELECT count(*) FROM test").unwrap();
     let count: i64 = stmt.query_row([], |row| row.get(0)).unwrap();
@@ -385,7 +385,7 @@ fn test_query_sqlite_via_duckdb() {
     let conn = duckdb::Connection::open_in_memory().unwrap();
     let config = lazycsv::session::FileConfig::default();
     // For sqlite, the table_name param is used as both view name and sqlite table name
-    lazycsv::query::load_csv_file_into_duckdb(&conn, &path, "users", &config).unwrap();
+    lazycsv::query::load_csv_file_into_duckdb(&conn, &path, "users", &config, false).unwrap();
 
     let mut stmt = conn.prepare("SELECT count(*) FROM users").unwrap();
     let count: i64 = stmt.query_row([], |row| row.get(0)).unwrap();

@@ -2,6 +2,24 @@
 
 All notable changes to LazyCSV will be documented in this file.
 
+## [0.24.5] - 2026-06-10
+
+### Changed
+- **Dedup performance**: `-D` now uses DuckDB's native `COPY (...) TO`
+  instead of row-by-row Rust iteration, letting DuckDB own the full
+  read → dedup → write pipeline. Default uses `ORDER BY (SELECT NULL)`
+  so DuckDB can parallelize freely; `--keep-first` still uses
+  deterministic file-order selection.
+- **Dedup type safety**: CSV is loaded with `all_varchar=true` in dedup
+  mode, preventing type inference errors on mixed-type columns (e.g. a
+  column that is usually numeric but contains `"-"`).
+
+### Fixed
+- `lazycsv -r file.csv` and `lazycsv -c file.csv` now work correctly
+  regardless of argument order. Previously clap would consume the
+  filename as the flag value when `-r`/`-c` appeared before the
+  positional argument.
+
 ## [0.24.4] - 2026-04-28
 
 ### Fixed

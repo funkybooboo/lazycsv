@@ -240,25 +240,25 @@ Download the latest release for your platform from [GitHub Releases](https://git
 
 **macOS (Apple Silicon)**
 ```bash
-curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.24.4-aarch64-apple-darwin.tar.gz | tar xz
+curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.24.5-aarch64-apple-darwin.tar.gz | tar xz
 sudo mv lazycsv /usr/local/bin/
 ```
 
 **macOS (Intel)**
 ```bash
-curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.24.4-x86_64-apple-darwin.tar.gz | tar xz
+curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.24.5-x86_64-apple-darwin.tar.gz | tar xz
 sudo mv lazycsv /usr/local/bin/
 ```
 
 **Linux (x86_64)**
 ```bash
-curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.24.4-x86_64-unknown-linux-gnu.tar.gz | tar xz
+curl -L https://github.com/funkybooboo/lazycsv/releases/latest/download/lazycsv-v0.24.5-x86_64-unknown-linux-gnu.tar.gz | tar xz
 sudo mv lazycsv /usr/local/bin/
 ```
 
 **Windows**
 
-Download `lazycsv-v0.24.4-x86_64-pc-windows-msvc.zip` from the [releases page](https://github.com/funkybooboo/lazycsv/releases/latest), extract, and add to your PATH.
+Download `lazycsv-v0.24.5-x86_64-pc-windows-msvc.zip` from the [releases page](https://github.com/funkybooboo/lazycsv/releases/latest), extract, and add to your PATH.
 
 ### Build from source
 

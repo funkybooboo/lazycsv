@@ -1755,7 +1755,7 @@ fn execute_stats_mode(cli_args: &cli::CliArgs) -> Result<()> {
 
     for (idx, file_path) in csv_files.iter().enumerate() {
         let table_name = lazycsv::query::table_name_from_path(file_path);
-        lazycsv::query::load_csv_file_into_duckdb(&conn, file_path, &table_name, &config)?;
+        lazycsv::query::load_csv_file_into_duckdb(&conn, file_path, &table_name, &config, false)?;
 
         if csv_files.len() > 1 {
             if idx > 0 {
@@ -2060,7 +2060,7 @@ fn execute_dedup(dedup_spec: &str, cli_args: &cli::CliArgs) -> Result<()> {
 
     let conn = Connection::open_in_memory().context("Failed to open DuckDB")?;
     let table_name = lazycsv::query::table_name_from_path(&file_path);
-    lazycsv::query::load_csv_file_into_duckdb(&conn, &file_path, &table_name, &config)?;
+    lazycsv::query::load_csv_file_into_duckdb(&conn, &file_path, &table_name, &config, true)?;
 
     let escaped = table_name.replace('"', "\"\"");
 
@@ -2152,9 +2152,6 @@ fn execute_dedup(dedup_spec: &str, cli_args: &cli::CliArgs) -> Result<()> {
         .map(|c| format!("\"{}\"", c.replace('"', "\"\"")))
         .collect();
 
-    // "last wins" means we want the highest row position; "first wins" the lowest
-    let order = if cli_args.keep_first { "ASC" } else { "DESC" };
-
     if cli_args.report_only {
         // Report mode: show all rows that have duplicates (count > 1), with row numbers
         let pk_col_names: Vec<String> = pk_columns
@@ -2212,30 +2209,32 @@ fn execute_dedup(dedup_spec: &str, cli_args: &cli::CliArgs) -> Result<()> {
         } else {
             "_rn = 1"
         };
-        let dedup_sql = format!(
-            "SELECT {cols} FROM (\
-                SELECT *, ROW_NUMBER() OVER (PARTITION BY {pk} ORDER BY _rownum {order}) AS _rn \
-                FROM (\
-                    SELECT *, ROW_NUMBER() OVER () AS _rownum FROM \"{table}\"\
-                )\
-            ) WHERE {filter} ORDER BY _rownum",
-            cols = all_cols.join(", "),
-            pk = partition_cols.join(", "),
-            order = order,
-            table = escaped,
-            filter = filter
-        );
-
-        let col_count = all_columns.len();
-        let mut stmt = conn.prepare(&dedup_sql)?;
-        let rows = stmt
-            .query_map([], |row| {
-                let values: Vec<String> = (0..col_count)
-                    .map(|i| lazycsv::query::duckdb_get_string(row, i))
-                    .collect();
-                Ok(values)
-            })
-            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        // --keep-first needs deterministic file-order selection, which requires _rownum.
+        // Default (no flag): use ORDER BY (SELECT NULL) so DuckDB can parallelize freely.
+        let dedup_sql = if cli_args.keep_first {
+            format!(
+                "SELECT {cols} FROM (\
+                    SELECT *, ROW_NUMBER() OVER (PARTITION BY {pk} ORDER BY _rownum ASC) AS _rn \
+                    FROM (\
+                        SELECT *, ROW_NUMBER() OVER () AS _rownum FROM \"{table}\"\
+                    )\
+                ) WHERE {filter} ORDER BY _rownum",
+                cols = all_cols.join(", "),
+                pk = partition_cols.join(", "),
+                table = escaped,
+                filter = filter
+            )
+        } else {
+            format!(
+                "SELECT * EXCLUDE (_rn) FROM (\
+                    SELECT *, ROW_NUMBER() OVER (PARTITION BY {pk} ORDER BY (SELECT NULL)) AS _rn \
+                    FROM \"{table}\"\
+                ) WHERE {filter}",
+                pk = partition_cols.join(", "),
+                table = escaped,
+                filter = filter
+            )
+        };
 
         let label = if cli_args.duplicates {
             "Duplicate rows"
@@ -2244,12 +2243,19 @@ fn execute_dedup(dedup_spec: &str, cli_args: &cli::CliArgs) -> Result<()> {
         };
 
         if cli_args.is_rows_flag() {
-            let count = rows.count();
+            let count_sql = format!("SELECT COUNT(*) FROM ({dedup_sql})");
+            let count: i64 = conn.query_row(&count_sql, [], |row| row.get(0))?;
             let separator = detect_thousands_separator();
             let mut writer = output_writer(cli_args)?;
-            writeln!(writer, "{}", format_number(count, separator))?;
+            writeln!(writer, "{}", format_number(count as usize, separator))?;
             return Ok(());
         }
+
+        // Delimiter string for COPY TO statement
+        let copy_delim = match cli_args.delimiter.map(|d| d as char).unwrap_or(',') {
+            '\t' => "\\t".to_string(),
+            c => c.to_string(),
+        };
 
         // Write output — detect format from -o extension
         if let Some(out_path) = cli_args.output.as_deref().filter(|o| *o != "-") {
@@ -2264,29 +2270,33 @@ fn execute_dedup(dedup_spec: &str, cli_args: &cli::CliArgs) -> Result<()> {
                         | lazycsv::export::ExportFormat::Xlsx
                 )
             ) {
-                let collected: Vec<Vec<String>> = rows
+                let col_count = all_columns.len();
+                let mut stmt = conn.prepare(&dedup_sql)?;
+                let collected: Vec<Vec<String>> = stmt
+                    .query_map([], |row| {
+                        Ok((0..col_count)
+                            .map(|i| lazycsv::query::duckdb_get_string(row, i))
+                            .collect())
+                    })
+                    .map_err(|e| anyhow::anyhow!("{}", e))?
                     .collect::<std::result::Result<Vec<_>, _>>()
                     .context("Failed to read dedup result")?;
                 lazycsv::export::export_to_file(format.unwrap(), path, &all_columns, &collected)?;
                 eprintln!("{} exported to {}", label, path.display());
             } else {
-                let mut wtr = csv::Writer::from_writer(output_writer(cli_args)?);
-                wtr.write_record(&all_columns)?;
-                for row_result in rows {
-                    let values = row_result.context("Failed to read dedup result row")?;
-                    wtr.write_record(&values)?;
-                }
-                wtr.flush()?;
+                // CSV output to file: use DuckDB COPY TO for native performance
+                let out_escaped = out_path.replace('\'', "''");
+                let copy_sql = format!(
+                    "COPY ({dedup_sql}) TO '{out_escaped}' (HEADER, DELIMITER '{copy_delim}')"
+                );
+                conn.execute_batch(&copy_sql)?;
                 report_output_file(cli_args, label);
             }
         } else {
-            let mut wtr = csv::Writer::from_writer(output_writer(cli_args)?);
-            wtr.write_record(&all_columns)?;
-            for row_result in rows {
-                let values = row_result.context("Failed to read dedup result row")?;
-                wtr.write_record(&values)?;
-            }
-            wtr.flush()?;
+            // stdout: use DuckDB COPY TO /dev/stdout for native performance
+            let copy_sql =
+                format!("COPY ({dedup_sql}) TO '/dev/stdout' (HEADER, DELIMITER '{copy_delim}')");
+            conn.execute_batch(&copy_sql)?;
         }
     }
 
