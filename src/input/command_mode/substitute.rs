@@ -161,7 +161,7 @@ fn split_by_delimiter(s: &str, delim: char) -> Vec<&str> {
 fn execute_substitute(app: &mut App, range: SubRange, sub: SubCommand) -> Result<InputResult> {
     // Build regex
     let regex = if sub.case_insensitive {
-        Regex::new(&format!("(?i){}", &sub.pattern))
+        Regex::new(&format!("(?i){}", sub.pattern))
     } else {
         Regex::new(&sub.pattern)
     };
